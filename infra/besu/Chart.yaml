@@ -1,0 +1,4 @@
+apiVersion: v1
+name: besu
+version: 0.0.1
+description: Deploys a besu node

@@ -1,0 +1,17 @@
+{
+  "0xb18C3D01CfAE68D8014458248b6AFccCBbc2331f": {
+    "privateKey": "<replace-with-local-bidder-private-key>",
+    "sealPrivateKey": "<replace-with-local-bidder-seal-private-key>",
+    "sealPublicKey": "<replace-with-local-bidder-seal-public-key>"
+  },
+  "0x8C7A8BE572bAddE00c3D3BdaF5bf11625738bb0D": {
+    "privateKey": "<replace-with-local-bidder-private-key>",
+    "sealPrivateKey": "<replace-with-local-bidder-seal-private-key>",
+    "sealPublicKey": "<replace-with-local-bidder-seal-public-key>"
+  },
+  "0x4774bE7da827F41FB97a5CACE0AB1D4eb43cb1C2": {
+    "privateKey": "<replace-with-local-bidder-private-key>",
+    "sealPrivateKey": "<replace-with-local-bidder-seal-private-key>",
+    "sealPublicKey": "<replace-with-local-bidder-seal-public-key>"
+  }
+}

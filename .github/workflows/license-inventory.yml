@@ -1,0 +1,34 @@
+name: Third-Party License Inventory
+
+on:
+  pull_request:
+    paths:
+      - "THIRD_PARTY_LICENSES.md"
+      - "scripts/verification/check-third-party-licenses.py"
+      - "contracts/foundry.toml"
+      - "services/nb-bond-api/package.json"
+      - "services/nb-bond-api/package-lock.json"
+      - "scripts/bid-encryption/package.json"
+      - "scripts/bid-encryption/package-lock.json"
+      - "scripts/bid-submitter/package.json"
+      - "scripts/bid-submitter/package-lock.json"
+      - "services/blockscout/bens-microservice/requirements.txt"
+      - "services/blockscout/bens-microservice/src/requirements.txt"
+      - "services/script-runner/notebook/requirements.txt"
+      - ".github/workflows/license-inventory.yml"
+  workflow_dispatch:
+
+jobs:
+  validate-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Validate curated third-party inventory
+        run: python3 scripts/verification/check-third-party-licenses.py

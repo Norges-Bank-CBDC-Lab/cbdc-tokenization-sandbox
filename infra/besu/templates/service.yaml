@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: besu
+  namespace: {{ .Values.namespace }}
+spec:
+  ports:
+    - port: 8545
+      targetPort: 8545
+      protocol: TCP
+      name: rpc-json-http
+    - port: 8546
+      targetPort: 8546
+      protocol: TCP
+      name: rpc-json-ws
+  selector:
+    app: besu
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consensus-ports
+  namespace: {{ .Values.namespace }}
+spec:
+  type: LoadBalancer
+  loadBalancerIP: {{ .Values.p2pHost | quote | default "127.0.0.1" }}
+  ports:
+    - name: p2p-tcp
+      port: 30303
+      protocol: TCP
+      targetPort: 30303
+    - name: p2p-udp
+      port: 30303
+      protocol: UDP
+      targetPort: 30303
+  selector:
+    app: besu
+---

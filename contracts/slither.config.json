@@ -1,0 +1,10 @@
+{
+    "detectors_to_exclude": [
+      "arbitrary-send-erc20",
+      "arbitrary-from-in-transferfrom",
+      "divide-before-multiply",
+      "incorrect-equality",
+      "reentrancy"
+    ],
+    "filter_paths": "dependencies"
+  }

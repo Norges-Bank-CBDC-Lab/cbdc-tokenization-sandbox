@@ -1,0 +1,23 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: besu
+  namespace: {{ .Values.namespace }}
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway
+    namespace: nginx-gateway
+    sectionName: rpc-json-http
+  hostnames:
+  - "besu.{{ .Values.rootDnsZone }}"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        # httpService allow us to plug in an authentication proxy
+        - name: {{ .Values.httpService }}
+          port: 8545

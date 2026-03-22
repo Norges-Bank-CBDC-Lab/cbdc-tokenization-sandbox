@@ -1,0 +1,35 @@
+name: Publication Hygiene
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".gitignore"
+      - "contracts/.env.example"
+      - "infra/besu/values.local.yaml"
+      - "services/nb-bond-api/helm/values.local.example.yaml"
+      - "scripts/bid-encryption/examples/**/*.json"
+      - "scripts/bid-submitter/examples/bids.keys.example.json"
+      - "scripts/generate-local-sandbox-fixtures.mjs"
+      - "scripts/verification/check-public-repo-hygiene.py"
+      - "scripts/verification/check-markdown-links.py"
+      - ".github/workflows/publication-hygiene.yml"
+  workflow_dispatch:
+
+jobs:
+  validate-publication-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Check public repo hygiene
+        run: python3 scripts/verification/check-public-repo-hygiene.py
+
+      - name: Check tracked markdown links
+        run: python3 scripts/verification/check-markdown-links.py

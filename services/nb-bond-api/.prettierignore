@@ -1,0 +1,7 @@
+dist
+node_modules
+.env*
+helm
+tests/**/*.js
+tests/**/*.js.map
+src/abi/*.json

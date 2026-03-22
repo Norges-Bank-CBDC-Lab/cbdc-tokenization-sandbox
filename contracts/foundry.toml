@@ -1,0 +1,24 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["dependencies"]
+solc = "0.8.29"
+evm_version = "london"
+bytecode_hash = "none" # cf https://book.getfoundry.sh/guides/deterministic-deployments-using-create2
+cbor_metadata = false
+# We find that optimizer is disabled (according to JSON in out/) unless explicitly enabled
+optimizer = true
+optimizer-runs = 200
+via_ir = true
+
+[dependencies]
+forge-std = "1.15.0"
+"@openzeppelin-contracts" = "5.3.0"
+"@openzeppelin-contracts-upgradeable" = "5.3.0"
+
+[rpc_endpoints]
+besu-local = "${BESU_LOCAL_RPC_URL}"
+anvil = "${ANVIL_RPC_URL}"
+
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

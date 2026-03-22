@@ -1,0 +1,17 @@
+# Local sandbox example only.
+# The start scripts can generate services/nb-bond-api/helm/values.local.yaml
+# automatically via node scripts/generate-local-sandbox-fixtures.mjs.
+# If you create it manually, keep the tracked file as a public-safe template.
+# Replace the placeholder secrets with base64-encoded private keys for local-only
+# sandbox accounts. Never commit or reuse real private keys outside local development.
+
+namespace: nb-bond-api
+nodeImage: node:25.6.0
+imagePullPolicy: IfNotPresent
+repoPath: /services/nb-bond-api
+env:
+  RPC_URL: http://besu.besu:8545
+  BOND_MANAGER_CONTRACT_NAME: "Bond Manager"
+secret:
+  BOND_ADMIN_PK: "<base64-encoded-local-sandbox-private-key>"
+  AUCTION_OWNER_SEAL_PK: "<base64-encoded-local-seal-private-key>"

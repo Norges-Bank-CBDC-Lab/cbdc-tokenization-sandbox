@@ -1,0 +1,5 @@
+{
+  "ciphertext": "<generate-from-a-local-sealed-bid>",
+  "plaintextHash": "<populate-from-the-local-sealed-bid-output>",
+  "privateKey": "<replace-with-generated-local-auction-seal-private-key>"
+}

@@ -1,0 +1,4 @@
+apiVersion: v1
+name: gateway
+version: 0.0.1
+description: Deploys an nginx api gateway

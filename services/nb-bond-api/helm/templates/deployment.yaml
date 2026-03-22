@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nb-bond-api
+  namespace: {{ .Values.namespace | default "nb-bond-api" }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: nb-bond-api
+  template:
+    metadata:
+      labels:
+        app: nb-bond-api
+    spec:
+      containers:
+        - name: nb-bond-api
+          image: {{ .Values.nodeImage | default "node:25.6.0"}}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          workingDir: /app
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -d node_modules ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
+                if [ -f package-lock.json ]; then
+                  npm ci
+                else
+                  npm install
+                fi
+              fi
+              if [ ! -d dist ] || [ ! -f dist/env-vars.js ] || ! grep -q "GLOBAL_REGISTRY_ADDRESS" dist/env-vars.js; then
+                npm run build
+              fi
+              mkdir -p data
+              touch data/ingestion.sqlite
+              npm start
+          envFrom:
+            - configMapRef:
+                name: nb-bond-api
+                optional: true
+            - secretRef:
+                name: nb-bond-api
+                optional: true
+          volumeMounts:
+            - name: nb-bond-api
+              mountPath: /app
+            - name: nb-bond-api-node-modules
+              mountPath: /app/node_modules
+      volumes:
+        - name: nb-bond-api
+          hostPath:
+            path: {{ .Values.repoPath | default "/" }}
+            type: DirectoryOrCreate
+        - name: nb-bond-api-node-modules
+          emptyDir: {}

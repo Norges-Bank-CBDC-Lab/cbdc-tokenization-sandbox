@@ -1,0 +1,17 @@
+# emacs
+*~
+
+# vscode
+/.vscode/
+**/.vscode/
+
+# deployment config
+/.env
+/contracts/.env
+/services/nb-bond-api/helm/values.local.yaml
+/scripts/bid-submitter/examples/bids.keys.json
+
+# local temp and OS metadata
+.DS_Store
+/.tmp/
+/.codex/

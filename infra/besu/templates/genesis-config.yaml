@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: besu-genesis
+  namespace: {{ .Values.namespace }}
+data:
+  genesis.json: {{- .Files.Get "config/genesis.json" | toYaml | indent 2 }}

@@ -1,0 +1,27 @@
+#
+# Central non-image version pins (charts, tooling versions, etc.).
+#
+# Intent:
+# - Keep chart versions in one place so upgrades are deliberate and repeatable.
+# - Avoid “implicit” updates when upstream charts change defaults.
+#
+# Usage:
+# - Update a chart version here.
+# - Redeploy the relevant component (or ./sandbox.sh start).
+#
+# Example (upgrade Blockscout chart):
+#   charts:
+#     blockscout_stack: 4.4.0
+#
+# Notes:
+# - Chart upgrades can introduce breaking changes; review upstream chart notes.
+# - Keep chart versions aligned with any image overrides you use.
+# - Version sources (check for new releases):
+#   - Blockscout stack chart: https://github.com/blockscout/helm-charts/releases
+#   - JupyterHub chart: https://jupyterhub.github.io/helm-chart/
+#   - NGINX Gateway Fabric chart: https://github.com/nginx/nginx-gateway-fabric/releases
+#
+charts:
+  blockscout_stack: 4.3.1
+  script_runner: 4.3.2
+  nginx_gateway_fabric: 2.4.1

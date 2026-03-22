@@ -1,0 +1,31 @@
+data-path={{ .Values.dataPath | quote }}
+logging={{ .Values.logging | quote }}
+
+host-allowlist=["*"]
+
+min-gas-price=0
+min-priority-fee=0
+network-id=2018
+
+rpc-http-cors-origins=["*"]
+rpc-http-enabled=true
+rpc-http-api=["ETH","NET","WEB3","ADMIN","DEBUG","TRACE","TXPOOL","CLIQUE"]
+rpc-http-host="0.0.0.0"
+rpc-http-port=8545
+rpc-ws-enabled=true
+rpc-ws-host="0.0.0.0"
+rpc-ws-port=8546
+
+sync-mode = "FULL"
+sync-min-peers=0
+data-storage-format="FOREST"
+
+tx-pool="SEQUENCED"
+tx-pool-no-local-priority=true
+bonsai-limit-trie-logs-enabled=false
+
+max-peers=25
+discovery-enabled=false
+p2p-enabled=true
+p2p-port=30303
+p2p-host={{ .Values.p2pHost | quote | default "127.0.0.1" }}

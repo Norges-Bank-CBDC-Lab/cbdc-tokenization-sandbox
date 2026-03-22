@@ -1,0 +1,69 @@
+name: Contracts CI
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+  workflow_dispatch:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    defaults:
+      run:
+        working-directory: ./contracts
+
+    name: Foundry project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: contracts
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@8789b3e21e6c11b2697f5eb56eddae542f746c10
+        with:
+          version: v1.5.1
+
+      - name: Show Forge version
+        run: |
+          forge --version
+
+      - name: Run Forge Soldeer Install
+        run: |
+          forge soldeer install
+        id: deps
+
+      - name: Run Forge fmt
+        run: |
+          forge fmt --check
+        id: fmt
+
+      - name: Run Forge build
+        run: |
+          forge build --sizes
+        id: build
+
+      - name: Check verify-latest mapping coverage
+        run: |
+          bash ./check-verify-latest-mapping.sh
+        id: verify-latest-mapping
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
+
+      - name: Run Slither static code analysis
+        uses: crytic/slither-action@b52cc1cbfee9ca3e8722dd5224299d16c9a6b80f
+        with:
+          target: ./contracts
+          fail-on: medium
+          slither-config: ./contracts/slither.config.json
+          slither-args: --filter-paths dependencies
+        id: slither

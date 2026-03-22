@@ -1,0 +1,12 @@
+namespace: besu
+rootDnsZone: "cbdc-sandbox.local"
+image: hyperledger/besu:26.1.0
+imagePullPolicy: IfNotPresent
+httpService: "besu"
+dataPath: /var/lib/besu
+# Set to DEBUG (or TRACE) temporarily when troubleshooting.
+logging: INFO
+# Populated from contracts/.env at deploy time so this tracked file stays public-safe.
+signerKey: "set-from-contracts-env-at-deploy-time"
+diskSize: "5Gi"
+p2pHost: "127.0.0.1"

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bens-service
+  namespace: blockscout
+spec:
+  selector:
+    app: bens
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8050
+  type: ClusterIP

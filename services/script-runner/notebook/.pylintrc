@@ -1,0 +1,8 @@
+[SIMILARITIES]
+min-similarity-lines=10 # avoid false positives
+
+[MESSAGES CONTROL]
+disable=missing-module-docstring, too-few-public-methods, too-many-instance-attributes, no-member, too-many-positional-arguments, broad-exception-caught, too-many-arguments, broad-exception-raised, unused-argument, unused-variable, too-many-locals, too-many-statements, too-many-branches, no-value-for-parameter, too-many-public-methods, too-many-lines
+
+[MAIN]
+source-roots=services/script-runner/notebook

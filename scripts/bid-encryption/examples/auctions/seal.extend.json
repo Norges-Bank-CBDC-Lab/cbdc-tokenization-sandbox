@@ -1,0 +1,62 @@
+[
+  {
+    "payload": {
+      "isin": "NO001DEMO000",
+      "bidder": "0xb18C3D01CfAE68D8014458248b6AFccCBbc2331f",
+      "nonce": "extend-1",
+      "rate": "9875",
+      "units": "100",
+      "salt": "0x11111111"
+    },
+    "signing": {
+      "chainId": "2018",
+      "verifyingContract": "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+      "auctionId": "0x722d3d2e29ec9177022f05144423704928a5787080f6018f2f8ba107dca748bb",
+      "bidderPrivateKey": "<replace-with-generated-local-bidder-private-key>",
+      "bidderNonce": "0"
+    },
+    "auctioneerPublicKey": "0x02bb5b47346ad274329f7a710362eae9230f83c6fb7c49027fafe668e9618371ea",
+    "bidderPublicKey": "0x0363c41b20416af28e1d06afd8e97441a84a6678276a7c61aeb789ca0804408f63",
+    "version": 1
+  },
+  {
+    "payload": {
+      "isin": "NO001DEMO000",
+      "bidder": "0x8C7A8BE572bAddE00c3D3BdaF5bf11625738bb0D",
+      "nonce": "extend-2",
+      "rate": "9860",
+      "units": "100",
+      "salt": "0x22222222"
+    },
+    "signing": {
+      "chainId": "2018",
+      "verifyingContract": "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+      "auctionId": "0x722d3d2e29ec9177022f05144423704928a5787080f6018f2f8ba107dca748bb",
+      "bidderPrivateKey": "<replace-with-generated-local-bidder-private-key>",
+      "bidderNonce": "1"
+    },
+    "auctioneerPublicKey": "0x02bb5b47346ad274329f7a710362eae9230f83c6fb7c49027fafe668e9618371ea",
+    "bidderPublicKey": "0x0305c0ccaf906a6e1e236ab8015b963e71596434e9c27f7dc11b06a0c5aac5269d",
+    "version": 1
+  },
+  {
+    "payload": {
+      "isin": "NO001DEMO000",
+      "bidder": "0x4774bE7da827F41FB97a5CACE0AB1D4eb43cb1C2",
+      "nonce": "extend-3",
+      "rate": "9850",
+      "units": "50",
+      "salt": "0x33333333"
+    },
+    "signing": {
+      "chainId": "2018",
+      "verifyingContract": "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+      "auctionId": "0x722d3d2e29ec9177022f05144423704928a5787080f6018f2f8ba107dca748bb",
+      "bidderPrivateKey": "<replace-with-generated-local-bidder-private-key>",
+      "bidderNonce": "2"
+    },
+    "auctioneerPublicKey": "0x02bb5b47346ad274329f7a710362eae9230f83c6fb7c49027fafe668e9618371ea",
+    "bidderPublicKey": "0x023383070a536da5dadabf5feead029b9c41ef2d9c52d59c4fdcca72b0649e8ba2",
+    "version": 1
+  }
+]

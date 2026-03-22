@@ -1,0 +1,17 @@
+# Compiler files
+/cache/
+/out/
+/.foundry-cache/
+/.home/
+
+# Ignores development broadcast logs
+/broadcast/
+
+# Soldeer
+/dependencies/
+
+# vscode
+/.vscode/
+
+# intellij
+/.idea/

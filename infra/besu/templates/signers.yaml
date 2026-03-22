@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: besu-key
+  namespace: {{ .Values.namespace }}
+data:
+  signer.key: {{ .Values.signerKey }}

@@ -1,0 +1,17 @@
+# Local sandbox values only.
+# These defaults target the CBDC sandbox's single-node Kind/Besu/Blockscout setup.
+# Never reuse them as production, staging, or internet-facing deployment values.
+
+# values for http route
+rootDnsZone: "cbdc-sandbox.local"
+frontendName: "blockscout-blockscout-stack-frontend-svc"
+frontendPort: 3000
+backendName: "blockscout-blockscout-stack-blockscout-svc"
+backendPort: 80
+bensName: "bens-service"
+bensPort: 80
+
+# values for db
+dbPassword: ps_user
+
+# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/398795a6fb05b95fd39a9da8c3e24bdf5122e4e3/charts/blockscout-stack/values.yaml

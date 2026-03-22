@@ -1,0 +1,4 @@
+server = "http://localhost:5001"
+
+[host."http://kind-registry:5000"]
+  capabilities = ["pull", "resolve", "push"]

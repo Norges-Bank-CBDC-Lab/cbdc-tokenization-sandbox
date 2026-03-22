@@ -1,0 +1,6 @@
+# cf https://z2jh.jupyter.org/en/stable/resources/reference.html
+
+singleuser:
+  extraEnv:
+    ROOT_DNS_ZONE: "cbdc-sandbox.local"
+    DATABASE_URL: "postgresql://ps_user:ps_user@postgres.blockscout.svc.cluster.local:5432/blockscout_db"

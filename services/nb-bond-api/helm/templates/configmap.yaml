@@ -1,0 +1,8 @@
+{{- if .Values.env }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nb-bond-api
+  namespace: {{ .Values.namespace | default "nb-bond-api" }}
+data: {{ .Values.env | toYaml| nindent 2 }}
+{{- end }}

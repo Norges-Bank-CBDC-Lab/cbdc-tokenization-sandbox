@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init-job
+  namespace: blockscout
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    spec:
+      containers:
+      - name: init-db
+        image: {{ .Values.dbImage }}
+        env:
+        - name: DATABASE_URL
+          value: {{ .Values.blockscout.env.DATABASE_URL }}
+        envFrom:
+          - secretRef:
+                name: environment
+        command:
+          - "/bin/bash"
+          - "-c"
+          - |
+            apt-get update && \
+            apt-get install -y python3-venv && \
+            python3 -m venv /opt/venv && \
+            source /opt/venv/bin/activate && \
+            pip3 install web3 && \
+            python3 /scripts/derive_addresses.py > /tmp/derived_addresses.txt && \
+            awk -F= '{
+              gsub(/"/, "", $1);
+              printf "INSERT INTO mapping (domain_name, address) VALUES (\x27%s\x27, \x27%s\x27);\n", $1, $2
+            }' /tmp/derived_addresses.txt > /tmp/insert_mapping.sql  && \
+            psql $DATABASE_URL -c "
+            CREATE TABLE IF NOT EXISTS mapping (
+                id SERIAL PRIMARY KEY,
+                domain_name VARCHAR(255) NOT NULL UNIQUE,
+                address VARCHAR(42) NOT NULL
+            );" && \
+            psql $DATABASE_URL -f /tmp/insert_mapping.sql
+        volumeMounts:
+        - mountPath: /scripts
+          name: derive-script
+      restartPolicy: OnFailure
+      volumes:
+      - name: derive-script
+        configMap:
+          name: derive-script-config
+  backoffLimit: 4

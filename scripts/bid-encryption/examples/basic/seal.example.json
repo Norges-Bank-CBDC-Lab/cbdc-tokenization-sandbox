@@ -1,0 +1,20 @@
+{
+  "payload": {
+    "isin": "NO0012345678",
+    "bidder": "0xb18C3D01CfAE68D8014458248b6AFccCBbc2331f",
+    "nonce": "bid-2",
+    "rate": "100000000000000000000",
+    "units": "500",
+    "salt": "0xffffffffffffff"
+  },
+  "auctioneerPublicKey": "0x02bb5b47346ad274329f7a710362eae9230f83c6fb7c49027fafe668e9618371ea",
+  "bidderPublicKey": "0x0363c41b20416af28e1d06afd8e97441a84a6678276a7c61aeb789ca0804408f63",
+  "signing": {
+    "chainId": "2018",
+    "verifyingContract": "0x8a791620dd6260079bf849dc5567adc3f2fdc318",
+    "auctionId": "0x8f78e70251da216bf3e810197eddb19a9892f0b9c8c9977cb92b894982e2e255",
+    "bidderPrivateKey": "<replace-with-generated-local-bidder-private-key>",
+    "bidderNonce": "1"
+  },
+  "version": 1
+}
