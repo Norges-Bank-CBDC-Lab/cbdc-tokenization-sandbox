@@ -46,6 +46,7 @@ License labels and deployment-time notes remain curated review items.
 | `babel-jest` | `30.3.0` | MIT |
 | `eslint` | `10.0.3` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
+| `globals` | `17.4.0` | MIT |
 | `jest` | `30.3.0` | MIT |
 | `prettier` | `3.8.1` | MIT |
 | `ts-jest` | `29.4.6` | MIT |
