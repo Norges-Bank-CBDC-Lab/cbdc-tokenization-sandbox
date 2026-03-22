@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: derive-script-config
+  namespace: blockscout
+data:
+  derive_addresses.py: |
+    import os
+    from web3 import Web3
+
+    def derive_address(private_key):
+        """
+        Derives a public Ethereum address from a given private key.
+        """
+        account = Web3().eth.account.from_key(private_key)
+        return account.address
+
+    if __name__ == "__main__":
+        # Filter private keys
+        pk_variables = {key: value for key, value in os.environ.items() if key.startswith("PK_")}
+        derived_addresses = {}
+        for key, private_key in pk_variables.items():
+            name_key = key.replace("PK_", "NAME_")
+            name = os.environ.get(name_key, None)
+            if private_key and name:
+                address = derive_address(private_key)
+                if address:
+                    derived_addresses[name] = address
+        # Output the derived addresses
+        for name, address in derived_addresses.items():
+            print(f"{name}={address}")

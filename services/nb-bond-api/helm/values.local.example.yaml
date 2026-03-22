@@ -1,0 +1,15 @@
+# Local sandbox example only.
+# Copy this file to services/nb-bond-api/helm/values.local.yaml before running
+# ./sandbox.sh start or ./services/nb-bond-api/nb-bond-api.sh start.
+# Replace the placeholder secret with a base64-encoded private key for a local-only
+# sandbox account. Never commit or reuse real private keys outside local development.
+
+namespace: nb-bond-api
+nodeImage: node:25.6.0
+imagePullPolicy: IfNotPresent
+repoPath: /services/nb-bond-api
+env:
+  RPC_URL: http://besu.besu:8545
+  BOND_MANAGER_CONTRACT_NAME: "Bond Manager"
+secret:
+  BOND_ADMIN_PK: "<base64-encoded-local-sandbox-private-key>"

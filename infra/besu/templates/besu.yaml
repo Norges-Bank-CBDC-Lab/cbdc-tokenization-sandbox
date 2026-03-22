@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: besu
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: besu
+    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  serviceName: "besu"
+  selector:
+    matchLabels:
+      app: besu
+  template:
+    metadata:
+      labels:
+        app: besu
+    spec:
+      containers:
+        - name: besu
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: json-rpc
+              containerPort: 8545
+            - name: json-rpc-ws
+              containerPort: 8546
+          volumeMounts:
+            - name: besu-data
+              mountPath: {{ .Values.dataPath }}
+            - name: besu-genesis
+              mountPath: /etc/genesis
+              readOnly: true
+            - name: besu-config
+              mountPath: /etc/besu
+              readOnly: true
+            - name: besu-key
+              mountPath: {{ .Values.dataPath }}/key
+              subPath: signer.key
+              readOnly: true
+          command:
+            - /opt/besu/bin/besu
+          args:
+            - --config-file=/etc/besu/config.toml
+            - --genesis-file=/etc/genesis/genesis.json
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 8545
+            initialDelaySeconds: 180
+            periodSeconds: 60
+      volumes:
+        - name: besu-data
+          persistentVolumeClaim:
+            claimName: besu-pvc
+        - name: besu-genesis
+          configMap:
+            name: besu-genesis
+            items:
+              - key: genesis.json
+                path: genesis.json
+        - name: besu-config
+          configMap:
+            name: besu-config
+        - name: besu-key
+          configMap:
+            name: besu-key
+            items:
+              - key: signer.key
+                path: signer.key

@@ -1,0 +1,4 @@
+apiVersion: v1
+name: nb-bond-api
+version: 0.0.1
+description: Deploys nb-bond-api

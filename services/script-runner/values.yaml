@@ -1,0 +1,98 @@
+# cf https://z2jh.jupyter.org/en/stable/resources/reference.html
+
+proxy:
+  service:
+    type: ClusterIP
+
+hub:
+  extraConfig:
+    # Modify pod.spec to load environment from K8s secret
+    # NOTE: secretRef.name must match the secret name created during sandbox setup
+    00-secret-environment: |
+      c.KubeSpawner.modify_pod_hook = lambda spawner, pod: modify_pod(spawner, pod)
+      def modify_pod(spawner, pod):
+        pod.spec.containers[0].env_from = [{ "secretRef": { "name": "environment" } }]
+        return pod
+    # add configmap with the current address of the contract registry
+    01-contract-registry: |
+      c.KubeSpawner.volumes.append(
+        {
+          'name': 'registry-contract-volume',
+          'configMap': {
+            'name': 'registry-contract',
+          }
+        }
+      )
+      c.KubeSpawner.volume_mounts.append(
+        {
+          'mountPath': '/work/registry-contract',
+          'name': 'registry-contract-volume',
+          'readOnly': True,
+        }
+      )
+    # add scripts, notebooks and contract abis
+    02-scripts-noteebooks-contracts: |
+      c.KubeSpawner.volumes.extend([
+        {
+          'name': 'scripts-volume',
+          'configMap': {
+            'name': 'scripts',
+          }
+        },
+        {
+          'name': 'notebooks-volume',
+          'configMap': {
+            'name': 'notebooks',
+          }
+        },
+        {
+          'name': 'contracts-volume',
+          'configMap': {
+            'name': 'contracts',
+          }
+        }
+      ])
+      c.KubeSpawner.volume_mounts.extend([
+        {
+          'mountPath': '/work/scripts.tar.gz',
+          'name': 'scripts-volume',
+          'subPath': 'scripts.tar.gz',
+          'readOnly': True,
+        },
+        {
+          'mountPath': '/work/notebooks.tar.gz',
+          'name': 'notebooks-volume',
+          'subPath': 'notebooks.tar.gz',
+          'readOnly': True,
+        },
+        {
+          'mountPath': '/work/contracts.tar.gz',
+          'name': 'contracts-volume',
+          'subPath': 'contracts.tar.gz',
+          'readOnly': True,
+        }
+      ])
+    # additional secrets/configmaps may be added (executed in alphanumeric order by key)
+    03-additional-config: |
+      pass
+
+singleuser:
+  defaultUrl: "lab/tree/info.ipynb"
+  image:
+    pullPolicy: IfNotPresent
+  extraFiles:
+    requirements:
+      mountPath: "/work/requirements.txt"
+  extraEnv:
+    NETWORK_HTTP_RPC_URL: "http://besu.besu.svc.cluster.local:8545"
+  lifecycleHooks:
+    postStart:
+      exec:
+        command:
+          - "bash"
+          - "-c"
+          - >
+            pip install -r /work/requirements.txt;
+            if [ ! -d "/home/jovyan/scripts" ]; then tar -xzvf /work/scripts.tar.gz -C /home/jovyan; fi;
+            if [ ! -d "/home/jovyan/contracts" ]; then tar -xzvf /work/contracts.tar.gz -C /home/jovyan; fi;
+            if [ ! -f "/home/jovyan/info.ipynb" ]; then tar -xzvf /work/notebooks.tar.gz -C /home/jovyan --strip-components=1; fi

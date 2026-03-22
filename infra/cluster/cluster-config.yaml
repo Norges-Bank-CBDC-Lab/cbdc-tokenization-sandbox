@@ -1,0 +1,39 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+containerdConfigPatches:
+  - |-
+    # Newer kindest/node images ship containerd configured with `registry.config_path`
+    # (certs.d style). Setting `registry.mirrors` alongside `config_path` breaks CRI
+    # init with: "mirrors cannot be set when config_path is provided".
+    #
+    # We rely on a `hosts.toml` mount under /etc/containerd/certs.d/kind/localhost:5001
+    # to map localhost:5001 -> kind-registry:5000 inside the kind network.
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d/kind"
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.32.11@sha256:5fc52d52a7b9574015299724bd68f183702956aa4a2116ae75a63cb574b35af8
+    extraPortMappings:
+      - containerPort: 31437
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 31438
+        hostPort: 443
+        protocol: TCP
+      - containerPort: 31439
+        hostPort: 8545
+        protocol: TCP
+      - containerPort: 31440
+        hostPort: 8546
+        protocol: TCP
+      - containerPort: 31441
+        hostPort: 8080
+        protocol: TCP
+    extraMounts:
+    # `hostPath` is resolved from the directory where `kind create cluster`
+    # is invoked. The sandbox helper runs that command from `infra/`, so this
+    # points at the tracked `infra/cluster/containerd-certs.d` directory.
+    - hostPath: ./cluster/containerd-certs.d
+      containerPath: /etc/containerd/certs.d/kind
+    - hostPath: ../services/nb-bond-api
+      containerPath: /services/nb-bond-api

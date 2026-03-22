@@ -1,0 +1,11 @@
+namespace: besu
+rootDnsZone: "cbdc-sandbox.local"
+image: hyperledger/besu:26.1.0
+imagePullPolicy: IfNotPresent
+httpService: "besu"
+dataPath: /var/lib/besu
+# Set to DEBUG (or TRACE) temporarily when troubleshooting.
+logging: INFO
+signerKey: "0188a5651493f70b740213dddd750590951a6a1d163636010e3dff1d66fd74aa"
+diskSize: "5Gi"
+p2pHost: "127.0.0.1"

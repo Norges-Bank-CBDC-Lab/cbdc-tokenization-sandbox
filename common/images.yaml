@@ -1,0 +1,41 @@
+#
+# Shared image versions used by the sandbox.
+#
+# Intent:
+# - Keep shared base image tags in one place so upgrades are predictable.
+# - Avoid “silent” changes from upstream chart defaults.
+#
+# Usage:
+# - Update the image tag here for images that are sourced from this file.
+# - Run: ./infra/infra.sh registry-sync
+# - Redeploy the affected component (or ./sandbox.sh start).
+#
+# Example (upgrade Postgres + BENS):
+#   blockscout:
+#     db: postgres:18.2
+#     bens: python:3.12.13
+#
+# Notes:
+# - Tags should be explicit (avoid ":latest") to keep builds reproducible.
+# - Some service-specific runtime images are pinned in the service config
+#   instead of here. Current example: Blockscout backend/frontend in
+#   services/blockscout/values.yaml.
+# - For multi-arch images, the registry sync will pull the correct platform.
+# - Version sources (check for new tags):
+#   - Besu: https://hub.docker.com/r/hyperledger/besu/tags
+#   - Postgres: https://hub.docker.com/_/postgres/tags
+#   - Python: https://hub.docker.com/_/python/tags
+#   - Jupyter base-notebook: https://quay.io/repository/jupyter/base-notebook?tab=tags
+#   - Node: https://hub.docker.com/_/node/tags
+#
+besu: hyperledger/besu:26.1.0
+
+blockscout:
+  db: postgres:18.1
+  bens: python:3.14.3
+
+script_runner:
+  base: quay.io/jupyter/base-notebook:notebook-7.5.3
+
+nb_bond_api:
+  base: node:25.6.0

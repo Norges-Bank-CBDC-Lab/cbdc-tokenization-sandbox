@@ -1,0 +1,8 @@
+# Node/npm
+node_modules/
+dist/
+build/
+.env
+
+# Local runtime data (sqlite + WAL/SHM, etc.)
+data/

@@ -1,0 +1,10 @@
+.ipynb_checkpoints/
+__pycache__/
+
+# in the notebooks directory, ignore all files except those ending in .ipynb
+# users will typically interact with the notebooks
+# and so there are extracted directly into the work directory of the user
+# (ie not within a "notebooks" directory)
+# and so in particular there should not be a contracts or scripts subdirectory here
+notebooks/*
+!notebooks/*.ipynb

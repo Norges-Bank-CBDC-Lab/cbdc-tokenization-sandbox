@@ -1,0 +1,157 @@
+# Local sandbox values only.
+# These defaults target the CBDC sandbox's single-node Kind/Besu/Blockscout setup.
+# Never reuse them as production, staging, or internet-facing deployment values.
+
+# Fallback image tags (overridden by common/images.yaml via common/helpers.sh)
+dbImage: postgres:18.1
+bensImage: python:3.14.3
+
+# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/398795a6fb05b95fd39a9da8c3e24bdf5122e4e3/charts/blockscout-stack/values.yaml
+config:
+  network:
+    id: 2018
+    name: Hyperledger Besu
+    shortname: Besu
+    currency:
+      name: ethNOK
+      symbol: ethNOK
+      decimals: 18
+      # if network uses dual token model like gnosis (in most case it should be set to false)
+      dualToken: false
+  account:
+    enabled: false
+  testnet: false
+  nameService:
+    enabled: false
+
+  ## If set to true will create service monitors for blockscout and stats
+  ##
+  prometheus:
+    enabled: false
+
+## Configuration options for backend
+##
+blockscout:
+  enabled: true
+  ## Replica count for indexer (if separate api is not used this replica count for deployment containing both indexer and api). Currently only one replica is supported
+  ##
+  # Conservative single-deployment local mode.
+  # Heavier indexer behavior is tuned down separately in values.backend.env.yaml.
+  replicaCount: 1
+  ## Image parametes
+  ##
+  image:
+    pullPolicy: IfNotPresent
+    # Pin to a specific Blockscout release to avoid drift from ":latest".
+    # Note: this may not exactly match the Helm chart appVersion.
+    repository: ghcr.io/blockscout/blockscout
+    tag: "v9.3.2"
+  ## Init container configuration (used to run DB migrations)
+  ##
+  init:
+    enabled: true
+    command:
+      - /bin/sh
+    args:
+      - -c
+      - bin/blockscout eval "Elixir.Explorer.ReleaseTasks.create_and_migrate()"
+  ## Run API service as separate deployment
+  ##
+  separateApi:
+    enabled: false
+    replicaCount: 1
+  command:
+    - /bin/sh
+  args:
+    - -c
+    - bin/blockscout start
+
+  terminationGracePeriodSeconds: 300
+  ## Liveness probe
+  ##
+  livenessProbe:
+    enabled: true
+    path: /api/health/liveness
+    params:
+      initialDelaySeconds: 100
+      periodSeconds: 100
+      timeoutSeconds: 30
+  ## Readiness probe
+  ##
+  readinessProbe:
+    enabled: true
+    path: /api/health/readiness
+    params:
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 60
+
+  service:
+    type: ClusterIP
+    port: 80
+  ## Configure ingress resource that allow you to access the blockscout installation.
+  ## ref: http://kubernetes.io/docs/user-guide/ingress/
+  ##
+  ingress:
+    enabled: false
+
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+
+frontend:
+  enabled: true
+  ## Image parametes
+  image:
+    pullPolicy: IfNotPresent
+    # Pin to a specific frontend release to avoid drift from ":latest".
+    repository: ghcr.io/blockscout/frontend
+    tag: "v2.6.0"
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  ingress:
+    enabled: false
+
+  resources:
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+  ## Liveness probe
+  ##
+  livenessProbe:
+    enabled: true
+    path: /api/healthz
+    params:
+      initialDelaySeconds: 100
+      periodSeconds: 100
+      timeoutSeconds: 30
+  ## Readiness probe
+  ##
+  readinessProbe:
+    enabled: true
+    path: /api/healthz
+    params:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 30
+stats:
+  enabled: false
+
+userOpsIndexer:
+  enabled: false
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true

@@ -1,0 +1,42 @@
+name: Pylint + Black
+
+on:
+  pull_request:
+    paths:
+      - "services/script-runner/notebook/**"
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Python linter (Pylint + Black)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+        cache: "pip"
+        cache-dependency-path: |
+          services/script-runner/notebook/requirements.txt
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r services/script-runner/notebook/requirements.txt
+
+    - name: Install linters
+      run: |
+        pip install pylint==3.3.7 "black[jupyter]"==25.1.0
+
+    - name: Analysing the code with pylint
+      run: |
+        pylint --rcfile=services/script-runner/notebook/.pylintrc services/script-runner/notebook
+
+    - name: Checking the code formatting with black
+      run: |
+        black --check --diff services/script-runner/notebook

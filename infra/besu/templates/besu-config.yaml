@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: besu-config
+  namespace: {{ .Values.namespace }}
+data:
+  config.toml: {{- include "config-toml-tpl" . | toYaml | indent 4 }}

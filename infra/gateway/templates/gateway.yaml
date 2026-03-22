@@ -1,0 +1,35 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+  - name: rpc-json-http
+    port: 8545
+    protocol: HTTP
+    hostname: "besu.{{ .Values.rootDnsZone }}"
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: blockscout-http
+    port: 80
+    protocol: HTTP
+    hostname: "blockscout.{{ .Values.rootDnsZone }}"
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: jupyterhub-http
+    port: 80
+    protocol: HTTP
+    hostname: "jupyterhub.{{ .Values.rootDnsZone }}"
+    allowedRoutes:
+      namespaces:
+        from: All
+  - name: nb-bond-api-http
+    port: 80
+    protocol: HTTP
+    hostname: "bond-api.{{ .Values.rootDnsZone }}"
+    allowedRoutes:
+      namespaces:
+        from: All

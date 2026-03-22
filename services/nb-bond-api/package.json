@@ -1,0 +1,45 @@
+{
+  "name": "nb-bond-api",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "clean:db": "rm -rf data && mkdir -p data && touch data/ingestion.sqlite",
+    "test": "jest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@noble/secp256k1": "3.0.0",
+    "better-sqlite3": "12.8.0",
+    "dotenv": "17.3.1",
+    "ethers": "6.16.0",
+    "express": "5.2.1",
+    "helmet": "8.1.0",
+    "winston": "3.19.0",
+    "zod": "4.3.6",
+    "zod-openapi": "5.4.6"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.0",
+    "@babel/preset-env": "7.29.2",
+    "@eslint/js": "10.0.1",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/express": "5.0.6",
+    "@types/jest": "30.0.0",
+    "@types/node": "25.5.0",
+    "babel-jest": "30.3.0",
+    "eslint": "10.0.3",
+    "eslint-config-prettier": "10.1.8",
+    "jest": "30.3.0",
+    "prettier": "3.8.1",
+    "ts-jest": "29.4.6",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.57.1"
+  }
+}
