@@ -22,7 +22,7 @@ inherits these rules and only adds what is specific to that folder.
 - Store post-mortem reports in `docs/post-mortems/` and add a link from the root README when created.
 - Keep a `docs/KNOWN_ISSUES.md` file for tracking known issues and follow-ups (create/update only when requested).
 - When making changes, check whether documentation needs an update and make it if required (see `docs/DOCUMENTATION_INDEX.md` for the key docs).
-- If you change dependency manifests, copied third-party material, or runtime image pins, update `THIRD_PARTY.md` and `THIRD_PARTY_LICENSES.md` as needed and run `python3 scripts/verification/check-third-party-licenses.py`.
+- If you change dependency manifests, copied third-party material, or runtime image pins, update `docs/THIRD_PARTY_NOTES.md` and `THIRD_PARTY_LICENSES.md` as needed and run `python3 scripts/verification/check-third-party-licenses.py`.
 - If you change public-facing docs or repo metadata, run `python3 scripts/verification/check-public-repo-hygiene.py` and `python3 scripts/verification/check-markdown-links.py`.
 
 ### Flag documentation (global)

@@ -188,6 +188,6 @@ to complement `sandbox.sh`, not replace the component-specific docs.
 
 This repository is licensed under Apache-2.0. See [LICENSE](LICENSE).
 
-For third-party provenance and dependency/license caveats, see
-[THIRD_PARTY.md](THIRD_PARTY.md) and
+For third-party provenance notes and dependency/license caveats, see
+[docs/THIRD_PARTY_NOTES.md](docs/THIRD_PARTY_NOTES.md) and
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
