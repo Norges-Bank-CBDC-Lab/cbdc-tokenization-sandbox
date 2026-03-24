@@ -1,12 +1,37 @@
-# Third-Party License Inventory
+# Third-Party Licenses
+
+This repository consists of files licensed under Apache-2.0 unless explicitly
+stated otherwise.
+
+The repository may be used alongside third-party components that are not part of
+this repository. Such components are not part of this repository, nor are they
+licensed to you by us. If you choose to use any such third-party components, you
+are solely responsible for complying with each component's corresponding
+open-source license terms.
+
+> ### Warning
+> If you link (statically or dynamically) any code in this repository with
+> components licensed under GPL-2.0 or GPL-3.0, the copyleft obligation may
+> extend to the combined work, requiring that the entire resulting program - if
+> distributed - be distributed under the applicable GPL license and that the
+> source code be made available in accordance with its requirements. Similarly,
+> if you statically link any code in this repository with components licensed
+> under LGPL, the copyleft obligation may equally extend to the combined work,
+> imposing the same distribution and source code requirements on the resulting
+> program. These are provided as examples only and do not constitute legal
+> advice. You are solely responsible for analyzing all implications of
+> incorporating third-party components under their respective open-source
+> license terms.
+
+## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
 deployment-time components used by this repository as of March 16, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
-adapted files kept in-tree, see `THIRD_PARTY.md`. For release artifacts, a
-generated dependency inventory should still be preferred over hand-maintained
-documentation.
+adapted files kept in-tree, generated code provenance, and related notes, see
+`docs/THIRD_PARTY_NOTES.md`. For release artifacts, a generated dependency
+inventory should still be preferred over hand-maintained documentation.
 
 The direct dependency tables below are validated in CI with
 `python3 scripts/verification/check-third-party-licenses.py`. That check verifies the
@@ -115,8 +140,8 @@ output and does not declare third-party npm dependencies.
 ## Deployment-Time Components
 
 This repository is intended to publish source code only. The components below
-are referenced, pulled, or deployed by the sandbox, but they are not
-distributed or relicensed by this source repository.
+are referenced by the sandbox, but they are not distributed or relicensed by
+this source repository.
 
 | Component | License | Notes |
 | --- | --- | --- |
@@ -127,14 +152,3 @@ distributed or relicensed by this source repository.
 | Blockscout Helm charts | GPL-3.0 | Pulled at deploy time |
 | Blockscout application | GPL-3.0 | Pulled at deploy time |
 | BusyBox image | GPL-2.0 | Referenced in `services/blockscout/templates/blockscout-migration-job.yaml` |
-
-## Notable Caveats
-
-- `psycopg2-binary` is more restrictive than Apache-2.0. If you distribute
-  images or environments that include it in the future, additional compliance
-  obligations may apply.
-- `caniuse-lite` appears as a transitive dev dependency in
-  `services/nb-bond-api/package-lock.json` and is labeled `CC-BY-4.0` in npm
-  metadata.
-- Third-party deployment-time software keeps its upstream license terms even
-  when this repository is Apache-2.0.

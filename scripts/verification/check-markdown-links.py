@@ -25,7 +25,9 @@ def tracked_markdown_files() -> list[Path]:
     for line in result.stdout.splitlines():
         if not line:
             continue
-        files.append(REPO_ROOT / line)
+        path = REPO_ROOT / line
+        if path.exists():
+            files.append(path)
     return files
 
 

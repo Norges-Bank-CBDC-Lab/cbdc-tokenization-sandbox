@@ -8,7 +8,7 @@ This file lists the documentation that is most likely to need updates when behav
 - `CONTRIBUTING.md`: Contribution workflow, validation expectations, and provenance rules.
 - `SECURITY.md`: Security reporting guidance and support scope.
 - `AGENTS.md`: Root repository guidance for AI coding agents and repo-aware automation.
-- `THIRD_PARTY.md`: File-level license exceptions and third-party deployment references.
+- `docs/THIRD_PARTY_NOTES.md`: File-level license exceptions and third-party deployment references.
 - `THIRD_PARTY_LICENSES.md`: Curated direct dependency and deployment-time license inventory.
 - `docs/ARCHITECTURE.md`: Component and workflow architecture (sandbox runtime, contracts, APIs, bid flow).
 - `docs/KNOWN_ISSUES.md`: Known issues and follow-ups.

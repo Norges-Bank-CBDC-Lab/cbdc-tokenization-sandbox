@@ -72,7 +72,7 @@ with the repository license.
 If you add or update third-party material:
 
 - preserve upstream SPDX identifiers, copyright notices, and attribution;
-- document copied or adapted files in `THIRD_PARTY.md`;
+- document copied or adapted files in `docs/THIRD_PARTY_NOTES.md`;
 - update `THIRD_PARTY_LICENSES.md` when direct dependencies or notable
   deployment-time components change;
 - avoid adding material under terms that are incompatible with the repository's

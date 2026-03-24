@@ -21,7 +21,7 @@ The current Jupyter footprint is broader than one optional UI service.
   `services/DEVELOPMENT.md`.
 - Documentation and provenance:
   `README.md`, `services/README.md`, `docs/ARCHITECTURE.md`,
-  `THIRD_PARTY.md`, `THIRD_PARTY_LICENSES.md`.
+  `docs/THIRD_PARTY_NOTES.md`, `THIRD_PARTY_LICENSES.md`.
 
 ## Removal Difficulty
 
@@ -162,7 +162,7 @@ Tasks:
   `README.md`, `services/README.md`, `services/DEVELOPMENT.md`,
   `docs/ARCHITECTURE.md`, `docs/KNOWN_ISSUES.md` if needed.
 - Remove or update Jupyter references from:
-  `services/AGENTS.md`, `THIRD_PARTY.md`, `THIRD_PARTY_LICENSES.md`.
+  `services/AGENTS.md`, `docs/THIRD_PARTY_NOTES.md`, `THIRD_PARTY_LICENSES.md`.
 - Remove references to notebook formatting and linting.
 
 Acceptance criteria:
@@ -220,7 +220,7 @@ Files very likely to change during removal:
 - `services/DEVELOPMENT.md`
 - `services/AGENTS.md`
 - `docs/ARCHITECTURE.md`
-- `THIRD_PARTY.md`
+- `docs/THIRD_PARTY_NOTES.md`
 - `THIRD_PARTY_LICENSES.md`
 - `.github/workflows/pylint.yml`
 - `services/script-runner/`
