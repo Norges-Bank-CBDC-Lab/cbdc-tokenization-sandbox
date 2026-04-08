@@ -76,7 +76,7 @@ License labels and deployment-time notes remain curated review items.
 | `prettier` | `3.8.1` | MIT |
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `5.9.3` | Apache-2.0 |
+| `typescript` | `6.0.2` | Apache-2.0 |
 | `typescript-eslint` | `8.58.1` | MIT |
 
 ### `scripts/bid-encryption`
