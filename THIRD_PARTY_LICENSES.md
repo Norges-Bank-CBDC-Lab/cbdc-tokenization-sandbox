@@ -54,7 +54,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.0.0` | MIT |
 | `better-sqlite3` | `12.8.0` | MIT |
-| `dotenv` | `17.4.0` | BSD-2-Clause |
+| `dotenv` | `17.4.1` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `helmet` | `8.1.0` | MIT |
@@ -77,7 +77,7 @@ License labels and deployment-time notes remain curated review items.
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
 | `typescript` | `5.9.3` | Apache-2.0 |
-| `typescript-eslint` | `8.58.0` | MIT |
+| `typescript-eslint` | `8.58.1` | MIT |
 
 ### `scripts/bid-encryption`
 
