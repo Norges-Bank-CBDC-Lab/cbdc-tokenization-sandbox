@@ -5,6 +5,7 @@ import process from "process";
 import {
   Contract,
   ContractTransactionReceipt,
+  ContractTransactionResponse,
   Interface,
   JsonRpcProvider,
   Wallet,
@@ -35,6 +36,14 @@ interface KeyEntry {
   privateKey: string;
 }
 
+interface BondAuctionSubmitter {
+  submitBid(
+    auctionId: string,
+    ciphertext: string,
+    plaintextHash: string,
+  ): Promise<ContractTransactionResponse>;
+}
+
 type KeyMap = Map<string, string>;
 
 const usage = `Usage:
@@ -59,7 +68,7 @@ async function main() {
       const bid = sealedBids[i];
 
       const signer = getSignerForBidder(bid.bidder, keyMap, provider);
-      const connected = contract.connect(signer);
+      const connected = contract.connect(signer) as unknown as BondAuctionSubmitter;
 
       console.log(`Submitting bid ${i} for bidder ${bid.bidder}`);
       const tx = await connected.submitBid(args.auctionId, bid.ciphertext, bid.plaintextHash);
