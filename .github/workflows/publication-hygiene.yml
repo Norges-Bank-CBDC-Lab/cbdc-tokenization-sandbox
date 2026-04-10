@@ -16,6 +16,9 @@ on:
       - ".github/workflows/publication-hygiene.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-publication-hygiene:
     runs-on: ubuntu-latest
