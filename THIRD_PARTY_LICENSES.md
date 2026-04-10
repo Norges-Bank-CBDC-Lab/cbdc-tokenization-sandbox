@@ -121,7 +121,7 @@ output and does not declare third-party npm dependencies.
 | Package | Version | License |
 | --- | --- | --- |
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
-| `web3` | `7.14.1` | MIT |
+| `web3` | `7.15.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
 | `ipython` | `9.10.0` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
