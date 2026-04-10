@@ -87,7 +87,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.5.2` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `5.9.3` | Apache-2.0 |
+| `typescript` | `6.0.2` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
