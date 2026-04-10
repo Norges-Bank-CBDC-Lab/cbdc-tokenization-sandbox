@@ -18,6 +18,9 @@ on:
       - ".github/workflows/license-inventory.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate-inventory:
     runs-on: ubuntu-latest
