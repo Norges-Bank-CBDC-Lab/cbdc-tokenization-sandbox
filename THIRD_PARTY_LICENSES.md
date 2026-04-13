@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of April 8, 2026.
+deployment-time components used by this repository as of April 13, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -67,13 +67,13 @@ License labels and deployment-time notes remain curated review items.
 | `@types/better-sqlite3` | `7.6.13` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `25.5.0` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `babel-jest` | `30.3.0` | MIT |
 | `eslint` | `10.2.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.4.0` | MIT |
+| `globals` | `17.5.0` | MIT |
 | `jest` | `30.3.0` | MIT |
-| `prettier` | `3.8.1` | MIT |
+| `prettier` | `3.8.2` | MIT |
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
 | `typescript` | `6.0.2` | Apache-2.0 |
@@ -85,7 +85,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.0.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.5.2` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
 | `typescript` | `6.0.2` | Apache-2.0 |
 
@@ -95,7 +95,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.0.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.5.2` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
 | `typescript` | `6.0.2` | Apache-2.0 |
 
