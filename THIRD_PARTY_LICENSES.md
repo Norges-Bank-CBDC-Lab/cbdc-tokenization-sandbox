@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of April 8, 2026.
+deployment-time components used by this repository as of April 13, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -52,7 +52,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `better-sqlite3` | `12.8.0` | MIT |
 | `dotenv` | `17.4.1` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
@@ -83,7 +83,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.5.2` | MIT |
 | `tsx` | `4.21.0` | MIT |
@@ -93,7 +93,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.5.2` | MIT |
 | `tsx` | `4.21.0` | MIT |
