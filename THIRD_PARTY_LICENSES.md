@@ -52,7 +52,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `better-sqlite3` | `12.8.0` | MIT |
 | `dotenv` | `17.4.1` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
@@ -83,7 +83,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
@@ -93,7 +93,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |

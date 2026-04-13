@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
-    "@noble/secp256k1": "3.0.0",
+    "@noble/secp256k1": "3.1.0",
     "better-sqlite3": "12.8.0",
     "dotenv": "17.4.1",
     "ethers": "6.16.0",

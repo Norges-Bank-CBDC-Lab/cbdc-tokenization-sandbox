@@ -7,7 +7,7 @@
     "submit": "tsx src/index.ts"
   },
   "dependencies": {
-    "@noble/secp256k1": "3.0.0",
+    "@noble/secp256k1": "3.1.0",
     "ethers": "6.16.0"
   },
   "devDependencies": {
