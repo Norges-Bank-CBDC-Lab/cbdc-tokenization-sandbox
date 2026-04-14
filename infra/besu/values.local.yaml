@@ -2,5 +2,8 @@
 # Keep machine-specific or secret values here when you need to override the
 # tracked defaults in values.yaml.
 
+# Populated from contracts/.env at deploy time so this tracked file stays public-safe.
+signerKey: "set-from-contracts-env-at-deploy-time"
+
 # Override this if your local sandbox uses a different DNS suffix.
 rootDnsZone: "cbdc-sandbox.local"
