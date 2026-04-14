@@ -25,7 +25,8 @@ Inherits the root `AGENTS.md`. This file covers infra-specific structure and sty
   - Blockscout backend/frontend pins: `services/blockscout/values.yaml`
 - Besu chart:
   - Chart: `infra/besu/Chart.yaml`
-  - Values: `infra/besu/values.local.yaml`
+  - Default values: `infra/besu/values.yaml`
+  - Local overrides: `infra/besu/values.local.yaml`
   - Templates: `infra/besu/templates/`
   - Config: `infra/besu/config/config.toml`
   - Genesis: `infra/besu/config/genesis.json`

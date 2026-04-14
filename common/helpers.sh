@@ -891,7 +891,16 @@ function loadImageToKind() {
 }
 
 function getBesuImage() {
-    default_image=$(yq -r '.image' $REPO_ROOT/infra/besu/values.local.yaml)
+    local local_image
+    local default_image
+
+    local_image=$(yq -r '.image // ""' $REPO_ROOT/infra/besu/values.local.yaml)
+    if [ -n "$local_image" ] && [ "$local_image" != "null" ]; then
+        default_image="$local_image"
+    else
+        default_image=$(yq -r '.image' $REPO_ROOT/infra/besu/values.yaml)
+    fi
+
     getImageValue "besu" "$default_image"
 }
 
