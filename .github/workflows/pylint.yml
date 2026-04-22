@@ -6,6 +6,9 @@ on:
       - "services/script-runner/notebook/**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     strategy:

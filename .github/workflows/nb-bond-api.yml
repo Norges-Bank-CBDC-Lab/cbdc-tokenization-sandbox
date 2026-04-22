@@ -6,6 +6,9 @@ on:
       - "services/nb-bond-api/**"
       - ".github/workflows/nb-bond-api.yml"
 
+permissions:
+  contents: read
+
 jobs:
   format-lint-test:
     runs-on: ubuntu-latest

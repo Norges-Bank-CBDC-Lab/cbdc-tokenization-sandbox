@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   const [rawMode, arg1, arg2, ...rest] = process.argv.slice(2);
   const mode = parseMode(rawMode);
   const inputPath = mode === "keygen" ? undefined : arg1;
-  let outputPath = mode === "keygen" ? arg1 : arg2;
+  let outputPath: string | undefined = mode === "keygen" ? arg1 : arg2;
   let extraArgs: string[] = rest;
 
   if ((mode === "encrypt" || mode === "decrypt") && outputPath?.startsWith("--")) {

@@ -1,0 +1,17 @@
+# Tracked defaults for the local Besu chart.
+# Keep the base image pin here so plain Helm renders and static scanners
+# resolve a concrete version instead of an unbounded template value.
+
+namespace: besu
+rootDnsZone: "cbdc-sandbox.local"
+# Pin to a specific Besu release to keep deploys reproducible.
+image: hyperledger/besu:26.1.0
+imagePullPolicy: IfNotPresent
+httpService: "besu"
+dataPath: /var/lib/besu
+# Set to DEBUG (or TRACE) temporarily when troubleshooting.
+logging: INFO
+# Populated from contracts/.env at deploy time so this tracked file stays public-safe.
+signerKey: "set-from-contracts-env-at-deploy-time"
+diskSize: "5Gi"
+p2pHost: "127.0.0.1"

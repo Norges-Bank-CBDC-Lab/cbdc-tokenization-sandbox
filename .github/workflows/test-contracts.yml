@@ -6,6 +6,9 @@ on:
       - "contracts/**"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   FOUNDRY_PROFILE: ci
 

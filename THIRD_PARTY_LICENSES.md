@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of March 16, 2026.
+deployment-time components used by this repository as of April 22, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -52,9 +52,9 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
-| `better-sqlite3` | `12.8.0` | MIT |
-| `dotenv` | `17.3.1` | BSD-2-Clause |
+| `@noble/secp256k1` | `3.1.0` | MIT |
+| `better-sqlite3` | `12.9.0` | MIT |
+| `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `helmet` | `8.1.0` | MIT |
@@ -67,37 +67,37 @@ License labels and deployment-time notes remain curated review items.
 | `@types/better-sqlite3` | `7.6.13` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `25.5.0` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `babel-jest` | `30.3.0` | MIT |
-| `eslint` | `10.0.3` | MIT |
+| `eslint` | `10.2.1` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.4.0` | MIT |
+| `globals` | `17.5.0` | MIT |
 | `jest` | `30.3.0` | MIT |
-| `prettier` | `3.8.1` | MIT |
-| `ts-jest` | `29.4.6` | MIT |
+| `prettier` | `3.8.3` | MIT |
+| `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `5.9.3` | Apache-2.0 |
-| `typescript-eslint` | `8.57.1` | MIT |
+| `typescript` | `6.0.2` | Apache-2.0 |
+| `typescript-eslint` | `8.59.0` | MIT |
 
 ### `scripts/bid-encryption`
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.5.0` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `5.9.3` | Apache-2.0 |
+| `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.0.0` | MIT |
+| `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.5.0` | MIT |
+| `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `5.9.3` | Apache-2.0 |
+| `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `services/blockscout/bens-microservice`
 
@@ -121,7 +121,7 @@ output and does not declare third-party npm dependencies.
 | Package | Version | License |
 | --- | --- | --- |
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
-| `web3` | `7.14.1` | MIT |
+| `web3` | `7.15.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
 | `ipython` | `9.10.0` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
