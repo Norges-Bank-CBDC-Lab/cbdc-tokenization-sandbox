@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of April 13, 2026.
+deployment-time components used by this repository as of April 22, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -54,7 +54,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `better-sqlite3` | `12.8.0` | MIT |
-| `dotenv` | `17.4.1` | BSD-2-Clause |
+| `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `helmet` | `8.1.0` | MIT |
@@ -69,15 +69,15 @@ License labels and deployment-time notes remain curated review items.
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `babel-jest` | `30.3.0` | MIT |
-| `eslint` | `10.2.0` | MIT |
+| `eslint` | `10.2.1` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.5.0` | MIT |
 | `jest` | `30.3.0` | MIT |
-| `prettier` | `3.8.2` | MIT |
+| `prettier` | `3.8.3` | MIT |
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
 | `typescript` | `6.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.58.1` | MIT |
+| `typescript-eslint` | `8.58.2` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -87,7 +87,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `6.0.2` | Apache-2.0 |
+| `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
@@ -97,7 +97,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `6.0.2` | Apache-2.0 |
+| `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `services/blockscout/bens-microservice`
 
