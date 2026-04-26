@@ -1,7 +1,7 @@
 ipywidgets==8.1.8
 web3==7.15.0
 eth-account==0.13.7
-ipython==9.10.0
+ipython==9.13.0
 pytz==2025.2
 plotly==6.5.2
 pandas==2.3.0
