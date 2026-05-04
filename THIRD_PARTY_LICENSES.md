@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of April 22, 2026.
+deployment-time components used by this repository as of May 4, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -62,22 +62,22 @@ License labels and deployment-time notes remain curated review items.
 | `zod` | `4.3.6` | MIT |
 | `zod-openapi` | `5.4.6` | MIT |
 | `@babel/core` | `7.29.0` | MIT |
-| `@babel/preset-env` | `7.29.2` | MIT |
+| `@babel/preset-env` | `7.29.3` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `babel-jest` | `30.3.0` | MIT |
-| `eslint` | `10.2.1` | MIT |
+| `eslint` | `10.3.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.5.0` | MIT |
+| `globals` | `17.6.0` | MIT |
 | `jest` | `30.3.0` | MIT |
 | `prettier` | `3.8.3` | MIT |
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `6.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.59.0` | MIT |
+| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript-eslint` | `8.59.1` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -121,13 +121,13 @@ output and does not declare third-party npm dependencies.
 | Package | Version | License |
 | --- | --- | --- |
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
-| `web3` | `7.15.0` | MIT |
+| `web3` | `7.16.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
-| `ipython` | `9.10.0` | BSD-3-Clause |
+| `ipython` | `9.13.0` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
 | `plotly` | `6.5.2` | MIT |
 | `pandas` | `2.3.0` | BSD-3-Clause |
-| `psycopg2-binary` | `2.9.11` | LGPL with exceptions |
+| `psycopg2-binary` | `2.9.12` | LGPL with exceptions |
 
 ## Direct Solidity Dependencies
 
