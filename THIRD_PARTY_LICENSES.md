@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of April 22, 2026.
+deployment-time components used by this repository as of May 4, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -121,13 +121,13 @@ output and does not declare third-party npm dependencies.
 | Package | Version | License |
 | --- | --- | --- |
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
-| `web3` | `7.15.0` | MIT |
+| `web3` | `7.16.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
-| `ipython` | `9.10.0` | BSD-3-Clause |
+| `ipython` | `9.13.0` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
 | `plotly` | `6.5.2` | MIT |
 | `pandas` | `2.3.0` | BSD-3-Clause |
-| `psycopg2-binary` | `2.9.11` | LGPL with exceptions |
+| `psycopg2-binary` | `2.9.12` | LGPL with exceptions |
 
 ## Direct Solidity Dependencies
 
