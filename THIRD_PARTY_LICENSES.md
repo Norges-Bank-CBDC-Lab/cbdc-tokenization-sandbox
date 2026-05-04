@@ -62,22 +62,22 @@ License labels and deployment-time notes remain curated review items.
 | `zod` | `4.3.6` | MIT |
 | `zod-openapi` | `5.4.6` | MIT |
 | `@babel/core` | `7.29.0` | MIT |
-| `@babel/preset-env` | `7.29.2` | MIT |
+| `@babel/preset-env` | `7.29.3` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
 | `babel-jest` | `30.3.0` | MIT |
-| `eslint` | `10.2.1` | MIT |
+| `eslint` | `10.3.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.5.0` | MIT |
+| `globals` | `17.6.0` | MIT |
 | `jest` | `30.3.0` | MIT |
 | `prettier` | `3.8.3` | MIT |
 | `ts-jest` | `29.4.9` | MIT |
 | `tsx` | `4.21.0` | MIT |
-| `typescript` | `6.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.59.0` | MIT |
+| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript-eslint` | `8.59.1` | MIT |
 
 ### `scripts/bid-encryption`
 
