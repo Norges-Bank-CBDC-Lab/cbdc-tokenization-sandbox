@@ -40,6 +40,6 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 - Keep Blockscout on published pinned images by default. Use `build-images.sh` only when intentionally testing upstream source changes locally.
 
 ### Flag documentation (services)
-- For service scripts that define environment flags (e.g., `USE_KIND_REGISTRY`), keep a banner comment block directly above the exports.
+- For service scripts that define environment flags (e.g., `DEPLOY_*`), keep a banner comment block directly above the exports.
 - If the banner is missing, create it; if it exists, add/update the flag entry.
 - Each banner line must describe what the flag does when set to `true` and when set to `false`.

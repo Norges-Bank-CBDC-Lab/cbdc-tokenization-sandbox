@@ -840,11 +840,9 @@ function loadImageToKind() {
     kind_image=$(toKindImageTag "$image")
     registry_image=$(tagForKindRegistry "$kind_image")
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        requireKindRegistry
-    fi
+    requireKindRegistry
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ] && [ "${FORCE_IMAGE_PULL:-false}" != "true" ]; then
+    if [ "${FORCE_IMAGE_PULL:-false}" != "true" ]; then
         if [ "$(kindRegistryHasImage "$kind_image")" == "true" ]; then
             echo "✅ Using cached registry image $registry_image"
             return 0
@@ -880,27 +878,7 @@ function loadImageToKind() {
         echo "✅ Tagged single-platform image as $kind_image"
     fi
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        pushImageToKindRegistry "$kind_image"
-        return 0
-    fi
-
-    # Load the image into Kind cluster with retries
-    echo "📦 Loading image $kind_image into Kind cluster..."
-    for i in {1..3}; do
-        if kind load docker-image "$kind_image" --name "$CLUSTER_NAME"; then
-            echo "✅ Successfully loaded image into cluster"
-            break
-        else
-            if [ $i -eq 3 ]; then
-                echo "⚠️ Failed to load image after 3 attempts. Will rely on cluster pull."
-            else
-                echo "⚠️ Attempt $i failed, retrying..."
-                sleep 2
-            fi
-        fi
-    done
-
+    pushImageToKindRegistry "$kind_image"
 }
 
 function getBesuImage() {
@@ -1040,12 +1018,8 @@ function deployBesu() {
     echo "🔍 Using Besu image: $BESU_IMAGE"
 
     loadImageToKind $BESU_IMAGE
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
-        echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
-    else
-        BESU_IMAGE_OVERRIDE="$BESU_IMAGE"
-    fi
+    BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
+    echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
 
     helm upgrade besu $REPO_ROOT/infra/besu \
          --install \
@@ -1173,11 +1147,8 @@ function deployScriptRunner() {
     echo "🔍 Using Script Runner image: $SCRIPTRUNNER_IMAGE"
 
     loadImageToKind $SCRIPTRUNNER_IMAGE
-    SCRIPTRUNNER_IMAGE_OVERRIDE="$SCRIPTRUNNER_IMAGE"
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        SCRIPTRUNNER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SCRIPTRUNNER_IMAGE")
-        echo "🔁 Using local registry image for Script Runner: $SCRIPTRUNNER_IMAGE_OVERRIDE"
-    fi
+    SCRIPTRUNNER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SCRIPTRUNNER_IMAGE")
+    echo "🔁 Using local registry image for Script Runner: $SCRIPTRUNNER_IMAGE_OVERRIDE"
     SCRIPTRUNNER_BASEIMAGE_NAME="$(imageRepo "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
     SCRIPTRUNNER_BASEIMAGE_TAG="$(imageTag "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
 
@@ -1225,21 +1196,14 @@ function deployBlockscout() {
     loadImageToKind $POSTGRES_IMAGE
     loadImageToKind $BENS_IMAGE
 
-    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE="$BLOCKSCOUT_FRONTEND_IMAGE"
-    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE="$BLOCKSCOUT_BACKEND_IMAGE"
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
-        BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
-        echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
-        echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
-        POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
-        BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
-        echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
-        echo "🔁 Using local registry image for python: $BENS_IMAGE_OVERRIDE"
-    else
-        POSTGRES_IMAGE_OVERRIDE="$POSTGRES_IMAGE"
-        BENS_IMAGE_OVERRIDE="$BENS_IMAGE"
-    fi
+    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
+    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
+    POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
+    BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
+    echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for python: $BENS_IMAGE_OVERRIDE"
 
     BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
     BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")

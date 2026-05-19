@@ -42,7 +42,6 @@ function printHelp() {
 # - DEPLOY_NB_BOND_API: true deploys NB Bond API; false skips the API service.
 # - DEPLOY_NB_UI: true deploys the NB UI frontend; false skips the operator UI.
 # - WAIT_FOR_APP_TIMEOUT_SECONDS: max seconds to wait; lower fails faster.
-# - USE_KIND_REGISTRY: true pushes/pulls via local registry; false loads directly.
 ################################################################################
 export DEPLOY_INFRA="true"
 export DEPLOY_CONTRACTS="true"
@@ -53,7 +52,6 @@ export DEPLOY_BLOCKSCOUT="true"
 export DEPLOY_NB_BOND_API="true"
 export DEPLOY_NB_UI="true"
 export WAIT_FOR_APP_TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-60}"
-export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
 
 function printServiceUrls() {
     title="SERVICE URLS (READY)"
@@ -151,9 +149,7 @@ if [ "$CMD" == "start" ]; then
     ensureLocalhostHostEntries
     deployedSomething="false"
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        requireKindRegistry
-    fi
+    requireKindRegistry
 
     # deploy infra
     if [ "$DEPLOY_INFRA" == "true" ]; then

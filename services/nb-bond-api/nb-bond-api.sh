@@ -49,14 +49,6 @@ if [ "$IS_SUBTASK" == "false" ]; then
     ensureLocalhostHostEntries
 fi
 
-################################################################################
-# OPTIONAL NB BOND API FLAGS (set before running this script)
-# - USE_KIND_REGISTRY: must be true; the chart pulls the locally-built image
-#                      from the kind registry. Set to false only if you're
-#                      replacing the build/push flow with something else.
-################################################################################
-export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
-
 if [[ $(clusterExists) == "false" ]]; then
     echo "Cluster '$CLUSTER_NAME' does not exists. Please start it first."
     exit 1

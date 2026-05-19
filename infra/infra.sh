@@ -57,11 +57,8 @@ fi
 if [ "$CMD" == "start" ]; then
     checkPrereqs
     ensureLocalhostHostEntries
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        requireKindRegistry
-    fi
+    requireKindRegistry
     createKindCluster
-    export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
 
     deployApiGateway
 
@@ -81,7 +78,6 @@ elif [ "$CMD" == "registry-start" ]; then
     ensureKindRegistry
 elif [ "$CMD" == "registry-sync" ]; then
     checkPrereqs
-    export USE_KIND_REGISTRY="true"
     ensureKindRegistry
     syncImagesToRegistry
 elif [ "$CMD" == "delete" ]; then

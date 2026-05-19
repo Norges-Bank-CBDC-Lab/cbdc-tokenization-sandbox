@@ -49,12 +49,6 @@ if [ "$IS_SUBTASK" == "false" ]; then
     ensureLocalhostHostEntries
 fi
 
-################################################################################
-# OPTIONAL BLOCKSCOUT FLAGS (set before running this script)
-# - USE_KIND_REGISTRY: true pushes/pulls via local registry; false loads directly.
-################################################################################
-export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
-
 if [[ $(clusterExists) == "false" ]]; then
     echo "Cluster '$CLUSTER_NAME' does not exists. Please start it first."
     exit 1
