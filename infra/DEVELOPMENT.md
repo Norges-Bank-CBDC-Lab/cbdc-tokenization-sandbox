@@ -146,11 +146,18 @@ assuming previous workarounds still apply.
 
 ## Security
 
-In the current sandbox setup, the following Besu endpoints are exposed without
-authentication for local development:
+In the current sandbox setup, the Besu JSON-RPC HTTP endpoint is exposed
+without authentication for local development:
 
 - `http://besu.cbdc-sandbox.local:8545/`
-- `ws://besu.cbdc-sandbox.local:8546/`
 
 Treat the infra layer as local-only. Do not expose it outside a trusted local
 development environment.
+
+Besu WebSocket (`ws://...:8546`) is not currently routed through the
+gateway: `infra/gateway/templates/gateway.yaml` defines no listener for
+port 8546, and the NodePort exposed by `infra/gateway/templates/nodeport-config.yaml`
+on host port 8546 maps to a gateway pod port the nginx-gateway pod does
+not bind. If WebSocket access is needed, either add a Gateway listener +
+HTTPRoute pair for port 8546, or use `kubectl port-forward` against the
+Besu service directly.
