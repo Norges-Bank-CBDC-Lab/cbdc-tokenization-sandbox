@@ -48,7 +48,13 @@ export function BondsPage({ navigate }) {
       title: 'Bond issued',
       body: `${result.isin} — issuing auction ${Fmt.shortHex(result.auctionId)}`,
     });
+    // First reload races the backend ingestion loop (default 3s tick): the
+    // create POST returns once the tx is mined, but ingestion may not have
+    // re-scanned the head block yet. Fire the immediate reload (so the UI
+    // updates as soon as the head IS ingested), then a delayed second one
+    // to cover the worst case where we just missed a tick.
     reload();
+    setTimeout(reload, 4000);
   }
 
   return (

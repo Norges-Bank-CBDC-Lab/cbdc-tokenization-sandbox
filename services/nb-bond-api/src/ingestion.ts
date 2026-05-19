@@ -472,6 +472,31 @@ async function processBlockRange(
   tx();
 }
 
+/**
+ * Compute the [from, to] block range an ingestion tick should process.
+ *
+ * `nextBlock` is the next block to process (== last processed + 1). `latest`
+ * is the chain head. Returns null when the chain hasn't produced anything new
+ * since the previous tick.
+ *
+ * Important: we DO process the single-block case where `latest === nextBlock`.
+ * The local sandbox runs Clique PoA which produces blocks only on activity,
+ * so the head sits at `nextBlock - 1 + 1 === nextBlock` for arbitrarily long
+ * stretches. Skipping that case (an earlier bug) left ingestion perpetually
+ * one block behind the head and silently lost any auction created during an
+ * idle stretch.
+ */
+export function computeIngestionWindow(
+  nextBlock: number,
+  latest: number,
+  batchSize = 500,
+): { from: number; to: number } | null {
+  if (latest < nextBlock) {
+    return null;
+  }
+  return { from: nextBlock, to: Math.min(latest, nextBlock + batchSize) };
+}
+
 export async function startIngestionLoop() {
   const db = openDatabase({ dbPath: envVariables.DB_PATH, readonly: false });
   const bondManagerAddress = await getBondManagerAddress();
@@ -488,14 +513,11 @@ export async function startIngestionLoop() {
   async function tick() {
     try {
       const latest = await provider.getBlockNumber();
-      const from = nextBlock;
-      const to = Math.min(latest, from + 500); // small batches
-      if (to < from) {
+      const window = computeIngestionWindow(nextBlock, latest);
+      if (!window) {
         return;
       }
-      if (to === from) {
-        return;
-      }
+      const { from, to } = window;
 
       logger.debug(`ingestion processing blocks [${from}, ${to}]`);
       await processBlockRange(db, bondManager, bondToken, from, to);

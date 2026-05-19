@@ -375,6 +375,17 @@ recreated. The image entrypoint touches `/app/data/ingestion.sqlite` on
 start so the read-side connection (opened in readonly mode at module load)
 does not race the writer-side schema creation.
 
+The ingestion loop polls every `POLL_INTERVAL_MS` (default 3 s) and
+processes blocks `[nextBlock, latest]` inclusive — the local Besu node uses
+Clique PoA, which produces blocks only on transaction activity, so the head
+sits at `nextBlock - 1 + 1 === nextBlock` for arbitrarily long idle stretches.
+The single-block case is handled in `computeIngestionWindow` so the head is
+not silently dropped on idle chains. Frontends that need the head block
+visible immediately after a write (see `services/nb-ui/src/pages/BondsPage.jsx`
+`handleCreated`) typically schedule a delayed second reload at ~one
+`POLL_INTERVAL_MS` past the immediate one to cover the worst-case race
+between the create POST returning and the next ingestion tick.
+
 ### 7.5 Cache behaviour
 
 Auction bid sets and computed allocations are cached in memory. On restart, the service attempts to hydrate auctions from chain by reading:

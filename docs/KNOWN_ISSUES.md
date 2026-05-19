@@ -50,19 +50,6 @@
   subset (with validation that the subset matches the previously-published
   `allocationHash` to prevent inconsistent on-chain state).
 
-## nb-ui: create-auction fails from the running frontend
-- After PR 3 landed, `web.cbdc-sandbox.local` loads and the bonds + auctions
-  indexes populate from the live NB Bond API, but issuing a new bond /
-  creating a new auction from the UI fails.
-- Root cause not yet diagnosed. Likely candidates: a frontend payload field
-  shape mismatch with `createAuctionRequestSchema`, a missing required
-  field, or a chain-side precondition (e.g. the issuer signer needs
-  pre-funded WNOK for issuing-auction simulation).
-- Planned follow-up: reproduce against `services/nb-bond-api` directly via
-  `curl POST /v1/bonds/{isin}/auctions`, capture the 400 / 500 response,
-  and either fix the frontend payload or extend the backend validation
-  message so the UI can surface a useful error.
-
 ## Repo has four sibling node_modules trees (~420 MB total)
 - `services/nb-bond-api/` (~173 MB), `services/nb-ui/` (~129 MB),
   `scripts/bid-encryption/` (~60 MB), `scripts/bid-submitter/` (~60 MB)
@@ -81,9 +68,9 @@
 - `./sandbox.sh build-images` only wraps
   `services/blockscout/build-images.sh`, which clones upstream Blockscout
   and builds the backend + frontend images from source as a fallback for
-  testing upstream changes. Other services that now use Dockerfile-based
-  local images (nb-ui today, nb-bond-api in the follow-up above) build
-  their images inside their own `<svc>.sh start`.
+  testing upstream changes. The other Dockerfile-based local services
+  (`services/nb-ui`, `services/nb-bond-api`) build their images inside
+  their own `<svc>.sh start`.
 - Planned follow-up: decide whether `./sandbox.sh build-images` should
   remain a Blockscout-only escape hatch, or grow to drive every
   per-service Docker build in one command (parallel `nb-ui.sh start
