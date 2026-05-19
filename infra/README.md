@@ -31,9 +31,9 @@ From `infra/`:
 
 `registry-start` creates or reuses the persistent local registry container, and
 `registry-sync` pushes the sandbox's pinned images into that registry for Kind
-to pull. Shared base images are pinned in `common/images.yaml`, while
-Blockscout backend and frontend images are pinned in
-`services/blockscout/values.yaml`.
+to pull. Sandbox deploy/build image pins are centralized in
+`common/images.yaml`, including Blockscout backend/frontend and shared base
+images.
 
 ## Current Sandbox Baseline
 

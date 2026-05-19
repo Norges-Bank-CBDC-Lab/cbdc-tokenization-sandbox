@@ -112,8 +112,8 @@ cd ..
 ./infra/infra.sh registry-sync
 ```
 
-Shared base images are pinned in `common/images.yaml`. Blockscout backend and
-frontend images are pinned in `services/blockscout/values.yaml`.
+Sandbox deploy/build image pins are centralized in `common/images.yaml`,
+including Blockscout backend/frontend and shared base images.
 
 7. Optional: generate the sandbox config file and edit deploy flags in
    `.env.sandbox` if you do not want the full stack. This writes the file to

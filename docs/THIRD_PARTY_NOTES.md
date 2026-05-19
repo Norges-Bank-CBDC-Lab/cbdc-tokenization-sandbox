@@ -40,6 +40,10 @@ pulled at build/deploy time. Current examples include:
 
 - Hyperledger Besu
 - NGINX Gateway Fabric
+- Docker Distribution Registry
+- Node.js runtime images
+- Python runtime images
+- PostgreSQL images
 - JupyterHub / Jupyter Docker Stacks
 - Blockscout charts and images
 - BusyBox image references in Helm templates

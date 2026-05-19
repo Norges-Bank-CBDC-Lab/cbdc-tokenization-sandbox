@@ -31,13 +31,13 @@ LOCAL_SANDBOX_FIXTURE_GENERATOR=$REPO_ROOT/scripts/generate-local-sandbox-fixtur
 BLOCKSCOUT_NAMESPACE=blockscout
 BLOCKSCOUT_DIR=$REPO_ROOT/services/blockscout
 BLOCKSCOUT_TMPDIR=$BLOCKSCOUT_DIR/.tmp
-BLOCKSCOUT_CHART_VERSION=4.3.1
+BLOCKSCOUT_CHART_VERSION=4.4.3
 BLOCKSCOUT_BENS_DIR=$BLOCKSCOUT_DIR/bens-microservice
 BENS_IMAGE=bens-microservice
 BENS_TAG=v1.0.0
 
 NB_BOND_API_NAMESPACE=nb-bond-api
-NB_BOND_API_BASEIMAGE=node:25.6.0
+NB_BOND_API_BASEIMAGE=node:24.15.0
 NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.yaml
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
 NB_UI_NAMESPACE=nb-ui
@@ -47,7 +47,7 @@ NB_UI_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
-KIND_REGISTRY_IMAGE=registry:2
+KIND_REGISTRY_IMAGE=registry:2.8.3
 KIND_REGISTRY_ENDPOINT="http://localhost:${KIND_REGISTRY_PORT}"
 
 OS_NAME=$(uname)
@@ -377,6 +377,9 @@ function toKindImageTag() {
 }
 
 function ensureKindRegistry() {
+    local registry_image
+    registry_image="$(getLocalRegistryImage)"
+
     if ! docker ps --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
         if docker ps -a --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
             docker start "${KIND_REGISTRY_NAME}" >/dev/null
@@ -385,7 +388,7 @@ function ensureKindRegistry() {
                 --restart=always \
                 -p "127.0.0.1:${KIND_REGISTRY_PORT}:5000" \
                 --name "${KIND_REGISTRY_NAME}" \
-                "${KIND_REGISTRY_IMAGE}" >/dev/null
+                "${registry_image}" >/dev/null
         fi
     fi
 
@@ -922,7 +925,7 @@ function getScriptRunnerChartVersion() {
 }
 
 function getNginxGatewayFabricVersion() {
-    getVersionValue "charts.nginx_gateway_fabric" "2.4.1"
+    getVersionValue "charts.nginx_gateway_fabric" "2.6.0"
 }
 
 function getBlockscoutDbImage() {
@@ -936,19 +939,35 @@ function getBlockscoutBensImage() {
 }
 
 function getBlockscoutFrontendImage() {
+    local repository
+    local tag
+    local default_image
+
     repository=$(yq -r '.frontend.image.repository // ""' $REPO_ROOT/services/blockscout/values.yaml)
     tag=$(yq -r '.frontend.image.tag // ""' $REPO_ROOT/services/blockscout/values.yaml)
     if [ -n "$repository" ] && [ "$repository" != "null" ] && [ -n "$tag" ] && [ "$tag" != "null" ]; then
-        echo "${repository}:${tag}"
+        default_image="${repository}:${tag}"
+    else
+        default_image=""
     fi
+
+    getImageValue "blockscout.frontend" "$default_image"
 }
 
 function getBlockscoutBackendImage() {
+    local repository
+    local tag
+    local default_image
+
     repository=$(yq -r '.blockscout.image.repository // ""' $REPO_ROOT/services/blockscout/values.yaml)
     tag=$(yq -r '.blockscout.image.tag // ""' $REPO_ROOT/services/blockscout/values.yaml)
     if [ -n "$repository" ] && [ "$repository" != "null" ] && [ -n "$tag" ] && [ "$tag" != "null" ]; then
-        echo "${repository}:${tag}"
+        default_image="${repository}:${tag}"
+    else
+        default_image=""
     fi
+
+    getImageValue "blockscout.backend" "$default_image"
 }
 
 function getScriptRunnerImage() {
@@ -960,8 +979,20 @@ function getNBBondApiImage() {
     getImageValue "nb_bond_api.base" "$NB_BOND_API_BASEIMAGE"
 }
 
-function getNBUIImage() {
+function getNBUINginxImage() {
     getImageValue "nb_ui.nginx" "$NB_UI_BASEIMAGE"
+}
+
+function getNBUIBuilderImage() {
+    getImageValue "nb_ui.builder" "$NB_BOND_API_BASEIMAGE"
+}
+
+function getLocalRegistryImage() {
+    if command -v yq >/dev/null 2>&1 && [ -f "$IMAGES_CONFIG" ]; then
+        getImageValue "local_registry" "$KIND_REGISTRY_IMAGE"
+    else
+        echo "$KIND_REGISTRY_IMAGE"
+    fi
 }
 
 function syncImagesToRegistry() {
@@ -973,7 +1004,10 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutBensImage)")
     images+=("$(getScriptRunnerImage)")
     images+=("$(getNBBondApiImage)")
-    images+=("$(getNBUIImage)")
+    # nb-ui Dockerfile stages: builder (node) + runtime (nginx-unprivileged).
+    # Pulled here so the local `docker build` works without internet.
+    images+=("$(getNBUIBuilderImage)")
+    images+=("$(getNBUINginxImage)")
 
     for image in "${images[@]}"; do
         if [ -n "$image" ] && [ "$image" != "null" ]; then
@@ -1166,28 +1200,11 @@ function composeBlockscoutChart() {
 }
 
 function deployBlockscout() {
-    # Extract blockscout image name from values file
-    BLOCKSCOUT_FRONTEND_REPOSITORY=$(yq -r '.frontend.image.repository' $REPO_ROOT/services/blockscout/values.yaml)
-    BLOCKSCOUT_FRONTEND_TAG=$(yq -r '.frontend.image.tag' $REPO_ROOT/services/blockscout/values.yaml)
-    if [ -z "$BLOCKSCOUT_FRONTEND_REPOSITORY" ] || [ "$BLOCKSCOUT_FRONTEND_REPOSITORY" == "null" ] || \
-       [ -z "$BLOCKSCOUT_FRONTEND_TAG" ] || [ "$BLOCKSCOUT_FRONTEND_TAG" == "null" ]; then
-        echo "ℹ️ Blockscout frontend image not pinned; skipping pre-load and relying on chart defaults."
-        BLOCKSCOUT_FRONTEND_IMAGE=""
-    else
-        BLOCKSCOUT_FRONTEND_IMAGE="${BLOCKSCOUT_FRONTEND_REPOSITORY}:${BLOCKSCOUT_FRONTEND_TAG}"
-        echo "🔍 Using blockscout frontend image: $BLOCKSCOUT_FRONTEND_IMAGE"
-    fi
+    BLOCKSCOUT_FRONTEND_IMAGE=$(getBlockscoutFrontendImage)
+    echo "🔍 Using blockscout frontend image: $BLOCKSCOUT_FRONTEND_IMAGE"
 
-    BLOCKSCOUT_BACKEND_REPOSITORY=$(yq -r '.blockscout.image.repository' $REPO_ROOT/services/blockscout/values.yaml)
-    BLOCKSCOUT_BACKEND_TAG=$(yq -r '.blockscout.image.tag' $REPO_ROOT/services/blockscout/values.yaml)
-    if [ -z "$BLOCKSCOUT_BACKEND_REPOSITORY" ] || [ "$BLOCKSCOUT_BACKEND_REPOSITORY" == "null" ] || \
-       [ -z "$BLOCKSCOUT_BACKEND_TAG" ] || [ "$BLOCKSCOUT_BACKEND_TAG" == "null" ]; then
-        echo "ℹ️ Blockscout backend image not pinned; skipping pre-load and relying on chart defaults."
-        BLOCKSCOUT_BACKEND_IMAGE=""
-    else
-        BLOCKSCOUT_BACKEND_IMAGE="${BLOCKSCOUT_BACKEND_REPOSITORY}:${BLOCKSCOUT_BACKEND_TAG}"
-        echo "🔍 Using blockscout backend image: $BLOCKSCOUT_BACKEND_IMAGE"
-    fi
+    BLOCKSCOUT_BACKEND_IMAGE=$(getBlockscoutBackendImage)
+    echo "🔍 Using blockscout backend image: $BLOCKSCOUT_BACKEND_IMAGE"
 
     POSTGRES_IMAGE=$(getBlockscoutDbImage)
     echo "🔍 Using postgres image: $POSTGRES_IMAGE"
@@ -1195,28 +1212,18 @@ function deployBlockscout() {
     BENS_IMAGE=$(getBlockscoutBensImage)
     echo "🔍 Using python image: $BENS_IMAGE"
 
-    if [ -n "$BLOCKSCOUT_FRONTEND_IMAGE" ]; then
-        loadImageToKind $BLOCKSCOUT_FRONTEND_IMAGE
-    fi
-    if [ -n "$BLOCKSCOUT_BACKEND_IMAGE" ]; then
-        loadImageToKind $BLOCKSCOUT_BACKEND_IMAGE
-    fi
+    loadImageToKind $BLOCKSCOUT_FRONTEND_IMAGE
+    loadImageToKind $BLOCKSCOUT_BACKEND_IMAGE
     loadImageToKind $POSTGRES_IMAGE
     loadImageToKind $BENS_IMAGE
 
+    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE="$BLOCKSCOUT_FRONTEND_IMAGE"
+    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE="$BLOCKSCOUT_BACKEND_IMAGE"
     if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        if [ -n "$BLOCKSCOUT_FRONTEND_IMAGE" ]; then
-            BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
-            BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
-            BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
-            echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
-        fi
-        if [ -n "$BLOCKSCOUT_BACKEND_IMAGE" ]; then
-            BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
-            BLOCKSCOUT_BACKEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
-            BLOCKSCOUT_BACKEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
-            echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
-        fi
+        BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
+        BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
+        echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
+        echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
         POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
         BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
         echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
@@ -1225,6 +1232,11 @@ function deployBlockscout() {
         POSTGRES_IMAGE_OVERRIDE="$POSTGRES_IMAGE"
         BENS_IMAGE_OVERRIDE="$BENS_IMAGE"
     fi
+
+    BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
+    BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
+    BLOCKSCOUT_BACKEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
+    BLOCKSCOUT_BACKEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
 
     # deploy postgres db and blockscout
     helm upgrade blockscout $BLOCKSCOUT_TMPDIR/blockscout-stack \
@@ -1361,7 +1373,7 @@ function deployNBUI() {
         popd >/dev/null
     fi
 
-    NB_UI_BASEIMAGE_RESOLVED="$(getNBUIImage)"
+    NB_UI_BASEIMAGE_RESOLVED="$(getNBUINginxImage)"
     loadImageToKind "$NB_UI_BASEIMAGE_RESOLVED"
     NB_UI_IMAGE_OVERRIDE="$NB_UI_BASEIMAGE_RESOLVED"
     if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then

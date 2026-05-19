@@ -2,7 +2,7 @@
   "name": "bid-encryption",
   "private": true,
   "license": "Apache-2.0",
-  "packageManager": "npm@11.7.0",
+  "packageManager": "npm@11.14.1",
   "scripts": {
     "encrypt": "tsx src/index.ts encrypt",
     "decrypt": "tsx src/index.ts decrypt",
@@ -12,9 +12,12 @@
     "@noble/secp256k1": "3.1.0",
     "ethers": "6.16.0"
   },
+  "overrides": {
+    "ws": "8.20.1"
+  },
   "devDependencies": {
-    "@types/node": "25.6.0",
-    "tsx": "4.21.0",
+    "@types/node": "24.12.4",
+    "tsx": "4.22.3",
     "typescript": "6.0.3"
   }
 }

@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of May 4, 2026.
+deployment-time components used by this repository as of May 19, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -53,33 +53,33 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
-| `better-sqlite3` | `12.9.0` | MIT |
+| `better-sqlite3` | `12.10.0` | MIT |
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `helmet` | `8.1.0` | MIT |
 | `winston` | `3.19.0` | MIT |
-| `zod` | `4.3.6` | MIT |
+| `zod` | `4.4.3` | MIT |
 | `zod-openapi` | `5.4.6` | MIT |
 | `@babel/core` | `7.29.0` | MIT |
-| `@babel/preset-env` | `7.29.3` | MIT |
+| `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
 | `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `25.6.0` | MIT |
-| `babel-jest` | `30.3.0` | MIT |
-| `eslint` | `10.3.0` | MIT |
+| `@types/node` | `24.12.4` | MIT |
+| `babel-jest` | `30.4.1` | MIT |
+| `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.6.0` | MIT |
-| `jest` | `30.3.0` | MIT |
+| `jest` | `30.4.2` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `ts-jest` | `29.4.9` | MIT |
-| `tsx` | `4.21.0` | MIT |
+| `ts-jest` | `29.4.10` | MIT |
+| `tsx` | `4.22.3` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
-| `typescript-eslint` | `8.59.1` | MIT |
+| `typescript-eslint` | `8.59.4` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -87,8 +87,8 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.6.0` | MIT |
-| `tsx` | `4.21.0` | MIT |
+| `@types/node` | `24.12.4` | MIT |
+| `tsx` | `4.22.3` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
@@ -97,8 +97,8 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
-| `@types/node` | `25.6.0` | MIT |
-| `tsx` | `4.21.0` | MIT |
+| `@types/node` | `24.12.4` | MIT |
+| `tsx` | `4.22.3` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `services/nb-ui`
@@ -133,10 +133,10 @@ output and does not declare third-party npm dependencies.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `fastapi` | `0.128.5` | MIT |
-| `uvicorn[standard]` | `0.40.0` | BSD-3-Clause |
-| `asyncpg` | `0.30.0` | Apache-2.0 |
-| `pydantic` | `2.12.0` | MIT |
+| `fastapi` | `0.136.1` | MIT |
+| `uvicorn[standard]` | `0.47.0` | BSD-3-Clause |
+| `asyncpg` | `0.31.0` | Apache-2.0 |
+| `pydantic` | `2.13.4` | MIT |
 | `typing-extensions` | `4.15.0` | PSF-2.0 |
 
 ### `services/script-runner/notebook`
@@ -156,9 +156,9 @@ output and does not declare third-party npm dependencies.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `forge-std` | `1.15.0` | MIT |
-| `@openzeppelin-contracts` | `5.3.0` | MIT |
-| `@openzeppelin-contracts-upgradeable` | `5.3.0` | MIT |
+| `forge-std` | `1.16.1` | MIT |
+| `@openzeppelin-contracts` | `5.4.0` | MIT |
+| `@openzeppelin-contracts-upgradeable` | `5.4.0` | MIT |
 
 ## Deployment-Time Components
 
@@ -170,6 +170,10 @@ this source repository.
 | --- | --- | --- |
 | Hyperledger Besu | Apache-2.0 | External runtime dependency |
 | NGINX Gateway Fabric | Apache-2.0 | External runtime dependency |
+| Docker Distribution Registry | Apache-2.0 | External local registry image |
+| Node.js | MIT | External runtime image for NB Bond API |
+| Python | PSF-2.0 | External runtime image for BENS |
+| PostgreSQL | PostgreSQL License | External database image for Blockscout/BENS |
 | JupyterHub Helm chart | BSD-3-Clause | External chart dependency |
 | Jupyter Docker Stacks / `base-notebook` image | BSD-3-Clause | External image dependency |
 | Blockscout Helm charts | GPL-3.0 | Pulled at deploy time |

@@ -10,16 +10,17 @@
 # - Run: ./infra/infra.sh registry-sync
 # - Redeploy the affected component (or ./sandbox.sh start).
 #
-# Example (upgrade Postgres + BENS):
+# Example (upgrade Blockscout + Postgres + BENS):
 #   blockscout:
-#     db: postgres:18.2
-#     bens: python:3.12.13
+#     backend: ghcr.io/blockscout/blockscout:v10.0.8
+#     frontend: ghcr.io/blockscout/frontend:v2.7.3
+#     db: postgres:18.4
+#     bens: python:3.14.5
 #
 # Notes:
 # - Tags should be explicit (avoid ":latest") to keep builds reproducible.
-# - Some service-specific runtime images are pinned in the service config
-#   instead of here. Current example: Blockscout backend/frontend in
-#   services/blockscout/values.yaml.
+# - Service values files may contain fallback tags for direct Helm usage, but
+#   the sandbox scripts read deploy/build image pins from this file.
 # - For multi-arch images, the registry sync will pull the correct platform.
 # - Version sources (check for new tags):
 #   - Besu: https://hub.docker.com/r/hyperledger/besu/tags
@@ -31,14 +32,22 @@
 besu: hyperledger/besu:26.1.0
 
 blockscout:
-  db: postgres:18.1
-  bens: python:3.14.3
+  backend: ghcr.io/blockscout/blockscout:v10.0.8
+  frontend: ghcr.io/blockscout/frontend:v2.7.3
+  db: postgres:18.4
+  bens: python:3.14.5
 
 script_runner:
   base: quay.io/jupyter/base-notebook:notebook-7.5.3
 
 nb_bond_api:
-  base: node:25.6.0
+  base: node:24.15.0
 
+# nb-ui ships as a self-contained image built locally from services/nb-ui/Dockerfile.
+# The two pins below are the Dockerfile stage bases — registry-sync pulls them so the
+# build works without internet, the build itself runs from ./services/nb-ui/nb-ui.sh.
 nb_ui:
+  builder: node:24.15.0
   nginx: nginxinc/nginx-unprivileged:1.27-alpine
+
+local_registry: registry:2.8.3

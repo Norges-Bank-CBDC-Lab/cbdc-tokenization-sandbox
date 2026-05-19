@@ -40,8 +40,8 @@ Blockscout is configured conservatively for local use. The values files under
 internet-facing deployment templates.
 
 The default sandbox path uses published GHCR Blockscout images pinned in
-`services/blockscout/values.yaml`. The local source-build helper
-`services/blockscout/build-images.sh` is optional and intended only for
+`common/images.yaml`. The local source-build helper
+`services/blockscout/build-images.sh` uses those same pins, and is optional for
 deliberate local debugging of upstream Blockscout changes.
 ### NB Bond API
 
