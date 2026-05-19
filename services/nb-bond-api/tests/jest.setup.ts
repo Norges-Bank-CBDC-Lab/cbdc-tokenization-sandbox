@@ -6,6 +6,5 @@ process.env.BOND_MANAGER_CONTRACT_NAME = process.env.BOND_MANAGER_CONTRACT_NAME 
 // that transitively import src/chain.ts which instantiates a Wallet at
 // module load).
 process.env.BOND_ADMIN_PK =
-  process.env.BOND_ADMIN_PK ??
-  '0x0000000000000000000000000000000000000000000000000000000000000001';
+  process.env.BOND_ADMIN_PK ?? '0x0000000000000000000000000000000000000000000000000000000000000001';
 process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';

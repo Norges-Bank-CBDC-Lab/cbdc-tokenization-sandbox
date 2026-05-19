@@ -1,0 +1,10 @@
+dist
+node_modules
+.env*
+
+# Helm templates embed Go-template directives ({{ .Values.foo }}) which the
+# YAML parser prettier ships with chokes on. Mirror the nb-bond-api ignore.
+helm
+
+# Vite build output and local-only runtime config.
+public/config.js
