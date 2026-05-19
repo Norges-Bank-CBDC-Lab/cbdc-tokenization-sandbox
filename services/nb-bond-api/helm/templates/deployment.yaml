@@ -13,10 +13,18 @@ spec:
       labels:
         app: nb-bond-api
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: nb-bond-api
           image: {{ required "image is required (built by services/nb-bond-api/nb-bond-api.sh)" .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -30,7 +38,8 @@ spec:
                 optional: true
           volumeMounts:
             # The image bakes /app/{dist,node_modules,package.json}. The only
-            # writable runtime path is the SQLite ingestion DB under /app/data.
+            # writable runtime path is the SQLite ingestion DB under /app/data,
+            # made writable for the runtime uid via the pod-level fsGroup.
             - name: nb-bond-api-data
               mountPath: /app/data
       volumes:

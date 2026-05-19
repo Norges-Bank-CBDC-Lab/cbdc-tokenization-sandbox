@@ -335,7 +335,32 @@ Typical 4xx errors:
 - `409 no allocation result available`: you called finalisation before closing and computing an allocation.
 - `400 allocationHash mismatch`: you attempted to finalise a different allocation than the one currently cached/computed.
 
-### 7.3 Ingestion database behaviour
+### 7.3 Security posture
+
+The local sandbox pod runs hardened by default:
+
+- the container image (`services/nb-bond-api/Dockerfile`) declares
+  `USER node`, so the runtime process runs as the unprivileged `node` user
+  (uid 1000) shipped by the upstream Node image, not as root;
+- the pod's `securityContext` sets `fsGroup: 1000` so the `/app/data`
+  emptyDir mount (the only writable runtime path; holds
+  `ingestion.sqlite` + its WAL sidecars) is group-writable for uid 1000;
+- the container's `securityContext` sets `runAsNonRoot: true`,
+  `allowPrivilegeEscalation: false`, `capabilities.drop: ["ALL"]`, and
+  `seccompProfile.type: RuntimeDefault`.
+
+Both blocks are surfaced via `services/nb-bond-api/helm/values.local.example.yaml`
+under `podSecurityContext` and `securityContext`, so non-local deployments
+can override them (e.g. to also set `readOnlyRootFilesystem: true` with
+appropriate writable tmp mounts — deliberately deferred from the sandbox
+default since it requires per-platform validation of any transitive write
+paths under `/tmp` or `~/.npm`).
+
+The service still does not implement authentication; treat it as a
+privileged internal service and protect it with network-level controls in
+any non-local deployment.
+
+### 7.4 Ingestion database behaviour
 
 The service maintains an SQLite database (default `data/ingestion.sqlite`) which it writes to in-process. This is used for:
 
@@ -350,7 +375,7 @@ recreated. The image entrypoint touches `/app/data/ingestion.sqlite` on
 start so the read-side connection (opened in readonly mode at module load)
 does not race the writer-side schema creation.
 
-### 7.4 Cache behaviour
+### 7.5 Cache behaviour
 
 Auction bid sets and computed allocations are cached in memory. On restart, the service attempts to hydrate auctions from chain by reading:
 

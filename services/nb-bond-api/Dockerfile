@@ -37,8 +37,20 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 # /app/data is the SQLite ingestion DB path (DB_PATH defaults to
 # data/ingestion.sqlite). The chart mounts an emptyDir over it so the dir is
-# writable at runtime without touching the image layer.
-RUN mkdir -p /app/data
+# writable at runtime without touching the image layer; pod-level fsGroup
+# makes it group-writable for the runtime uid.
+RUN mkdir -p /app/data \
+    && chown -R node:node /app
+
+# Run as the unprivileged `node` user (uid 1000) that the upstream node image
+# ships with. The chart pins fsGroup: 1000 so the emptyDir mount at /app/data
+# is writable for this uid; everything else under /app is owned by node:node
+# but read-only at runtime by convention.
+#
+# USER must be numeric so kubelet's runAsNonRoot check can statically verify
+# the image's uid is not 0. With `USER node` (name), kubelet refuses to start
+# the pod ("image has non-numeric user, cannot verify user is non-root").
+USER 1000:1000
 
 EXPOSE 8080
 # The read-side DB connection is opened in readonly mode at module load, which
