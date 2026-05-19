@@ -1,9 +1,31 @@
-node_modules
-dist
-data
-.git
+# Build context hygiene — keep image build fast and reproducible.
+node_modules/
+dist/
+build/
+coverage/
+data/
+
+# Tests aren't needed to produce the runtime image.
+tests/
+
+# Local dev metadata that has no business in the image.
+.git/
 .gitignore
-npm-debug.log
+.dockerignore
+.prettierrc
+.prettierignore
+eslint.config.mjs
+babel.config.cjs
+jest.config.cjs
+tsconfig.test.json
+README.md
+AGENTS.md
+DEVELOPMENT.md
+openapi.json
+scripts/
+helm/
+
+# Local-only env files
 .env
 .env.*
-tests
+npm-debug.log

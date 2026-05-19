@@ -51,13 +51,11 @@ fi
 
 ################################################################################
 # OPTIONAL NB BOND API FLAGS (set before running this script)
-# - USE_KIND_REGISTRY: true pushes/pulls via local registry; false loads directly.
+# - USE_KIND_REGISTRY: must be true; the chart pulls the locally-built image
+#                      from the kind registry. Set to false only if you're
+#                      replacing the build/push flow with something else.
 ################################################################################
 export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
-
-if [ "$CMD" == "start" ]; then
-    requireNBBondApiHelmValues
-fi
 
 if [[ $(clusterExists) == "false" ]]; then
     echo "Cluster '$CLUSTER_NAME' does not exists. Please start it first."
@@ -65,26 +63,10 @@ if [[ $(clusterExists) == "false" ]]; then
 fi
 
 if [ "$CMD" == "start" ]; then
-    # ensure dist folder exists, if not build the project
-    if [ ! -d "./dist" ]; then
-        echo "♻️ NB Bond API 'dist' folder not found. Building..."
-        # install deps and build with npm
-        if [ -f "package-lock.json" ]; then
-            npm ci || {
-                echo "❌ Failed to install NB Bond API dependencies (npm ci)"
-                exit 1
-            }
-        else
-            npm install || {
-                echo "❌ Failed to install NB Bond API dependencies (npm install)"
-                exit 1
-            }
-        fi
-        npm run build || {
-            echo "❌ Failed to build NB Bond API"
-            exit 1
-        }
-    fi
+    # deployNBBondAPI builds services/nb-bond-api via Dockerfile, tags it with
+    # the bundle content hash, pushes to the local kind registry, and installs
+    # the chart pointing at that image. The image bundles dist/ + production
+    # node_modules; the SQLite ingestion DB lives on an emptyDir at /app/data.
     deployNBBondAPI
 
     if [ "$IS_SUBTASK" == "false" ]; then

@@ -33,9 +33,9 @@ nodes:
     # `hostPath` is resolved from the directory where `kind create cluster`
     # is invoked. The sandbox helper runs that command from `infra/`, so this
     # points at the tracked `infra/cluster/containerd-certs.d` directory.
+    # Both nb-bond-api and nb-ui used to mount the host source tree here for
+    # build-on-boot; both now ship as self-contained images built by their
+    # `<svc>.sh start` scripts and pulled from the local registry, so no
+    # source mount is needed.
     - hostPath: ./cluster/containerd-certs.d
       containerPath: /etc/containerd/certs.d/kind
-    - hostPath: ../services/nb-bond-api
-      containerPath: /services/nb-bond-api
-    - hostPath: ../services/nb-ui
-      containerPath: /services/nb-ui

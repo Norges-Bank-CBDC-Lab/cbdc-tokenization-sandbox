@@ -23,6 +23,21 @@ local-only fixture keys. The sandbox and service start scripts also generate it
 automatically if it is missing. Do not commit or reuse real keys outside local
 development.
 
+## Local Deployment Model
+
+`./nb-bond-api.sh start` builds the service as a self-contained Docker image
+from `services/nb-bond-api/Dockerfile` (multi-stage: builder runs `npm ci` +
+`npm run build`, runtime ships only `dist/` plus production `node_modules`).
+The image is tagged with a content hash over `src/`, `package.json`,
+`package-lock.json`, `tsconfig.json`, and the `Dockerfile`, pushed to the
+local Kind registry at `localhost:5001/nb-bond-api:<hash>`, and the Helm
+chart is installed with `--set image=<that tag>`. Re-runs skip the build
+when the content hash matches an existing registry tag.
+
+The pod mounts an `emptyDir` at `/app/data` for the SQLite ingestion DB; no
+host source mount is required and the chart no longer runs `npm ci` /
+`npm run build` at container start.
+
 ## Env
 
 - `RPC_URL` – JSON-RPC endpoint

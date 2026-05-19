@@ -63,21 +63,6 @@
   and either fix the frontend payload or extend the backend validation
   message so the UI can surface a useful error.
 
-## nb-bond-api still ships via host-mount + pod-side npm build
-- After PR 3, `services/nb-ui` deploys as a self-contained Docker image
-  built and pushed to the local Kind registry by `./nb-ui.sh start`.
-  `services/nb-bond-api` still uses the older pattern: a generic
-  `node:24.15.0` image with the host's `services/nb-bond-api` directory
-  mounted via `infra/cluster/cluster-config.yaml` and `npm ci + npm run
-  build` running at container start.
-- Planned follow-up: migrate `nb-bond-api` to the same image-baked shape
-  (multi-stage Dockerfile, content-hash tag, push to local registry, drop
-  the Kind extra-mount). The work is a small refactor of `deployNBBondAPI`
-  in `common/helpers.sh` plus a new `services/nb-bond-api/Dockerfile`.
-  Once migrated, the only remaining Kind extra-mount can be removed
-  entirely and adding any future service stops requiring a sandbox
-  delete + start.
-
 ## Repo has four sibling node_modules trees (~420 MB total)
 - `services/nb-bond-api/` (~173 MB), `services/nb-ui/` (~129 MB),
   `scripts/bid-encryption/` (~60 MB), `scripts/bid-submitter/` (~60 MB)

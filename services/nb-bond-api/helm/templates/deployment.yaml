@@ -15,26 +15,12 @@ spec:
     spec:
       containers:
         - name: nb-bond-api
-          image: {{ .Values.nodeImage | default "node:24.15.0"}}
+          image: {{ required "image is required (built by services/nb-bond-api/nb-bond-api.sh)" .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
-          workingDir: /app
-          command:
-            - sh
-            - -c
-            - |
-              if [ ! -d node_modules ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
-                if [ -f package-lock.json ]; then
-                  npm ci
-                else
-                  npm install
-                fi
-              fi
-              if [ ! -d dist ] || [ ! -f dist/env-vars.js ] || ! grep -q "GLOBAL_REGISTRY_ADDRESS" dist/env-vars.js; then
-                npm run build
-              fi
-              mkdir -p data
-              touch data/ingestion.sqlite
-              npm start
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
           envFrom:
             - configMapRef:
                 name: nb-bond-api
@@ -43,14 +29,10 @@ spec:
                 name: nb-bond-api
                 optional: true
           volumeMounts:
-            - name: nb-bond-api
-              mountPath: /app
-            - name: nb-bond-api-node-modules
-              mountPath: /app/node_modules
+            # The image bakes /app/{dist,node_modules,package.json}. The only
+            # writable runtime path is the SQLite ingestion DB under /app/data.
+            - name: nb-bond-api-data
+              mountPath: /app/data
       volumes:
-        - name: nb-bond-api
-          hostPath:
-            path: {{ .Values.repoPath | default "/" }}
-            type: DirectoryOrCreate
-        - name: nb-bond-api-node-modules
+        - name: nb-bond-api-data
           emptyDir: {}

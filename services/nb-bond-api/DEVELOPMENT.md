@@ -344,6 +344,12 @@ The service maintains an SQLite database (default `data/ingestion.sqlite`) which
 
 If `DB_PATH` is unwritable, or ingestion cannot reach `RPC_URL`, these endpoints may return empty data or become stale, even if the on-chain contracts are operating correctly.
 
+In the sandbox Helm deployment, the database lives on an `emptyDir` volume
+mounted at `/app/data`, so its contents are reset whenever the pod is
+recreated. The image entrypoint touches `/app/data/ingestion.sqlite` on
+start so the read-side connection (opened in readonly mode at module load)
+does not race the writer-side schema creation.
+
 ### 7.4 Cache behaviour
 
 Auction bid sets and computed allocations are cached in memory. On restart, the service attempts to hydrate auctions from chain by reading:
