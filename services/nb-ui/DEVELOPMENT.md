@@ -120,7 +120,7 @@ the `nb-ui-http` listener on the `nginx-gateway/gateway` Gateway.
 
 The pod's `web-server` container runs `nginxinc/nginx-unprivileged`
 internally to serve static files — that's a pod-local static server,
-*not* a second cluster gateway. The cluster Gateway (NGINX Gateway
+_not_ a second cluster gateway. The cluster Gateway (NGINX Gateway
 Fabric, in the `nginx-gateway` namespace) is the only ingress; it routes
 to the pod's Service like any other backend.
 
@@ -149,7 +149,7 @@ to the pod's Service like any other backend.
 The image is the entire bundle. Editing `src/*` produces a new content
 hash, which triggers a fresh build + push + helm upgrade automatically.
 Editing only test files / docs (matched by `.dockerignore`) intentionally
-*doesn't* bust the cache.
+_doesn't_ bust the cache.
 
 ## Known gotchas
 

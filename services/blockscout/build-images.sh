@@ -72,7 +72,6 @@ docker build \
     --build-arg GIT_COMMIT_SHA="$frontend_sha" \
     "$frontend_tmp"
 
-export USE_KIND_REGISTRY="true"
 ensureKindRegistry
 
 loadImageToKind "$frontend_image"

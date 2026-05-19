@@ -28,7 +28,7 @@ inherits these rules and only adds what is specific to that folder.
 - If you change public-facing docs or repo metadata, run `python3 scripts/verification/check-public-repo-hygiene.py` and `python3 scripts/verification/check-markdown-links.py`.
 
 ### Flag documentation (global)
-- For script environment flags (e.g., `USE_KIND_REGISTRY`, `DEPLOY_*`), keep a banner comment block directly above the exports.
+- For script environment flags (e.g., `DEPLOY_*`, `WAIT_FOR_APP_TIMEOUT_SECONDS`), keep a banner comment block directly above the exports.
 - If the banner is missing, create it; if it exists, add/update the flag entry.
 - Each banner line must describe what the flag does when set to `true` and when set to `false`.
 

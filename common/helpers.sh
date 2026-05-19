@@ -37,7 +37,9 @@ BENS_IMAGE=bens-microservice
 BENS_TAG=v1.0.0
 
 NB_BOND_API_NAMESPACE=nb-bond-api
-NB_BOND_API_BASEIMAGE=node:24.15.0
+NB_BOND_API_DIR=$REPO_ROOT/services/nb-bond-api
+NB_BOND_API_BUILDER_BASEIMAGE=node:24.15.0
+NB_BOND_API_RUNTIME_BASEIMAGE=node:24.15.0
 NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.yaml
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
 NB_UI_NAMESPACE=nb-ui
@@ -838,11 +840,9 @@ function loadImageToKind() {
     kind_image=$(toKindImageTag "$image")
     registry_image=$(tagForKindRegistry "$kind_image")
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        requireKindRegistry
-    fi
+    requireKindRegistry
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ] && [ "${FORCE_IMAGE_PULL:-false}" != "true" ]; then
+    if [ "${FORCE_IMAGE_PULL:-false}" != "true" ]; then
         if [ "$(kindRegistryHasImage "$kind_image")" == "true" ]; then
             echo "✅ Using cached registry image $registry_image"
             return 0
@@ -878,27 +878,7 @@ function loadImageToKind() {
         echo "✅ Tagged single-platform image as $kind_image"
     fi
 
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        pushImageToKindRegistry "$kind_image"
-        return 0
-    fi
-
-    # Load the image into Kind cluster with retries
-    echo "📦 Loading image $kind_image into Kind cluster..."
-    for i in {1..3}; do
-        if kind load docker-image "$kind_image" --name "$CLUSTER_NAME"; then
-            echo "✅ Successfully loaded image into cluster"
-            break
-        else
-            if [ $i -eq 3 ]; then
-                echo "⚠️ Failed to load image after 3 attempts. Will rely on cluster pull."
-            else
-                echo "⚠️ Attempt $i failed, retrying..."
-                sleep 2
-            fi
-        fi
-    done
-
+    pushImageToKindRegistry "$kind_image"
 }
 
 function getBesuImage() {
@@ -974,8 +954,12 @@ function getScriptRunnerImage() {
     getImageValue "script_runner.base" "$default_image"
 }
 
-function getNBBondApiImage() {
-    getImageValue "nb_bond_api.base" "$NB_BOND_API_BASEIMAGE"
+function getNBBondApiBuilderImage() {
+    getImageValue "nb_bond_api.builder" "$NB_BOND_API_BUILDER_BASEIMAGE"
+}
+
+function getNBBondApiRuntimeImage() {
+    getImageValue "nb_bond_api.runtime" "$NB_BOND_API_RUNTIME_BASEIMAGE"
 }
 
 function getNBUINginxImage() {
@@ -983,7 +967,7 @@ function getNBUINginxImage() {
 }
 
 function getNBUIBuilderImage() {
-    getImageValue "nb_ui.builder" "$NB_BOND_API_BASEIMAGE"
+    getImageValue "nb_ui.builder" "$NB_BOND_API_BUILDER_BASEIMAGE"
 }
 
 function getLocalRegistryImage() {
@@ -1002,7 +986,10 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutDbImage)")
     images+=("$(getBlockscoutBensImage)")
     images+=("$(getScriptRunnerImage)")
-    images+=("$(getNBBondApiImage)")
+    # nb-bond-api Dockerfile stages: builder + runtime (both node).
+    # Pulled here so the local `docker build` works without internet.
+    images+=("$(getNBBondApiBuilderImage)")
+    images+=("$(getNBBondApiRuntimeImage)")
     # nb-ui Dockerfile stages: builder (node) + runtime (nginx-unprivileged).
     # Pulled here so the local `docker build` works without internet.
     images+=("$(getNBUIBuilderImage)")
@@ -1031,12 +1018,8 @@ function deployBesu() {
     echo "🔍 Using Besu image: $BESU_IMAGE"
 
     loadImageToKind $BESU_IMAGE
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
-        echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
-    else
-        BESU_IMAGE_OVERRIDE="$BESU_IMAGE"
-    fi
+    BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
+    echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
 
     helm upgrade besu $REPO_ROOT/infra/besu \
          --install \
@@ -1164,11 +1147,8 @@ function deployScriptRunner() {
     echo "🔍 Using Script Runner image: $SCRIPTRUNNER_IMAGE"
 
     loadImageToKind $SCRIPTRUNNER_IMAGE
-    SCRIPTRUNNER_IMAGE_OVERRIDE="$SCRIPTRUNNER_IMAGE"
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        SCRIPTRUNNER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SCRIPTRUNNER_IMAGE")
-        echo "🔁 Using local registry image for Script Runner: $SCRIPTRUNNER_IMAGE_OVERRIDE"
-    fi
+    SCRIPTRUNNER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SCRIPTRUNNER_IMAGE")
+    echo "🔁 Using local registry image for Script Runner: $SCRIPTRUNNER_IMAGE_OVERRIDE"
     SCRIPTRUNNER_BASEIMAGE_NAME="$(imageRepo "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
     SCRIPTRUNNER_BASEIMAGE_TAG="$(imageTag "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
 
@@ -1216,21 +1196,14 @@ function deployBlockscout() {
     loadImageToKind $POSTGRES_IMAGE
     loadImageToKind $BENS_IMAGE
 
-    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE="$BLOCKSCOUT_FRONTEND_IMAGE"
-    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE="$BLOCKSCOUT_BACKEND_IMAGE"
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
-        BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
-        echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
-        echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
-        POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
-        BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
-        echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
-        echo "🔁 Using local registry image for python: $BENS_IMAGE_OVERRIDE"
-    else
-        POSTGRES_IMAGE_OVERRIDE="$POSTGRES_IMAGE"
-        BENS_IMAGE_OVERRIDE="$BENS_IMAGE"
-    fi
+    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
+    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
+    POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
+    BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
+    echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for python: $BENS_IMAGE_OVERRIDE"
 
     BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
     BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
@@ -1317,15 +1290,73 @@ function deployContracts() {
 }
 
 
+# Compute a short content hash over the inputs that influence the built
+# nb-bond-api image. Used as the image tag so a fresh image is built (and
+# pushed) only when something that actually changes the runtime bundle
+# changes.
+function nbBondApiBundleHash() {
+    # Sources that affect the build output: source tree + tsconfig + lockfile
+    # + Dockerfile. Anything outside this list (tests, README, openapi.json
+    # snapshot, dev-only configs) legitimately doesn't bust the cache.
+    {
+        find "$NB_BOND_API_DIR/src" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
+        shasum -a 256 \
+            "$NB_BOND_API_DIR/package.json" \
+            "$NB_BOND_API_DIR/package-lock.json" \
+            "$NB_BOND_API_DIR/tsconfig.json" \
+            "$NB_BOND_API_DIR/Dockerfile" 2>/dev/null
+    } | shasum -a 256 | cut -c1-12
+}
+
 function deployNBBondAPI() {
     requireNBBondApiHelmValues
+    requireKindRegistry
 
-    NB_BOND_API_BASEIMAGE="$(getNBBondApiImage)"
-    loadImageToKind $NB_BOND_API_BASEIMAGE
-    NB_BOND_API_IMAGE_OVERRIDE="$NB_BOND_API_BASEIMAGE"
-    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
-        NB_BOND_API_IMAGE_OVERRIDE=$(kindRegistryImageFor "$NB_BOND_API_BASEIMAGE")
-        echo "🔁 Using local registry image for NB Bond API: $NB_BOND_API_IMAGE_OVERRIDE"
+    # Pull both Dockerfile stage bases through docker first so the build
+    # works offline (matches the nb-ui pattern).
+    NB_BOND_API_BUILDER_RESOLVED="$(getNBBondApiBuilderImage)"
+    NB_BOND_API_RUNTIME_RESOLVED="$(getNBBondApiRuntimeImage)"
+    loadImageToKind "$NB_BOND_API_BUILDER_RESOLVED"
+    if [ "$NB_BOND_API_RUNTIME_RESOLVED" != "$NB_BOND_API_BUILDER_RESOLVED" ]; then
+        loadImageToKind "$NB_BOND_API_RUNTIME_RESOLVED"
+    fi
+
+    local bundle_hash
+    bundle_hash="$(nbBondApiBundleHash)"
+    if [ -z "$bundle_hash" ]; then
+        echo "❌ Could not compute nb-bond-api bundle hash."
+        return 1
+    fi
+    # Image refs follow the existing kind-registry convention: containerd
+    # inside the Kind node has hosts.toml mapping localhost:5001 → the kind
+    # registry, so the pod-side pull tag is the same "localhost:5001/..."
+    # the host pushes to. See infra/cluster/containerd-certs.d/.
+    local local_tag="nb-bond-api:${bundle_hash}"
+    local push_tag="localhost:${KIND_REGISTRY_PORT}/nb-bond-api:${bundle_hash}"
+    local pull_tag_in_kind="$push_tag"
+
+    # Skip rebuild if the image is already in the local registry — content
+    # hash is the cache key. The registry serves OCI manifests so we list
+    # tags rather than negotiate media types.
+    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/nb-bond-api/tags/list" 2>/dev/null \
+        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
+        echo "✅ nb-bond-api image ${push_tag} already in local registry — skipping build."
+    else
+        echo "🐳 Building nb-bond-api image ${local_tag}..."
+        docker build \
+            --tag "$local_tag" \
+            --build-arg "NB_BOND_API_BUILDER_IMAGE=${NB_BOND_API_BUILDER_RESOLVED}" \
+            --build-arg "NB_BOND_API_RUNTIME_IMAGE=${NB_BOND_API_RUNTIME_RESOLVED}" \
+            "$NB_BOND_API_DIR" || {
+            echo "❌ Failed to build nb-bond-api image"
+            return 1
+        }
+        echo "📦 Pushing ${push_tag}..."
+        docker tag "$local_tag" "$push_tag"
+        docker push "$push_tag" || {
+            echo "❌ Failed to push nb-bond-api image to local registry"
+            return 1
+        }
     fi
 
     registry_contract_address="$(getRegistryContractAddressFromConfigmap)"
@@ -1343,7 +1374,7 @@ function deployNBBondAPI() {
          --namespace $NB_BOND_API_NAMESPACE \
          --create-namespace \
          --values "$NB_BOND_API_HELM_VALUES_FILE" \
-         --set nodeImage=$NB_BOND_API_IMAGE_OVERRIDE \
+         --set "image=${pull_tag_in_kind}" \
          --set-string env.GLOBAL_REGISTRY_ADDRESS=$registry_contract_address
 }
 

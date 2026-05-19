@@ -52,7 +52,11 @@ export function AuctionsPage({ navigate }) {
       title: 'Auction created',
       body: `${Fmt.shortHex(res.auctionId)} on ${res.isin}`,
     });
+    // First reload races the backend ingestion loop (default 3s tick); the
+    // delayed second reload covers the worst case where the immediate one
+    // just missed a tick. See BondsPage handleCreated for details.
     reload();
+    setTimeout(reload, 4000);
   }
 
   return (
