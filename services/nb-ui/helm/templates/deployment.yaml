@@ -16,38 +16,14 @@ spec:
         # Force a rollout whenever the rendered runtime-config changes.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      initContainers:
-        # Stage the pre-built bundle + the rendered config.js into an emptyDir
-        # that nginx can serve. The bundle comes from the host (Vite-built into
-        # services/nb-ui/dist/ before deploy — see services/nb-ui/nb-ui.sh).
-        - name: stage-bundle
-          image: {{ .Values.nginxImage | default "nginxinc/nginx-unprivileged:1.27-alpine" }}
-          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
-          command:
-            - sh
-            - -c
-            - |
-              set -e
-              if [ ! -d /source/dist ] || [ -z "$(ls -A /source/dist 2>/dev/null)" ]; then
-                echo "❌ /source/dist is missing or empty."
-                echo "   Build the bundle on the host with: cd services/nb-ui && npm run build"
-                exit 1
-              fi
-              cp -R /source/dist/. /html/
-              cp /runtime-config/config.js /html/config.js
-              echo "✅ Staged $(ls /html | wc -l) entries into /usr/share/nginx/html"
-          volumeMounts:
-            - name: nb-ui-source
-              mountPath: /source
-              readOnly: true
-            - name: nb-ui-runtime-config
-              mountPath: /runtime-config
-              readOnly: true
-            - name: nb-ui-html
-              mountPath: /html
       containers:
-        - name: nginx
-          image: {{ .Values.nginxImage | default "nginxinc/nginx-unprivileged:1.27-alpine" }}
+        # The container is named `web-server` (not `nginx`) to keep the
+        # distinction with the cluster-wide NGINX Gateway Fabric pod clear.
+        # The image happens to be nginx-unprivileged but this pod is just a
+        # static file server for the React bundle; routing lives in the
+        # Gateway, not here.
+        - name: web-server
+          image: {{ required "image is required (built by services/nb-ui/nb-ui.sh)" .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
           ports:
             # nginx-unprivileged listens on 8080 by default.
@@ -55,8 +31,12 @@ spec:
               containerPort: 8080
               protocol: TCP
           volumeMounts:
-            - name: nb-ui-html
-              mountPath: /usr/share/nginx/html
+            # The image ships dist/ at /usr/share/nginx/html/. We overlay
+            # config.js from the chart-rendered ConfigMap so the runtime
+            # config can be re-pointed per deployment without rebuilding.
+            - name: nb-ui-runtime-config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
               readOnly: true
           readinessProbe:
             httpGet:
@@ -71,12 +51,6 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 15
       volumes:
-        - name: nb-ui-source
-          hostPath:
-            path: {{ .Values.repoPath | default "/services/nb-ui" }}
-            type: Directory
         - name: nb-ui-runtime-config
           configMap:
             name: nb-ui-runtime-config
-        - name: nb-ui-html
-          emptyDir: {}

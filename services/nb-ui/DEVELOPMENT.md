@@ -101,14 +101,16 @@ build-time-agnostic bundle.
 ## Runtime config injection
 
 The same built bundle is re-pointable at runtime via `/config.js`. The
-local sandbox renders that file from the chart's `runtimeConfig` block —
-see `services/nb-ui/helm/templates/configmap.yaml`.
+local sandbox renders that file from the chart's `runtimeConfig` block
+(`services/nb-ui/helm/templates/configmap.yaml`) and overlays it onto
+`/usr/share/nginx/html/config.js` via a ConfigMap mount with `subPath`.
 
-For a non-local nginx deployment the recommended pattern is an init
-container that runs `envsubst` over `public/config.template.js` into the
-served `/config.js`, with env vars supplied by chart values. The
-placeholders (`__USE_MOCK__`, `__API_BASE_URL__`, etc.) match the
-template variable shape.
+For a non-local nginx deployment the same image works unchanged — the
+deploying environment just supplies a different ConfigMap. If you need
+env-var-style placeholder substitution at container start instead,
+`public/config.template.js` ships placeholders (`__USE_MOCK__`,
+`__API_BASE_URL__`, etc.) that an `envsubst`-running init container can
+consume.
 
 ## Hostname
 
@@ -116,37 +118,51 @@ Served at `web.cbdc-sandbox.local` (mapped to `127.0.0.1` by the
 sandbox's `/etc/hosts` append step). The chart's HTTPRoute attaches to
 the `nb-ui-http` listener on the `nginx-gateway/gateway` Gateway.
 
+The pod's `web-server` container runs `nginxinc/nginx-unprivileged`
+internally to serve static files — that's a pod-local static server,
+*not* a second cluster gateway. The cluster Gateway (NGINX Gateway
+Fabric, in the `nginx-gateway` namespace) is the only ingress; it routes
+to the pod's Service like any other backend.
+
 ## Deployment shape
 
-- `nginxinc/nginx-unprivileged:1.27-alpine` runtime (pinned in
-  `common/images.yaml`).
-- An init container stages the pre-built `dist/` plus the rendered
-  `config.js` (from the chart's `ConfigMap`) into an emptyDir that nginx
-  serves read-only.
-- `npm run build` runs on the host before deploy. The host path
-  `services/nb-ui/dist/` is mounted into the Kind node via
-  `infra/cluster/cluster-config.yaml`, then re-mounted into the init
-  container.
+- `services/nb-ui/Dockerfile`: multi-stage build. `node:24.15.0` builder
+  runs `npm ci && npm run build`; the result is COPYed into the
+  `nginxinc/nginx-unprivileged:1.27-alpine` runtime image. Both stage
+  bases are pinned in `common/images.yaml` under `nb_ui.{builder,nginx}`.
+- `./nb-ui.sh start` (or `./sandbox.sh start`) calls `deployNBUI` in
+  `common/helpers.sh`, which:
+  1. Pulls both stage bases through Docker (`loadImageToKind`) so the
+     build works offline.
+  2. Computes a short content-hash over `src/`, `public/`, `package*.json`,
+     `index.html`, `vite.config.js`, `Dockerfile` → the image tag.
+  3. Checks the local Kind registry; if `nb-ui:<hash>` already exists
+     there, skips the build entirely (cache key = bundle content).
+  4. Otherwise: `docker build` → `docker tag → docker push` to
+     `localhost:5001/nb-ui:<hash>`.
+  5. `helm upgrade --install` with `image=kind-registry:5000/nb-ui:<hash>`.
+- The chart deploys: one `web-server` container (nginx-unprivileged
+  bundled with the React `dist/`), one ConfigMap mounted onto
+  `/usr/share/nginx/html/config.js` via `subPath`. No init container, no
+  hostPath, no Kind extra-mounts.
 
-If `dist/` is missing the init container fails fast with a clear error
-telling the operator to run `npm run build`. The lifecycle script
-`./nb-ui.sh start` rebuilds automatically when `dist/` is absent.
+The image is the entire bundle. Editing `src/*` produces a new content
+hash, which triggers a fresh build + push + helm upgrade automatically.
+Editing only test files / docs (matched by `.dockerignore`) intentionally
+*doesn't* bust the cache.
 
 ## Known gotchas
 
-- The Kind cluster config carries an explicit `extraMounts` entry for
-  `services/nb-ui`. After pulling changes that add or remove a mount,
-  `./sandbox.sh delete && ./sandbox.sh start` is required to pick the new
-  mount up — Kind cannot hot-reload mounts.
-- The chart sets `repoPath: /services/nb-ui` for the in-Kind container
-  path. If you change the Kind mount target, change the chart value too.
-- The init container runs as the nginx user. The chart uses an emptyDir
-  for the html mount precisely so the unprivileged nginx process can read
-  from it without filesystem permission gymnastics.
-- The CSP / security headers in the dev nginx config are intentionally
-  permissive for the trusted-local sandbox. A non-local deployment
-  should tighten CSP — flagged in `docs/nb-ui-frontend-plan.md` Portability
-  Flags.
+- The cache key is `services/nb-ui/{src,public,package.json,package-lock.json,index.html,vite.config.js,Dockerfile}`.
+  If you add a new build input that legitimately affects `dist/`, extend
+  `nbUIBundleHash` in `common/helpers.sh` accordingly.
+- nginx-unprivileged listens on port `8080`, not `80`. The chart's
+  Service maps port `80` → `8080`. Don't paste an `80` into the container
+  spec.
+- The CSP / security headers from nginx-unprivileged's defaults are
+  permissive enough to load the React bundle in a sandbox context. A
+  non-local deployment should tighten CSP via a custom nginx config —
+  flagged in `docs/nb-ui-frontend-plan.md` Portability Flags.
 
 ## Follow-ups
 

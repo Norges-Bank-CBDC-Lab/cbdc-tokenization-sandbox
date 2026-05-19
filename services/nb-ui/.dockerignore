@@ -1,0 +1,22 @@
+# Build context hygiene — keep image build fast and reproducible.
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+# Tests aren't needed to produce the runtime bundle.
+tests/
+
+# Local dev metadata that has no business in the image.
+.git/
+.gitignore
+.dockerignore
+.prettierrc.json
+eslint.config.mjs
+README.md
+AGENTS.md
+DEVELOPMENT.md
+
+# Local-only runtime config (the chart re-renders this at install time).
+public/config.js

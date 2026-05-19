@@ -51,8 +51,9 @@ fi
 
 ################################################################################
 # OPTIONAL NB UI FLAGS (set before running this script)
-# - USE_KIND_REGISTRY: true pulls the nginx image via the local registry;
-#                      false loads directly into the Kind node.
+# - USE_KIND_REGISTRY: must be true; the chart pulls the locally-built image
+#                      from the kind registry. Set to false only if you're
+#                      replacing the build/push flow with something else.
 ################################################################################
 export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
 
@@ -62,10 +63,11 @@ if [[ $(clusterExists) == "false" ]]; then
 fi
 
 if [ "$CMD" == "start" ]; then
-    # deployNBUI builds dist/ on the host (npm ci + npm run build) when missing,
-    # then helm-installs the chart. The deployment's init container copies the
-    # bundle from the host (mounted via infra/cluster/cluster-config.yaml) into
-    # an emptyDir nginx serves from.
+    # deployNBUI builds services/nb-ui via Dockerfile, tags it with the
+    # bundle content hash, pushes to the local kind registry, and installs
+    # the chart pointing at that image. The image bundles dist/ at
+    # /usr/share/nginx/html/; runtime config.js is overlaid from a chart
+    # ConfigMap at install time.
     deployNBUI
 
     if [ "$IS_SUBTASK" == "false" ]; then

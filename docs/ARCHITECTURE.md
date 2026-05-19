@@ -213,9 +213,15 @@ the NB Bond API:
 - tenant / client / scope values for the Entra plugin are never committed —
   they are read from `window.__APP_CONFIG__` at startup
 
-Deployment shape in the local sandbox: an init container stages the
-host-built `dist/` plus the chart-rendered `config.js` into an emptyDir;
-the unprivileged-nginx main container serves the staged content read-only.
+Deployment shape in the local sandbox: a multi-stage Dockerfile in
+`services/nb-ui/` builds the React bundle inside the Node builder image
+and copies the result into an `nginxinc/nginx-unprivileged` runtime
+image. The lifecycle script (`./nb-ui.sh start`) builds the image,
+tags it with a content hash of the build inputs, pushes to the local
+Kind registry, and helm-installs the chart. The chart's only runtime
+twist is a ConfigMap mount that overlays `/usr/share/nginx/html/config.js`
+from chart values, so the same image is re-pointable per deployment
+without rebuilding.
 
 ## Key Workflows
 

@@ -1,8 +1,7 @@
 # NB UI
 
 React + Vite operator frontend for the NB Bond Auction Service. Served at
-`http://web.cbdc-sandbox.local/` when the sandbox is fully wired (see
-`docs/nb-ui-frontend-plan.md`, PR 3 phase).
+`http://web.cbdc-sandbox.local/` when the sandbox is up.
 
 ## Scripts
 
@@ -12,10 +11,21 @@ From `services/nb-ui/`:
   changes).
 - `npm run dev` – Vite dev server on `http://localhost:5173/`, with a
   hot-reload pipeline. Talks to the runtime config in `public/config.js`.
-- `npm run build` – production build into `dist/`.
+- `npm run build` – production build into `dist/`. The sandbox deploy path
+  does this inside Docker, so you only need this for local Vite work.
 - `npm test` – Vitest unit + feature tests.
 - `npm run lint` / `npm run format:check` – static checks (also run in CI by
   `.github/workflows/nb-ui.yml`).
+
+## Deploying into the local sandbox
+
+`./nb-ui.sh start` (called by `./sandbox.sh start` when `DEPLOY_NB_UI=true`)
+builds the bundle inside a `services/nb-ui/Dockerfile` multi-stage image,
+tags it with a content hash of the build inputs, pushes to the local Kind
+registry, and helm-installs the chart pointing at it. A second run with no
+changes is a no-op — the registry cache key is the bundle hash itself.
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the full deploy shape.
 
 ## Talking to the backend
 

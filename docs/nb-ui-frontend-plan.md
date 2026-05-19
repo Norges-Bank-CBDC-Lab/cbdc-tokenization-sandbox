@@ -70,7 +70,7 @@ What was inspected and what was actually verified in this session.
 - CORS middleware in NB Bond API, narrow-scoped to the configured frontend origin (default: `http://web.cbdc-sandbox.local`).
 - Pluggable auth layer in the frontend: a small `AuthProvider` interface + two implementations: `none` (default) and `entra` (MSAL Browser). Selected at runtime by `window.AppConfig.AUTH_MODE`.
 - Runtime-config injection so the same built bundle can be re-pointed (different `API_BASE_URL`, different `AUTH_MODE`, different OIDC client/tenant) without rebuilding. A `config.template.js` is rendered at container start from env vars.
-- New helm chart `services/nb-ui/helm/` with an nginx pod serving the built `dist/`, plus a config-templating init container.
+- New helm chart `services/nb-ui/helm/` with an `nginxinc/nginx-unprivileged` pod (container named `web-server`) serving a Docker-image-baked `dist/`. Runtime config is overlaid from a chart ConfigMap onto `/usr/share/nginx/html/config.js`. Image is built and pushed to the local Kind registry by `./nb-ui.sh start` using a content-hash tag — see `services/nb-ui/Dockerfile`. (An earlier draft of this plan used a host-mounted `dist/` + init container; that was replaced with the image-baked approach in PR 3 to remove the Kind extra-mount and to match exactly what an Azure deployment will pull.)
 - New `HTTPRoute` in `infra/gateway/templates/` for `web.cbdc-sandbox.local`.
 - New `DEPLOY_NB_UI` flag in `sandbox.sh` (banner-comment block per root `AGENTS.md`).
 - New service-scoped docs: `services/nb-ui/README.md`, `AGENTS.md`, `DEVELOPMENT.md`.
