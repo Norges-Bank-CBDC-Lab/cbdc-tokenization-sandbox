@@ -1,0 +1,37 @@
+{
+  "name": "nb-ui",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@azure/msal-browser": "3.30.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.7.0",
+    "@testing-library/react": "16.1.0",
+    "@testing-library/user-event": "14.5.2",
+    "@vitejs/plugin-react": "4.7.0",
+    "eslint": "9.18.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react": "7.37.4",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "globals": "17.6.0",
+    "jsdom": "26.0.0",
+    "prettier": "3.8.3",
+    "vite": "6.0.7",
+    "vitest": "3.0.5"
+  }
+}

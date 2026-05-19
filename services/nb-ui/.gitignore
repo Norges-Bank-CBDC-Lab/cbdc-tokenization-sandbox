@@ -1,0 +1,12 @@
+# Node/npm
+node_modules/
+dist/
+build/
+coverage/
+
+# Vite dev artefacts
+.vite/
+*.local
+
+# Test artefacts
+*.tsbuildinfo
