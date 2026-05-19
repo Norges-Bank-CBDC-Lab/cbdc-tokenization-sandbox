@@ -19,22 +19,22 @@ requireBin docker
 requireBin git
 requireBin yq
 
-backend_repo=$(yq -r '.blockscout.image.repository // ""' "$REPO_ROOT/services/blockscout/values.yaml")
-backend_tag=$(yq -r '.blockscout.image.tag // ""' "$REPO_ROOT/services/blockscout/values.yaml")
-frontend_repo=$(yq -r '.frontend.image.repository // ""' "$REPO_ROOT/services/blockscout/values.yaml")
-frontend_tag=$(yq -r '.frontend.image.tag // ""' "$REPO_ROOT/services/blockscout/values.yaml")
+backend_image="$(getBlockscoutBackendImage)"
+frontend_image="$(getBlockscoutFrontendImage)"
 
-if [[ -z "$backend_repo" || -z "$backend_tag" ]]; then
-    echo "❌ blockscout.image.repository/tag must be set in services/blockscout/values.yaml"
+backend_repo=$(imageRepo "$backend_image")
+backend_tag=$(imageTag "$backend_image")
+frontend_repo=$(imageRepo "$frontend_image")
+frontend_tag=$(imageTag "$frontend_image")
+
+if [[ -z "$backend_repo" || -z "$backend_tag" || "$backend_tag" == "latest" ]]; then
+    echo "❌ blockscout.backend must be set to an explicit tag in common/images.yaml"
     exit 1
 fi
-if [[ -z "$frontend_repo" || -z "$frontend_tag" ]]; then
-    echo "❌ frontend.image.repository/tag must be set in services/blockscout/values.yaml"
+if [[ -z "$frontend_repo" || -z "$frontend_tag" || "$frontend_tag" == "latest" ]]; then
+    echo "❌ blockscout.frontend must be set to an explicit tag in common/images.yaml"
     exit 1
 fi
-
-backend_image="${backend_repo}:${backend_tag}"
-frontend_image="${frontend_repo}:${frontend_tag}"
 
 platform=$(getKindTargetPlatform)
 

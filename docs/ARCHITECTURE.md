@@ -233,8 +233,9 @@ For concrete sequences, see:
 
 ## Configuration And Versioning
 
-- shared base image tags are pinned in `common/images.yaml`
-- Blockscout backend/frontend image tags are pinned in `services/blockscout/values.yaml`
+- sandbox deploy/build image tags are pinned in `common/images.yaml`
+- Blockscout backend/frontend fallback tags for direct Helm use live in
+  `services/blockscout/values.yaml`
 - chart versions are centralized in `common/versions.yaml`
 - deploy toggles are generated into `.env.sandbox` by
   `./sandbox.sh generate-config` and consumed by `./sandbox.sh start`

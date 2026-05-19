@@ -6,7 +6,7 @@
 # sandbox accounts. Never commit or reuse real private keys outside local development.
 
 namespace: nb-bond-api
-nodeImage: node:25.6.0
+nodeImage: node:24.15.0
 imagePullPolicy: IfNotPresent
 repoPath: /services/nb-bond-api
 env:
