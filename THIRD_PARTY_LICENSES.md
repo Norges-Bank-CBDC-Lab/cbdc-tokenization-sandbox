@@ -119,7 +119,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `26.0.0` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `vite` | `6.0.7` | MIT |
+| `vite` | `6.4.2` | MIT |
 | `vitest` | `3.0.5` | MIT |
 
 ### `services/blockscout/bens-microservice`
