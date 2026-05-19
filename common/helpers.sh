@@ -44,7 +44,11 @@ NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.y
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
-NB_UI_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
+NB_UI_BUILDER_BASEIMAGE=node:24.15.0
+NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
+# Backwards-compat alias; older code paths and external callers may still
+# reference NB_UI_BASEIMAGE expecting the nginx runtime base.
+NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
@@ -761,11 +765,38 @@ function waitForApiGateway() {
     msg="Testing gateway..."
     waitMsg "$msg" start
     i=0
+    timeout_seconds="${WAIT_FOR_APP_TIMEOUT_SECONDS:-0}"
+    if [[ "$timeout_seconds" -gt 0 && "$timeout_seconds" -lt 60 ]]; then
+        timeout_seconds=60
+    fi
 
-    while [ "$(curl -o /dev/null -s -w "%{http_code}\n" http://besu.cbdc-sandbox.local)" == "502" ]; do
+    # Probe the actual Besu JSON-RPC listener on the gateway: hostname +
+    # port 8545 (the gateway has no listener on port 80 for this host),
+    # with a real eth_blockNumber call. Treat anything except a successful
+    # 2xx with a JSON-RPC result envelope as not-ready — Earlier code
+    # checked only for "exact 502" on `http://besu.cbdc-sandbox.local/`
+    # (no port), which returns 404 the moment the gateway pod is up but
+    # before the Besu HTTPRoute has been programmed, so the loop exited
+    # immediately and the readiness gate did nothing.
+    local rpc_url="http://besu.cbdc-sandbox.local:8545/"
+    local rpc_body='{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+
+    while true; do
+        response=$(curl -fsS -X POST -H "Content-Type: application/json" \
+            --max-time 5 \
+            --data "$rpc_body" \
+            "$rpc_url" 2>/dev/null || true)
+        if [ -n "$response" ] && echo "$response" | jq -e '.result | startswith("0x")' >/dev/null 2>&1; then
+            break
+        fi
         waitMsg "$msg" $i
         sleep 1
         i=$(( i+1 ))
+        if [[ "$timeout_seconds" -gt 0 && "$i" -ge "$timeout_seconds" ]]; then
+            echo
+            echo "⚠️ Timed out waiting for Besu JSON-RPC via the gateway after ${timeout_seconds}s."
+            return 0
+        fi
     done
 
     waitMsg "$msg" end
@@ -963,11 +994,11 @@ function getNBBondApiRuntimeImage() {
 }
 
 function getNBUINginxImage() {
-    getImageValue "nb_ui.nginx" "$NB_UI_BASEIMAGE"
+    getImageValue "nb_ui.nginx" "$NB_UI_NGINX_BASEIMAGE"
 }
 
 function getNBUIBuilderImage() {
-    getImageValue "nb_ui.builder" "$NB_BOND_API_BUILDER_BASEIMAGE"
+    getImageValue "nb_ui.builder" "$NB_UI_BUILDER_BASEIMAGE"
 }
 
 function getLocalRegistryImage() {

@@ -276,6 +276,11 @@ def main() -> int:
             REPO_ROOT / "scripts/bid-submitter/package.json",
             REPO_ROOT / "scripts/bid-submitter/package-lock.json",
         ),
+        (
+            "services/nb-ui",
+            REPO_ROOT / "services/nb-ui/package.json",
+            REPO_ROOT / "services/nb-ui/package-lock.json",
+        ),
     ]
 
     for section_name, package_json_path, lockfile_path in node_sections:
