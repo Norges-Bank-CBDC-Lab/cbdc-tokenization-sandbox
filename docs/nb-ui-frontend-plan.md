@@ -716,3 +716,44 @@ Each PR body should include:
 - `docs/DOCUMENTATION_INDEX.md` lists every new doc.
 - Operator confirms the browser smoke test works against the running sandbox.
 - Portability flags captured in this plan are visible in `services/nb-ui/DEVELOPMENT.md` so a future operator considering a non-local deployment has the list in one place.
+
+---
+
+## Closeout: what landed vs what carried forward (2026-05-19)
+
+**Status: feature branch implementation complete and live-verified.** The branch `feature-frontend/nb-ui` shipped seven commits on top of `development`:
+
+1. Plan doc + index entry.
+2. `services/nb-bond-api`: `GET /v1/bonds`, `GET /v1/auctions`, CORS middleware, OpenAPI regen script + tests + license inventory.
+3. `services/nb-ui/`: Vite + React frontend with pluggable auth (`none` + `entra-MSAL`), 18 Vitest tests, GH Actions workflow, license inventory.
+4. Chart + gateway listener + Kind cluster-config mount + `DEPLOY_NB_UI` flag + lifecycle script + per-service docs + cross-cutting docs.
+5. Merge from `development` (picked up the Blockscout `v2.7.3` / `v10.0.8` pin updates that yanked `v2.6.0` upstream).
+6. **Design change**: replaced the host-mount-and-init-container deploy with a multi-stage Dockerfile (Node builder → nginx-unprivileged runtime). `deployNBUI` computes a content-hash tag, pushes to the local Kind registry, helm-installs with that image. The Kind extra-mount for `services/nb-ui` was removed entirely. The pod's main container was also renamed from `nginx` to `web-server` so it doesn't read as a second cluster gateway in `kubectl get pods`.
+7. Bug fix: `image=kind-registry:5001/...` → `image=localhost:5001/...` (matches the existing convention — containerd `hosts.toml` rewrites `localhost:5001` to the in-network registry).
+
+Final live state verified end-to-end:
+
+- `kubectl -n nb-ui get pod` → `1/1 Running` with image `localhost:5001/nb-ui:<bundle-hash>`.
+- `curl -sI http://web.cbdc-sandbox.local/` → `200 OK`, `text/html`.
+- `/config.js` returns the chart-rendered runtime config (`USE_MOCK: false`, `API_BASE_URL: http://bond-api.cbdc-sandbox.local`, `AUTH_MODE: none`).
+- CORS preflight from `web.cbdc-sandbox.local` against `bond-api.cbdc-sandbox.local` returns `Access-Control-Allow-Origin` correctly.
+- Browser smoke: bonds index + auctions index + bond / auction detail pages all render.
+
+### Carried forward (tracked in `docs/KNOWN_ISSUES.md`)
+
+1. **`reopenAuction` has no backend / on-chain support** — frontend throws `NotImplementedError` (501) in real mode, mock fakes it.
+2. **`finaliseAuction` `winners` field is ignored server-side** — open design question whether operator-selectable winners are intended.
+3. **Create-auction from the running UI fails** — discovered after final smoke; root cause not yet diagnosed. Reproduce against `nb-bond-api` directly to capture the response and decide whether it's a payload-shape mismatch on the frontend or a missing chain-side precondition.
+4. **`nb-bond-api` still uses the older host-mount + pod-side-`npm-build` deploy.** Now that `nb-ui` works image-baked, migrating `nb-bond-api` the same way is a small refactor (Dockerfile + replace `deployNBBondAPI` body + drop the Kind extra-mount). After that migration, the Kind cluster-config has zero per-service extra-mounts and adding any future service stops requiring a sandbox delete + start.
+5. **`./sandbox.sh build-images` is Blockscout-only** — open whether to grow it into an "every per-service Docker build" entry point or leave it as a Blockscout escape hatch.
+
+### Design decisions that landed (no longer "open questions")
+
+- **Deploy shape: image-baked, pushed to local Kind registry.** Not host-mount-plus-init-container as the original plan had it. This matches what an Azure deployment will look like, removes Kind cluster-config coupling, and gives a content-hash cache key that skips rebuilds on no-op runs.
+- **Hostname: `web.cbdc-sandbox.local`** (folder still `services/nb-ui/`).
+- **Vite + Vitest + ESLint + Prettier**, all confirmed in scope and tracked in `THIRD_PARTY_LICENSES.md`.
+- **Modern-browsers-only target** (Vite `target: 'es2020'`).
+- **`DEPLOY_NB_UI=true` is the default**, flippable via `.env.sandbox`.
+- **Norges Bank logo SVG is repo-owned** — no `THIRD_PARTY_NOTES.md` row.
+- **The container is named `web-server`, not `nginx`** — disambiguates from NGINX Gateway Fabric in pod listings.
+- **MSAL is in the main bundle (not lazy-loaded)** — the deployment expectation for the Entra-mode case is a per-environment image rebuild with the right runtime config, so the lazy-load complexity isn't paying for itself.
