@@ -1001,6 +1001,22 @@ function getNBUIBuilderImage() {
     getImageValue "nb_ui.builder" "$NB_UI_BUILDER_BASEIMAGE"
 }
 
+# Make sure the given upstream image ref is present in the host's local
+# Docker image cache. `loadImageToKind` pushes a `:kind`-tagged variant to
+# the local Kind registry but it short-circuits when that tag is already
+# present, which means a fresh checkout can have the registry tag without
+# the original upstream ref cached locally. `docker build` then tries to
+# resolve the upstream ref over the network and fails offline. This helper
+# does an explicit `docker pull` only when the image is missing locally.
+function ensureLocalDockerImage() {
+    local image_ref=$1
+    if docker image inspect "$image_ref" >/dev/null 2>&1; then
+        return 0
+    fi
+    echo "🔄 Pulling $image_ref into local Docker cache for build use..."
+    docker pull "$image_ref"
+}
+
 function getLocalRegistryImage() {
     if command -v yq >/dev/null 2>&1 && [ -f "$IMAGES_CONFIG" ]; then
         getImageValue "local_registry" "$KIND_REGISTRY_IMAGE"
@@ -1373,6 +1389,13 @@ function deployNBBondAPI() {
         | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
         echo "✅ nb-bond-api image ${push_tag} already in local registry — skipping build."
     else
+        # `docker build` resolves ARG defaults from the upstream registry
+        # unless those images are already in the host's Docker image
+        # cache. Ensure they are before invoking build.
+        ensureLocalDockerImage "$NB_BOND_API_BUILDER_RESOLVED"
+        if [ "$NB_BOND_API_RUNTIME_RESOLVED" != "$NB_BOND_API_BUILDER_RESOLVED" ]; then
+            ensureLocalDockerImage "$NB_BOND_API_RUNTIME_RESOLVED"
+        fi
         echo "🐳 Building nb-bond-api image ${local_tag}..."
         docker build \
             --tag "$local_tag" \
@@ -1458,6 +1481,11 @@ function deployNBUI() {
         | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
         echo "✅ nb-ui image ${push_tag} already in local registry — skipping build."
     else
+        # `docker build` resolves ARG defaults from the upstream registry
+        # unless those images are already in the host's Docker image
+        # cache. Ensure they are before invoking build.
+        ensureLocalDockerImage "$NB_UI_BUILDER_RESOLVED"
+        ensureLocalDockerImage "$NB_UI_NGINX_RESOLVED"
         echo "🐳 Building nb-ui image ${local_tag}..."
         docker build \
             --tag "$local_tag" \
