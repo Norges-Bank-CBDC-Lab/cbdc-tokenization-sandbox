@@ -65,7 +65,6 @@ function printServiceUrls() {
 
     if [ "$DEPLOY_INFRA" == "true" ]; then
         echo "${bold_on}* Besu RPC:      http://besu.cbdc-sandbox.local:8545${bold_off}"
-        echo "${bold_on}* Besu WS:       ws://besu.cbdc-sandbox.local:8546${bold_off}"
     fi
 
     if [ "$DEPLOY_BLOCKSCOUT" == "true" ]; then
@@ -132,11 +131,16 @@ while [[ $# -ge 1 ]] ; do
     shift
 done
 
+# Source deploy-flag overrides for every lifecycle command so `stop` and
+# `delete` see the same DEPLOY_* values that `start` did. Without this,
+# stopping a session that enabled DEPLOY_SCRIPTRUNNER (or any non-default
+# flag) through .env.sandbox would skip uninstalling that service.
+if [ -f "$DEPLOYMENT_CONFIG_FILE" ]; then
+    source "$DEPLOYMENT_CONFIG_FILE"
+fi
+
 if [ "$CMD" == "start" ]; then
     checkPrereqs
-    if [ -f "$DEPLOYMENT_CONFIG_FILE" ]; then
-        source "$DEPLOYMENT_CONFIG_FILE"
-    fi
 
     if [ "$DEPLOY_CONTRACTS" == "true" ] || [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
         requireContractsEnv
@@ -253,7 +257,6 @@ if [ "$CMD" == "start" ]; then
         echo
         echo " - besu rpc node, via"
         echo "   http://besu.cbdc-sandbox.local:8545"
-        echo "   ws://besu.cbdc-sandbox.local:8546"
     fi
 
     if [ "$DEPLOY_CONTRACTS" == "true" ]; then
