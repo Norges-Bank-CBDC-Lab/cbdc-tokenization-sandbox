@@ -1381,10 +1381,13 @@ function deployNBUI() {
         echo "❌ Could not compute nb-ui bundle hash."
         return 1
     fi
-    local image_repo="${KIND_REGISTRY_NAME}:${KIND_REGISTRY_PORT}/nb-ui"
+    # Image refs follow the existing kind-registry convention: containerd
+    # inside the Kind node has hosts.toml mapping localhost:5001 → the kind
+    # registry, so the pod-side pull tag is the same "localhost:5001/..."
+    # the host pushes to. See infra/cluster/containerd-certs.d/.
     local local_tag="nb-ui:${bundle_hash}"
     local push_tag="localhost:${KIND_REGISTRY_PORT}/nb-ui:${bundle_hash}"
-    local pull_tag_in_kind="${image_repo}:${bundle_hash}"
+    local pull_tag_in_kind="$push_tag"
 
     # Skip rebuild if the image is already in the local registry — content
     # hash is the cache key. The registry serves OCI manifests so we list
