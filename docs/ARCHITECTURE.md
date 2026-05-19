@@ -75,6 +75,7 @@ entries:
 - `blockscout.cbdc-sandbox.local` for the explorer
 - `bond-api.cbdc-sandbox.local` for the NB Bond API
 - `jupyterhub.cbdc-sandbox.local` for the script runner
+- `web.cbdc-sandbox.local` for the NB UI operator frontend
 
 ### Component Diagram
 
@@ -84,14 +85,16 @@ entries:
                             |  *.cbdc-sandbox.local
                             v
                     [NGINX Gateway API]
-                      |     |      |
-                      |     |      +--> [NB Bond API] ----+
-                      |     |                             |
-                      |     +--> [Blockscout] ----+       | JSON-RPC
-                      |                           |       v
-                      +--> [Besu JSON-RPC/WS] <---+   [Besu node]
-                            |
-                            +--> [Deployed Solidity contracts]
+                      |  |     |      |
+                      |  |     |      +--> [NB Bond API] ----+
+                      |  |     |                             |
+                      |  |     +--> [Blockscout] ----+       | JSON-RPC
+                      |  |                           |       v
+                      |  +--> [Besu JSON-RPC/WS] <---+   [Besu node]
+                      |        |
+                      |        +--> [Deployed Solidity contracts]
+                      |
+                      +--> [NB UI (React, nginx)] -- /v1/* --> [NB Bond API]
 
   (optional) [JupyterHub script runner] -> calls Blockscout / Besu / NB Bond API
   (optional) [scripts/* CLIs] ----------> submit on-chain bids via Besu JSON-RPC
@@ -193,6 +196,27 @@ The repository also includes reference tools for client-side workflows:
 These CLIs are reference implementations for the sandbox, not production
 tooling.
 
+### NB UI (`services/nb-ui`)
+
+The NB UI is a React + Vite browser-facing operator frontend, served by an
+nginx container at `http://web.cbdc-sandbox.local/`. It is a thin client over
+the NB Bond API:
+
+- the only network seam is `services/nb-ui/src/api/`; the rest of the UI does
+  not call `fetch` directly
+- all backend URLs come from runtime configuration (`/config.js`), so the
+  same built bundle is re-pointable per deployment without a rebuild
+- auth is pluggable: a `noneAuth` provider is the default (no `Authorization`
+  header, no sign-in UI — matching the sandbox's trusted-local posture), and
+  an `entraAuth` provider wraps MSAL Browser for environments that publish
+  OIDC tenant / client config at runtime
+- tenant / client / scope values for the Entra plugin are never committed —
+  they are read from `window.__APP_CONFIG__` at startup
+
+Deployment shape in the local sandbox: an init container stages the
+host-built `dist/` plus the chart-rendered `config.js` into an emptyDir;
+the unprivileged-nginx main container serves the staged content read-only.
+
 ## Key Workflows
 
 ### 1. Start the sandbox
@@ -250,9 +274,15 @@ local development, including:
 - Blockscout HTTP endpoints
 - NB Bond API
 - JupyterHub
+- NB UI (no sign-in chrome when `AUTH_MODE=none`, which is the default)
 
 Treat the entire environment as trusted-local only. Do not reuse keys,
 credentials, or example values outside local development.
+
+The NB UI ships a pluggable auth layer (`services/nb-ui/src/auth/`) that
+defaults to no-auth locally and can be switched to OIDC (Entra / MSAL) per
+deployment via runtime config without rebuilding the bundle. Tenant- and
+client-specific values are intentionally **not** committed in this repo.
 
 ## Read Next
 

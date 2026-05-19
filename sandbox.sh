@@ -40,6 +40,7 @@ function printHelp() {
 # - DEPLOY_SCRIPTRUNNER: true deploys JupyterHub; false skips script runner.
 # - DEPLOY_BLOCKSCOUT: true deploys Blockscout; false skips the explorer stack.
 # - DEPLOY_NB_BOND_API: true deploys NB Bond API; false skips the API service.
+# - DEPLOY_NB_UI: true deploys the NB UI frontend; false skips the operator UI.
 # - WAIT_FOR_APP_TIMEOUT_SECONDS: max seconds to wait; lower fails faster.
 # - USE_KIND_REGISTRY: true pushes/pulls via local registry; false loads directly.
 ################################################################################
@@ -50,6 +51,7 @@ export DEPLOY_SKIP_SIMULATION="${DEPLOY_SKIP_SIMULATION:-false}"
 export DEPLOY_SCRIPTRUNNER="false"
 export DEPLOY_BLOCKSCOUT="true"
 export DEPLOY_NB_BOND_API="true"
+export DEPLOY_NB_UI="true"
 export WAIT_FOR_APP_TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-60}"
 export USE_KIND_REGISTRY="${USE_KIND_REGISTRY:-true}"
 
@@ -88,6 +90,9 @@ function printPostContractsUrls() {
 
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
         echo "${bold_on}* NB Bond API:   http://bond-api.cbdc-sandbox.local${bold_off}"
+    fi
+    if [ "$DEPLOY_NB_UI" == "true" ]; then
+        echo "${bold_on}* NB UI:         http://web.cbdc-sandbox.local${bold_off}"
     fi
 
     echo "${bold_on}${border}${bold_off}"
@@ -204,6 +209,13 @@ if [ "$CMD" == "start" ]; then
         deployedSomething="true"
     fi
 
+    if [ "$DEPLOY_NB_UI" == "true" ]; then
+        echo "Deploying NB UI..."
+        cd $SCRIPT_DIR/services/nb-ui
+        ./nb-ui.sh start --as-subtask
+        deployedSomething="true"
+    fi
+
     if [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
         echo "Deploying script runner..."
         cd $SCRIPT_DIR/services/script-runner
@@ -227,6 +239,10 @@ if [ "$CMD" == "start" ]; then
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
         waitForNBBondAPI
         printPostContractsUrls
+    fi
+
+    if [ "$DEPLOY_NB_UI" == "true" ]; then
+        waitForNBUI
     fi
 
     if [ "$deployedSomething" == "true" ]; then
@@ -268,12 +284,23 @@ if [ "$CMD" == "start" ]; then
         echo "   http://bond-api.cbdc-sandbox.local"
     fi
 
+    if [ "$DEPLOY_NB_UI" == "true" ]; then
+        echo
+        echo " - NB UI, via"
+        echo "   http://web.cbdc-sandbox.local"
+    fi
+
 elif [ "$CMD" == "stop" ]; then
     checkPrereqs
     ensureLocalhostHostEntries
     if [[ $(clusterExists) == "false" ]]; then
         echo "Cluster '$CLUSTER_NAME' does not exist. Nothing to stop."
         exit 0
+    fi
+
+    if [ "$DEPLOY_NB_UI" == "true" ]; then
+        cd $SCRIPT_DIR/services/nb-ui
+        ./nb-ui.sh stop --as-subtask || true
     fi
 
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then

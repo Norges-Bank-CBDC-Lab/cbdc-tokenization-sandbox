@@ -39,3 +39,6 @@ script_runner:
 
 nb_bond_api:
   base: node:25.6.0
+
+nb_ui:
+  nginx: nginxinc/nginx-unprivileged:1.27-alpine

@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nb-ui
+  namespace: {{ .Values.namespace | default "nb-ui" }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: nb-ui
+  template:
+    metadata:
+      labels:
+        app: nb-ui
+      annotations:
+        # Force a rollout whenever the rendered runtime-config changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      initContainers:
+        # Stage the pre-built bundle + the rendered config.js into an emptyDir
+        # that nginx can serve. The bundle comes from the host (Vite-built into
+        # services/nb-ui/dist/ before deploy — see services/nb-ui/nb-ui.sh).
+        - name: stage-bundle
+          image: {{ .Values.nginxImage | default "nginxinc/nginx-unprivileged:1.27-alpine" }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              if [ ! -d /source/dist ] || [ -z "$(ls -A /source/dist 2>/dev/null)" ]; then
+                echo "❌ /source/dist is missing or empty."
+                echo "   Build the bundle on the host with: cd services/nb-ui && npm run build"
+                exit 1
+              fi
+              cp -R /source/dist/. /html/
+              cp /runtime-config/config.js /html/config.js
+              echo "✅ Staged $(ls /html | wc -l) entries into /usr/share/nginx/html"
+          volumeMounts:
+            - name: nb-ui-source
+              mountPath: /source
+              readOnly: true
+            - name: nb-ui-runtime-config
+              mountPath: /runtime-config
+              readOnly: true
+            - name: nb-ui-html
+              mountPath: /html
+      containers:
+        - name: nginx
+          image: {{ .Values.nginxImage | default "nginxinc/nginx-unprivileged:1.27-alpine" }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            # nginx-unprivileged listens on 8080 by default.
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: nb-ui-html
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: nb-ui-source
+          hostPath:
+            path: {{ .Values.repoPath | default "/services/nb-ui" }}
+            type: Directory
+        - name: nb-ui-runtime-config
+          configMap:
+            name: nb-ui-runtime-config
+        - name: nb-ui-html
+          emptyDir: {}

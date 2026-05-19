@@ -24,6 +24,8 @@ This file lists the documentation that is most likely to need updates when behav
 - `services/blockscout/debugging.md`: Blockscout/Besu debugging playbook.
 - `services/nb-bond-api/README.md`: NB Bond API overview and environment variables.
 - `services/nb-bond-api/DEVELOPMENT.md`: NB Bond API runbooks and OpenAPI usage.
+- `services/nb-ui/README.md`: NB UI operator frontend overview.
+- `services/nb-ui/DEVELOPMENT.md`: NB UI runtime config, auth plugin model, deployment shape.
 - `services/blockscout/bens-microservice/README.md`: BENS OpenAPI server (generated; update via regen script).
 
 ## Contracts
@@ -46,4 +48,5 @@ This file lists the documentation that is most likely to need updates when behav
 ## Operations and reports
 - `infra/AGENTS.md`: Infra-specific AI agent guidance and safety checks.
 - `services/AGENTS.md`: Service-specific AI agent guidance and conventions.
+- `services/nb-ui/AGENTS.md`: NB UI-specific AI agent guidance and safety checks.
 - `docs/diagrams/processes/*.md`: Process diagram narratives.

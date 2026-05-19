@@ -40,6 +40,10 @@ NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_BASEIMAGE=node:25.6.0
 NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.yaml
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
+NB_UI_NAMESPACE=nb-ui
+NB_UI_DIR=$REPO_ROOT/services/nb-ui
+NB_UI_DIST_DIR=$NB_UI_DIR/dist
+NB_UI_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
@@ -215,6 +219,7 @@ function ensureLocalhostHostEntries() {
         "blockscout.cbdc-sandbox.local"
         "jupyterhub.cbdc-sandbox.local"
         "bond-api.cbdc-sandbox.local"
+        "web.cbdc-sandbox.local"
     )
     local missing_hosts=()
 
@@ -774,6 +779,10 @@ function waitForNBBondAPI() {
     waitForApp nb-bond-api nb-bond-api
 }
 
+function waitForNBUI() {
+    waitForApp nb-ui nb-ui
+}
+
 function createKindCluster() {
     # NOTE: kind resolves `extraMounts[].hostPath` relative to the current working directory,
     # not relative to the config file path. Our kind config assumes it is invoked from `infra/`.
@@ -951,6 +960,10 @@ function getNBBondApiImage() {
     getImageValue "nb_bond_api.base" "$NB_BOND_API_BASEIMAGE"
 }
 
+function getNBUIImage() {
+    getImageValue "nb_ui.nginx" "$NB_UI_BASEIMAGE"
+}
+
 function syncImagesToRegistry() {
     images=()
     images+=("$(getBesuImage)")
@@ -960,6 +973,7 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutBensImage)")
     images+=("$(getScriptRunnerImage)")
     images+=("$(getNBBondApiImage)")
+    images+=("$(getNBUIImage)")
 
     for image in "${images[@]}"; do
         if [ -n "$image" ] && [ "$image" != "null" ]; then
@@ -1320,4 +1334,45 @@ function deployNBBondAPI() {
          --values "$NB_BOND_API_HELM_VALUES_FILE" \
          --set nodeImage=$NB_BOND_API_IMAGE_OVERRIDE \
          --set-string env.GLOBAL_REGISTRY_ADDRESS=$registry_contract_address
+}
+
+function deployNBUI() {
+    if [ ! -d "$NB_UI_DIST_DIR" ] || [ -z "$(ls -A "$NB_UI_DIST_DIR" 2>/dev/null)" ]; then
+        echo "♻️ NB UI 'dist' folder not found. Building..."
+        pushd "$NB_UI_DIR" >/dev/null
+        if [ -f "package-lock.json" ]; then
+            npm ci || {
+                echo "❌ Failed to install NB UI dependencies (npm ci)"
+                popd >/dev/null
+                return 1
+            }
+        else
+            npm install || {
+                echo "❌ Failed to install NB UI dependencies (npm install)"
+                popd >/dev/null
+                return 1
+            }
+        fi
+        npm run build || {
+            echo "❌ Failed to build NB UI"
+            popd >/dev/null
+            return 1
+        }
+        popd >/dev/null
+    fi
+
+    NB_UI_BASEIMAGE_RESOLVED="$(getNBUIImage)"
+    loadImageToKind "$NB_UI_BASEIMAGE_RESOLVED"
+    NB_UI_IMAGE_OVERRIDE="$NB_UI_BASEIMAGE_RESOLVED"
+    if [ "${USE_KIND_REGISTRY:-false}" == "true" ]; then
+        NB_UI_IMAGE_OVERRIDE=$(kindRegistryImageFor "$NB_UI_BASEIMAGE_RESOLVED")
+        echo "🔁 Using local registry image for NB UI: $NB_UI_IMAGE_OVERRIDE"
+    fi
+
+    helm upgrade nb-ui "$REPO_ROOT/services/nb-ui/helm" \
+         --install \
+         --kube-context kind-$CLUSTER_NAME \
+         --namespace $NB_UI_NAMESPACE \
+         --create-namespace \
+         --set nginxImage="$NB_UI_IMAGE_OVERRIDE"
 }

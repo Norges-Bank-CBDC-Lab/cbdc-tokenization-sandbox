@@ -1,0 +1,21 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: nb-ui
+  namespace: {{ .Values.namespace | default "nb-ui" }}
+spec:
+  parentRefs:
+    - name: gateway
+      namespace: nginx-gateway
+      sectionName: nb-ui-http
+  hostnames:
+    - "web.{{ .Values.rootDnsZone | default "cbdc-sandbox.local" }}"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: nb-ui
+          namespace: {{ .Values.namespace | default "nb-ui" }}
+          port: 80

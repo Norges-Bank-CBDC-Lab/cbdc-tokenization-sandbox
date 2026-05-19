@@ -43,6 +43,8 @@ pulled at build/deploy time. Current examples include:
 - JupyterHub / Jupyter Docker Stacks
 - Blockscout charts and images
 - BusyBox image references in Helm templates
+- `nginxinc/nginx-unprivileged` (BSD-2-Clause), used as the runtime image for
+  the `services/nb-ui` frontend chart. Pinned in `common/images.yaml`.
 
 > ### Warning
 > **Users deploying the sandbox are responsible for complying with the

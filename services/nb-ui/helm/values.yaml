@@ -1,0 +1,30 @@
+# Tracked defaults for the nb-ui chart. Local overrides may go in
+# services/nb-ui/helm/values.local.yaml (gitignored) when the sandbox needs
+# them; nb-ui has no required secrets so the default values render cleanly
+# without a local file.
+
+namespace: nb-ui
+nginxImage: nginxinc/nginx-unprivileged:1.27-alpine
+imagePullPolicy: IfNotPresent
+
+# Inside the Kind node container, the host services/nb-ui directory is mounted
+# at /services/nb-ui via infra/cluster/cluster-config.yaml. The chart re-mounts
+# the same path into the init container so it can stage the pre-built dist/.
+repoPath: /services/nb-ui
+
+rootDnsZone: cbdc-sandbox.local
+
+# Runtime configuration rendered into /config.js by the chart and served
+# alongside the static bundle. See services/nb-ui/src/config.js for the shape.
+# Override any of these at deploy time to point the same bundle at a different
+# backend, or to switch the auth plugin without rebuilding.
+runtimeConfig:
+  useMock: false
+  apiBaseUrl: http://bond-api.cbdc-sandbox.local
+  authMode: none
+  authTenantId: ""
+  authClientId: ""
+  authAuthority: ""
+  authScopes: ""
+  authRedirectUri: ""
+  mockLatencyMs: 0

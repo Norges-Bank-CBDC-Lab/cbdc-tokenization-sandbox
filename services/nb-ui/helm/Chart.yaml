@@ -1,0 +1,4 @@
+apiVersion: v1
+name: nb-ui
+version: 0.0.1
+description: Deploys nb-ui (React + Vite operator frontend) behind nginx

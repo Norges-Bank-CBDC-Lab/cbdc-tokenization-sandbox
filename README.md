@@ -126,8 +126,8 @@ frontend images are pinned in `services/blockscout/values.yaml`.
 
 Typical flags in `.env.sandbox` include `DEPLOY_INFRA`, `DEPLOY_BLOCKSCOUT`,
 `DEPLOY_SCRIPTRUNNER`, `DEPLOY_CONTRACTS`, `DEPLOY_VERIFY_CONTRACTS`,
-`DEPLOY_SKIP_SIMULATION`, and `DEPLOY_NB_BOND_API`. If you skip this step, the
-default root-level workflow is used.
+`DEPLOY_SKIP_SIMULATION`, `DEPLOY_NB_BOND_API`, and `DEPLOY_NB_UI`. If you
+skip this step, the default root-level workflow is used.
 
 8. Start the sandbox:
 
@@ -150,6 +150,7 @@ If the script does not update your hosts file, add these entries manually:
 127.0.0.1 jupyterhub.cbdc-sandbox.local
 127.0.0.1 blockscout.cbdc-sandbox.local
 127.0.0.1 bond-api.cbdc-sandbox.local
+127.0.0.1 web.cbdc-sandbox.local
 ```
 
 Use `/etc/hosts` on Linux/macOS or
