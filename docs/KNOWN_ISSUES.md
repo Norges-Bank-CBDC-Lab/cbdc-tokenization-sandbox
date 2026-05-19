@@ -78,6 +78,20 @@
   entirely and adding any future service stops requiring a sandbox
   delete + start.
 
+## Repo has four sibling node_modules trees (~420 MB total)
+- `services/nb-bond-api/` (~173 MB), `services/nb-ui/` (~129 MB),
+  `scripts/bid-encryption/` (~60 MB), `scripts/bid-submitter/` (~60 MB)
+  each carry their own `node_modules/`. All are gitignored, but they add
+  up to ~34k files on disk and make VS Code's file-watcher and global
+  search slow unless explicitly excluded. The repo doesn't ship a
+  `.vscode/` workspace setting (the root `.gitignore` excludes
+  `/.vscode/`); each developer maintains their own.
+- Planned follow-up: convert the four services to npm workspaces with a
+  root `package.json` and a single hoisted `node_modules/`. Saves
+  150-200 MB through dedup and cuts the watch surface by ~half. Touches
+  each service's `package.json`, the existing `npm ci` flows in each
+  `<svc>.sh`, and the CI workflows.
+
 ## sandbox.sh build-images is Blockscout-only today
 - `./sandbox.sh build-images` only wraps
   `services/blockscout/build-images.sh`, which clones upstream Blockscout
