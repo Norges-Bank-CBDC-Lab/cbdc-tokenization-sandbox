@@ -12,11 +12,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "regen:openapi": "tsx scripts/regen-openapi.ts"
   },
   "dependencies": {
     "@noble/secp256k1": "3.1.0",
     "better-sqlite3": "12.10.0",
+    "cors": "2.8.6",
     "dotenv": "17.4.2",
     "ethers": "6.16.0",
     "express": "5.2.1",
@@ -39,6 +41,7 @@
     "@babel/preset-env": "7.29.5",
     "@eslint/js": "10.0.1",
     "@types/better-sqlite3": "7.6.13",
+    "@types/cors": "2.8.19",
     "@types/express": "5.0.6",
     "@types/jest": "30.0.0",
     "@types/node": "24.12.4",

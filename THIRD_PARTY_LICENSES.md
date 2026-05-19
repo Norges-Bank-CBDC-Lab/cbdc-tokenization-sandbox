@@ -54,6 +54,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `better-sqlite3` | `12.10.0` | MIT |
+| `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
@@ -65,6 +66,7 @@ License labels and deployment-time notes remain curated review items.
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
+| `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `24.12.4` | MIT |
@@ -98,6 +100,27 @@ License labels and deployment-time notes remain curated review items.
 | `@types/node` | `24.12.4` | MIT |
 | `tsx` | `4.22.3` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
+
+### `services/nb-ui`
+
+| Package | Version | License |
+| --- | --- | --- |
+| `@azure/msal-browser` | `3.30.0` | MIT |
+| `react` | `18.3.1` | MIT |
+| `react-dom` | `18.3.1` | MIT |
+| `@testing-library/jest-dom` | `6.7.0` | MIT |
+| `@testing-library/react` | `16.1.0` | MIT |
+| `@testing-library/user-event` | `14.5.2` | MIT |
+| `@vitejs/plugin-react` | `4.7.0` | MIT |
+| `eslint` | `9.18.0` | MIT |
+| `eslint-config-prettier` | `10.1.8` | MIT |
+| `eslint-plugin-react` | `7.37.4` | MIT |
+| `eslint-plugin-react-hooks` | `5.1.0` | MIT |
+| `globals` | `17.6.0` | MIT |
+| `jsdom` | `26.0.0` | MIT |
+| `prettier` | `3.8.3` | MIT |
+| `vite` | `6.0.7` | MIT |
+| `vitest` | `3.0.5` | MIT |
 
 ### `services/blockscout/bens-microservice`
 

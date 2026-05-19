@@ -7,6 +7,7 @@ infrastructure and deployed contracts.
 
 - `blockscout/`: explorer stack with Postgres and optional BENS name service
 - `nb-bond-api/`: privileged operator API for the bond lifecycle
+- `nb-ui/`: React + Vite operator frontend served by nginx
 - `script-runner/`: JupyterHub-based notebook environment
 
 ## Start Here
@@ -24,6 +25,7 @@ From the repository root:
 cd services/blockscout && ./blockscout.sh start
 node scripts/generate-local-sandbox-fixtures.mjs
 cd services/nb-bond-api && ./nb-bond-api.sh start
+cd services/nb-ui && ./nb-ui.sh start
 ```
 
 For `script-runner`, prefer the root sandbox workflow unless you are already
@@ -53,10 +55,19 @@ service start scripts.
 The hosted notebook environment is optional. Some notebook flows assume
 Blockscout is running and contracts have already been verified.
 
+### NB UI
+
+React + Vite browser-facing operator UI served by nginx at
+`http://web.cbdc-sandbox.local/`. Talks to the NB Bond API through a single
+network seam. Ships with a pluggable auth layer (`none` by default,
+`entra` via MSAL Browser opt-in). Runtime config is injected per
+deployment without rebuilding.
+
 ## Read Next
 
 - [DEVELOPMENT.md](DEVELOPMENT.md) for detailed service operations
 - [nb-bond-api/README.md](nb-bond-api/README.md) for the operator API
+- [nb-ui/README.md](nb-ui/README.md) for the operator frontend
 - [blockscout/debugging.md](blockscout/debugging.md) for explorer diagnostics
 - [../docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for how the services fit
   into the sandbox

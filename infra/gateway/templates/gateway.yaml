@@ -33,3 +33,10 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+  - name: nb-ui-http
+    port: 80
+    protocol: HTTP
+    hostname: "web.{{ .Values.rootDnsZone }}"
+    allowedRoutes:
+      namespaces:
+        from: All

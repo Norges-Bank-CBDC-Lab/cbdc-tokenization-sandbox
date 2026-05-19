@@ -161,3 +161,41 @@ export function getBondEventsByIsin(db: IngestionDatabase, isin: string, limit =
     payload: string;
   }>;
 }
+
+export interface AuctionRow {
+  auction_id: string;
+  isin: string;
+  type: string | null;
+  created_block: number | null;
+  created_tx: string | null;
+  bond: string | null;
+}
+
+export function listAllAuctions(db: IngestionDatabase): AuctionRow[] {
+  const stmt = db.prepare(
+    `SELECT auction_id, isin, type, created_block, created_tx, bond
+     FROM auctions
+     ORDER BY created_block DESC, auction_id`,
+  );
+  return stmt.all() as AuctionRow[];
+}
+
+export interface BondRow {
+  isin: string;
+  bond: string | null;
+  created_block: number | null;
+}
+
+export function listAllBonds(db: IngestionDatabase): BondRow[] {
+  // One row per (isin, bond) tuple. Multiple partitions can share an ISIN
+  // (different bond contracts), so we group and take the earliest creation
+  // block as the bond's "born at".
+  const stmt = db.prepare(
+    `SELECT isin, bond, MIN(created_block) AS created_block
+     FROM partitions
+     WHERE isin IS NOT NULL
+     GROUP BY isin, bond
+     ORDER BY created_block, isin`,
+  );
+  return stmt.all() as BondRow[];
+}

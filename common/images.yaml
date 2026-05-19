@@ -43,4 +43,11 @@ script_runner:
 nb_bond_api:
   base: node:24.15.0
 
+# nb-ui ships as a self-contained image built locally from services/nb-ui/Dockerfile.
+# The two pins below are the Dockerfile stage bases — registry-sync pulls them so the
+# build works without internet, the build itself runs from ./services/nb-ui/nb-ui.sh.
+nb_ui:
+  builder: node:24.15.0
+  nginx: nginxinc/nginx-unprivileged:1.27-alpine
+
 local_registry: registry:2.8.3

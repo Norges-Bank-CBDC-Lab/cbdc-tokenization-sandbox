@@ -1,0 +1,28 @@
+# Tracked defaults for the nb-ui chart. The `image` value has no default —
+# `services/nb-ui/nb-ui.sh start` builds the bundle into a local image, pushes
+# it to the kind registry, and sets this value at install time. Direct
+# `helm template` / `helm install` invocations must pass it explicitly.
+
+namespace: nb-ui
+# The locally-built nb-ui image. Required; produced by nb-ui.sh as
+# `localhost:5001/nb-ui:<short-content-hash>`. No default — failing fast at
+# render time is better than silently pulling an unrelated nginx.
+image: ""
+imagePullPolicy: IfNotPresent
+
+rootDnsZone: cbdc-sandbox.local
+
+# Runtime configuration rendered into /config.js by the chart and served
+# alongside the static bundle. See services/nb-ui/src/config.js for the shape.
+# Override any of these at deploy time to point the same image at a different
+# backend, or to switch the auth plugin without rebuilding.
+runtimeConfig:
+  useMock: false
+  apiBaseUrl: http://bond-api.cbdc-sandbox.local
+  authMode: none
+  authTenantId: ""
+  authClientId: ""
+  authAuthority: ""
+  authScopes: ""
+  authRedirectUri: ""
+  mockLatencyMs: 0

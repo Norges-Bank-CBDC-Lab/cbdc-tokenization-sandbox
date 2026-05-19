@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nb-ui-runtime-config
+  namespace: {{ .Values.namespace | default "nb-ui" }}
+data:
+  # config.js is loaded by index.html before the React bundle, so
+  # window.__APP_CONFIG__ is populated when src/config.js runs.
+  config.js: |
+    window.__APP_CONFIG__ = {
+      USE_MOCK: {{ .Values.runtimeConfig.useMock | default false }},
+      API_BASE_URL: {{ .Values.runtimeConfig.apiBaseUrl | quote }},
+      AUTH_MODE: {{ .Values.runtimeConfig.authMode | default "none" | quote }},
+      AUTH_TENANT_ID: {{ .Values.runtimeConfig.authTenantId | default "" | quote }},
+      AUTH_CLIENT_ID: {{ .Values.runtimeConfig.authClientId | default "" | quote }},
+      AUTH_AUTHORITY: {{ .Values.runtimeConfig.authAuthority | default "" | quote }},
+      AUTH_SCOPES: {{ .Values.runtimeConfig.authScopes | default "" | quote }},
+      AUTH_REDIRECT_URI: {{ .Values.runtimeConfig.authRedirectUri | default "" | quote }},
+      MOCK_LATENCY_MS: {{ .Values.runtimeConfig.mockLatencyMs | default 0 }},
+    };

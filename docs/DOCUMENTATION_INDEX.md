@@ -14,6 +14,7 @@ This file lists the documentation that is most likely to need updates when behav
 - `docs/KNOWN_ISSUES.md`: Known issues and follow-ups.
 - `docs/post-mortems/README.md`: Incident reports and historical troubleshooting write-ups.
 - `docs/jupyter-removal-plan.md`: Deferred decommission plan for the JupyterHub-based script runner and its replacement path.
+- `docs/nb-ui-frontend-plan.md`: Implementation plan for the `services/nb-ui/` operator frontend (React + Vite), NB Bond API aggregate endpoints + CORS, and pluggable auth (none / Entra-MSAL).
 
 ## Infra and services
 - `infra/README.md`: Infra overview and command entrypoint.
@@ -23,6 +24,8 @@ This file lists the documentation that is most likely to need updates when behav
 - `services/blockscout/debugging.md`: Blockscout/Besu debugging playbook.
 - `services/nb-bond-api/README.md`: NB Bond API overview and environment variables.
 - `services/nb-bond-api/DEVELOPMENT.md`: NB Bond API runbooks and OpenAPI usage.
+- `services/nb-ui/README.md`: NB UI operator frontend overview.
+- `services/nb-ui/DEVELOPMENT.md`: NB UI runtime config, auth plugin model, deployment shape.
 - `services/blockscout/bens-microservice/README.md`: BENS OpenAPI server (generated; update via regen script).
 
 ## Contracts
@@ -45,4 +48,5 @@ This file lists the documentation that is most likely to need updates when behav
 ## Operations and reports
 - `infra/AGENTS.md`: Infra-specific AI agent guidance and safety checks.
 - `services/AGENTS.md`: Service-specific AI agent guidance and conventions.
+- `services/nb-ui/AGENTS.md`: NB UI-specific AI agent guidance and safety checks.
 - `docs/diagrams/processes/*.md`: Process diagram narratives.

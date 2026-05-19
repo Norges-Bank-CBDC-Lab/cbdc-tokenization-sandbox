@@ -37,3 +37,5 @@ nodes:
       containerPath: /etc/containerd/certs.d/kind
     - hostPath: ../services/nb-bond-api
       containerPath: /services/nb-bond-api
+    - hostPath: ../services/nb-ui
+      containerPath: /services/nb-ui

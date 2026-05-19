@@ -33,6 +33,9 @@ development.
   The local sandbox generator sets this to a stable fixture value in the Helm secret.
 - `LOG_LEVEL` – defaults to `info`
 - `EXPRESS_PORT` – defaults to `8080`
+- `CORS_ALLOWED_ORIGINS` – comma-separated list of origins the CORS middleware accepts.
+  Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend).
+  Override (with multiple comma-separated origins if needed) for a non-local deployment.
 
 ## Scripts
 

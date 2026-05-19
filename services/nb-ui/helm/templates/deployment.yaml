@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nb-ui
+  namespace: {{ .Values.namespace | default "nb-ui" }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: nb-ui
+  template:
+    metadata:
+      labels:
+        app: nb-ui
+      annotations:
+        # Force a rollout whenever the rendered runtime-config changes.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        # The container is named `web-server` (not `nginx`) to keep the
+        # distinction with the cluster-wide NGINX Gateway Fabric pod clear.
+        # The image happens to be nginx-unprivileged but this pod is just a
+        # static file server for the React bundle; routing lives in the
+        # Gateway, not here.
+        - name: web-server
+          image: {{ required "image is required (built by services/nb-ui/nb-ui.sh)" .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            # nginx-unprivileged listens on 8080 by default.
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            # The image ships dist/ at /usr/share/nginx/html/. We overlay
+            # config.js from the chart-rendered ConfigMap so the runtime
+            # config can be re-pointed per deployment without rebuilding.
+            - name: nb-ui-runtime-config
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+      volumes:
+        - name: nb-ui-runtime-config
+          configMap:
+            name: nb-ui-runtime-config

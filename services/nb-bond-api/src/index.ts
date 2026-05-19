@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
 
@@ -30,6 +31,8 @@ import {
   getAuctionEventsByIsin,
   getBalancesByIsin,
   getBondEventsByIsin,
+  listAllAuctions,
+  listAllBonds,
   openDatabase,
 } from './ingestion-db';
 import { keccak256, toUtf8Bytes } from 'ethers';
@@ -54,9 +57,21 @@ import { validateRequest } from './validation';
 
 const sealingKeys: SealingKeypair = initSealingKeypair(envVariables.AUCTION_OWNER_SEAL_PK);
 
+const corsAllowedOrigins = envVariables.CORS_ALLOWED_ORIGINS.split(',')
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0);
+
 const app = express();
 app.use(express.json());
 app.use(helmet());
+app.use(
+  cors({
+    origin: corsAllowedOrigins,
+    credentials: false,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  }),
+);
 
 // Read-only connection for history lookups; ingestion writer will open in write mode.
 const historyDb = openDatabase({ dbPath: envVariables.DB_PATH, readonly: true });
@@ -880,96 +895,151 @@ app.get('/v1/bonds/:isin/holders', validateRequest(isinParamSchema, 'params'), a
   });
 });
 
+interface BondSummary {
+  isin: string;
+  maturityDuration: string | null;
+  maturityDate: string | null;
+  timeToMaturity: string | null;
+  couponDuration: string | null;
+  couponYield: string | null;
+  couponPaymentsTotal: string | null;
+  couponPaymentsMade: string | null;
+  couponPaymentsRemaining: string | null;
+  status: 'minting' | 'maturing' | 'matured' | 'redeemed' | 'unknown';
+  totalSupply: string | null;
+}
+
+async function buildBondSummary(isin: string): Promise<BondSummary> {
+  const bondToken = await getBondToken();
+  const partition = keccak256(toUtf8Bytes(isin));
+
+  const maturityDurationRaw = await bondToken.maturityDuration(partition).catch(() => null);
+  const couponDurationRaw = await bondToken.couponDuration(partition).catch(() => null);
+  const couponYieldRaw = await bondToken.couponYield(partition).catch(() => null);
+  const lastCouponPaymentRaw = await bondToken.lastCouponPayment(partition).catch(() => null);
+  const couponPaymentCountRaw = await bondToken.couponPaymentCount(partition).catch(() => null);
+  const isMaturedRaw = await bondToken.isMatured(partition).catch(() => null);
+  const totalSupplyRaw = await bondToken.totalSupplyByPartition(partition).catch(() => null);
+  const maturityDateRaw = await bondToken.maturityDate(partition).catch(() => null);
+  const bondEvents = getBondEventsByIsin(historyDb, isin, 1000, 0);
+
+  const maturityDuration = maturityDurationRaw ? BigInt(maturityDurationRaw.toString()) : null;
+  const couponDuration = couponDurationRaw ? BigInt(couponDurationRaw.toString()) : null;
+  const couponYield = couponYieldRaw ? BigInt(couponYieldRaw.toString()) : null;
+  const lastCouponPayment = lastCouponPaymentRaw ? BigInt(lastCouponPaymentRaw.toString()) : null;
+  const couponPaymentCount = couponPaymentCountRaw
+    ? BigInt(couponPaymentCountRaw.toString())
+    : null;
+  const maturityDate = maturityDateRaw ? BigInt(maturityDateRaw.toString()) : null;
+  const totalSupply = totalSupplyRaw ? BigInt(totalSupplyRaw.toString()) : null;
+  const isMatured = Boolean(isMaturedRaw);
+  const balanceSum = getBalancesByIsin(historyDb, isin).reduce(
+    (sum, b) => sum + BigInt(b.balance ?? '0'),
+    0n,
+  );
+  let supplyResolved =
+    totalSupply !== null
+      ? balanceSum < totalSupply
+        ? balanceSum
+        : totalSupply
+      : balanceSum !== null
+        ? balanceSum
+        : null;
+
+  let couponPaymentsTotal: bigint | null = null;
+  let couponPaymentsRemaining: bigint | null = null;
+  if (maturityDuration && couponDuration && couponDuration > 0n) {
+    couponPaymentsTotal = maturityDuration / couponDuration;
+    if (couponPaymentCount !== null) {
+      const remaining = couponPaymentsTotal - (couponPaymentCount ?? 0n);
+      couponPaymentsRemaining = remaining >= 0n ? remaining : 0n;
+    }
+  }
+
+  let timeToMaturity: bigint | null = null;
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (maturityDate && maturityDate > 0n) {
+    const diff = maturityDate > now ? maturityDate - now : 0n;
+    timeToMaturity = diff;
+  } else if (couponDuration && couponPaymentCount !== null && couponPaymentsTotal !== null) {
+    const remainingIntervals = couponPaymentsTotal - (couponPaymentCount ?? 0n);
+    const base = lastCouponPayment && lastCouponPayment > 0n ? lastCouponPayment : now;
+    const estimated = base + remainingIntervals * couponDuration;
+    timeToMaturity = estimated > now ? estimated - now : 0n;
+  }
+
+  const hasRedeemEvent = bondEvents.some((e) => e.type === 'REDEEMED');
+  // If redemption was observed on-chain but totalSupply call failed (or local balances are stale),
+  // force supplyResolved to 0 so status reflects redemption accurately.
+  if (hasRedeemEvent && (totalSupply === null || supplyResolved === null)) {
+    supplyResolved = 0n;
+  }
+
+  let status: 'minting' | 'maturing' | 'matured' | 'redeemed' | 'unknown' = 'unknown';
+  if (isMatured || hasRedeemEvent) {
+    status = supplyResolved === 0n ? 'redeemed' : 'matured';
+  } else if (couponPaymentCount !== null && couponPaymentCount > 0n) {
+    status = 'maturing';
+  } else if (couponPaymentCount !== null) {
+    status = 'minting';
+  }
+
+  return {
+    isin,
+    maturityDuration: maturityDuration?.toString() ?? null,
+    maturityDate: maturityDate?.toString() ?? null,
+    timeToMaturity: timeToMaturity?.toString() ?? null,
+    couponDuration: couponDuration?.toString() ?? null,
+    couponYield: couponYield?.toString() ?? null,
+    couponPaymentsTotal: couponPaymentsTotal?.toString() ?? null,
+    couponPaymentsMade: couponPaymentCount?.toString() ?? null,
+    couponPaymentsRemaining: couponPaymentsRemaining?.toString() ?? null,
+    status,
+    totalSupply: supplyResolved !== null ? supplyResolved.toString() : null,
+  };
+}
+
 app.get('/v1/bonds/:isin', validateRequest(isinParamSchema, 'params'), async (req, res, next) => {
   try {
     const { isin } = req.params as { isin: string };
-    const bondToken = await getBondToken();
-    const partition = keccak256(toUtf8Bytes(isin));
+    res.json(await buildBondSummary(isin));
+  } catch (err) {
+    next(err);
+  }
+});
 
-    const maturityDurationRaw = await bondToken.maturityDuration(partition).catch(() => null);
-    const couponDurationRaw = await bondToken.couponDuration(partition).catch(() => null);
-    const couponYieldRaw = await bondToken.couponYield(partition).catch(() => null);
-    const lastCouponPaymentRaw = await bondToken.lastCouponPayment(partition).catch(() => null);
-    const couponPaymentCountRaw = await bondToken.couponPaymentCount(partition).catch(() => null);
-    const isMaturedRaw = await bondToken.isMatured(partition).catch(() => null);
-    const totalSupplyRaw = await bondToken.totalSupplyByPartition(partition).catch(() => null);
-    const maturityDateRaw = await bondToken.maturityDate(partition).catch(() => null);
-    const bondEvents = getBondEventsByIsin(historyDb, isin, 1000, 0);
+app.get('/v1/bonds', async (_req, res, next) => {
+  try {
+    const rows = listAllBonds(historyDb);
+    // Bond summary composer makes ~8 on-chain reads; fan out in parallel.
+    const bonds = await Promise.all(rows.map((r) => buildBondSummary(r.isin)));
+    res.json({ bonds });
+  } catch (err) {
+    next(err);
+  }
+});
 
-    const maturityDuration = maturityDurationRaw ? BigInt(maturityDurationRaw.toString()) : null;
-    const couponDuration = couponDurationRaw ? BigInt(couponDurationRaw.toString()) : null;
-    const couponYield = couponYieldRaw ? BigInt(couponYieldRaw.toString()) : null;
-    const lastCouponPayment = lastCouponPaymentRaw ? BigInt(lastCouponPaymentRaw.toString()) : null;
-    const couponPaymentCount = couponPaymentCountRaw
-      ? BigInt(couponPaymentCountRaw.toString())
-      : null;
-    const maturityDate = maturityDateRaw ? BigInt(maturityDateRaw.toString()) : null;
-    const totalSupply = totalSupplyRaw ? BigInt(totalSupplyRaw.toString()) : null;
-    const isMatured = Boolean(isMaturedRaw);
-    const balanceSum = getBalancesByIsin(historyDb, isin).reduce(
-      (sum, b) => sum + BigInt(b.balance ?? '0'),
-      0n,
-    );
-    let supplyResolved =
-      totalSupply !== null
-        ? balanceSum < totalSupply
-          ? balanceSum
-          : totalSupply
-        : balanceSum !== null
-          ? balanceSum
-          : null;
-
-    let couponPaymentsTotal: bigint | null = null;
-    let couponPaymentsRemaining: bigint | null = null;
-    if (maturityDuration && couponDuration && couponDuration > 0n) {
-      couponPaymentsTotal = maturityDuration / couponDuration;
-      if (couponPaymentCount !== null) {
-        const remaining = couponPaymentsTotal - (couponPaymentCount ?? 0n);
-        couponPaymentsRemaining = remaining >= 0n ? remaining : 0n;
-      }
-    }
-
-    let timeToMaturity: bigint | null = null;
-    const now = BigInt(Math.floor(Date.now() / 1000));
-    if (maturityDate && maturityDate > 0n) {
-      const diff = maturityDate > now ? maturityDate - now : 0n;
-      timeToMaturity = diff;
-    } else if (couponDuration && couponPaymentCount !== null && couponPaymentsTotal !== null) {
-      const remainingIntervals = couponPaymentsTotal - (couponPaymentCount ?? 0n);
-      const base = lastCouponPayment && lastCouponPayment > 0n ? lastCouponPayment : now;
-      const estimated = base + remainingIntervals * couponDuration;
-      timeToMaturity = estimated > now ? estimated - now : 0n;
-    }
-
-    const hasRedeemEvent = bondEvents.some((e) => e.type === 'REDEEMED');
-    // If redemption was observed on-chain but totalSupply call failed (or local balances are stale),
-    // force supplyResolved to 0 so status reflects redemption accurately.
-    if (hasRedeemEvent && (totalSupply === null || supplyResolved === null)) {
-      supplyResolved = 0n;
-    }
-
-    let status: 'minting' | 'maturing' | 'matured' | 'redeemed' | 'unknown' = 'unknown';
-    if (isMatured || hasRedeemEvent) {
-      status = supplyResolved === 0n ? 'redeemed' : 'matured';
-    } else if (couponPaymentCount !== null && couponPaymentCount > 0n) {
-      status = 'maturing';
-    } else if (couponPaymentCount !== null) {
-      status = 'minting';
-    }
-
-    res.json({
-      isin,
-      maturityDuration: maturityDuration?.toString() ?? null,
-      maturityDate: maturityDate?.toString() ?? null,
-      timeToMaturity: timeToMaturity?.toString() ?? null,
-      couponDuration: couponDuration?.toString() ?? null,
-      couponYield: couponYield?.toString() ?? null,
-      couponPaymentsTotal: couponPaymentsTotal?.toString() ?? null,
-      couponPaymentsMade: couponPaymentCount?.toString() ?? null,
-      couponPaymentsRemaining: couponPaymentsRemaining?.toString() ?? null,
-      status,
-      totalSupply: supplyResolved !== null ? supplyResolved.toString() : null,
-    });
+app.get('/v1/auctions', async (_req, res, next) => {
+  try {
+    const rows = listAllAuctions(historyDb);
+    // Hydrate each auction from chain so we can return a coherent summary.
+    // ensureCached short-circuits when the in-process cache already has it.
+    const cached = await Promise.all(rows.map((r) => ensureCached(r.auction_id)));
+    const auctions = cached
+      .filter((a): a is NonNullable<typeof a> => Boolean(a))
+      .map((a) => ({
+        auctionId: a.auctionId,
+        isin: a.isin ?? '',
+        type: a.auctionType !== undefined ? auctionTypeToString(a.auctionType) : undefined,
+        status: a.status,
+        end: a.metadata?.end ? a.metadata.end.toString() : null,
+        size: a.metadata?.offering ? a.metadata.offering.toString() : null,
+        allocationHash: a.allocationResult?.allocationHash ?? null,
+        finalised: a.finalised ?? false,
+        rejected: a.rejected ?? false,
+        cancelled: a.cancelled ?? false,
+      }));
+    res.json({ auctions });
   } catch (err) {
     next(err);
   }

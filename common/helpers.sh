@@ -40,6 +40,9 @@ NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_BASEIMAGE=node:24.15.0
 NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.yaml
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
+NB_UI_NAMESPACE=nb-ui
+NB_UI_DIR=$REPO_ROOT/services/nb-ui
+NB_UI_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
@@ -215,6 +218,7 @@ function ensureLocalhostHostEntries() {
         "blockscout.cbdc-sandbox.local"
         "jupyterhub.cbdc-sandbox.local"
         "bond-api.cbdc-sandbox.local"
+        "web.cbdc-sandbox.local"
     )
     local missing_hosts=()
 
@@ -777,6 +781,10 @@ function waitForNBBondAPI() {
     waitForApp nb-bond-api nb-bond-api
 }
 
+function waitForNBUI() {
+    waitForApp nb-ui nb-ui
+}
+
 function createKindCluster() {
     # NOTE: kind resolves `extraMounts[].hostPath` relative to the current working directory,
     # not relative to the config file path. Our kind config assumes it is invoked from `infra/`.
@@ -970,6 +978,14 @@ function getNBBondApiImage() {
     getImageValue "nb_bond_api.base" "$NB_BOND_API_BASEIMAGE"
 }
 
+function getNBUINginxImage() {
+    getImageValue "nb_ui.nginx" "$NB_UI_BASEIMAGE"
+}
+
+function getNBUIBuilderImage() {
+    getImageValue "nb_ui.builder" "$NB_BOND_API_BASEIMAGE"
+}
+
 function getLocalRegistryImage() {
     if command -v yq >/dev/null 2>&1 && [ -f "$IMAGES_CONFIG" ]; then
         getImageValue "local_registry" "$KIND_REGISTRY_IMAGE"
@@ -987,6 +1003,10 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutBensImage)")
     images+=("$(getScriptRunnerImage)")
     images+=("$(getNBBondApiImage)")
+    # nb-ui Dockerfile stages: builder (node) + runtime (nginx-unprivileged).
+    # Pulled here so the local `docker build` works without internet.
+    images+=("$(getNBUIBuilderImage)")
+    images+=("$(getNBUINginxImage)")
 
     for image in "${images[@]}"; do
         if [ -n "$image" ] && [ "$image" != "null" ]; then
@@ -1325,4 +1345,78 @@ function deployNBBondAPI() {
          --values "$NB_BOND_API_HELM_VALUES_FILE" \
          --set nodeImage=$NB_BOND_API_IMAGE_OVERRIDE \
          --set-string env.GLOBAL_REGISTRY_ADDRESS=$registry_contract_address
+}
+
+# Compute a short content hash over the inputs that influence the built
+# bundle. Used as the nb-ui image tag so a fresh image is built (and pushed)
+# only when something that actually changes the bundle changes.
+function nbUIBundleHash() {
+    # Sources that affect the build output: source tree + build config + lockfile
+    # + Dockerfile. Anything outside this list (tests, README, .dockerignore)
+    # legitimately doesn't bust the cache.
+    {
+        find "$NB_UI_DIR/src" "$NB_UI_DIR/public" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
+        shasum -a 256 \
+            "$NB_UI_DIR/package.json" \
+            "$NB_UI_DIR/package-lock.json" \
+            "$NB_UI_DIR/index.html" \
+            "$NB_UI_DIR/vite.config.js" \
+            "$NB_UI_DIR/Dockerfile" 2>/dev/null
+    } | shasum -a 256 | cut -c1-12
+}
+
+function deployNBUI() {
+    requireKindRegistry
+
+    # Pull both Dockerfile stage bases through docker first so the build
+    # works offline (matches the pattern other services use).
+    NB_UI_BUILDER_RESOLVED="$(getNBUIBuilderImage)"
+    NB_UI_NGINX_RESOLVED="$(getNBUINginxImage)"
+    loadImageToKind "$NB_UI_BUILDER_RESOLVED"
+    loadImageToKind "$NB_UI_NGINX_RESOLVED"
+
+    local bundle_hash
+    bundle_hash="$(nbUIBundleHash)"
+    if [ -z "$bundle_hash" ]; then
+        echo "❌ Could not compute nb-ui bundle hash."
+        return 1
+    fi
+    # Image refs follow the existing kind-registry convention: containerd
+    # inside the Kind node has hosts.toml mapping localhost:5001 → the kind
+    # registry, so the pod-side pull tag is the same "localhost:5001/..."
+    # the host pushes to. See infra/cluster/containerd-certs.d/.
+    local local_tag="nb-ui:${bundle_hash}"
+    local push_tag="localhost:${KIND_REGISTRY_PORT}/nb-ui:${bundle_hash}"
+    local pull_tag_in_kind="$push_tag"
+
+    # Skip rebuild if the image is already in the local registry — content
+    # hash is the cache key. The registry serves OCI manifests so we list
+    # tags rather than negotiate media types.
+    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/nb-ui/tags/list" 2>/dev/null \
+        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
+        echo "✅ nb-ui image ${push_tag} already in local registry — skipping build."
+    else
+        echo "🐳 Building nb-ui image ${local_tag}..."
+        docker build \
+            --tag "$local_tag" \
+            --build-arg "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
+            --build-arg "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}" \
+            "$NB_UI_DIR" || {
+            echo "❌ Failed to build nb-ui image"
+            return 1
+        }
+        echo "📦 Pushing ${push_tag}..."
+        docker tag "$local_tag" "$push_tag"
+        docker push "$push_tag" || {
+            echo "❌ Failed to push nb-ui image to local registry"
+            return 1
+        }
+    fi
+
+    helm upgrade nb-ui "$REPO_ROOT/services/nb-ui/helm" \
+         --install \
+         --kube-context kind-$CLUSTER_NAME \
+         --namespace $NB_UI_NAMESPACE \
+         --create-namespace \
+         --set "image=${pull_tag_in_kind}"
 }

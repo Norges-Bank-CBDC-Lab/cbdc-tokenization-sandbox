@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nb-ui
+  namespace: {{ .Values.namespace | default "nb-ui" }}
+spec:
+  selector:
+    app: nb-ui
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: ClusterIP

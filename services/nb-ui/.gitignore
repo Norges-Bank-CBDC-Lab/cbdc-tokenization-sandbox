@@ -1,0 +1,31 @@
+# Node / npm install artefacts and caches
+node_modules/
+dist/
+build/
+coverage/
+.npm/
+.eslintcache
+
+# Vite dev artefacts
+.vite/
+
+# Local env overrides. Vite reads .env, .env.local, .env.[mode].local, etc.
+# The sandbox does not use Vite's env-var pipeline (runtime config flows
+# through /config.js), so these files only appear as local dev tweaks and
+# should never be committed.
+.env
+.env.*
+*.local
+
+# Test artefacts
+*.tsbuildinfo
+
+# npm / yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS noise (root .gitignore already covers .vscode and .DS_Store;
+# repeat them here so a stray editor or copy into this folder is still safe).
+.DS_Store
+.idea/
