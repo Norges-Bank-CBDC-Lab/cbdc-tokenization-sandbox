@@ -15,6 +15,10 @@ const envSchema = z.object({
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
+  // Comma-separated list of origins the CORS middleware accepts.
+  // Default targets the local sandbox frontend at http://web.cbdc-sandbox.local.
+  // Override (e.g. with multiple origins) for any non-local deployment.
+  CORS_ALLOWED_ORIGINS: z.string().default('http://web.cbdc-sandbox.local'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

@@ -378,6 +378,18 @@ export const bondSummaryResponseSchema = z
   })
   .meta({ description: 'Bond summary', id: 'BondSummaryResponse' });
 
+export const listBondsResponseSchema = z
+  .object({
+    bonds: z.array(bondSummaryResponseSchema),
+  })
+  .meta({ description: 'List of all known bonds', id: 'ListBondsResponse' });
+
+export const listAllAuctionsResponseSchema = z
+  .object({
+    auctions: z.array(auctionSummarySchema),
+  })
+  .meta({ description: 'List of all known auctions across bonds', id: 'ListAllAuctionsResponse' });
+
 export const healthResponseSchema = z
   .object({
     status: z.string(),
@@ -751,6 +763,34 @@ export const openApiDocument = createDocument({
         },
       },
     },
+    '/v1/bonds': {
+      get: {
+        responses: {
+          200: {
+            description: 'List of all known bonds across ISINs',
+            content: {
+              'application/json': {
+                schema: listBondsResponseSchema,
+              },
+            },
+          },
+        },
+      },
+    },
+    '/v1/auctions': {
+      get: {
+        responses: {
+          200: {
+            description: 'List of all known auctions across bonds',
+            content: {
+              'application/json': {
+                schema: listAllAuctionsResponseSchema,
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     schemas: {
@@ -788,6 +828,8 @@ export const openApiDocument = createDocument({
       HoldersResponse: holdersResponseSchema,
       HolderBalance: holderBalanceSchema,
       BondSummaryResponse: bondSummaryResponseSchema,
+      ListBondsResponse: listBondsResponseSchema,
+      ListAllAuctionsResponse: listAllAuctionsResponseSchema,
       HealthResponse: healthResponseSchema,
       IsinParam: isinParamSchema,
       AuctionIdParam: auctionIdParamSchema,

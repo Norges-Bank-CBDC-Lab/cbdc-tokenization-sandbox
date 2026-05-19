@@ -50,6 +50,7 @@ Important optional settings:
 - `START_BLOCK`: initial backfill block for ingestion (default `0`).
 - `POLL_INTERVAL_MS`: ingestion polling interval (default `3000`).
 - `EXPRESS_PORT`: listen port (default `8080`).
+- `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
 
 ### 2.3 Start commands
 
@@ -122,9 +123,13 @@ Base path is `/v1`. All request and response bodies are JSON.
   - Response includes: `bondManager`, `bondAuction`, `bondToken`, `sealingPublicKey`.
 - `GET /docs` and `GET /v1/openapi.json`
   - Purpose: fetch OpenAPI JSON.
+  - On-disk snapshot: `services/nb-bond-api/openapi.json`. Regenerate after any schema change with `npm run regen:openapi`.
 
 ### 4.2 Bond and lifecycle status
 
+- `GET /v1/bonds`
+  - Purpose: list every known bond as a `BondSummaryResponse`.
+  - Notes: enumerated from the ingestion DB `partitions` table, then each ISIN is hydrated through the same composer used by `GET /v1/bonds/{isin}` (about 8 on-chain reads per bond, fanned out in parallel).
 - `GET /v1/bonds/{isin}`
   - Purpose: summary view of bond lifecycle state, maturity and coupon progress.
   - Notes: derived from on-chain state, plus ingestion-derived balances/events where available.
@@ -158,6 +163,10 @@ Base path is `/v1`. All request and response bodies are JSON.
   - Notes: the service maintains an in-memory cache, and also attempts to hydrate the latest on-chain auction for the ISIN.
 
 ### 4.4 Auction operations by auctionId
+
+- `GET /v1/auctions`
+  - Purpose: list every known auction across all bonds as `AuctionSummary` entries.
+  - Notes: enumerated from the ingestion DB `auctions` table; each row is hydrated through `ensureCached` so the response reflects current chain state.
 
 - `GET /v1/auctions/{auctionId}`
   - Purpose: combined view of on-chain metadata plus cached derived state.

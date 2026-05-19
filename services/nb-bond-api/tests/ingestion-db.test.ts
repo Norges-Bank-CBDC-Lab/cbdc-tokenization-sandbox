@@ -6,6 +6,8 @@ import {
   getAuctionEventsByIsin,
   getBalancesByIsin,
   getBondEventsByIsin,
+  listAllAuctions,
+  listAllBonds,
   type IngestionDatabase,
   openDatabase,
 } from '../src/ingestion-db';
@@ -76,5 +78,58 @@ describe('ingestion database', () => {
         payload: '{"amount":"100"}',
       },
     ]);
+  });
+
+  it('lists all auctions across ISINs, newest first', () => {
+    db.prepare(
+      `INSERT INTO auctions(auction_id, isin, type, created_block, created_tx, bond)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run('0xaaaa', 'NO0000000001', 'RATE', 100, '0xtx1', '0xbond1');
+    db.prepare(
+      `INSERT INTO auctions(auction_id, isin, type, created_block, created_tx, bond)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run('0xbbbb', 'NO0000000002', 'PRICE', 200, '0xtx2', '0xbond2');
+    db.prepare(
+      `INSERT INTO auctions(auction_id, isin, type, created_block, created_tx, bond)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run('0xcccc', 'NO0000000001', 'BUYBACK', 150, '0xtx3', '0xbond1');
+
+    const rows = listAllAuctions(db);
+    expect(rows.map((r) => r.auction_id)).toEqual(['0xbbbb', '0xcccc', '0xaaaa']);
+    expect(rows[0]).toEqual({
+      auction_id: '0xbbbb',
+      isin: 'NO0000000002',
+      type: 'PRICE',
+      created_block: 200,
+      created_tx: '0xtx2',
+      bond: '0xbond2',
+    });
+  });
+
+  it('lists all bonds as unique (isin, bond) pairs with earliest block', () => {
+    db.prepare(
+      `INSERT INTO partitions(partition, isin, bond, created_block)
+       VALUES (?, ?, ?, ?)`,
+    ).run('0xpart1', 'NO0000000001', '0xbond1', 100);
+    db.prepare(
+      `INSERT INTO partitions(partition, isin, bond, created_block)
+       VALUES (?, ?, ?, ?)`,
+    ).run('0xpart2', 'NO0000000002', '0xbond2', 200);
+    // Same (isin, bond) at a later block — should collapse to the earlier block.
+    db.prepare(
+      `INSERT INTO partitions(partition, isin, bond, created_block)
+       VALUES (?, ?, ?, ?)`,
+    ).run('0xpart3', 'NO0000000001', '0xbond1', 300);
+
+    const rows = listAllBonds(db);
+    expect(rows).toEqual([
+      { isin: 'NO0000000001', bond: '0xbond1', created_block: 100 },
+      { isin: 'NO0000000002', bond: '0xbond2', created_block: 200 },
+    ]);
+  });
+
+  it('returns an empty array when no bonds or auctions have been ingested', () => {
+    expect(listAllAuctions(db)).toEqual([]);
+    expect(listAllBonds(db)).toEqual([]);
   });
 });

@@ -54,6 +54,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `better-sqlite3` | `12.9.0` | MIT |
+| `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
@@ -65,6 +66,7 @@ License labels and deployment-time notes remain curated review items.
 | `@babel/preset-env` | `7.29.3` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
+| `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `25.6.0` | MIT |
