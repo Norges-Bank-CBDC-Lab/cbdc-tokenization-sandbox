@@ -33,8 +33,7 @@ BLOCKSCOUT_DIR=$REPO_ROOT/services/blockscout
 BLOCKSCOUT_TMPDIR=$BLOCKSCOUT_DIR/.tmp
 BLOCKSCOUT_CHART_VERSION=4.4.3
 BLOCKSCOUT_BENS_DIR=$BLOCKSCOUT_DIR/bens-microservice
-BENS_IMAGE=bens-microservice
-BENS_TAG=v1.0.0
+BENS_BASEIMAGE=python:3.14.5
 
 NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_DIR=$REPO_ROOT/services/nb-bond-api
@@ -943,7 +942,12 @@ function getBlockscoutDbImage() {
     getImageValue "blockscout.db" "$default_image"
 }
 
-function getBlockscoutBensImage() {
+function getBensBaseImage() {
+    # The python base used as both builder and runtime stages of the BENS
+    # Dockerfile. Pinned in common/images.yaml under blockscout.bens and
+    # pre-pulled by `./infra/infra.sh registry-sync`. The final BENS image
+    # is built locally with a content-hash tag and pushed to
+    # localhost:5001/bens-microservice:<hash> — see prepareBensImage.
     default_image=$(yq -r '.bensImage' $REPO_ROOT/services/blockscout/values.yaml)
     getImageValue "blockscout.bens" "$default_image"
 }
@@ -1031,7 +1035,7 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutFrontendImage)")
     images+=("$(getBlockscoutBackendImage)")
     images+=("$(getBlockscoutDbImage)")
-    images+=("$(getBlockscoutBensImage)")
+    images+=("$(getBensBaseImage)")
     images+=("$(getScriptRunnerImage)")
     # nb-bond-api Dockerfile stages: builder + runtime (both node).
     # Pulled here so the local `docker build` works without internet.
@@ -1120,20 +1124,76 @@ binaryData:
 EOF
 }
 
-function deployBensScriptsToConfigmap() {
-    cd $BLOCKSCOUT_BENS_DIR
-    if [ -d "$BLOCKSCOUT_BENS_DIR/src/openapi_server" ]; then
-        echo "Skipping BENS OpenAPI generation during deploy."
-        echo "If you changed the spec, run:"
-        echo "  (cd $BLOCKSCOUT_BENS_DIR && ./regen-openapi.sh)"
-    else
-        echo "❌ Missing generated BENS OpenAPI server at $BLOCKSCOUT_BENS_DIR/src/openapi_server."
-        echo "Run the generator manually before deploying:"
-        echo "  (cd $BLOCKSCOUT_BENS_DIR && ./regen-openapi.sh)"
-        exit 1
+# Compute a short content hash over the inputs that influence the built
+# BENS image. Used as the image tag so a fresh image is built (and
+# pushed) only when something that actually changes the runtime bundle
+# changes.
+function bensImageHash() {
+    # Sources that affect the build output: generated server tree +
+    # requirements.txt + Dockerfile. The swagger spec is the source for
+    # the generator, but the generator output is what ships, so we hash
+    # only the output.
+    {
+        find "$BLOCKSCOUT_BENS_DIR/src/openapi_server" -type f \
+            -not -path '*/__pycache__/*' -not -name '*.pyc' \
+            -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
+        shasum -a 256 \
+            "$BLOCKSCOUT_BENS_DIR/requirements.txt" \
+            "$BLOCKSCOUT_BENS_DIR/Dockerfile" 2>/dev/null
+    } | shasum -a 256 | cut -c1-12
+}
+
+# Build the BENS image locally and push to the kind registry. Echoes the
+# in-kind pull tag (localhost:5001/bens-microservice:<hash>) on stdout
+# so callers can pass it to helm as --set bensImage=...; everything
+# else goes to stderr.
+function prepareBensImage() {
+    requireKindRegistry
+
+    if [ ! -d "$BLOCKSCOUT_BENS_DIR/src/openapi_server" ]; then
+        echo "❌ Missing generated BENS OpenAPI server at $BLOCKSCOUT_BENS_DIR/src/openapi_server." >&2
+        echo "Run the generator before deploying:" >&2
+        echo "  (cd $BLOCKSCOUT_BENS_DIR && ./regen-openapi.sh)" >&2
+        return 1
     fi
-    cp "$BLOCKSCOUT_BENS_DIR/requirements.txt" "$BLOCKSCOUT_BENS_DIR/src/"
-    deployDirectoryToConfigmap ${BLOCKSCOUT_BENS_DIR} src $BLOCKSCOUT_NAMESPACE
+
+    local bens_base
+    bens_base="$(getBensBaseImage)"
+    loadImageToKind "$bens_base" >&2
+
+    local bundle_hash
+    bundle_hash="$(bensImageHash)"
+    if [ -z "$bundle_hash" ]; then
+        echo "❌ Could not compute BENS bundle hash." >&2
+        return 1
+    fi
+
+    local local_tag="bens-microservice:${bundle_hash}"
+    local push_tag="localhost:${KIND_REGISTRY_PORT}/bens-microservice:${bundle_hash}"
+
+    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/bens-microservice/tags/list" 2>/dev/null \
+        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
+        echo "✅ BENS image ${push_tag} already in local registry — skipping build." >&2
+    else
+        ensureLocalDockerImage "$bens_base" >&2
+        echo "🐳 Building BENS image ${local_tag}..." >&2
+        docker build \
+            --tag "$local_tag" \
+            --build-arg "BENS_BUILDER_IMAGE=${bens_base}" \
+            --build-arg "BENS_RUNTIME_IMAGE=${bens_base}" \
+            "$BLOCKSCOUT_BENS_DIR" >&2 || {
+            echo "❌ Failed to build BENS image" >&2
+            return 1
+        }
+        echo "📦 Pushing ${push_tag}..." >&2
+        docker tag "$local_tag" "$push_tag"
+        docker push "$push_tag" >&2 || {
+            echo "❌ Failed to push BENS image to local registry" >&2
+            return 1
+        }
+    fi
+
+    echo "$push_tag"
 }
 
 function deployScriptRunnerScriptsToConfigmap() {
@@ -1235,22 +1295,22 @@ function deployBlockscout() {
     POSTGRES_IMAGE=$(getBlockscoutDbImage)
     echo "🔍 Using postgres image: $POSTGRES_IMAGE"
 
-    BENS_IMAGE=$(getBlockscoutBensImage)
-    echo "🔍 Using python image: $BENS_IMAGE"
-
     loadImageToKind $BLOCKSCOUT_FRONTEND_IMAGE
     loadImageToKind $BLOCKSCOUT_BACKEND_IMAGE
     loadImageToKind $POSTGRES_IMAGE
-    loadImageToKind $BENS_IMAGE
+
+    # BENS is a repo-owned service: build the image locally with a
+    # content-hash tag, push to the kind registry, and pass that ref to
+    # helm. prepareBensImage echoes the pull tag on stdout.
+    BENS_IMAGE_OVERRIDE="$(prepareBensImage)"
+    echo "🔁 Using locally-built BENS image: $BENS_IMAGE_OVERRIDE"
 
     BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
     BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
     POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
-    BENS_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BENS_IMAGE")
     echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
     echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
     echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
-    echo "🔁 Using local registry image for python: $BENS_IMAGE_OVERRIDE"
 
     BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
     BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")

@@ -56,7 +56,6 @@ fi
 
 if [ "$CMD" == "start" ]; then
     deployEvmEnvironmentSecret $BLOCKSCOUT_NAMESPACE
-    deployBensScriptsToConfigmap
     composeBlockscoutChart
     deployBlockscout
 elif [ "$CMD" == "stop" ]; then

@@ -150,4 +150,7 @@ pyproject.toml
 setup.cfg
 src/openapi_server/security_api.py
 src/requirements.txt
-Dockerfile
+# Dockerfile was on the openapi-generator's default ignore list (its
+# scaffolded stub isn't useful here). The Dockerfile that does ship is
+# the multi-stage build authored by this repo — keep it tracked.
+!Dockerfile
