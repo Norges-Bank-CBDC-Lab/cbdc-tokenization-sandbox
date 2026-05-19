@@ -15,6 +15,7 @@
 .DS_Store
 /.tmp/
 /.codex/
+/.claude/
 
 # local AI handoff notes
 Handoff-AI-*.md
