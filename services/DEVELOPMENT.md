@@ -166,8 +166,8 @@ From the repository root:
 ./infra/infra.sh registry-sync
 ```
 
-Shared base image versions are pinned in `common/images.yaml`. Blockscout
-backend and frontend image pins live in `services/blockscout/values.yaml`.
+Sandbox deploy/build image pins are centralized in `common/images.yaml`,
+including Blockscout backend/frontend and shared base images.
 Chart versions are pinned in `common/versions.yaml`.
 
 ## Formatting And Linting

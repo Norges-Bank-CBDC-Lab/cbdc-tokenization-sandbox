@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: nb-bond-api
-          image: {{ .Values.nodeImage | default "node:25.6.0"}}
+          image: {{ .Values.nodeImage | default "node:24.15.0"}}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
           workingDir: /app
           command:

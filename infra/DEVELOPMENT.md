@@ -25,7 +25,7 @@ Current layout:
 
 - host address: `localhost:5001`
 - Kind-network address: `kind-registry:5000`
-- registry image: `registry:2`
+- registry image: pinned in `common/images.yaml`
 
 Important behavior:
 
@@ -33,9 +33,8 @@ Important behavior:
   container;
 - `./infra.sh registry-sync` pushes the image versions referenced by the
   sandbox;
-- shared base image pins live in `common/images.yaml`;
-- Blockscout backend and frontend image pins live in
-  `services/blockscout/values.yaml`;
+- sandbox deploy/build image pins live in `common/images.yaml`, including
+  Blockscout backend/frontend and shared base images;
 - chart versions are pinned separately in `common/versions.yaml`;
 - deleting the Kind cluster does not delete the registry container.
 

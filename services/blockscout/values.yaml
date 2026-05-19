@@ -2,9 +2,9 @@
 # These defaults target the CBDC sandbox's single-node Kind/Besu/Blockscout setup.
 # Never reuse them as production, staging, or internet-facing deployment values.
 
-# Fallback image tags (overridden by common/images.yaml via common/helpers.sh)
-dbImage: postgres:18.1
-bensImage: python:3.14.3
+# Fallback image tags (standard sandbox scripts override from common/images.yaml)
+dbImage: postgres:18.4
+bensImage: python:3.14.5
 
 # Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/398795a6fb05b95fd39a9da8c3e24bdf5122e4e3/charts/blockscout-stack/values.yaml
 config:
@@ -42,10 +42,9 @@ blockscout:
   ##
   image:
     pullPolicy: IfNotPresent
-    # Pin to a specific Blockscout release to avoid drift from ":latest".
-    # Note: this may not exactly match the Helm chart appVersion.
+    # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/blockscout
-    tag: "v9.3.2"
+    tag: "v10.0.8"
   ## Init container configuration (used to run DB migrations)
   ##
   init:
@@ -108,9 +107,9 @@ frontend:
   ## Image parametes
   image:
     pullPolicy: IfNotPresent
-    # Pin to a specific frontend release to avoid drift from ":latest".
+    # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/frontend
-    tag: "v2.6.0"
+    tag: "v2.7.3"
 
   replicaCount: 1
 
