@@ -16,6 +16,10 @@ spec:
         # Force a rollout whenever the rendered runtime-config changes.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         # The container is named `web-server` (not `nginx`) to keep the
         # distinction with the cluster-wide NGINX Gateway Fabric pod clear.
@@ -25,6 +29,10 @@ spec:
         - name: web-server
           image: {{ required "image is required (built by services/nb-ui/nb-ui.sh)" .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             # nginx-unprivileged listens on 8080 by default.
             - name: http
@@ -38,6 +46,17 @@ spec:
               mountPath: /usr/share/nginx/html/config.js
               subPath: config.js
               readOnly: true
+            {{- if (.Values.securityContext).readOnlyRootFilesystem }}
+            # With readOnlyRootFilesystem: true, nginx-unprivileged needs
+            # writable scratch space for its temp files (client_body_temp,
+            # proxy_temp, fastcgi_temp, scgi_temp, uwsgi_temp) and pid file.
+            # The upstream image is configured to put them under /tmp and
+            # /var/cache/nginx; mount tmpfs-style emptyDirs over both.
+            - name: nginx-tmp
+              mountPath: /tmp
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /
@@ -54,3 +73,9 @@ spec:
         - name: nb-ui-runtime-config
           configMap:
             name: nb-ui-runtime-config
+        {{- if (.Values.securityContext).readOnlyRootFilesystem }}
+        - name: nginx-tmp
+          emptyDir: {}
+        - name: nginx-cache
+          emptyDir: {}
+        {{- end }}

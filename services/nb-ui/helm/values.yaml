@@ -12,6 +12,23 @@ imagePullPolicy: IfNotPresent
 
 rootDnsZone: cbdc-sandbox.local
 
+# Sandbox-conservative hardening defaults. The `nginxinc/nginx-unprivileged`
+# image already ships with USER nginx (uid 101); fsGroup makes the
+# ConfigMap and tmp emptyDirs accessible to that uid. Override these
+# blocks for non-local deployments to tighten further if appropriate.
+podSecurityContext:
+  fsGroup: 101
+
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+  readOnlyRootFilesystem: true
+
 # Runtime configuration rendered into /config.js by the chart and served
 # alongside the static bundle. See services/nb-ui/src/config.js for the shape.
 # Override any of these at deploy time to point the same image at a different
