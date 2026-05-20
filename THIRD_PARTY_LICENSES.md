@@ -106,8 +106,8 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@azure/msal-browser` | `3.30.0` | MIT |
-| `react` | `18.3.1` | MIT |
-| `react-dom` | `18.3.1` | MIT |
+| `react` | `19.2.6` | MIT |
+| `react-dom` | `19.2.6` | MIT |
 | `@testing-library/jest-dom` | `6.7.0` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.5.2` | MIT |
