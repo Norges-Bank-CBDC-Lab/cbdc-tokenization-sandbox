@@ -15,6 +15,9 @@ integrators.
   example files and required `.gitignore` entries
 - `check-markdown-links.py`: validates local links inside tracked Markdown
   files
+- `check-node-version-consistency.py`: validates that the shared Node.js
+  toolchain pin in `common/node-version.env` matches CI, Docker build inputs,
+  and direct `@types/node` manifests
 
 ## Typical Usage
 
@@ -24,4 +27,5 @@ Run these from the repository root:
 python3 scripts/verification/check-third-party-licenses.py
 python3 scripts/verification/check-public-repo-hygiene.py
 python3 scripts/verification/check-markdown-links.py
+python3 scripts/verification/check-node-version-consistency.py
 ```

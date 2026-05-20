@@ -6,6 +6,17 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}" )" && cd .. && pwd)"
 TMPDIR_FLAGFILE=.isCbdcSandboxTmpdir
 IMAGES_CONFIG=$REPO_ROOT/common/images.yaml
 VERSIONS_CONFIG=$REPO_ROOT/common/versions.yaml
+NODE_VERSION_CONFIG=$REPO_ROOT/common/node-version.env
+
+if [ ! -f "$NODE_VERSION_CONFIG" ]; then
+    echo "❌ Missing Node version config: $NODE_VERSION_CONFIG" >&2
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$NODE_VERSION_CONFIG"
+: "${SANDBOX_NODE_VERSION:?Missing SANDBOX_NODE_VERSION in $NODE_VERSION_CONFIG}"
+: "${SANDBOX_NODE_IMAGE:?Missing SANDBOX_NODE_IMAGE in $NODE_VERSION_CONFIG}"
 
 REGISTRY_CONTRACT_NAMESPACE=jupyterhub
 REGISTRY_CONTRACT_CONFIGMAP=registry-contract
@@ -37,13 +48,13 @@ BENS_BASEIMAGE=python:3.14.5
 
 NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_DIR=$REPO_ROOT/services/nb-bond-api
-NB_BOND_API_BUILDER_BASEIMAGE=node:24.15.0
-NB_BOND_API_RUNTIME_BASEIMAGE=node:24.15.0
+NB_BOND_API_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
+NB_BOND_API_RUNTIME_BASEIMAGE=$SANDBOX_NODE_IMAGE
 NB_BOND_API_HELM_VALUES_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.yaml
 NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values.local.example.yaml
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
-NB_UI_BUILDER_BASEIMAGE=node:24.15.0
+NB_UI_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
 NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
 # Backwards-compat alias; older code paths and external callers may still
 # reference NB_UI_BASEIMAGE expecting the nginx runtime base.
@@ -990,11 +1001,11 @@ function getScriptRunnerImage() {
 }
 
 function getNBBondApiBuilderImage() {
-    getImageValue "nb_bond_api.builder" "$NB_BOND_API_BUILDER_BASEIMAGE"
+    echo "$NB_BOND_API_BUILDER_BASEIMAGE"
 }
 
 function getNBBondApiRuntimeImage() {
-    getImageValue "nb_bond_api.runtime" "$NB_BOND_API_RUNTIME_BASEIMAGE"
+    echo "$NB_BOND_API_RUNTIME_BASEIMAGE"
 }
 
 function getNBUINginxImage() {
@@ -1002,7 +1013,7 @@ function getNBUINginxImage() {
 }
 
 function getNBUIBuilderImage() {
-    getImageValue "nb_ui.builder" "$NB_UI_BUILDER_BASEIMAGE"
+    echo "$NB_UI_BUILDER_BASEIMAGE"
 }
 
 # Make sure the given upstream image ref is present in the host's local

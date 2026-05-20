@@ -52,7 +52,8 @@ inherits these rules and only adds what is specific to that folder.
 - `services/`: Service code (e.g., APIs).
 - `infra/`: Infrastructure configs.
 - `docs/`: Documentation, diagrams, and post-mortem reports.
-- `common/images.yaml`: Shared base image versions for local deployments. Some services pin runtime images in their own values files, for example `services/blockscout/values.yaml`.
+- `common/images.yaml`: Shared non-Node image versions for local deployments. Some services pin runtime images in their own values files, for example `services/blockscout/values.yaml`.
+- `common/node-version.env`: Shared Node.js toolchain and image version for CI and Node-based sandbox services.
 - `common/versions.yaml`: Central chart versions for local deployments.
 - `services/blockscout/bens-microservice/regen-openapi.sh`: Manual BENS OpenAPI generation.
 
