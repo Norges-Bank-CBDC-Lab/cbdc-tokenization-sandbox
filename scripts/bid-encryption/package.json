@@ -12,9 +12,6 @@
     "@noble/secp256k1": "3.1.0",
     "ethers": "6.16.0"
   },
-  "overrides": {
-    "ws": "8.20.1"
-  },
   "devDependencies": {
     "@types/node": "25.9.1",
     "tsx": "4.22.3",
