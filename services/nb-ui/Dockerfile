@@ -6,12 +6,13 @@
 # mounted at /usr/share/nginx/html/config.js from a ConfigMap at install
 # time, so the same image is re-pointable per deployment without rebuilding.
 #
-# Stage bases are pinned in common/images.yaml under nb_ui.{builder,nginx}
-# and pre-pulled by `./infra/infra.sh registry-sync` so an offline build
+# The Node.js builder base is passed from common/node-version.env by
+# common/helpers.sh. The nginx runtime base is pinned in common/images.yaml.
+# Both are pre-pulled by `./infra/infra.sh registry-sync` so an offline build
 # works.
 
 # Build the bundle.
-ARG NB_UI_BUILDER_IMAGE=node:24.15.0
+ARG NB_UI_BUILDER_IMAGE
 ARG NB_UI_NGINX_IMAGE=nginxinc/nginx-unprivileged:1.27-alpine
 
 FROM ${NB_UI_BUILDER_IMAGE} AS builder

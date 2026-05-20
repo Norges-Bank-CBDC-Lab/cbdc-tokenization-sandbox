@@ -126,10 +126,10 @@ to the pod's Service like any other backend.
 
 ## Deployment shape
 
-- `services/nb-ui/Dockerfile`: multi-stage build. `node:24.15.0` builder
-  runs `npm ci && npm run build`; the result is COPYed into the
-  `nginxinc/nginx-unprivileged:1.27-alpine` runtime image. Both stage
-  bases are pinned in `common/images.yaml` under `nb_ui.{builder,nginx}`.
+- `services/nb-ui/Dockerfile`: multi-stage build. The Node.js builder from
+  `common/node-version.env` runs `npm ci && npm run build`; the result is
+  COPYed into the `nginxinc/nginx-unprivileged:1.27-alpine` runtime image.
+  The nginx runtime base is pinned in `common/images.yaml` under `nb_ui.nginx`.
 - `./nb-ui.sh start` (or `./sandbox.sh start`) calls `deployNBUI` in
   `common/helpers.sh`, which:
   1. Pulls both stage bases through Docker (`loadImageToKind`) so the

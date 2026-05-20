@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "services/nb-ui/**"
+      - "common/node-version.env"
       - ".github/workflows/nb-ui.yml"
 
 permissions:
@@ -19,10 +20,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Load Node.js version
+        id: node-version
+        working-directory: .
+        run: |
+          set -a
+          . common/node-version.env
+          set +a
+          echo "version=${SANDBOX_NODE_VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "24"
+          node-version: "${{ steps.node-version.outputs.version }}"
           cache: "npm"
           cache-dependency-path: services/nb-ui/package-lock.json
 

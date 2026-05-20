@@ -40,19 +40,11 @@ blockscout:
 script_runner:
   base: quay.io/jupyter/base-notebook:notebook-7.5.3
 
-# nb-bond-api ships as a self-contained image built locally from
-# services/nb-bond-api/Dockerfile. The two pins below are the Dockerfile stage
-# bases — registry-sync pulls them so the build works without internet, the
-# build itself runs from ./services/nb-bond-api/nb-bond-api.sh.
-nb_bond_api:
-  builder: node:24.15.0
-  runtime: node:24.15.0
-
 # nb-ui ships as a self-contained image built locally from services/nb-ui/Dockerfile.
-# The two pins below are the Dockerfile stage bases — registry-sync pulls them so the
-# build works without internet, the build itself runs from ./services/nb-ui/nb-ui.sh.
+# Node.js build/runtime stage bases are centralized in common/node-version.env.
+# The nginx runtime base below is pre-pulled by registry-sync so the local
+# nb-ui Docker build works without internet.
 nb_ui:
-  builder: node:24.15.0
   nginx: nginxinc/nginx-unprivileged:1.27-alpine
 
 local_registry: registry:2.8.3

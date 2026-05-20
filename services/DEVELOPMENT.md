@@ -166,8 +166,8 @@ From the repository root:
 ./infra/infra.sh registry-sync
 ```
 
-Sandbox deploy/build image pins are centralized in `common/images.yaml`,
-including Blockscout backend/frontend and shared base images.
+Sandbox deploy/build image pins are centralized in `common/images.yaml`.
+The shared Node.js toolchain pin is centralized in `common/node-version.env`.
 Chart versions are pinned in `common/versions.yaml`.
 
 ## Formatting And Linting

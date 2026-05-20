@@ -123,8 +123,8 @@ the first deploy doesn't pay the pull cost mid-flight:
 ./infra/infra.sh registry-sync
 ```
 
-Sandbox deploy/build image pins are centralized in `common/images.yaml`,
-including Blockscout backend/frontend and shared base images.
+Sandbox deploy/build image pins are centralized in `common/images.yaml`.
+The shared Node.js toolchain pin is centralized in `common/node-version.env`.
 
 7. Optional: generate the sandbox config file and edit deploy flags in
    `.env.sandbox` if you do not want the full stack. This writes the file to

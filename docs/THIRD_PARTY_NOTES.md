@@ -51,9 +51,8 @@ pulled at build/deploy time. Current examples include:
   of the `services/nb-ui/Dockerfile` multi-stage build (and pinned in
   `common/images.yaml` under `nb_ui.nginx`).
 - `node` (MIT), used as the builder stage of `services/nb-ui/Dockerfile`
-  (pinned in `common/images.yaml` under `nb_ui.builder`) and as the
-  builder + runtime stages of `services/nb-bond-api/Dockerfile` (pinned in
-  `common/images.yaml` under `nb_bond_api.{builder,runtime}`).
+  and as the builder + runtime stages of `services/nb-bond-api/Dockerfile`
+  (pinned in `common/node-version.env`).
 - `python` (PSF-2.0), used as the builder + runtime stages of
   `services/blockscout/bens-microservice/Dockerfile` (pinned in
   `common/images.yaml` under `blockscout.bens`). The pinned wheels

@@ -39,7 +39,8 @@ Non-goals:
 - `contracts/`: Solidity contracts, Foundry configuration, and deploy/verify
   helpers
 - `scripts/`: reference CLIs and repository verification utilities
-- `common/images.yaml`: shared base image versions for local deployments
+- `common/images.yaml`: shared non-Node image versions for local deployments
+- `common/node-version.env`: shared Node.js toolchain and image version
 - `common/versions.yaml`: pinned chart versions for local deployments
 - `services/blockscout/values.yaml`: Blockscout backend/frontend image pins and
   local chart overrides
@@ -264,6 +265,7 @@ For concrete sequences, see:
 ## Configuration And Versioning
 
 - sandbox deploy/build image tags are pinned in `common/images.yaml`
+- Node.js toolchain and image tags are pinned in `common/node-version.env`
 - Blockscout backend/frontend fallback tags for direct Helm use live in
   `services/blockscout/values.yaml`
 - chart versions are centralized in `common/versions.yaml`

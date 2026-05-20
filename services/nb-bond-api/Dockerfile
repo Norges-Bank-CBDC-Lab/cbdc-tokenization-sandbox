@@ -11,11 +11,12 @@
 # under /app/data, which the Helm chart mounts as an emptyDir so it stays
 # writable without touching the image layer.
 #
-# Stage bases are pinned in common/images.yaml under nb_bond_api.{builder,runtime}
-# and pre-pulled by `./infra/infra.sh registry-sync` so an offline build works.
+# Node.js stage bases are passed from common/node-version.env by
+# common/helpers.sh and pre-pulled by `./infra/infra.sh registry-sync` so an
+# offline build works.
 
-ARG NB_BOND_API_BUILDER_IMAGE=node:24.15.0
-ARG NB_BOND_API_RUNTIME_IMAGE=node:24.15.0
+ARG NB_BOND_API_BUILDER_IMAGE
+ARG NB_BOND_API_RUNTIME_IMAGE
 
 FROM ${NB_BOND_API_BUILDER_IMAGE} AS builder
 WORKDIR /app
