@@ -115,7 +115,7 @@ License labels and deployment-time notes remain curated review items.
 | `eslint` | `9.18.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.4` | MIT |
-| `eslint-plugin-react-hooks` | `5.1.0` | MIT |
+| `eslint-plugin-react-hooks` | `7.1.1` | MIT |
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `26.0.0` | MIT |
 | `prettier` | `3.8.3` | MIT |

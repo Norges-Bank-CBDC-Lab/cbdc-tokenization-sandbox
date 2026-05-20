@@ -45,7 +45,7 @@ This file covers the React + Vite operator frontend specifically.
 
 - ES modules + JSX. No IIFE wrappers, no `window.X = X` exports — components
   and helpers are imported by path.
-- React 18 functional components. No class components.
+- React functional components. No class components.
 - Don't reach for a UI kit. The existing `components/ui.jsx` primitives
   (Button, Modal, Field, Input, RadioGroup, StatusBadge, ToastProvider,
   …) cover everything the operator UI needs.

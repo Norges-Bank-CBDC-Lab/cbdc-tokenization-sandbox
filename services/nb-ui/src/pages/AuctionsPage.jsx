@@ -24,7 +24,8 @@ export function AuctionsPage({ navigate }) {
   const [typeFilter, setTypeFilter] = useState('all');
   const toast = useToast();
 
-  const auctions = data?.auctions ?? [];
+  const rawAuctions = data?.auctions;
+  const auctions = useMemo(() => rawAuctions ?? [], [rawAuctions]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
