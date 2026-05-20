@@ -1,0 +1,61 @@
+# Root .dockerignore — applies to Docker builds whose context is the repo
+# root, namely services/nb-bond-api/Dockerfile and services/nb-ui/Dockerfile.
+# (services/blockscout/bens-microservice/Dockerfile uses its own subdirectory
+# as build context, so it reads bens-microservice/.dockerignore instead.)
+#
+# Goal: send the minimum useful tar to the Docker daemon. Anything outside
+# the two image-baked services' source trees + their npm-workspace metadata
+# is excluded.
+
+# Always-exclude
+.git
+.tmp
+.codex
+.claude
+.vscode
+.DS_Store
+*.log
+Handoff-AI-*.md
+node_modules
+**/node_modules
+
+# Local-only artefacts and secrets
+.env
+.env.*
+contracts/.env
+contracts/.env.example
+services/nb-bond-api/helm/values.local.yaml
+scripts/bid-submitter/examples/bids.keys.json
+
+# Areas none of the image-baked services need in their build context
+contracts
+infra
+docs
+services/blockscout
+services/script-runner
+
+# Build / coverage / cache outputs (gitignored but worth re-excluding)
+**/dist
+**/build
+**/coverage
+**/.vite
+**/data
+services/nb-bond-api/openapi.json
+
+# Tests are not needed to produce either runtime image
+services/nb-bond-api/tests
+services/nb-ui/tests
+
+# Editor / lint / format config files that don't affect the build output
+**/.prettierrc
+**/.prettierrc.json
+**/.prettierignore
+**/.gitignore
+**/.dockerignore
+**/eslint.config.mjs
+**/babel.config.cjs
+**/jest.config.cjs
+**/tsconfig.test.json
+**/AGENTS.md
+**/DEVELOPMENT.md
+**/README.md

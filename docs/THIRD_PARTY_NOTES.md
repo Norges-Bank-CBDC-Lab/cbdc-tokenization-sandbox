@@ -66,12 +66,12 @@ pulled at build/deploy time. Current examples include:
 
 ## Notable Caveats
 
-- `caniuse-lite` appears as a transitive dev dependency in
-  `services/nb-bond-api/package-lock.json` and `services/nb-ui/package-lock.json`
-  and is labeled `CC-BY-4.0` in npm metadata.
-- `lightningcss` appears as a transitive dev/build dependency in
-  `services/nb-ui/package-lock.json` after the Vite 8 toolchain upgrade and is
-  labeled `MPL-2.0` in npm metadata. Its platform-specific optional packages
-  carry the same license.
+- `caniuse-lite` appears as a transitive dev dependency under the
+  `services/nb-bond-api` and `services/nb-ui` workspaces in the root
+  `package-lock.json` and is labeled `CC-BY-4.0` in npm metadata.
+- `lightningcss` appears as a transitive dev/build dependency under
+  the `services/nb-ui` workspace in the root `package-lock.json` after
+  the Vite 8 toolchain upgrade and is labeled `MPL-2.0` in npm metadata.
+  Its platform-specific optional packages carry the same license.
 - Third-party deployment-time software keeps its upstream license terms even
   when this repository is Apache-2.0.

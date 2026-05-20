@@ -1413,14 +1413,17 @@ function deployContracts() {
 # pushed) only when something that actually changes the runtime bundle
 # changes.
 function nbBondApiBundleHash() {
-    # Sources that affect the build output: source tree + tsconfig + lockfile
-    # + Dockerfile. Anything outside this list (tests, README, openapi.json
-    # snapshot, dev-only configs) legitimately doesn't bust the cache.
+    # Sources that affect the build output: workspace source + tsconfig +
+    # Dockerfile + the root-level workspace metadata (package.json /
+    # package-lock.json) since deps now resolve at the repo root.
+    # Anything outside this list (tests, README, openapi.json snapshot,
+    # dev-only configs) legitimately doesn't bust the cache.
     {
         find "$NB_BOND_API_DIR/src" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
+            "$REPO_ROOT/package.json" \
+            "$REPO_ROOT/package-lock.json" \
             "$NB_BOND_API_DIR/package.json" \
-            "$NB_BOND_API_DIR/package-lock.json" \
             "$NB_BOND_API_DIR/tsconfig.json" \
             "$NB_BOND_API_DIR/Dockerfile" 2>/dev/null
     } | shasum -a 256 | cut -c1-12
@@ -1468,11 +1471,15 @@ function deployNBBondAPI() {
             ensureLocalDockerImage "$NB_BOND_API_RUNTIME_RESOLVED"
         fi
         echo "🐳 Building nb-bond-api image ${local_tag}..."
+        # Build context is the repo root so the Dockerfile can COPY the
+        # workspace-level package.json + package-lock.json. The root
+        # .dockerignore controls what actually goes over to the daemon.
         docker build \
             --tag "$local_tag" \
             --build-arg "NB_BOND_API_BUILDER_IMAGE=${NB_BOND_API_BUILDER_RESOLVED}" \
             --build-arg "NB_BOND_API_RUNTIME_IMAGE=${NB_BOND_API_RUNTIME_RESOLVED}" \
-            "$NB_BOND_API_DIR" || {
+            -f "$NB_BOND_API_DIR/Dockerfile" \
+            "$REPO_ROOT" || {
             echo "❌ Failed to build nb-bond-api image"
             return 1
         }
@@ -1507,14 +1514,17 @@ function deployNBBondAPI() {
 # bundle. Used as the nb-ui image tag so a fresh image is built (and pushed)
 # only when something that actually changes the bundle changes.
 function nbUIBundleHash() {
-    # Sources that affect the build output: source tree + build config + lockfile
-    # + Dockerfile. Anything outside this list (tests, README, .dockerignore)
+    # Sources that affect the build output: workspace source + build config
+    # + Dockerfile + the root-level workspace metadata (package.json /
+    # package-lock.json) since deps now resolve at the repo root.
+    # Anything outside this list (tests, README, .dockerignore)
     # legitimately doesn't bust the cache.
     {
         find "$NB_UI_DIR/src" "$NB_UI_DIR/public" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
+            "$REPO_ROOT/package.json" \
+            "$REPO_ROOT/package-lock.json" \
             "$NB_UI_DIR/package.json" \
-            "$NB_UI_DIR/package-lock.json" \
             "$NB_UI_DIR/index.html" \
             "$NB_UI_DIR/vite.config.js" \
             "$NB_UI_DIR/Dockerfile" 2>/dev/null
@@ -1558,11 +1568,15 @@ function deployNBUI() {
         ensureLocalDockerImage "$NB_UI_BUILDER_RESOLVED"
         ensureLocalDockerImage "$NB_UI_NGINX_RESOLVED"
         echo "🐳 Building nb-ui image ${local_tag}..."
+        # Build context is the repo root so the Dockerfile can COPY the
+        # workspace-level package.json + package-lock.json. The root
+        # .dockerignore controls what actually goes over to the daemon.
         docker build \
             --tag "$local_tag" \
             --build-arg "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
             --build-arg "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}" \
-            "$NB_UI_DIR" || {
+            -f "$NB_UI_DIR/Dockerfile" \
+            "$REPO_ROOT" || {
             echo "❌ Failed to build nb-ui image"
             return 1
         }

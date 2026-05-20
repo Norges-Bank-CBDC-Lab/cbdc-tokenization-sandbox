@@ -160,15 +160,34 @@ def parse_simple_inventory_section(
     return {row["Package"]: row for row in rows}
 
 
-def build_expected_node_section(package_json_path: Path, lockfile_path: Path) -> dict[str, dict[str, str]]:
+def build_expected_node_section(
+    package_json_path: Path,
+    lockfile_path: Path,
+    workspace_relpath: str | None = None,
+) -> dict[str, dict[str, str]]:
+    """Resolve a workspace's direct deps against a (root) lockfile.
+
+    With npm workspaces, the lockfile lives at the repo root and entries are
+    keyed by their position in the dep tree: hoisted shared deps land at
+    `node_modules/<name>`, but a workspace-pinned override lives at
+    `<workspace-path>/node_modules/<name>`. Pass `workspace_relpath` to
+    consult the workspace-scoped key first and fall back to the hoisted one.
+    """
     package_json = json.loads(read_text(package_json_path))
     lockfile = json.loads(read_text(lockfile_path))
     lock_packages = lockfile.get("packages", {})
 
+    def resolve_lock_entry(name: str) -> dict | None:
+        if workspace_relpath:
+            scoped = lock_packages.get(f"{workspace_relpath}/node_modules/{name}")
+            if scoped is not None:
+                return scoped
+        return lock_packages.get(f"node_modules/{name}")
+
     expected: dict[str, dict[str, str]] = {}
     for field_name in ("dependencies", "devDependencies"):
         for package_name, version in package_json.get(field_name, {}).items():
-            lock_entry = lock_packages.get(f"node_modules/{package_name}")
+            lock_entry = resolve_lock_entry(package_name)
             if lock_entry is None:
                 raise ValueError(
                     f"Direct dependency {package_name} is missing from {lockfile_path}"
@@ -260,36 +279,42 @@ def main() -> int:
     inventory_lines = read_lines(INVENTORY_PATH)
     errors: list[str] = []
 
+    # All four npm packages are workspaces of the repo-root package.json,
+    # so deps resolve against the single root lockfile. Each tuple is
+    # (display section name, workspace package.json, workspace relpath).
+    root_lockfile = REPO_ROOT / "package-lock.json"
     node_sections = [
         (
             "services/nb-bond-api",
             REPO_ROOT / "services/nb-bond-api/package.json",
-            REPO_ROOT / "services/nb-bond-api/package-lock.json",
+            "services/nb-bond-api",
         ),
         (
             "scripts/bid-encryption",
             REPO_ROOT / "scripts/bid-encryption/package.json",
-            REPO_ROOT / "scripts/bid-encryption/package-lock.json",
+            "scripts/bid-encryption",
         ),
         (
             "scripts/bid-submitter",
             REPO_ROOT / "scripts/bid-submitter/package.json",
-            REPO_ROOT / "scripts/bid-submitter/package-lock.json",
+            "scripts/bid-submitter",
         ),
         (
             "services/nb-ui",
             REPO_ROOT / "services/nb-ui/package.json",
-            REPO_ROOT / "services/nb-ui/package-lock.json",
+            "services/nb-ui",
         ),
     ]
 
-    for section_name, package_json_path, lockfile_path in node_sections:
+    for section_name, package_json_path, workspace_relpath in node_sections:
         actual_rows = parse_node_inventory_section(
             inventory_lines,
             f"### `{section_name}`",
             parent_heading="## Direct Node.js Dependencies",
         )
-        expected_rows = build_expected_node_section(package_json_path, lockfile_path)
+        expected_rows = build_expected_node_section(
+            package_json_path, root_lockfile, workspace_relpath=workspace_relpath
+        )
         errors.extend(
             assert_rows_match(
                 section_name,
