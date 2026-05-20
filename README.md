@@ -105,10 +105,21 @@ forge soldeer install
 cd ..
 ```
 
-6. Start the local registry and push the sandbox's pinned images into it:
+6. Start the local registry the sandbox pulls all images through:
 
 ```console
 ./infra/infra.sh registry-start
+```
+
+The registry container persists across cluster lifecycles, so this is a
+one-time setup (and a no-op on subsequent runs). `./sandbox.sh start`
+pulls and pushes any missing images into this registry on demand via
+`loadImageToKind`.
+
+Optionally pre-warm the registry with every pinned third-party image so
+the first deploy doesn't pay the pull cost mid-flight:
+
+```console
 ./infra/infra.sh registry-sync
 ```
 
@@ -162,14 +173,15 @@ Use `/etc/hosts` on Linux/macOS or
 | --- | --- |
 | `./sandbox.sh start` | Create or update the local sandbox |
 | `./sandbox.sh stop` | Stop workloads while keeping the cluster and cached images |
-| `./sandbox.sh delete` | Tear down the cluster and clear cached images |
+| `./sandbox.sh delete` | Tear down the Kind cluster. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, `docker rm -f kind-registry`. |
 | `./sandbox.sh generate-config` | Create `.env.sandbox` with deploy toggles |
-| `./infra/infra.sh registry-start` | Start the local registry used by the sandbox |
-| `./infra/infra.sh registry-sync` | Push the sandbox's pinned images into the local registry |
+| `./infra/infra.sh registry-start` | Start the local registry container (one-time setup; no-op if already running) |
+| `./infra/infra.sh registry-sync` | Optional pre-warm: push every pinned third-party image into the local registry up front so `sandbox.sh start` doesn't pull them on demand |
 
-If startup fails with missing content digest errors, run `registry-start` and
-`registry-sync` first. This avoids `kind` image import issues on Docker
-Desktop.
+If startup fails with missing content digest errors, run `registry-sync`
+first. This avoids on-demand image pulls racing the deploy steps on slow
+links and is the common fix when `kind` image imports look flaky on
+Docker Desktop.
 
 ## Makefile Shortcuts
 
