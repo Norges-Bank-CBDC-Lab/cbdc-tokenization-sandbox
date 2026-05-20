@@ -22,7 +22,8 @@ export function BondsPage({ navigate }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const toast = useToast();
 
-  const bonds = data?.bonds ?? [];
+  const rawBonds = data?.bonds;
+  const bonds = useMemo(() => rawBonds ?? [], [rawBonds]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();

@@ -15,7 +15,7 @@
  * "nb-ui: reopenAuction needs backend / on-chain support". The httpClient
  * throws NotImplementedError so the UI shows a clear toast.
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { useApi } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
@@ -181,17 +181,16 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
   const bidsQ = useApi(() => AuctionsApi.getAuctionBids(auctionId), [auctionId]);
   const [mode, setMode] = useState('approve');
   const [ack, setAck] = useState(false);
-  const [selected, setSelected] = useState(null);
+  const [selectionOverride, setSelectionOverride] = useState(null);
   const offering = Number(status.metadata.offering || 0);
 
-  useEffect(() => {
-    if (bidsQ.data && selected === null) {
-      setSelected(new Set(bidsQ.data.bids.map((_, i) => i)));
-    }
-  }, [bidsQ.data, selected]);
-
-  const bids = bidsQ.data?.bids ?? [];
+  const rawBids = bidsQ.data?.bids;
+  const bids = useMemo(() => rawBids ?? [], [rawBids]);
   const unsealed = bidsQ.data?.state === 'unsealed';
+  const selected = useMemo(() => {
+    if (!bidsQ.data) return null;
+    return selectionOverride ?? new Set(bids.map((_, i) => i));
+  }, [bidsQ.data, bids, selectionOverride]);
 
   const summary = useMemo(() => {
     if (!selected || !unsealed) return null;
@@ -208,18 +207,18 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
   }, [selected, bids, unsealed, offering]);
 
   function toggle(i) {
-    setSelected((prev) => {
-      const next = new Set(prev);
+    setSelectionOverride((prev) => {
+      const next = new Set(prev ?? selected ?? []);
       if (next.has(i)) next.delete(i);
       else next.add(i);
       return next;
     });
   }
   function selectAll() {
-    setSelected(new Set(bids.map((_, i) => i)));
+    setSelectionOverride(new Set(bids.map((_, i) => i)));
   }
   function selectNone() {
-    setSelected(new Set());
+    setSelectionOverride(new Set());
   }
   function autoFill() {
     const idxs = bids.map((b, i) => ({ i, rate: Number(b.rate), units: Number(b.units) }));
@@ -231,7 +230,7 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
       next.add(x.i);
       acc += x.units;
     }
-    setSelected(next);
+    setSelectionOverride(next);
   }
 
   const allocationHash = status.cached?.allocationHash || allocation?.allocationHash || null;

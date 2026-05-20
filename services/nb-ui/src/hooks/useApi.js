@@ -18,6 +18,8 @@ export function useApi(fetcher, deps = []) {
 
   useEffect(() => {
     cancelled.current = false;
+    // Fetch lifecycle state is intentionally synchronized with the request effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     Promise.resolve()

@@ -68,8 +68,8 @@ pulled at build/deploy time. Current examples include:
 ## Notable Caveats
 
 - `caniuse-lite` appears as a transitive dev dependency in
-  `services/nb-bond-api/package-lock.json` and is labeled `CC-BY-4.0` in npm
-  metadata.
+  `services/nb-bond-api/package-lock.json` and `services/nb-ui/package-lock.json`
+  and is labeled `CC-BY-4.0` in npm metadata.
 - `lightningcss` appears as a transitive dev/build dependency in
   `services/nb-ui/package-lock.json` after the Vite 8 toolchain upgrade and is
   labeled `MPL-2.0` in npm metadata. Its platform-specific optional packages
