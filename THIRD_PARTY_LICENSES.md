@@ -109,7 +109,7 @@ License labels and deployment-time notes remain curated review items.
 | `react` | `18.3.1` | MIT |
 | `react-dom` | `18.3.1` | MIT |
 | `@testing-library/jest-dom` | `6.7.0` | MIT |
-| `@testing-library/react` | `16.1.0` | MIT |
+| `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.5.2` | MIT |
 | `@vitejs/plugin-react` | `4.7.0` | MIT |
 | `eslint` | `9.18.0` | MIT |
