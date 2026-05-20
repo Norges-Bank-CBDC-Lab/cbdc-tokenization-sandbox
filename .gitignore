@@ -19,3 +19,6 @@
 
 # local AI handoff notes
 Handoff-AI-*.md
+
+# npm workspaces — hoisted node_modules lives at the repo root
+/node_modules/
