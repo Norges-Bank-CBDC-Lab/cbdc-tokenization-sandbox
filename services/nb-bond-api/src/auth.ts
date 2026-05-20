@@ -38,12 +38,20 @@ const entraConfig: EntraConfig | null =
 
 logger.info(`auth mode: ${envVariables.NB_BOND_API_AUTH_MODE}`);
 
-/** Extracts the bearer token from the Authorization header, or null. */
+/**
+ * Extracts the bearer token from the Authorization header, or null.
+ *
+ * Prefix-checks "Bearer " case-insensitively without a regex so a
+ * crafted header like "Bearer " + many whitespace chars can't trigger
+ * polynomial backtracking (CodeQL js/polynomial-redos).
+ */
 function extractBearer(req: Request): string | null {
   const header = req.header('Authorization');
   if (!header) return null;
-  const m = /^Bearer\s+(.+)$/i.exec(header);
-  return m ? m[1].trim() : null;
+  const prefix = header.slice(0, 7);
+  if (prefix.toLowerCase() !== 'bearer ') return null;
+  const token = header.slice(7).trim();
+  return token.length > 0 ? token : null;
 }
 
 /**

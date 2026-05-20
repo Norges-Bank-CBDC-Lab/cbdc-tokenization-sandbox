@@ -15,6 +15,7 @@
  */
 import cors from 'cors';
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
@@ -77,6 +78,19 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'If-None-Match'],
     exposedHeaders: ['ETag'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  }),
+);
+
+// Global rate limit. Generous enough for the operator UI's polling
+// cadence (every few seconds) but bounded — guards against runaway
+// clients and satisfies the CodeQL `js/missing-rate-limiting` check
+// on the auth-gated routes mounted below.
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: 300,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
   }),
 );
 
