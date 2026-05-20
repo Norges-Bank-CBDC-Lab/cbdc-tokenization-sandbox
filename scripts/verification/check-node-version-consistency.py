@@ -11,10 +11,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NODE_VERSION_PATH = REPO_ROOT / "common/node-version.env"
 
+ROOT_LOCKFILE_PATH = REPO_ROOT / "package-lock.json"
+
+# Each entry: (workspace package.json, workspace relative path in the
+# root lockfile's `packages` map).
 NODE_TYPE_MANIFESTS = (
-    REPO_ROOT / "services/nb-bond-api/package.json",
-    REPO_ROOT / "scripts/bid-encryption/package.json",
-    REPO_ROOT / "scripts/bid-submitter/package.json",
+    (REPO_ROOT / "services/nb-bond-api/package.json", "services/nb-bond-api"),
+    (REPO_ROOT / "scripts/bid-encryption/package.json", "scripts/bid-encryption"),
+    (REPO_ROOT / "scripts/bid-submitter/package.json", "scripts/bid-submitter"),
 )
 
 NODE_IMAGE_FILES = (
@@ -57,11 +61,11 @@ def load_json(path: Path) -> dict:
 
 def assert_at_types_node_versions(expected_version: str) -> list[str]:
     errors: list[str] = []
+    lockfile = load_json(ROOT_LOCKFILE_PATH)
+    lock_packages = lockfile.get("packages", {})
 
-    for package_json_path in NODE_TYPE_MANIFESTS:
-        lockfile_path = package_json_path.with_name("package-lock.json")
+    for package_json_path, workspace_relpath in NODE_TYPE_MANIFESTS:
         package_json = load_json(package_json_path)
-        lockfile = load_json(lockfile_path)
 
         actual = package_json.get("devDependencies", {}).get("@types/node")
         if actual != expected_version:
@@ -70,23 +74,30 @@ def assert_at_types_node_versions(expected_version: str) -> list[str]:
                 f"{actual!r}, expected {expected_version!r}"
             )
 
-        root_dev_dependencies = lockfile.get("packages", {}).get("", {}).get(
+        # Each workspace's entry in the root lockfile is keyed by its
+        # relative path and replicates the workspace's devDependencies.
+        workspace_dev_deps = lock_packages.get(workspace_relpath, {}).get(
             "devDependencies", {}
         )
-        lock_root_actual = root_dev_dependencies.get("@types/node")
-        if lock_root_actual != expected_version:
+        lock_workspace_actual = workspace_dev_deps.get("@types/node")
+        if lock_workspace_actual != expected_version:
             errors.append(
-                f"{lockfile_path.relative_to(REPO_ROOT)} root package: @types/node is "
-                f"{lock_root_actual!r}, expected {expected_version!r}"
+                f"{ROOT_LOCKFILE_PATH.relative_to(REPO_ROOT)} workspace "
+                f"{workspace_relpath!r}: @types/node is "
+                f"{lock_workspace_actual!r}, expected {expected_version!r}"
             )
 
-        lock_entry = lockfile.get("packages", {}).get("node_modules/@types/node")
-        lock_actual = None if lock_entry is None else lock_entry.get("version")
-        if lock_actual != expected_version:
-            errors.append(
-                f"{lockfile_path.relative_to(REPO_ROOT)} node_modules/@types/node: "
-                f"version is {lock_actual!r}, expected {expected_version!r}"
-            )
+    # The hoisted (deduped) copy of @types/node only lives under one
+    # node_modules/@types/node entry at the root, so check it once outside
+    # the per-workspace loop.
+    hoisted = lock_packages.get("node_modules/@types/node")
+    hoisted_version = None if hoisted is None else hoisted.get("version")
+    if hoisted_version != expected_version:
+        errors.append(
+            f"{ROOT_LOCKFILE_PATH.relative_to(REPO_ROOT)} "
+            f"node_modules/@types/node: version is {hoisted_version!r}, "
+            f"expected {expected_version!r}"
+        )
 
     return errors
 
@@ -133,8 +144,13 @@ def assert_workflows_load_node_version(expected_version: str) -> list[str]:
         rel = workflow_path.relative_to(REPO_ROOT)
         if ". common/node-version.env" not in text:
             errors.append(f"{rel}: workflow must load common/node-version.env")
-        if "working-directory: ." not in text:
-            errors.append(f"{rel}: Node version loader must run from repository root")
+        # The previous version of this check required an explicit
+        # `working-directory: .` on the Node-version-loader step because
+        # the job had a `defaults.run.working-directory: services/<svc>`
+        # block that needed to be overridden. With the workspace-aware
+        # workflows, `npm ci` runs from the repository root and there is
+        # no job-level default to override, so the explicit override is
+        # gone.
         if "echo \"version=${SANDBOX_NODE_VERSION}\" >> \"$GITHUB_OUTPUT\"" not in text:
             errors.append(
                 f"{rel}: workflow must expose SANDBOX_NODE_VERSION as a step output"

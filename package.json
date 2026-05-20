@@ -1,0 +1,13 @@
+{
+  "name": "cbdc-tokenization-sandbox",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Local CBDC sandbox monorepo. Use npm workspaces to install once at the repo root for all Node packages.",
+  "packageManager": "npm@11.14.1",
+  "workspaces": [
+    "services/nb-bond-api",
+    "services/nb-ui",
+    "scripts/bid-encryption",
+    "scripts/bid-submitter"
+  ]
+}

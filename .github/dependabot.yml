@@ -4,20 +4,12 @@ updates:
   directory: "/"
   schedule:
     interval: "weekly"
+# Single npm entry for the whole repo: services/nb-bond-api, services/nb-ui,
+# scripts/bid-encryption, and scripts/bid-submitter are all declared as
+# workspaces of the repo-root package.json, so Dependabot resolves them
+# together against the root package-lock.json.
 - package-ecosystem: "npm"
-  directory: "/services/nb-bond-api"
-  schedule:
-    interval: "weekly"
-- package-ecosystem: "npm"
-  directory: "/services/nb-ui"
-  schedule:
-    interval: "weekly"
-- package-ecosystem: "npm"
-  directory: "/scripts/bid-submitter"
-  schedule:
-    interval: "weekly"
-- package-ecosystem: "npm"
-  directory: "/scripts/bid-encryption"
+  directory: "/"
   schedule:
     interval: "weekly"
 - package-ecosystem: "pip"

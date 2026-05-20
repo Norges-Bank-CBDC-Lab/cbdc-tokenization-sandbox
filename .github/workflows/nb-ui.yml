@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "services/nb-ui/**"
+      - "package.json"
+      - "package-lock.json"
       - "common/node-version.env"
       - ".github/workflows/nb-ui.yml"
 
@@ -13,16 +15,12 @@ permissions:
 jobs:
   format-lint-test-build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/nb-ui
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Load Node.js version
         id: node-version
-        working-directory: .
         run: |
           set -a
           . common/node-version.env
@@ -34,19 +32,19 @@ jobs:
         with:
           node-version: "${{ steps.node-version.outputs.version }}"
           cache: "npm"
-          cache-dependency-path: services/nb-ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      - name: Install workspace dependencies
         run: npm ci
 
       - name: Run format check
-        run: npm run format:check
+        run: npm run format:check -w nb-ui
 
       - name: Run lint
-        run: npm run lint
+        run: npm run lint -w nb-ui
 
       - name: Run unit tests
-        run: npm test
+        run: npm test -w nb-ui
 
       - name: Run production build
-        run: npm run build
+        run: npm run build -w nb-ui
