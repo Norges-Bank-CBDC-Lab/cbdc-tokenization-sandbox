@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of May 19, 2026.
+deployment-time components used by this repository as of May 20, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -111,7 +111,7 @@ License labels and deployment-time notes remain curated review items.
 | `@testing-library/jest-dom` | `6.7.0` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.5.2` | MIT |
-| `@vitejs/plugin-react` | `4.7.0` | MIT |
+| `@vitejs/plugin-react` | `6.0.2` | MIT |
 | `eslint` | `9.18.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.4` | MIT |
@@ -119,8 +119,8 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `26.0.0` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `vite` | `6.4.2` | MIT |
-| `vitest` | `3.0.5` | MIT |
+| `vite` | `8.0.13` | MIT |
+| `vitest` | `4.1.7` | MIT |
 
 ### `services/blockscout/bens-microservice`
 
