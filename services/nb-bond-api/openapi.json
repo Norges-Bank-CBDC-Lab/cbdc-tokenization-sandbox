@@ -2,453 +2,718 @@
   "openapi": "3.1.0",
   "info": {
     "title": "NB Bond Auction Service",
-    "version": "1.0.0"
+    "version": "2.0.0",
+    "description": "Public API for the CBDC tokenization sandbox bond service. Sandbox-scale demo backing the nb-ui reference frontend. See docs/openapi-v2-plan.md for design notes.",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
   },
+  "servers": [
+    {
+      "url": "http://bond-api.cbdc-sandbox.local",
+      "description": "Local Kind sandbox"
+    }
+  ],
+  "tags": [
+    {
+      "name": "system",
+      "description": "Service health"
+    },
+    {
+      "name": "bonds",
+      "description": "Bond resources (root of the resource tree)"
+    },
+    {
+      "name": "auctions",
+      "description": "Auction resources (bid/allocation subtree of a bond)"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "paths": {
     "/v1/health": {
       "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "getHealth",
+        "summary": "Service health",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Health information",
-            "content": {
-              "application/json": {
+            "description": "Health and binding information",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
                 "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
+                  "type": "string"
                 }
               }
-            }
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}/auctions": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAuctionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Auction created",
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreateAuctionResponse"
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             }
           },
-          "400": {
-            "description": "Bad request"
-          }
-        }
-      },
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auctions for ISIN",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListAuctionsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auction status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuctionStatusResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/close": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Close auction",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CloseResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/bids": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Bids",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BidsResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/allocations": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Allocation result",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AllocationsResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found"
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/finalisation": {
-      "put": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FinaliseRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Finalise auction",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FinaliseResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/cancel": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Cancel auction",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CancelResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}/coupon-payments": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PayCouponRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Coupon payment submitted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PayCouponResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request"
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}/redemptions": {
-      "post": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RedeemRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Redemption submitted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RedeemResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request"
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}/history": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auction history",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuctionHistoryResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}/holders": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Holders for ISIN",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HoldersResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/bonds/{isin}": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "isin",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Isin"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Bond summary",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BondSummaryResponseOutput"
-                }
-              }
-            }
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
     },
     "/v1/bonds": {
       "get": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "listBonds",
+        "summary": "List all bonds with full subtree (auctions, bids, allocations, holders)",
         "responses": {
           "200": {
-            "description": "List of all known bonds across ISINs",
+            "description": "All bonds. Primary cache-priming call for the UI.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListBondsResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Bond"
+                  }
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bonds/{isin}": {
+      "get": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "getBond",
+        "summary": "Get a single bond with full subtree",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bond resource",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bonds/{isin}/coupon-payments": {
+      "post": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "payCoupon",
+        "summary": "Pay coupon to bond holders",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldersBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated bond after submitting the coupon-payment tx",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bonds/{isin}/redemptions": {
+      "post": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "redeem",
+        "summary": "Redeem bond tokens for holders",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HoldersBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated bond after submitting the redemption tx",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bonds/{isin}/history": {
+      "get": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "listBondHistory",
+        "summary": "Paginated event history for a bond and its auctions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Return events with block < this value"
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event history",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HistoryEvent"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bonds/{isin}/auctions": {
+      "post": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "createAuction",
+        "summary": "Create an auction under a bond. Response is the updated parent Bond.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuctionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated bond with the new auction appended",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
     },
     "/v1/auctions": {
       "get": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "listAuctions",
+        "summary": "List all auctions across bonds (flat view of the full tree)",
         "responses": {
           "200": {
-            "description": "List of all known auctions across bonds",
+            "description": "All auctions with bids and allocations",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ListAllAuctionsResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Auction"
+                  }
                 }
               }
             }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/auctions/{auctionId}": {
+      "get": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "getAuction",
+        "summary": "Get a single auction subtree",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auctionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuctionId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auction resource",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "closeAuction",
+        "summary": "Transition auction to a new status. Only \"closed\" accepted today.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auctionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuctionId"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseAuctionBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated auction after the state transition",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "cancelAuction",
+        "summary": "Cancel auction (soft-delete; stays on-chain with status=\"cancelled\")",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auctionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuctionId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled auction (status=\"cancelled\")",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/auctions/{auctionId}/finalisation": {
+      "put": {
+        "tags": [
+          "auctions"
+        ],
+        "operationId": "finaliseAuction",
+        "summary": "Approve or reject the computed allocation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auctionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AuctionId"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinaliseBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated auction after finalisation",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }
@@ -456,10 +721,546 @@
   },
   "components": {
     "schemas": {
-      "AuctionSummary": {
+      "HoldersBody": {
         "type": "object",
         "properties": {
-          "auctionId": {
+          "holders": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Address"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional subset of holders to pay/redeem. null = all holders."
+          }
+        },
+        "required": [
+          "holders"
+        ],
+        "description": "Body for coupon-payment and redemption operations"
+      },
+      "Address": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{40}$",
+        "description": "Ethereum address",
+        "examples": [
+          "0x1234567890abcdef1234567890abcdef12345678"
+        ]
+      },
+      "CreateAuctionBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/AuctionType"
+          },
+          "end": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Auction close timestamp (unix seconds)",
+            "examples": [
+              "1000000000000000000"
+            ],
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "size": {
+            "description": "Offering or buyback size in 1000-NOK units",
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "maturityDuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds from distribution to maturity (required for RATE auctions)"
+          }
+        },
+        "required": [
+          "type",
+          "end",
+          "size",
+          "maturityDuration"
+        ],
+        "description": "Request body for creating an auction under a bond"
+      },
+      "AuctionType": {
+        "type": "string",
+        "enum": [
+          "RATE",
+          "PRICE",
+          "BUYBACK"
+        ],
+        "description": "Auction pricing model"
+      },
+      "BigIntString": {
+        "type": "string",
+        "pattern": "^[0-9]+$",
+        "description": "Decimal string representation of a uint256",
+        "examples": [
+          "1000000000000000000"
+        ]
+      },
+      "CloseAuctionBody": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "closed",
+            "description": "Target status. Only \"closed\" is accepted today; enum extensible later."
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "PATCH body for the close transition"
+      },
+      "FinaliseBody": {
+        "type": "object",
+        "properties": {
+          "allocationHash": {
+            "$ref": "#/components/schemas/HexString"
+          },
+          "approve": {
+            "type": "boolean",
+            "description": "true → finalised; false → rejected (allocation discarded)"
+          }
+        },
+        "required": [
+          "allocationHash",
+          "approve"
+        ],
+        "description": "PUT body for approving or rejecting a computed allocation"
+      },
+      "HexString": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]+$",
+        "description": "Hex string",
+        "examples": [
+          "0xabc123"
+        ]
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "URI reference categorising the error",
+            "examples": [
+              "about:blank"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "description": "Short, human-readable summary"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "HTTP status code"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human-readable explanation"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Path that produced the error"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ProblemFieldError"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Populated for 400 validation failures; null otherwise"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "description": "RFC 7807 error body. Returned for every 4xx/5xx response."
+      },
+      "ProblemFieldError": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "additionalProperties": false,
+        "description": "Per-field validation error"
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "contracts": {
+            "$ref": "#/components/schemas/HealthContracts"
+          },
+          "sealingPubKey": {
+            "$ref": "#/components/schemas/HexString"
+          }
+        },
+        "required": [
+          "status",
+          "contracts",
+          "sealingPubKey"
+        ],
+        "additionalProperties": false,
+        "description": "Service health and binding information"
+      },
+      "HealthContracts": {
+        "type": "object",
+        "properties": {
+          "bondManager": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "bondAuction": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "bondToken": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": [
+          "bondManager",
+          "bondAuction",
+          "bondToken"
+        ],
+        "additionalProperties": false,
+        "description": "Contract addresses the service is bound to"
+      },
+      "Bond": {
+        "type": "object",
+        "properties": {
+          "isin": {
+            "$ref": "#/components/schemas/Isin"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BondStatus"
+          },
+          "totalSupply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contracts": {
+            "$ref": "#/components/schemas/BondContracts"
+          },
+          "maturity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BondMaturity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "coupon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BondCoupon"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HolderBalance"
+            }
+          },
+          "auctions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Auction"
+            }
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "isin",
+          "status",
+          "totalSupply",
+          "contracts",
+          "maturity",
+          "coupon",
+          "holders",
+          "auctions",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "Bond resource. Carries the full subtree of auctions, bids, allocations, and holders. A single GET /v1/bonds populates the entire UI cache."
+      },
+      "Isin": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ISIN identifying a bond",
+        "examples": [
+          "NO0012345678"
+        ]
+      },
+      "BondStatus": {
+        "type": "string",
+        "enum": [
+          "minting",
+          "maturing",
+          "matured",
+          "redeemed",
+          "unknown"
+        ],
+        "description": "Bond lifecycle status"
+      },
+      "BondContracts": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "description": "ERC20 bond token contract",
+            "$ref": "#/components/schemas/Address"
+          },
+          "auction": {
+            "description": "BondAuction contract",
+            "$ref": "#/components/schemas/Address"
+          },
+          "manager": {
+            "description": "BondManager contract",
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": [
+          "token",
+          "auction",
+          "manager"
+        ],
+        "additionalProperties": false,
+        "description": "On-chain contract addresses for this bond"
+      },
+      "BondMaturity": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Configured maturity duration in seconds"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "description": "Unix timestamp in seconds (decimal string).",
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maturity date as unix timestamp"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds until maturity; 0 once matured"
+          }
+        },
+        "required": [
+          "duration",
+          "date",
+          "remaining"
+        ],
+        "additionalProperties": false,
+        "description": "Maturity configuration and remaining time"
+      },
+      "BondCoupon": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds between coupon payments"
+          },
+          "yieldBps": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Bps"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Annualised coupon yield in bps"
+          },
+          "payments": {
+            "$ref": "#/components/schemas/CouponPayments"
+          }
+        },
+        "required": [
+          "duration",
+          "yieldBps",
+          "payments"
+        ],
+        "additionalProperties": false,
+        "description": "Coupon configuration and payment progress"
+      },
+      "Bps": {
+        "type": "string",
+        "pattern": "^[0-9]+$",
+        "description": "Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.",
+        "examples": [
+          "425",
+          "9875",
+          "10123"
+        ]
+      },
+      "CouponPayments": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "made": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "total",
+          "made",
+          "remaining"
+        ],
+        "additionalProperties": false,
+        "description": "Coupon payment progress"
+      },
+      "HolderBalance": {
+        "type": "object",
+        "properties": {
+          "holder": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "holder",
+          "balance",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "A single bond holder and their balance"
+      },
+      "Auction": {
+        "type": "object",
+        "properties": {
+          "id": {
             "$ref": "#/components/schemas/AuctionId"
           },
           "isin": {
@@ -474,12 +1275,14 @@
           "end": {
             "anyOf": [
               {
+                "description": "Unix timestamp in seconds (decimal string).",
                 "$ref": "#/components/schemas/BigIntString"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Scheduled close timestamp"
           },
           "size": {
             "anyOf": [
@@ -489,52 +1292,75 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Offering or buyback size in 1000-NOK units"
           },
-          "allocationHash": {
+          "maturityDuration": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/HexString"
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds from distribution until maturity (required for RATE auctions)"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "sealingPubKey": {
+            "description": "Public key used by bidders to encrypt sealed bids",
+            "$ref": "#/components/schemas/HexString"
+          },
+          "contracts": {
+            "$ref": "#/components/schemas/AuctionContracts"
+          },
+          "bids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Bid"
+            }
+          },
+          "allocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Allocation"
               },
               {
                 "type": "null"
               }
             ]
           },
-          "finalised": {
-            "type": "boolean"
+          "txs": {
+            "$ref": "#/components/schemas/AuctionTxs"
           },
-          "rejected": {
-            "type": "boolean"
-          },
-          "cancelled": {
-            "type": "boolean"
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
           }
         },
         "required": [
-          "auctionId",
+          "id",
           "isin",
+          "type",
+          "status",
           "end",
           "size",
-          "allocationHash"
+          "maturityDuration",
+          "owner",
+          "sealingPubKey",
+          "contracts",
+          "bids",
+          "allocation",
+          "txs",
+          "md5"
         ],
-        "description": "Auction summary"
-      },
-      "Address": {
-        "type": "string",
-        "pattern": "^0x[a-fA-F0-9]{40}$",
-        "description": "Ethereum address",
-        "examples": [
-          "0x1234567890abcdef1234567890abcdef12345678"
-        ]
-      },
-      "HexString": {
-        "type": "string",
-        "pattern": "^0x[a-fA-F0-9]+$",
-        "description": "Hex string",
-        "examples": [
-          "0xabc123"
-        ]
+        "additionalProperties": false,
+        "description": "Auction resource with bids and allocation subtree"
       },
       "AuctionId": {
         "type": "string",
@@ -542,32 +1368,6 @@
         "description": "Auction identifier (bytes32 hex)",
         "examples": [
           "0x1234abcd00000000000000000000000000000000000000000000000000000000"
-        ]
-      },
-      "BigIntString": {
-        "type": "string",
-        "pattern": "^[0-9]+$",
-        "description": "Decimal string representation of a uint256",
-        "examples": [
-          "1000000000000000000"
-        ]
-      },
-      "BpsString": {
-        "type": "string",
-        "pattern": "^[0-9]+$",
-        "description": "Percentage in bps (1e4 precision, e.g., 425 = 4.25%, 9875 = 98.75%)",
-        "examples": [
-          "425",
-          "9875",
-          "10123"
-        ]
-      },
-      "Isin": {
-        "type": "string",
-        "minLength": 1,
-        "description": "ISIN for the bond auction",
-        "examples": [
-          "NO0012345678"
         ]
       },
       "AuctionStatus": {
@@ -579,12 +1379,43 @@
           "rejected",
           "cancelled"
         ],
-        "description": "Auction lifecycle status",
-        "examples": [
-          "open",
-          "closed",
-          "finalised"
-        ]
+        "description": "Auction lifecycle status"
+      },
+      "AuctionContracts": {
+        "type": "object",
+        "properties": {
+          "auction": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "token": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": [
+          "auction",
+          "token"
+        ],
+        "additionalProperties": false,
+        "description": "On-chain contract addresses owning this auction"
+      },
+      "Bid": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/SealedBid"
+          },
+          {
+            "$ref": "#/components/schemas/UnsealedBid"
+          }
+        ],
+        "description": "Bid; discriminated by `state` — sealed during open, unsealed after close",
+        "type": "object",
+        "discriminator": {
+          "propertyName": "state",
+          "mapping": {
+            "sealed": "#/components/schemas/SealedBid",
+            "unsealed": "#/components/schemas/UnsealedBid"
+          }
+        }
       },
       "SealedBid": {
         "type": "object",
@@ -592,19 +1423,33 @@
           "bidder": {
             "$ref": "#/components/schemas/Address"
           },
+          "state": {
+            "type": "string",
+            "const": "sealed"
+          },
           "ciphertext": {
             "$ref": "#/components/schemas/HexString"
           },
           "plaintextHash": {
             "$ref": "#/components/schemas/HexString"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
           }
         },
         "required": [
           "bidder",
+          "state",
           "ciphertext",
-          "plaintextHash"
+          "plaintextHash",
+          "md5"
         ],
-        "description": "Sealed bid"
+        "additionalProperties": false,
+        "description": "Bid in sealed (encrypted) state during an open auction"
       },
       "UnsealedBid": {
         "type": "object",
@@ -612,1591 +1457,279 @@
           "bidder": {
             "$ref": "#/components/schemas/Address"
           },
+          "state": {
+            "type": "string",
+            "const": "unsealed"
+          },
           "rate": {
-            "$ref": "#/components/schemas/BpsString"
+            "$ref": "#/components/schemas/Bps"
           },
           "units": {
             "$ref": "#/components/schemas/BigIntString"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
           }
         },
         "required": [
           "bidder",
+          "state",
           "rate",
-          "units"
+          "units",
+          "md5"
         ],
-        "description": "Unsealed bid"
+        "additionalProperties": false,
+        "description": "Bid in unsealed (revealed) state after auction close"
       },
       "Allocation": {
         "type": "object",
         "properties": {
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "units": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "rate": {
-            "$ref": "#/components/schemas/BpsString"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "bidder",
-          "units",
-          "rate"
-        ],
-        "description": "Allocation entry"
-      },
-      "AllocationResult": {
-        "type": "object",
-        "properties": {
           "clearingRate": {
-            "$ref": "#/components/schemas/BpsString"
+            "$ref": "#/components/schemas/Bps"
           },
           "totalAllocated": {
             "$ref": "#/components/schemas/BigIntString"
           },
-          "allocationHash": {
+          "hash": {
+            "description": "Hash committing to the allocation result; matches on-chain",
             "$ref": "#/components/schemas/HexString"
           },
           "auctionType": {
             "$ref": "#/components/schemas/AuctionType"
           },
           "computedAt": {
-            "type": "number",
-            "description": "Milliseconds since epoch"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Unix timestamp in milliseconds."
           },
-          "allocations": {
+          "entries": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Allocation"
+              "$ref": "#/components/schemas/AllocationEntry"
             }
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
           }
         },
         "required": [
           "clearingRate",
           "totalAllocated",
-          "allocationHash",
+          "hash",
           "auctionType",
           "computedAt",
-          "allocations"
+          "entries",
+          "md5"
         ],
-        "description": "Computed allocation result"
+        "additionalProperties": false,
+        "description": "Computed allocation result for a closed auction"
       },
-      "CreateAuctionRequest": {
+      "AllocationEntry": {
         "type": "object",
         "properties": {
-          "type": {
-            "$ref": "#/components/schemas/AuctionType"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              }
-            ],
-            "description": "Auction end timestamp (unix seconds)"
-          },
-          "size": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              }
-            ],
-            "description": "Offering or buyback size in whole 1,000 NOK units"
-          },
-          "maturityDuration": {
-            "description": "Seconds from distribution until maturity (required for RATE)",
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0,
-                "maximum": 9007199254740991
-              },
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              }
-            ]
-          }
-        },
-        "required": [
-          "type",
-          "end",
-          "size"
-        ],
-        "description": "Create auction request"
-      },
-      "AuctionMetadata": {
-        "type": "object",
-        "properties": {
-          "owner": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionPubKey": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "bond": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "offering": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "owner",
-          "end",
-          "auctionPubKey",
-          "bond",
-          "offering",
-          "auctionType"
-        ],
-        "description": "On-chain auction metadata"
-      },
-      "AuctionCached": {
-        "type": "object",
-        "properties": {
-          "sealedCount": {
-            "type": "number"
-          },
-          "unsealedCount": {
-            "type": "number"
-          },
-          "allocationHash": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HexString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "finalised": {
-            "type": "boolean"
-          },
-          "rejected": {
-            "type": "boolean"
-          },
-          "cancelled": {
-            "type": "boolean"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "sealedCount",
-          "unsealedCount",
-          "allocationHash",
-          "finalised",
-          "rejected"
-        ],
-        "description": "Cached auction info"
-      },
-      "OnChainAllocation": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
           "bidder": {
             "$ref": "#/components/schemas/Address"
           },
           "units": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BigIntString"
           },
           "rate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BpsString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
+            "$ref": "#/components/schemas/Bps"
           }
         },
         "required": [
-          "isin",
           "bidder",
           "units",
           "rate"
         ],
-        "description": "On-chain allocation tuple"
+        "additionalProperties": false,
+        "description": "A single bidder share of a completed allocation"
       },
-      "FinaliseRequest": {
+      "AuctionTxs": {
         "type": "object",
         "properties": {
-          "allocationHash": {
-            "$ref": "#/components/schemas/HexString"
+          "create": {
+            "$ref": "#/components/schemas/TxRef"
           },
-          "approve": {
-            "type": "boolean"
+          "close": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TxRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finalise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TxRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cancel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TxRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "allocationHash",
-          "approve"
+          "create",
+          "close",
+          "finalise",
+          "cancel"
         ],
-        "description": "Approve or reject allocation"
+        "additionalProperties": false,
+        "description": "Latest transaction per state-changing action on this auction"
       },
-      "PayCouponRequest": {
+      "TxRef": {
         "type": "object",
         "properties": {
-          "holders": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Address"
-            }
-          }
-        },
-        "description": "Pay coupon request"
-      },
-      "RedeemRequest": {
-        "type": "object",
-        "properties": {
-          "holders": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Address"
-            }
-          }
-        },
-        "description": "Redeem request"
-      },
-      "AuctionHistoryEvent": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "type": {
-            "type": "string"
+          "hash": {
+            "$ref": "#/components/schemas/HexString"
           },
           "block": {
-            "type": "number"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "payload": {}
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Block number, or null if not yet mined / unknown."
+          }
         },
         "required": [
-          "isin",
-          "type",
-          "block",
-          "txHash",
-          "payload"
+          "hash",
+          "block"
         ],
-        "description": "Auction event history row"
+        "additionalProperties": false,
+        "description": "Reference to an on-chain transaction"
       },
-      "HolderBalance": {
+      "HistoryEvent": {
         "type": "object",
         "properties": {
           "isin": {
             "$ref": "#/components/schemas/Isin"
           },
-          "holder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "balance": {
-            "$ref": "#/components/schemas/BigIntString"
-          }
-        },
-        "required": [
-          "isin",
-          "holder",
-          "balance"
-        ],
-        "description": "Holder balance"
-      },
-      "BondSummaryResponse": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "maturityDuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "maturityDate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "timeToMaturity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponDuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponYield": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsTotal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsMade": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsRemaining": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "minting",
-              "maturing",
-              "matured",
-              "redeemed",
-              "unknown"
-            ]
-          },
-          "totalSupply": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "isin",
-          "maturityDuration",
-          "maturityDate",
-          "timeToMaturity",
-          "couponDuration",
-          "couponYield",
-          "couponPaymentsTotal",
-          "couponPaymentsMade",
-          "couponPaymentsRemaining",
-          "status",
-          "totalSupply"
-        ],
-        "description": "Bond summary"
-      },
-      "AuctionType": {
-        "type": "string",
-        "enum": [
-          "RATE",
-          "PRICE",
-          "BUYBACK"
-        ],
-        "description": "Auction type",
-        "examples": [
-          "RATE",
-          "PRICE",
-          "BUYBACK"
-        ]
-      },
-      "CreateAuctionResponse": {
-        "type": "object",
-        "properties": {
           "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuctionId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set for auction-scoped events; null for bond-level events"
           },
           "type": {
-            "$ref": "#/components/schemas/AuctionType"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "end": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "size": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "maturityDuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionPubKey": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "bondAuction": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "bondToken": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "type",
-          "status",
-          "end",
-          "size",
-          "maturityDuration",
-          "auctionPubKey",
-          "bondAuction",
-          "bondToken",
-          "txHash",
-          "blockNumber"
-        ],
-        "additionalProperties": false,
-        "description": "Create auction response"
-      },
-      "ListAuctionsResponse": {
-        "type": "object",
-        "properties": {
-          "auctions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AuctionSummaryOutput"
-            }
-          }
-        },
-        "required": [
-          "auctions"
-        ],
-        "additionalProperties": false,
-        "description": "List auctions for an ISIN"
-      },
-      "CloseResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "bidCount": {
-            "type": "number"
-          },
-          "bids": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UnsealedBidOutput"
-            }
-          },
-          "allocation": {
-            "$ref": "#/components/schemas/AllocationResultOutput"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "status",
-          "txHash",
-          "blockNumber",
-          "bidCount",
-          "bids",
-          "allocation",
-          "auctionType"
-        ],
-        "additionalProperties": false,
-        "description": "Close auction response"
-      },
-      "BidsResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "state": {
             "type": "string",
-            "enum": [
-              "sealed",
-              "unsealed"
-            ]
-          },
-          "bidCount": {
-            "type": "number"
-          },
-          "bids": {
-            "type": "array",
-            "items": {
-              "anyOf": [
-                {
-                  "$ref": "#/components/schemas/UnsealedBidOutput"
-                },
-                {
-                  "$ref": "#/components/schemas/SealedBidOutput"
-                }
-              ]
-            }
-          },
-          "allocation": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AllocationResultOutput"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "state",
-          "bidCount",
-          "bids",
-          "allocation",
-          "auctionType"
-        ],
-        "additionalProperties": false,
-        "description": "Bids response"
-      },
-      "AllocationsResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "allocation": {
-            "$ref": "#/components/schemas/AllocationResultOutput"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          },
-          "finalised": {
-            "type": "boolean"
-          },
-          "rejected": {
-            "type": "boolean"
-          },
-          "cancelled": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "allocation",
-          "status",
-          "auctionType",
-          "finalised",
-          "rejected"
-        ],
-        "additionalProperties": false,
-        "description": "Allocation result response"
-      },
-      "AuctionStatusResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/AuctionMetadataOutput"
-          },
-          "cached": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AuctionCachedOutput"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "allocations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OnChainAllocationOutput"
-            }
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "status",
-          "metadata",
-          "cached",
-          "allocations"
-        ],
-        "additionalProperties": false,
-        "description": "Auction status response"
-      },
-      "FinaliseResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "finalised",
-              "rejected"
-            ]
-          },
-          "allocationHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "allocation": {
-            "$ref": "#/components/schemas/AllocationResultOutput"
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "status"
-        ],
-        "additionalProperties": false,
-        "description": "Finalise auction response"
-      },
-      "CancelResponse": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "status",
-          "txHash",
-          "blockNumber"
-        ],
-        "additionalProperties": false,
-        "description": "Cancel auction response"
-      },
-      "PayCouponResponse": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "status": {
-            "type": "string",
-            "const": "submitted"
-          },
-          "holderCount": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "isin",
-          "txHash",
-          "blockNumber",
-          "status",
-          "holderCount"
-        ],
-        "additionalProperties": false,
-        "description": "Pay coupon response"
-      },
-      "RedeemResponse": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "txHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "blockNumber": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "status": {
-            "type": "string",
-            "const": "submitted"
-          },
-          "holderCount": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "isin",
-          "txHash",
-          "blockNumber",
-          "status",
-          "holderCount"
-        ],
-        "additionalProperties": false,
-        "description": "Redeem response"
-      },
-      "AuctionHistoryResponse": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AuctionHistoryEventOutput"
-            }
-          },
-          "bondEvents": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "isin": {
-                  "$ref": "#/components/schemas/Isin"
-                },
-                "type": {
-                  "type": "string"
-                },
-                "block": {
-                  "type": "number"
-                },
-                "txHash": {
-                  "$ref": "#/components/schemas/HexString"
-                },
-                "payload": {}
-              },
-              "required": [
-                "isin",
-                "type",
-                "block",
-                "txHash",
-                "payload"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "isin",
-          "events"
-        ],
-        "additionalProperties": false,
-        "description": "Auction history response"
-      },
-      "HoldersResponse": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "holders": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/HolderBalanceOutput"
-            }
-          }
-        },
-        "required": [
-          "isin",
-          "holders"
-        ],
-        "additionalProperties": false,
-        "description": "Holders response"
-      },
-      "ListBondsResponse": {
-        "type": "object",
-        "properties": {
-          "bonds": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BondSummaryResponseOutput"
-            }
-          }
-        },
-        "required": [
-          "bonds"
-        ],
-        "additionalProperties": false,
-        "description": "List of all known bonds"
-      },
-      "ListAllAuctionsResponse": {
-        "type": "object",
-        "properties": {
-          "auctions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AuctionSummaryOutput"
-            }
-          }
-        },
-        "required": [
-          "auctions"
-        ],
-        "additionalProperties": false,
-        "description": "List of all known auctions across bonds"
-      },
-      "HealthResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          },
-          "bondManager": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "bondAuction": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "bondToken": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "sealingPublicKey": {
-            "$ref": "#/components/schemas/HexString"
-          }
-        },
-        "required": [
-          "status",
-          "bondManager",
-          "bondAuction",
-          "bondToken",
-          "sealingPublicKey"
-        ],
-        "additionalProperties": false,
-        "description": "Health response"
-      },
-      "AuctionSummaryOutput": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "type": {
-            "$ref": "#/components/schemas/AuctionType"
-          },
-          "status": {
-            "$ref": "#/components/schemas/AuctionStatus"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "size": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "allocationHash": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HexString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "finalised": {
-            "type": "boolean"
-          },
-          "rejected": {
-            "type": "boolean"
-          },
-          "cancelled": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "auctionId",
-          "isin",
-          "end",
-          "size",
-          "allocationHash"
-        ],
-        "additionalProperties": false,
-        "description": "Auction summary"
-      },
-      "SealedBidOutput": {
-        "type": "object",
-        "properties": {
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "ciphertext": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "plaintextHash": {
-            "$ref": "#/components/schemas/HexString"
-          }
-        },
-        "required": [
-          "bidder",
-          "ciphertext",
-          "plaintextHash"
-        ],
-        "additionalProperties": false,
-        "description": "Sealed bid"
-      },
-      "UnsealedBidOutput": {
-        "type": "object",
-        "properties": {
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "rate": {
-            "$ref": "#/components/schemas/BpsString"
-          },
-          "units": {
-            "$ref": "#/components/schemas/BigIntString"
-          }
-        },
-        "required": [
-          "bidder",
-          "rate",
-          "units"
-        ],
-        "additionalProperties": false,
-        "description": "Unsealed bid"
-      },
-      "AllocationOutput": {
-        "type": "object",
-        "properties": {
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "units": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "rate": {
-            "$ref": "#/components/schemas/BpsString"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "bidder",
-          "units",
-          "rate"
-        ],
-        "additionalProperties": false,
-        "description": "Allocation entry"
-      },
-      "AllocationResultOutput": {
-        "type": "object",
-        "properties": {
-          "clearingRate": {
-            "$ref": "#/components/schemas/BpsString"
-          },
-          "totalAllocated": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "allocationHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          },
-          "computedAt": {
-            "type": "number",
-            "description": "Milliseconds since epoch"
-          },
-          "allocations": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AllocationOutput"
-            }
-          }
-        },
-        "required": [
-          "clearingRate",
-          "totalAllocated",
-          "allocationHash",
-          "auctionType",
-          "computedAt",
-          "allocations"
-        ],
-        "additionalProperties": false,
-        "description": "Computed allocation result"
-      },
-      "AuctionMetadataOutput": {
-        "type": "object",
-        "properties": {
-          "owner": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "end": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionPubKey": {
-            "$ref": "#/components/schemas/HexString"
-          },
-          "bond": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "offering": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "owner",
-          "end",
-          "auctionPubKey",
-          "bond",
-          "offering",
-          "auctionType"
-        ],
-        "additionalProperties": false,
-        "description": "On-chain auction metadata"
-      },
-      "AuctionCachedOutput": {
-        "type": "object",
-        "properties": {
-          "sealedCount": {
-            "type": "number"
-          },
-          "unsealedCount": {
-            "type": "number"
-          },
-          "allocationHash": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HexString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "finalised": {
-            "type": "boolean"
-          },
-          "rejected": {
-            "type": "boolean"
-          },
-          "cancelled": {
-            "type": "boolean"
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "sealedCount",
-          "unsealedCount",
-          "allocationHash",
-          "finalised",
-          "rejected"
-        ],
-        "additionalProperties": false,
-        "description": "Cached auction info"
-      },
-      "OnChainAllocationOutput": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "units": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "rate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BpsString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "auctionType": {
-            "$ref": "#/components/schemas/AuctionType"
-          }
-        },
-        "required": [
-          "isin",
-          "bidder",
-          "units",
-          "rate"
-        ],
-        "additionalProperties": false,
-        "description": "On-chain allocation tuple"
-      },
-      "AuctionHistoryEventOutput": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
-          },
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "type": {
-            "type": "string"
+            "description": "Event name as emitted by the contracts (e.g. \"BidSubmitted\", \"CouponPaid\")"
           },
           "block": {
-            "type": "number"
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
           },
           "txHash": {
             "$ref": "#/components/schemas/HexString"
           },
-          "payload": {}
+          "payload": {
+            "description": "Event-specific opaque payload; clients treat as untyped JSON"
+          }
         },
         "required": [
           "isin",
+          "auctionId",
           "type",
           "block",
           "txHash",
           "payload"
         ],
         "additionalProperties": false,
-        "description": "Auction event history row"
-      },
-      "HolderBalanceOutput": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "holder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "balance": {
-            "$ref": "#/components/schemas/BigIntString"
+        "description": "Auction or bond event observed on-chain"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation failed; `errors[]` populated.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
-        },
-        "required": [
-          "isin",
-          "holder",
-          "balance"
-        ],
-        "additionalProperties": false,
-        "description": "Holder balance"
+        }
       },
-      "BondSummaryResponseOutput": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
-          },
-          "maturityDuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "maturityDate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "timeToMaturity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponDuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponYield": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsTotal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsMade": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "couponPaymentsRemaining": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "minting",
-              "maturing",
-              "matured",
-              "redeemed",
-              "unknown"
-            ]
-          },
-          "totalSupply": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BigIntString"
-              },
-              {
-                "type": "null"
-              }
-            ]
+      "Unauthorized": {
+        "description": "Authentication required or token invalid.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
-        },
-        "required": [
-          "isin",
-          "maturityDuration",
-          "maturityDate",
-          "timeToMaturity",
-          "couponDuration",
-          "couponYield",
-          "couponPaymentsTotal",
-          "couponPaymentsMade",
-          "couponPaymentsRemaining",
-          "status",
-          "totalSupply"
-        ],
-        "additionalProperties": false,
-        "description": "Bond summary"
+        }
       },
-      "BidPlaintext": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "type": "string"
-          },
-          "bidder": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "nonce": {
-            "type": "string"
-          },
-          "rate": {
-            "$ref": "#/components/schemas/BpsString"
-          },
-          "units": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "salt": {
-            "type": "string"
-          },
-          "bidderNonce": {
-            "$ref": "#/components/schemas/BigIntString"
-          },
-          "bidderSig": {
-            "$ref": "#/components/schemas/HexString"
+      "NotFound": {
+        "description": "Resource does not exist.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
-        },
-        "required": [
-          "isin",
-          "bidder",
-          "nonce",
-          "rate",
-          "units",
-          "salt",
-          "bidderNonce",
-          "bidderSig"
-        ],
-        "additionalProperties": false,
-        "description": "Bid plaintext payload"
+        }
       },
-      "IsinParam": {
-        "type": "object",
-        "properties": {
-          "isin": {
-            "$ref": "#/components/schemas/Isin"
+      "Conflict": {
+        "description": "Operation conflicts with current resource state.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
-        },
-        "required": [
-          "isin"
-        ],
-        "additionalProperties": false
+        }
       },
-      "AuctionIdParam": {
-        "type": "object",
-        "properties": {
-          "auctionId": {
-            "$ref": "#/components/schemas/AuctionId"
+      "InternalError": {
+        "description": "Unexpected server error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
           }
-        },
-        "required": [
-          "auctionId"
-        ],
-        "additionalProperties": false
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Microsoft Entra ID access token. In deployments where NB_BOND_API_AUTH_MODE=none (local sandbox default), the header is accepted but not validated."
       }
     }
   }

@@ -1,7 +1,14 @@
 /**
- * auctionsApi — public API surface for auction resources.
+ * auctionsApi — auction-resource API surface.
  *
- * UI imports THIS module. See bondsApi.js for the architectural contract.
+ * Maps to the v2 endpoint catalog (docs/openapi-v2-plan.md §5):
+ *   - PATCH /v1/auctions/{id} { status: "closed" }  → close
+ *   - DELETE /v1/auctions/{id}                       → cancel
+ *   - PUT /v1/auctions/{id}/finalisation             → approve/reject
+ *
+ * Mutations return the updated parent (Bond on create, Auction on
+ * close/cancel/finalise) — the cache layer in httpClient drops stale
+ * entries automatically.
  */
 import { AppConfig } from '../config.js';
 import { HttpClient, NotImplementedError } from './httpClient.js';
@@ -9,54 +16,45 @@ import { MockClient } from './mockClient.js';
 
 const isMockMode = () => AppConfig.USE_MOCK;
 
-async function listAllAuctions() {
-  if (isMockMode()) return MockClient.listAllAuctions();
+async function listAuctions() {
+  if (isMockMode()) return MockClient.listAuctions();
   return HttpClient.get('/v1/auctions');
 }
 
-async function listAuctionsForBond(isin) {
-  if (isMockMode()) return MockClient.listAuctionsForBond(isin);
-  return HttpClient.get(`/v1/bonds/${encodeURIComponent(isin)}/auctions`);
+async function getAuction(auctionId) {
+  if (isMockMode()) return MockClient.getAuction(auctionId);
+  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}`);
 }
 
 async function createAuction(isin, payload) {
   if (isMockMode()) return MockClient.createAuction(isin, payload);
+  // Server returns the updated parent Bond with the new auction in
+  // its `auctions[]` array.
   return HttpClient.post(`/v1/bonds/${encodeURIComponent(isin)}/auctions`, payload);
-}
-
-async function getAuctionStatus(auctionId) {
-  if (isMockMode()) return MockClient.getAuctionStatus(auctionId);
-  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}`);
-}
-
-async function getAuctionBids(auctionId) {
-  if (isMockMode()) return MockClient.getAuctionBids(auctionId);
-  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}/bids`);
-}
-
-async function getAuctionAllocations(auctionId) {
-  if (isMockMode()) return MockClient.getAuctionAllocations(auctionId);
-  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}/allocations`);
 }
 
 async function closeAuction(auctionId) {
   if (isMockMode()) return MockClient.closeAuction(auctionId);
-  return HttpClient.post(`/v1/auctions/${encodeURIComponent(auctionId)}/close`);
+  return HttpClient.patch(`/v1/auctions/${encodeURIComponent(auctionId)}`, {
+    status: 'closed',
+  });
+}
+
+async function cancelAuction(auctionId) {
+  if (isMockMode()) return MockClient.cancelAuction(auctionId);
+  return HttpClient.del(`/v1/auctions/${encodeURIComponent(auctionId)}`);
 }
 
 /**
- * Reopen a closed auction. NOT in the current OpenAPI spec and not supported
- * by the BondAuction contract (it has no closed→open transition). The mock
- * fakes it for UI prototyping; the real client throws NotImplementedError so
+ * Reopen a closed auction. NOT in the v2 spec and not supported on
+ * the BondAuction contract (no closed→open transition). Mock fakes
+ * it for UI prototyping; real client throws NotImplementedError so
  * the UI can show a clear "reopen unsupported" toast.
- *
- * Backend follow-up: see docs/KNOWN_ISSUES.md "nb-ui: reopenAuction needs
- * backend / on-chain support".
  */
 async function reopenAuction(auctionId) {
   if (isMockMode()) return MockClient.reopenAuction(auctionId);
   throw new NotImplementedError(
-    'Reopen auction is not implemented in the backend yet — see docs/KNOWN_ISSUES.md.',
+    'Reopen auction is not implemented in the backend — see docs/KNOWN_ISSUES.md.',
   );
 }
 
@@ -66,31 +64,22 @@ async function reopenAuction(auctionId) {
  * @param {string} auctionId
  * @param {string} allocationHash
  * @param {boolean} approve
- * @param {number[]=} winners - operator-selected winning bid indices (mock only).
- *   The real backend computes the allocation server-side and ignores this
- *   field; the parameter is kept here so the UI doesn't have to know the
- *   difference. See docs/KNOWN_ISSUES.md "nb-ui: operator-selectable winners".
+ * @param {number[]=} winners - mock-only: operator-selected winning
+ *   bid indices. The real backend computes the allocation server-side
+ *   and ignores this field.
  */
 async function finaliseAuction(auctionId, allocationHash, approve, winners) {
-  const body = { allocationHash, approve, winners };
-  if (isMockMode()) return MockClient.finaliseAuction(auctionId, body);
+  const body = { allocationHash, approve };
+  if (isMockMode()) return MockClient.finaliseAuction(auctionId, { ...body, winners });
   return HttpClient.put(`/v1/auctions/${encodeURIComponent(auctionId)}/finalisation`, body);
 }
 
-async function cancelAuction(auctionId) {
-  if (isMockMode()) return MockClient.cancelAuction(auctionId);
-  return HttpClient.post(`/v1/auctions/${encodeURIComponent(auctionId)}/cancel`);
-}
-
 export const AuctionsApi = {
-  listAllAuctions,
-  listAuctionsForBond,
+  listAuctions,
+  getAuction,
   createAuction,
-  getAuctionStatus,
-  getAuctionBids,
-  getAuctionAllocations,
   closeAuction,
+  cancelAuction,
   reopenAuction,
   finaliseAuction,
-  cancelAuction,
 };

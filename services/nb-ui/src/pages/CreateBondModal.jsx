@@ -39,9 +39,9 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
       const now = Math.floor(Date.now() / 1000);
       const body = {
         type: auctionType,
-        end: now + Math.round(Number(endDays) * 86400),
-        size: Math.round(Number(size)),
-        maturityDuration: Math.round(Number(maturityYears) * YEAR_SECS),
+        end: String(now + Math.round(Number(endDays) * 86400)),
+        size: String(Math.round(Number(size))),
+        maturityDuration: String(Math.round(Number(maturityYears) * YEAR_SECS)),
       };
       const res = await mutation.run({ isin, body });
       onCreated(res);

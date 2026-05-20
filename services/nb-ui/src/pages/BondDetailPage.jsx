@@ -1,9 +1,12 @@
 /**
- * BondDetailPage — single bond + its auctions + holders.
+ * BondDetailPage — single bond with its auctions + holders.
+ *
+ * One GET /v1/bonds/{isin} returns the full bond tree. Auctions and
+ * holders are sliced from `bond.auctions` and `bond.holders`. No
+ * per-feature fetches.
  */
 import { useState } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
-import { AuctionsApi } from '../api/auctionsApi.js';
 import { useApi } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
@@ -19,8 +22,6 @@ import { CreateAuctionModal } from './CreateAuctionModal.jsx';
 
 export function BondDetailPage({ isin, navigate }) {
   const bondQ = useApi(() => BondsApi.getBond(isin), [isin]);
-  const auctionsQ = useApi(() => AuctionsApi.listAuctionsForBond(isin), [isin]);
-  const holdersQ = useApi(() => BondsApi.getBondHolders(isin), [isin]);
   const [showCreate, setShowCreate] = useState(false);
   const toast = useToast();
 
@@ -38,19 +39,22 @@ export function BondDetailPage({ isin, navigate }) {
     );
 
   const b = bondQ.data;
+  const auctions = b.auctions ?? [];
+  const holders = b.holders ?? [];
 
-  function handleCreated(res) {
+  function handleCreated(updatedBond) {
     setShowCreate(false);
+    const newAuction = updatedBond?.auctions?.[0];
     toast.push({
       kind: 'ok',
       title: 'Auction created',
-      body: `${Fmt.shortHex(res.auctionId)} on ${res.isin}`,
+      body: `${newAuction ? Fmt.shortHex(newAuction.id) : ''} on ${updatedBond.isin}`,
     });
     // First reload races the backend ingestion loop (default 3s tick); the
     // delayed second reload covers the worst case where the immediate one
-    // just missed a tick. See BondsPage handleCreated for details.
-    auctionsQ.reload();
-    setTimeout(auctionsQ.reload, 4000);
+    // just missed a tick.
+    bondQ.reload();
+    setTimeout(bondQ.reload, 4000);
   }
 
   return (
@@ -74,19 +78,13 @@ export function BondDetailPage({ isin, navigate }) {
             <StatusBadge status={b.status} />
             <span>·</span>
             <span>
-              Coupon {Fmt.bpsToPct(b.couponYield)} · matures {Fmt.formatUnixDate(b.maturityDate)}
+              Coupon {Fmt.bpsToPct(b.coupon?.yieldBps)} · matures{' '}
+              {Fmt.formatUnixDate(b.maturity?.date)}
             </span>
           </div>
         </div>
         <div className="actions">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              bondQ.reload();
-              auctionsQ.reload();
-              holdersQ.reload();
-            }}
-          >
+          <Button variant="ghost" onClick={bondQ.reload}>
             Refresh
           </Button>
           <Button variant="primary" onClick={() => setShowCreate(true)}>
@@ -103,20 +101,20 @@ export function BondDetailPage({ isin, navigate }) {
         </div>
         <div className="kpi">
           <div className="kpi-label">Coupon yield</div>
-          <div className="kpi-value">{Fmt.bpsToPct(b.couponYield)}</div>
+          <div className="kpi-value">{Fmt.bpsToPct(b.coupon?.yieldBps)}</div>
           <div className="kpi-sub">Annualised</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Time to maturity</div>
-          <div className="kpi-value">{Fmt.durationToYears(b.timeToMaturity)}</div>
-          <div className="kpi-sub">{Fmt.formatRelative(b.maturityDate)}</div>
+          <div className="kpi-value">{Fmt.durationToYears(b.maturity?.remaining)}</div>
+          <div className="kpi-sub">{Fmt.formatRelative(b.maturity?.date)}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Coupons paid</div>
           <div className="kpi-value">
-            {b.couponPaymentsMade ?? '0'} / {b.couponPaymentsTotal ?? '—'}
+            {b.coupon?.payments?.made ?? '0'} / {b.coupon?.payments?.total ?? '—'}
           </div>
-          <div className="kpi-sub">{b.couponPaymentsRemaining ?? '—'} remaining</div>
+          <div className="kpi-sub">{b.coupon?.payments?.remaining ?? '—'} remaining</div>
         </div>
       </div>
 
@@ -134,15 +132,15 @@ export function BondDetailPage({ isin, navigate }) {
                 <StatusBadge status={b.status} />
               </dd>
               <dt>Maturity duration</dt>
-              <dd>{Fmt.durationToYears(b.maturityDuration)}</dd>
+              <dd>{Fmt.durationToYears(b.maturity?.duration)}</dd>
               <dt>Maturity date</dt>
-              <dd>{Fmt.formatUnixDate(b.maturityDate)}</dd>
+              <dd>{Fmt.formatUnixDate(b.maturity?.date)}</dd>
               <dt>Coupon duration</dt>
-              <dd>{Fmt.durationToYears(b.couponDuration)}</dd>
+              <dd>{Fmt.durationToYears(b.coupon?.duration)}</dd>
               <dt>Coupon yield</dt>
-              <dd>{Fmt.bpsToPct(b.couponYield)}</dd>
+              <dd>{Fmt.bpsToPct(b.coupon?.yieldBps)}</dd>
               <dt>Coupon payments (total)</dt>
-              <dd className="mono">{b.couponPaymentsTotal ?? '—'}</dd>
+              <dd className="mono">{b.coupon?.payments?.total ?? '—'}</dd>
               <dt>Total supply</dt>
               <dd className="mono">
                 {Fmt.formatUnits(b.totalSupply)} units · {Fmt.formatNok(b.totalSupply)}
@@ -159,59 +157,55 @@ export function BondDetailPage({ isin, navigate }) {
             </Button>
           </div>
           <div className="card-body flush">
-            {auctionsQ.loading && <LoadingState />}
-            {auctionsQ.error && <ErrorState error={auctionsQ.error} onRetry={auctionsQ.reload} />}
-            {!auctionsQ.loading &&
-              !auctionsQ.error &&
-              (auctionsQ.data.auctions.length === 0 ? (
-                <EmptyState
-                  title="No auctions yet"
-                  message="Create the first auction for this bond."
-                />
-              ) : (
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Auction ID</th>
-                      <th>Type</th>
-                      <th>Status</th>
-                      <th className="num">Size</th>
-                      <th className="num">Ends</th>
-                      <th></th>
+            {auctions.length === 0 ? (
+              <EmptyState
+                title="No auctions yet"
+                message="Create the first auction for this bond."
+              />
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Auction ID</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th className="num">Size</th>
+                    <th className="num">Ends</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auctions.map((a) => (
+                    <tr
+                      key={a.id}
+                      className="clickable"
+                      onClick={() => navigate(`/auctions/${a.id}`)}
+                    >
+                      <td className="mono">{Fmt.shortHex(a.id, 8, 6)}</td>
+                      <td>
+                        <TypeBadge type={a.type} />
+                      </td>
+                      <td>
+                        <StatusBadge status={a.status} />
+                      </td>
+                      <td className="num mono">{Fmt.formatUnits(a.size)}</td>
+                      <td className="num">{Fmt.formatUnixDate(a.end)}</td>
+                      <td className="right">
+                        <a
+                          href={`#/auctions/${a.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigate(`/auctions/${a.id}`);
+                          }}
+                        >
+                          View →
+                        </a>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {auctionsQ.data.auctions.map((a) => (
-                      <tr
-                        key={a.auctionId}
-                        className="clickable"
-                        onClick={() => navigate(`/auctions/${a.auctionId}`)}
-                      >
-                        <td className="mono">{Fmt.shortHex(a.auctionId, 8, 6)}</td>
-                        <td>
-                          <TypeBadge type={a.type} />
-                        </td>
-                        <td>
-                          <StatusBadge status={a.status} />
-                        </td>
-                        <td className="num mono">{Fmt.formatUnits(a.size)}</td>
-                        <td className="num">{Fmt.formatUnixDate(a.end)}</td>
-                        <td className="right">
-                          <a
-                            href={`#/auctions/${a.auctionId}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              navigate(`/auctions/${a.auctionId}`);
-                            }}
-                          >
-                            View →
-                          </a>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ))}
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -219,40 +213,32 @@ export function BondDetailPage({ isin, navigate }) {
           <div className="card-header">
             <h3 className="card-title">Holders</h3>
             <span className="muted mono" style={{ fontSize: 12 }}>
-              {holdersQ.data?.holders?.length ?? 0} address
-              {(holdersQ.data?.holders?.length ?? 0) === 1 ? '' : 'es'}
+              {holders.length} address{holders.length === 1 ? '' : 'es'}
             </span>
           </div>
           <div className="card-body flush">
-            {holdersQ.loading && <LoadingState />}
-            {holdersQ.error && <ErrorState error={holdersQ.error} onRetry={holdersQ.reload} />}
-            {!holdersQ.loading &&
-              !holdersQ.error &&
-              (holdersQ.data.holders.length === 0 ? (
-                <EmptyState
-                  title="No holders"
-                  message="No allocations have been distributed yet."
-                />
-              ) : (
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Holder</th>
-                      <th className="num">Balance (units)</th>
-                      <th className="num">Value</th>
+            {holders.length === 0 ? (
+              <EmptyState title="No holders" message="No allocations have been distributed yet." />
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Holder</th>
+                    <th className="num">Balance (units)</th>
+                    <th className="num">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holders.map((h) => (
+                    <tr key={h.holder}>
+                      <td className="mono">{h.holder}</td>
+                      <td className="num mono">{Fmt.formatUnits(h.balance)}</td>
+                      <td className="num">{Fmt.formatNok(h.balance)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {holdersQ.data.holders.map((h) => (
-                      <tr key={h.holder}>
-                        <td className="mono">{h.holder}</td>
-                        <td className="num mono">{Fmt.formatUnits(h.balance)}</td>
-                        <td className="num">{Fmt.formatNok(h.balance)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ))}
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>

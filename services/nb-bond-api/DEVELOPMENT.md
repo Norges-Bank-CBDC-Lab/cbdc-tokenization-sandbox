@@ -22,7 +22,7 @@ The API is defined by the OpenAPI 3.1 document in `services/nb-bond-api/openapi.
 
 - It does not provide endpoints for dealers/investors to place bids. Bids are submitted on-chain to `BondAuction` using the CLIs under `scripts/` (see §5).
 - It does not provide endpoints for secondary-market order placement. Scenario 3 trading is implemented on-chain via bond order book contracts, but is not driven through this OpenAPI surface.
-- It does not implement authentication. It must be treated as a privileged internal service and deployed behind appropriate network controls.
+- It implements two configurable auth modes — `none` (sandbox default, header accepted but ignored) and `entra` (JWT validated against a Microsoft Entra ID tenant). See §7.7. The OpenAPI document always declares `bearerAuth`; the `none` mode is a runtime override for the sandbox.
 
 ## 2. Quickstart (run the service)
 
@@ -51,6 +51,8 @@ Important optional settings:
 - `POLL_INTERVAL_MS`: ingestion polling interval (default `3000`).
 - `EXPRESS_PORT`: listen port (default `8080`).
 - `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
+- `NB_BOND_API_AUTH_MODE`: `none` (default) or `entra`. See §7.7.
+- `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE`: required when `NB_BOND_API_AUTH_MODE=entra`.
 
 ### 2.3 Start commands
 
@@ -112,107 +114,78 @@ Important: the same field name `rate` is reused across auction types:
 
 The API treats bond quantities as whole "units". In this sandbox, `size` and `units` are expressed in whole 1,000 NOK nominal units (see `CreateAuctionRequest.size` description in `services/nb-bond-api/src/schemas.ts`).
 
-## 4. Endpoint reference (v1)
+## 4. Endpoint reference (v2)
 
-Base path is `/v1`. All request and response bodies are JSON.
+Base path is `/v1`. All request and response bodies are JSON. The full
+v2 design (rationale + DTO catalog) lives in
+[`docs/openapi-v2-plan.md`](../../docs/openapi-v2-plan.md).
+
+Two architectural rules apply across the surface:
+
+- **Bulky resource tree.** A `GET /v1/bonds` returns every bond with
+  its nested `auctions[]` (each with `bids[]`, `allocation`, `txs`)
+  and `holders[]`. Single-resource GETs (`GET /v1/bonds/{isin}`,
+  `GET /v1/auctions/{id}`) return the same DTO sub-shape so the UI
+  can deep-link without first fetching the parent.
+- **Mutations return the updated parent.** Coupon / redeem /
+  createAuction respond with the new `Bond`. Close / cancel /
+  finalise respond with the new `Auction`. The caller swaps its
+  cache atomically — no follow-up GET needed.
+
+Errors are RFC 7807 `application/problem+json` documents (`type`,
+`title`, `status`, `detail`, `instance`, `errors[]`). Validation
+failures populate `errors[]` with `{ field, message }` entries.
 
 ### 4.1 Health and OpenAPI
 
-- `GET /health` and `GET /v1/health`
+- `GET /v1/health`
   - Purpose: health check and discovery of contract addresses and sealing public key.
-  - Response includes: `bondManager`, `bondAuction`, `bondToken`, `sealingPublicKey`.
+  - Public — bypasses the auth gate (`security: []` in the OpenAPI document).
+  - Response: `Health` — `{ status, contracts: { bondManager, bondAuction, bondToken }, sealingPubKey }`.
 - `GET /docs` and `GET /v1/openapi.json`
-  - Purpose: fetch OpenAPI JSON.
-  - On-disk snapshot: `services/nb-bond-api/openapi.json`. Regenerate after any schema change with `npm run regen:openapi`.
+  - Purpose: fetch the OpenAPI JSON. Public.
+  - On-disk snapshot: [`openapi.json`](openapi.json). Regenerate after any schema change with `npm run regen:openapi`.
 
-### 4.2 Bond and lifecycle status
+### 4.2 Bonds
 
-- `GET /v1/bonds`
-  - Purpose: list every known bond as a `BondSummaryResponse`.
-  - Notes: enumerated from the ingestion DB `partitions` table, then each ISIN is hydrated through the same composer used by `GET /v1/bonds/{isin}` (about 8 on-chain reads per bond, fanned out in parallel).
-- `GET /v1/bonds/{isin}`
-  - Purpose: summary view of bond lifecycle state, maturity and coupon progress.
-  - Notes: derived from on-chain state, plus ingestion-derived balances/events where available.
+- `GET /v1/bonds` (`operationId: listBonds`)
+  - Returns `Bond[]` — the canonical "one call for everything" that primes the UI cache.
+  - Each `Bond` carries `contracts`, nested `maturity` / `coupon` blocks, `holders[]`, and the full `auctions[]` subtree (with bids and allocations).
+- `GET /v1/bonds/{isin}` (`operationId: getBond`)
+  - Returns one `Bond` — same shape as a list element.
+- `POST /v1/bonds/{isin}/coupon-payments` (`operationId: payCoupon`)
+  - Body: `HoldersBody` (`{ holders: Address[] | null }`); `null` defaults to all current holders.
+  - Returns the updated `Bond` (response replaces the cached parent).
+- `POST /v1/bonds/{isin}/redemptions` (`operationId: redeem`)
+  - Body: `HoldersBody`. Returns the updated `Bond`.
+- `GET /v1/bonds/{isin}/history` (`operationId: listBondHistory`)
+  - Returns `HistoryEvent[]` directly (no wrapper). Combines auction and bond events for the ISIN.
+  - Query: `before` (cursor block, exclusive), `limit` (default 100, max 500).
+  - Kept as a separate paginated resource because event volume grows unboundedly and would defeat the ETag freshness of the parent `Bond`.
 
-- `GET /v1/bonds/{isin}/holders`
-  - Purpose: list active holders and their current partition balances.
-  - Notes: uses an ingestion-derived holder set, then filters by live on-chain balance, so ingestion must be running.
+### 4.3 Auctions
 
-- `GET /v1/bonds/{isin}/history`
-  - Purpose: returns a combined stream of auction and bond lifecycle events for the ISIN.
-  - Notes: backed by the ingestion database.
-
-### 4.3 Auctions by ISIN
-
-- `POST /v1/bonds/{isin}/auctions`
-  - Purpose: create an auction for an ISIN.
-  - Request: `CreateAuctionRequest`
-    - `type`: `RATE` | `PRICE` | `BUYBACK`
-    - `end`: unix seconds (number or `BigIntString`), must be in the future
-    - `size`: offering size (RATE, PRICE) or buyback size (BUYBACK), in bond units
-    - `maturityDuration`: required for `RATE`, seconds from distribution until maturity
-  - Behavioural constraints enforced by the API:
-    - First auction for an ISIN must be `RATE`.
-    - Subsequent auctions cannot be `RATE`.
-  - Response: `CreateAuctionResponse`
-    - Includes `auctionId`, `auctionPubKey` (the sealing public key bidders must use), contract addresses, and `txHash`.
-
-- `GET /v1/bonds/{isin}/auctions`
-  - Purpose: list cached and discovered auctions for an ISIN.
-  - Query (optional): `status` and `type`.
-  - Notes: the service maintains an in-memory cache, and also attempts to hydrate the latest on-chain auction for the ISIN.
-
-### 4.4 Auction operations by auctionId
-
-- `GET /v1/auctions`
-  - Purpose: list every known auction across all bonds as `AuctionSummary` entries.
-  - Notes: enumerated from the ingestion DB `auctions` table; each row is hydrated through `ensureCached` so the response reflects current chain state.
-
-- `GET /v1/auctions/{auctionId}`
-  - Purpose: combined view of on-chain metadata plus cached derived state.
-  - Returns:
-    - `metadata` (owner, end, offering, auctionPubKey, bond address, auctionType)
-    - `allocations` (on-chain allocation tuples, if finalised)
-    - `cached` (sealed/unsealed counts, allocationHash, flags)
-
-- `POST /v1/auctions/{auctionId}/close`
-  - Purpose: close the auction on-chain and compute an allocation off-chain.
-  - Side effects:
-    - Sends `BondManager.closeAuction(isin)` transaction.
-    - Fetches sealed bids from `BondManager.getSealedBids(isin)`.
-    - Unseals bids using the service sealing keypair.
-    - Computes allocation:
-      - `RATE` and `PRICE`: uniform allocation with a single clearing rate.
-      - `BUYBACK`: fills cheapest offers first and produces a pay-as-bid allocation; `clearingRate` is the lowest accepted price.
-    - Caches sealed bids, unsealed bids, and `allocationResult` in memory.
-  - Response: `CloseResponse`
-    - Includes unsealed bid summary and `allocation.allocationHash` (used for the approval step).
-
-- `GET /v1/auctions/{auctionId}/bids?state=sealed|unsealed`
-  - Purpose: retrieve sealed or unsealed bids, plus any cached allocation result.
-  - Notes:
-    - `sealed` includes ciphertext and plaintext hashes.
-    - `unsealed` returns only `bidder`, `rate`, and `units` (not the full plaintext).
-
-- `GET /v1/auctions/{auctionId}/allocations`
-  - Purpose: retrieve the computed allocation result (if available in cache or recomputable from chain).
-
-- `PUT /v1/auctions/{auctionId}/finalisation`
-  - Purpose: finalise (approve) or reject an allocation.
-  - Request: `FinaliseRequest`
-    - `allocationHash`: must match the cached allocation hash
-    - `approve`: `true` to finalise on-chain, `false` to mark the allocation as rejected in the API state
-  - Side effects when `approve=true`:
-    - Builds per-allocation proofs from unsealed bid plaintext (bid intent signature and nonce).
-    - Sends `BondManager.finaliseAuction(isin, allocations, proofs)` transaction.
-  - Response: `FinaliseResponse`
-    - On approval includes `txHash` and the allocation result.
-    - On rejection returns status `rejected` without an on-chain transaction.
-
-- `POST /v1/auctions/{auctionId}/cancel`
-  - Purpose: cancel the active auction for the ISIN on-chain.
-  - Side effects:
-    - Sends `BondManager.cancelAuction(isin)` transaction.
+- `POST /v1/bonds/{isin}/auctions` (`operationId: createAuction`)
+  - Body: `CreateAuctionBody` — `{ type, end (BigIntString), size (BigIntString), maturityDuration (BigIntString | null) }`.
+  - Behavioural rules: first auction for an ISIN must be `RATE`; subsequent auctions cannot be `RATE`; `maturityDuration` is required for `RATE`.
+  - Returns the updated `Bond` with the new auction in its `auctions[]`.
+- `GET /v1/auctions` (`operationId: listAuctions`)
+  - Returns `Auction[]` across all bonds — flat view of the same tree (each auction is identical to its nested counterpart). Useful for "auctions by status" filtering without going through bonds.
+- `GET /v1/auctions/{auctionId}` (`operationId: getAuction`)
+  - Returns one `Auction` with its `bids[]`, `allocation`, and `txs`.
+- `PATCH /v1/auctions/{auctionId}` (`operationId: closeAuction`)
+  - Body: `CloseAuctionBody` — `{ status: "closed" }` (only valid transition target today; enum extensible later).
+  - Effects: sends `BondManager.closeAuction(isin)`, unseals bids, computes the allocation (uniform for `RATE`/`PRICE`, pay-as-bid for `BUYBACK`).
+  - Returns the updated `Auction` with `status: "closed"` and the computed `allocation`.
+- `DELETE /v1/auctions/{auctionId}` (`operationId: cancelAuction`)
+  - No body. Soft-delete: the auction remains on-chain with `status: "cancelled"`.
+  - Effects: sends `BondManager.cancelAuction(isin)`.
+  - Returns the cancelled `Auction`.
+- `PUT /v1/auctions/{auctionId}/finalisation` (`operationId: finaliseAuction`)
+  - Body: `FinaliseBody` — `{ allocationHash, approve }`. `allocationHash` must match `auction.allocation.hash`.
+  - When `approve=true`: rebuilds per-allocation proofs from the unsealed plaintext, sends `BondManager.finaliseAuction(isin, allocations, proofs)`.
+  - When `approve=false`: marks the allocation rejected; no on-chain transaction.
+  - Returns the updated `Auction`.
 
 ## 5. Bid submission (dealer workflow, CLIs)
 
@@ -257,19 +230,18 @@ This section provides step-by-step "operator runbooks" that use only this OpenAP
 
 1. Create the auction:
    - `POST /v1/bonds/{isin}/auctions` with `type=RATE`, `end`, `size`, and `maturityDuration`.
+   - Response is the updated `Bond` with the new auction in `auctions[0]`.
 2. Distribute auction parameters to dealers:
-   - `auctionId` and `auctionPubKey` from the response.
-   - `bondAuction` address from the response (for signing and submission).
+   - `id` and `sealingPubKey` from the new `Auction`.
+   - `contracts.auction` (bond-auction contract address) for signing and submission.
 3. Dealers submit sealed bids on-chain using the CLIs (see §5).
 4. Close and compute:
-   - `POST /v1/auctions/{auctionId}/close`
-   - Review `allocation.allocations`, `allocation.clearingRate`, and `allocation.allocationHash`.
+   - `PATCH /v1/auctions/{auctionId}` body `{ "status": "closed" }`.
+   - Response is the updated `Auction`. Review `allocation.entries`, `allocation.clearingRate`, `allocation.hash`.
 5. Finalise (or reject):
-   - `PUT /v1/auctions/{auctionId}/finalisation` with `allocationHash` and `approve=true` to submit the on-chain finalisation.
-   - If the operator does not approve the computed outcome, set `approve=false` to record rejection (no on-chain transaction is sent).
-6. Verify:
-   - `GET /v1/auctions/{auctionId}` for on-chain status and allocations.
-   - `GET /v1/bonds/{isin}` for bond summary.
+   - `PUT /v1/auctions/{auctionId}/finalisation` body `{ "allocationHash", "approve": true }` to submit on-chain.
+   - If the operator does not approve the computed outcome, send `approve=false` to record rejection (no on-chain transaction).
+6. Verify: subsequent `GET /v1/auctions/{auctionId}` (or `GET /v1/bonds/{isin}`) reflects the new status.
 
 ### 6.2 Issuance extension (PRICE auction)
 
@@ -291,21 +263,16 @@ Buyback-specific notes:
 Coupon payment:
 
 1. Determine holders:
-   - Option A: let the API resolve holders, call `POST /v1/bonds/{isin}/coupon-payments` with `{}`.
-   - Option B: call `GET /v1/bonds/{isin}/holders` and submit those addresses explicitly as `holders` in the request body.
-2. Submit coupon payment:
-   - `POST /v1/bonds/{isin}/coupon-payments`
-3. Verify via:
-   - `GET /v1/bonds/{isin}/history` for bond events.
-   - `GET /v1/bonds/{isin}` for coupon counters and maturity estimate.
+   - Option A: let the API resolve holders, call `POST /v1/bonds/{isin}/coupon-payments` with `{ "holders": null }`.
+   - Option B: call `GET /v1/bonds/{isin}` and submit a subset from `bond.holders[].holder` explicitly.
+2. Submit: `POST /v1/bonds/{isin}/coupon-payments`. The response is the updated `Bond` — its `coupon.payments.{made,remaining}` counters reflect the new payment.
+3. Verify via `GET /v1/bonds/{isin}/history` for the `COUPON_PAID` event.
 
 Redemption:
 
 1. Determine holders as above.
-2. Submit redemption:
-   - `POST /v1/bonds/{isin}/redemptions`
-3. Verify:
-   - `GET /v1/bonds/{isin}` should progress to `status=redeemed` once total supply is observed as zero.
+2. Submit: `POST /v1/bonds/{isin}/redemptions`. The response is the updated `Bond`.
+3. Verify: `GET /v1/bonds/{isin}` should report `status: "redeemed"` once total supply reaches zero.
 
 ### 6.5 Scenario 3, secondary trading (note)
 
@@ -388,10 +355,59 @@ between the create POST returning and the next ingestion tick.
 
 ### 7.5 Cache behaviour
 
-Auction bid sets and computed allocations are cached in memory. On restart, the service attempts to hydrate auctions from chain by reading:
+Auction bid sets and computed allocations are derived per-request from
+chain + ingestion DB by [`src/compose.ts`](src/compose.ts). The service
+does not retain in-memory state between requests for cacheable DTOs —
+the bulky GETs are stateless. On restart there is nothing to hydrate.
 
-- on-chain auction metadata and on-chain allocations (if already finalised),
-- sealed bids from `BondManager.getSealedBids(isin)`,
-- and recomputing unsealed bids and allocation results if it can unseal bids with the current sealing key.
+For durable audit artefacts, use the on-chain allocations and the
+ingestion-backed history endpoints rather than client-side caches.
 
-If you need durable audit artefacts, use the on-chain allocations and the ingestion-backed history endpoints, rather than relying on in-memory state.
+### 7.6 ETag / md5 caching protocol
+
+Every successful response sets two headers:
+
+- `ETag: "<md5>"` — md5 of canonical (key-sorted) JSON of the response body.
+- `Cache-Control: no-cache, must-revalidate`.
+
+Each cacheable DTO (`Bond`, `Auction`, `Bid` variants, `Allocation`,
+`HolderBalance`) also carries an `md5` field stamped server-side over
+its own subtree. Clients can compare per-DTO `md5` values to skip
+re-rendering unchanged subtrees without diffing fields.
+
+Polling: send `If-None-Match: "<etag>"` on subsequent GETs. When the
+server-computed ETag matches, the response is `304 Not Modified` with
+an empty body — the client serves the cached body. At sandbox scale
+this is the difference between shipping ~50 KB per poll and ~200 B.
+
+Mutations always return the updated parent DTO with a fresh `ETag`.
+Clients use the response body as the new cache state for that
+resource. The frontend's [`httpClient.js`](../nb-ui/src/api/httpClient.js)
+clears its full cache on any mutation; subsequent GETs re-prime
+naturally.
+
+The md5 is server-computed only. Clients treat it as an opaque cache
+key — they never recompute it.
+
+### 7.7 Authentication modes
+
+`NB_BOND_API_AUTH_MODE` selects one of two enforcement modes at
+startup. The OpenAPI document always declares `bearerAuth` on every
+secured operation; the runtime decides whether to enforce.
+
+- `none` (default for the local sandbox) — the `Authorization` header
+  is accepted but not validated. All requests pass.
+- `entra` — bearer tokens are validated as JWTs issued by Microsoft
+  Entra ID. The middleware (`src/auth.ts`) verifies signature against
+  the tenant's JWKS, plus `iss` and `aud` claims. Required env:
+  `NB_BOND_API_AUTH_ENTRA_TENANT_ID`, `NB_BOND_API_AUTH_ENTRA_AUDIENCE`.
+  Misconfiguration (e.g. `entra` mode without a tenant id) fails fast
+  at startup — there is no silent fallback.
+
+`/v1/health`, `/docs`, and `/v1/openapi.json` are mounted before the
+auth gate and stay public in both modes. Every other endpoint goes
+through the middleware.
+
+ArgoCD-managed deployments must keep `NB_BOND_API_AUTH_MODE` and the
+nb-ui `AUTH_MODE` in sync. A mismatch (e.g. backend `entra`, frontend
+`none`) produces clear 401s rather than silent partial behaviour.

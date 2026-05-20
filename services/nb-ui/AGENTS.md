@@ -11,6 +11,11 @@ This file covers the React + Vite operator frontend specifically.
   `AppConfig.USE_MOCK`. `httpClient.js` is the only place that calls `fetch`
   and the only place that attaches the `Authorization` header — both
   intentional, so swapping transport or auth never ripples into pages.
+  `httpClient.js` also owns the path-keyed ETag cache that backs the
+  bulky-tree fetch pattern (sends `If-None-Match`, serves cached body on
+  `304`, clears cache on every mutation). `selectors.js` provides pure
+  helpers (`selectBond`, `selectAuction`, `selectBids`, `selectHolders`)
+  to slice the cached tree — pages never call per-feature endpoints.
 - `src/auth/` — pluggable auth layer. `AuthProvider.js` is the jsdoc-typed
   interface every plugin implements. `noneAuth.js` is the default (no-op,
   no `Authorization` header). `entraAuth.js` wraps MSAL Browser. The

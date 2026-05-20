@@ -17,22 +17,21 @@ import {
 import { CreateAuctionModal } from './CreateAuctionModal.jsx';
 
 export function AuctionsPage({ navigate }) {
-  const { data, loading, error, reload } = useApi(() => AuctionsApi.listAllAuctions(), []);
+  const { data, loading, error, reload } = useApi(() => AuctionsApi.listAuctions(), []);
   const [showCreate, setShowCreate] = useState(false);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const toast = useToast();
 
-  const rawAuctions = data?.auctions;
-  const auctions = useMemo(() => rawAuctions ?? [], [rawAuctions]);
+  const auctions = useMemo(() => data ?? [], [data]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return auctions.filter((a) => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       if (typeFilter !== 'all' && a.type !== typeFilter) return false;
-      if (ql && !(a.isin.toLowerCase().includes(ql) || a.auctionId.toLowerCase().includes(ql)))
+      if (ql && !(a.isin.toLowerCase().includes(ql) || a.id.toLowerCase().includes(ql)))
         return false;
       return true;
     });
@@ -46,12 +45,13 @@ export function AuctionsPage({ navigate }) {
     return acc;
   }, [auctions]);
 
-  function handleCreated(res) {
+  function handleCreated(updatedBond) {
     setShowCreate(false);
+    const newAuction = updatedBond?.auctions?.[0];
     toast.push({
       kind: 'ok',
       title: 'Auction created',
-      body: `${Fmt.shortHex(res.auctionId)} on ${res.isin}`,
+      body: `${newAuction ? Fmt.shortHex(newAuction.id) : ''} on ${updatedBond.isin}`,
     });
     // First reload races the backend ingestion loop (default 3s tick); the
     // delayed second reload covers the worst case where the immediate one
@@ -166,12 +166,8 @@ export function AuctionsPage({ navigate }) {
             </thead>
             <tbody>
               {filtered.map((a) => (
-                <tr
-                  key={a.auctionId}
-                  className="clickable"
-                  onClick={() => navigate(`/auctions/${a.auctionId}`)}
-                >
-                  <td className="mono">{Fmt.shortHex(a.auctionId, 8, 6)}</td>
+                <tr key={a.id} className="clickable" onClick={() => navigate(`/auctions/${a.id}`)}>
+                  <td className="mono">{Fmt.shortHex(a.id, 8, 6)}</td>
                   <td className="mono">
                     <a
                       href={`#/bonds/${a.isin}`}
@@ -199,10 +195,10 @@ export function AuctionsPage({ navigate }) {
                   </td>
                   <td className="right">
                     <a
-                      href={`#/auctions/${a.auctionId}`}
+                      href={`#/auctions/${a.id}`}
                       onClick={(e) => {
                         e.preventDefault();
-                        navigate(`/auctions/${a.auctionId}`);
+                        navigate(`/auctions/${a.id}`);
                       }}
                     >
                       View →
