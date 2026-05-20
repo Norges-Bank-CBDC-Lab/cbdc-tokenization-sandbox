@@ -54,6 +54,12 @@ pulled at build/deploy time. Current examples include:
   (pinned in `common/images.yaml` under `nb_ui.builder`) and as the
   builder + runtime stages of `services/nb-bond-api/Dockerfile` (pinned in
   `common/images.yaml` under `nb_bond_api.{builder,runtime}`).
+- `python` (PSF-2.0), used as the builder + runtime stages of
+  `services/blockscout/bens-microservice/Dockerfile` (pinned in
+  `common/images.yaml` under `blockscout.bens`). The pinned wheels
+  (FastAPI, Uvicorn, asyncpg, Pydantic, typing-extensions) are listed
+  with their license under "Direct Python Dependencies →
+  `services/blockscout/bens-microservice`" in `THIRD_PARTY_LICENSES.md`.
 
 > ### Warning
 > **Users deploying the sandbox are responsible for complying with the

@@ -1,0 +1,20 @@
+# Build context hygiene — keep image build fast and reproducible.
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Tooling / source-of-truth files not needed for the runtime image.
+.git/
+.gitignore
+.dockerignore
+README.md
+package.json
+regen-openapi.sh
+swagger/
+
+# Old pattern artifacts.
+*.tar.gz

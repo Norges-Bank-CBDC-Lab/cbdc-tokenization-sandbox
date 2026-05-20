@@ -13,32 +13,43 @@ spec:
       labels:
         app: bens
     spec:
+      securityContext:
+        # nobody:nobody (65534:65534). BENS doesn't write to disk; the
+        # image's USER directive pins this and fsGroup keeps any future
+        # ConfigMap mounts readable by the runtime uid.
+        fsGroup: 65534
       containers:
-      - name: bens
-        image: {{ .Values.bensImage }}
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8050
-        env:
-        - name: DATABASE_URL
-          value: {{ .Values.blockscout.env.DATABASE_URL }}
-        command: ["/bin/sh"]
-        args:
-        - "-c"
-        - |
-          mkdir -p /tmp/config && \
-          cp /app/config/src.tar.gz /tmp/config/ && \
-          tar -xzf /tmp/config/src.tar.gz -C /tmp/config && \
-          python3 -m venv /venv && \
-          . /venv/bin/activate && \
-          pip install --upgrade pip && \
-          pip install --no-cache-dir -r /tmp/config/src/requirements.txt && \
-          export PYTHONPATH=/tmp/config/src && \
-          uvicorn openapi_server.main:app --host 0.0.0.0 --port 8050
-        volumeMounts:
-        - name: bens-configmap-volume
-          mountPath: /app/config
-      volumes:
-      - name: bens-configmap-volume
-        configMap:
-          name: src
+        - name: bens
+          # Built locally and pushed to the kind registry by
+          # prepareBensImage (common/helpers.sh); the helm install
+          # supplies the content-hash tag via --set bensImage=...
+          image: {{ required "bensImage is required (built by prepareBensImage in common/helpers.sh)" .Values.bensImage }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8050
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.blockscout.env.DATABASE_URL }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8050
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8050
+            initialDelaySeconds: 10
+            periodSeconds: 15
