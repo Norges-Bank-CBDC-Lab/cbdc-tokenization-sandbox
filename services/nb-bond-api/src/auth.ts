@@ -28,9 +28,7 @@ function buildEntraConfig(): EntraConfig {
   const tenantId = envVariables.NB_BOND_API_AUTH_ENTRA_TENANT_ID!;
   const audience = envVariables.NB_BOND_API_AUTH_ENTRA_AUDIENCE!;
   const issuer = `https://login.microsoftonline.com/${tenantId}/v2.0`;
-  const jwksUrl = new URL(
-    `https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`,
-  );
+  const jwksUrl = new URL(`https://login.microsoftonline.com/${tenantId}/discovery/v2.0/keys`);
   const jwks = createRemoteJWKSet(jwksUrl);
   return { tenantId, audience, issuer, jwks };
 }

@@ -11,7 +11,11 @@
  */
 import { keccak256, toUtf8Bytes } from 'ethers';
 
-import { buildAllocationHash, computeBuybackAllocation, computeUniformAllocation } from './allocation';
+import {
+  buildAllocationHash,
+  computeBuybackAllocation,
+  computeUniformAllocation,
+} from './allocation';
 import { getBondAuction, getBondAuctionAddress, getBondManager, getBondToken } from './chain';
 import { withMd5 } from './http';
 import {
@@ -102,11 +106,7 @@ function composeSealedBid(raw: { bidder: string; ciphertext: string; plaintextHa
   });
 }
 
-function composeUnsealedBid(raw: {
-  bidder: string;
-  rate: bigint;
-  units: bigint;
-}): Bid {
+function composeUnsealedBid(raw: { bidder: string; rate: bigint; units: bigint }): Bid {
   return withMd5({
     bidder: raw.bidder,
     state: 'unsealed' as const,
@@ -157,10 +157,7 @@ function composeHolderBalance(holder: string, balance: string): HolderBalance {
   return withMd5({ holder, balance });
 }
 
-async function composeHolders(
-  db: IngestionDatabase,
-  isin: string,
-): Promise<HolderBalance[]> {
+async function composeHolders(db: IngestionDatabase, isin: string): Promise<HolderBalance[]> {
   const dbHolders = getBalancesByIsin(db, isin);
   let bondToken;
   try {
@@ -193,10 +190,7 @@ async function composeHolders(
 
 // #region Auction tx history ─────────────────────────────────────────
 
-function buildAuctionTxs(
-  row: AuctionRow | null,
-  events: AuctionEventRow[],
-): Auction['txs'] {
+function buildAuctionTxs(row: AuctionRow | null, events: AuctionEventRow[]): Auction['txs'] {
   let close: TxRefT | null = null;
   let finalise: TxRefT | null = null;
   let cancel: TxRefT | null = null;
@@ -254,9 +248,9 @@ async function fetchAuctionChainState(auctionId: string): Promise<AuctionChainSt
 
     const bondManager = await getBondManager();
     const sealed = await bondManager.getSealedBids(isin).catch(() => []);
-    const sealedBids = (sealed as Array<{ bidder: string; ciphertext: string; plaintextHash: string }>).map(
-      normalizeSealedBid,
-    );
+    const sealedBids = (
+      sealed as Array<{ bidder: string; ciphertext: string; plaintextHash: string }>
+    ).map(normalizeSealedBid);
 
     const offering = parseBigInt(metaRaw.offering?.toString?.() ?? '0', 'offering');
     let unsealedBids: ReturnType<typeof unsealBid>[] | null = null;
@@ -264,17 +258,21 @@ async function fetchAuctionChainState(auctionId: string): Promise<AuctionChainSt
       try {
         unsealedBids = sealedBids.map((b, i) => unsealBid(isin, b, i));
       } catch (err) {
-        logger.debug(`fetchAuctionChainState: unseal failed for ${auctionId}: ${(err as Error).message}`);
+        logger.debug(
+          `fetchAuctionChainState: unseal failed for ${auctionId}: ${(err as Error).message}`,
+        );
       }
     }
 
-    const onChainAllocations = (allocRaw as Array<{
-      bidder: string;
-      units?: bigint | string;
-      rate?: bigint | string;
-      isin?: string;
-      auctionType?: number | bigint;
-    }>).map((a) => ({
+    const onChainAllocations = (
+      allocRaw as Array<{
+        bidder: string;
+        units?: bigint | string;
+        rate?: bigint | string;
+        isin?: string;
+        auctionType?: number | bigint;
+      }>
+    ).map((a) => ({
       bidder: a.bidder,
       units: parseBigInt(a.units?.toString?.() ?? '0', 'units'),
       rate: parseBigInt(a.rate?.toString?.() ?? '0', 'rate'),
@@ -489,9 +487,7 @@ export async function composeBond(db: IngestionDatabase, isin: string): Promise<
   const maturityDuration = maturityDurationRaw ? BigInt(maturityDurationRaw.toString()) : null;
   const couponDuration = couponDurationRaw ? BigInt(couponDurationRaw.toString()) : null;
   const couponYield = couponYieldRaw ? BigInt(couponYieldRaw.toString()) : null;
-  const lastCouponPayment = lastCouponPaymentRaw
-    ? BigInt(lastCouponPaymentRaw.toString())
-    : null;
+  const lastCouponPayment = lastCouponPaymentRaw ? BigInt(lastCouponPaymentRaw.toString()) : null;
   const couponPaymentCount = couponPaymentCountRaw
     ? BigInt(couponPaymentCountRaw.toString())
     : null;
@@ -504,11 +500,7 @@ export async function composeBond(db: IngestionDatabase, isin: string): Promise<
     0n,
   );
   let resolvedSupply =
-    totalSupply !== null
-      ? balanceSum < totalSupply
-        ? balanceSum
-        : totalSupply
-      : balanceSum;
+    totalSupply !== null ? (balanceSum < totalSupply ? balanceSum : totalSupply) : balanceSum;
 
   // If the chain says totalSupply is unknown but we observed a redemption,
   // the bond is fully redeemed.

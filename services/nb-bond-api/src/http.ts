@@ -22,9 +22,7 @@ function canonicalize(value: unknown): string {
   return (
     '{' +
     keys
-      .map(
-        (k) => JSON.stringify(k) + ':' + canonicalize((value as Record<string, unknown>)[k]),
-      )
+      .map((k) => JSON.stringify(k) + ':' + canonicalize((value as Record<string, unknown>)[k]))
       .join(',') +
     '}'
   );
@@ -118,8 +116,7 @@ export class HttpError extends Error {
 
 export const badRequest = (detail?: string, errors?: { field: string; message: string }[]) =>
   new HttpError(400, 'Bad Request', { detail, errors });
-export const unauthorized = (detail?: string) =>
-  new HttpError(401, 'Unauthorized', { detail });
+export const unauthorized = (detail?: string) => new HttpError(401, 'Unauthorized', { detail });
 export const notFound = (detail?: string) => new HttpError(404, 'Not Found', { detail });
 export const conflict = (detail?: string) => new HttpError(409, 'Conflict', { detail });
 export const internalError = (detail?: string) =>
@@ -133,13 +130,11 @@ export function problemErrorMiddleware(
   _next: NextFunction,
 ): void {
   if (err instanceof HttpError) {
-    res.status(err.status).json(
-      buildProblem(req, err.status, err.title, { detail: err.detail, errors: err.errors }),
-    );
+    res
+      .status(err.status)
+      .json(buildProblem(req, err.status, err.title, { detail: err.detail, errors: err.errors }));
     return;
   }
   const message = err instanceof Error ? err.message : String(err);
-  res
-    .status(500)
-    .json(buildProblem(req, 500, 'Internal Server Error', { detail: message }));
+  res.status(500).json(buildProblem(req, 500, 'Internal Server Error', { detail: message }));
 }

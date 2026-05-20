@@ -17,14 +17,7 @@
  */
 import { useState, useMemo } from 'react';
 import { Fmt } from '../utils/format.js';
-import {
-  Button,
-  Field,
-  Input,
-  Modal,
-  RadioGroup,
-  StatusBadge,
-} from '../components/ui.jsx';
+import { Button, Field, Input, Modal, RadioGroup, StatusBadge } from '../components/ui.jsx';
 
 const STEPS = [
   { key: 'open', label: 'Open', hint: 'Accepting sealed bids' },
@@ -175,10 +168,7 @@ function CloseModal({ auction, onClose, onConfirm, busy }) {
 
 function FinaliseModal({ auction, onClose, onConfirm, busy }) {
   // Bids come from the auction subtree — no separate fetch.
-  const bids = useMemo(
-    () => auction.bids.filter((b) => b.state === 'unsealed'),
-    [auction.bids],
-  );
+  const bids = useMemo(() => auction.bids.filter((b) => b.state === 'unsealed'), [auction.bids]);
   const unsealed = bids.length > 0;
   const [mode, setMode] = useState('approve');
   const [ack, setAck] = useState(false);
@@ -231,8 +221,7 @@ function FinaliseModal({ auction, onClose, onConfirm, busy }) {
   }
 
   const allocationHash = auction.allocation?.hash || null;
-  const disabled =
-    busy || !allocationHash || !ack || (mode === 'approve' && selected.size === 0);
+  const disabled = busy || !allocationHash || !ack || (mode === 'approve' && selected.size === 0);
 
   return (
     <Modal
@@ -493,14 +482,7 @@ function CancelModal({ auction, onClose, onConfirm, busy }) {
   );
 }
 
-export function AuctionLifecyclePanel({
-  auction,
-  onClose,
-  onReopen,
-  onFinalise,
-  onCancel,
-  busy,
-}) {
+export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, onCancel, busy }) {
   const [modal, setModal] = useState(null);
   const s = auction.status;
 

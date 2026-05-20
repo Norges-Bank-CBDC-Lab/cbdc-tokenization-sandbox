@@ -60,8 +60,11 @@ export function selectAllocation(bonds, isin, auctionId) {
 /** Latest transaction across the auction's lifecycle, for status banners. */
 export function selectLatestAuctionTx(auction) {
   if (!auction?.txs) return null;
-  const candidates = [auction.txs.cancel, auction.txs.finalise, auction.txs.close, auction.txs.create].filter(
-    Boolean,
-  );
+  const candidates = [
+    auction.txs.cancel,
+    auction.txs.finalise,
+    auction.txs.close,
+    auction.txs.create,
+  ].filter(Boolean);
   return candidates[0] ?? null;
 }

@@ -59,6 +59,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `helmet` | `8.1.0` | MIT |
+| `jose` | `6.2.3` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
 | `zod-openapi` | `5.4.6` | MIT |

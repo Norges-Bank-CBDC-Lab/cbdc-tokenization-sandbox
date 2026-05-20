@@ -49,11 +49,14 @@ const bpsSchema = z
     examples: ['425', '9875', '10123'],
   });
 
-const isinSchema = z.string().min(1).meta({
-  id: 'Isin',
-  description: 'ISIN identifying a bond',
-  examples: ['NO0012345678'],
-});
+const isinSchema = z
+  .string()
+  .min(1)
+  .meta({
+    id: 'Isin',
+    description: 'ISIN identifying a bond',
+    examples: ['NO0012345678'],
+  });
 
 const auctionIdSchema = z
   .string()
@@ -91,19 +94,15 @@ const auctionTypeSchema = z.enum(['RATE', 'PRICE', 'BUYBACK']).meta({
   description: 'Auction pricing model',
 });
 
-const auctionStatusSchema = z
-  .enum(['open', 'closed', 'finalised', 'rejected', 'cancelled'])
-  .meta({
-    id: 'AuctionStatus',
-    description: 'Auction lifecycle status',
-  });
+const auctionStatusSchema = z.enum(['open', 'closed', 'finalised', 'rejected', 'cancelled']).meta({
+  id: 'AuctionStatus',
+  description: 'Auction lifecycle status',
+});
 
-const bondStatusSchema = z
-  .enum(['minting', 'maturing', 'matured', 'redeemed', 'unknown'])
-  .meta({
-    id: 'BondStatus',
-    description: 'Bond lifecycle status',
-  });
+const bondStatusSchema = z.enum(['minting', 'maturing', 'matured', 'redeemed', 'unknown']).meta({
+  id: 'BondStatus',
+  description: 'Bond lifecycle status',
+});
 
 export const bidStateSchema = z.enum(['sealed', 'unsealed']).meta({
   id: 'BidState',
@@ -564,10 +563,7 @@ const paths: ZodOpenApiPathsObject = {
       operationId: 'listBonds',
       summary: 'List all bonds with full subtree (auctions, bids, allocations, holders)',
       responses: {
-        200: successJson(
-          'All bonds. Primary cache-priming call for the UI.',
-          z.array(bondSchema),
-        ),
+        200: successJson('All bonds. Primary cache-priming call for the UI.', z.array(bondSchema)),
         ...errorRefs.read,
       },
     },

@@ -166,11 +166,7 @@ export function AuctionsPage({ navigate }) {
             </thead>
             <tbody>
               {filtered.map((a) => (
-                <tr
-                  key={a.id}
-                  className="clickable"
-                  onClick={() => navigate(`/auctions/${a.id}`)}
-                >
+                <tr key={a.id} className="clickable" onClick={() => navigate(`/auctions/${a.id}`)}>
                   <td className="mono">{Fmt.shortHex(a.id, 8, 6)}</td>
                   <td className="mono">
                     <a

@@ -133,36 +133,28 @@ app.get('/v1/bonds', async (req, res, next) => {
   }
 });
 
-app.get(
-  '/v1/bonds/:isin',
-  validateRequest(isinParamSchema, 'params'),
-  async (req, res, next) => {
-    try {
-      const { isin } = req.params as { isin: string };
-      const bond = await composeBond(historyDb, isin);
-      if (!bond) throw notFound(`bond ${isin} not found`);
-      okResponse(req, res, bond);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+app.get('/v1/bonds/:isin', validateRequest(isinParamSchema, 'params'), async (req, res, next) => {
+  try {
+    const { isin } = req.params as { isin: string };
+    const bond = await composeBond(historyDb, isin);
+    if (!bond) throw notFound(`bond ${isin} not found`);
+    okResponse(req, res, bond);
+  } catch (err) {
+    next(err);
+  }
+});
 
-app.get(
-  '/v1/bonds/:isin/history',
-  validateRequest(isinParamSchema, 'params'),
-  (req, res, next) => {
-    try {
-      const { isin } = req.params as { isin: string };
-      const before = req.query.before ? Number(req.query.before) : null;
-      const limit = req.query.limit ? Number(req.query.limit) : null;
-      const events = composeBondHistory(historyDb, isin, { before, limit });
-      okResponse(req, res, events);
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+app.get('/v1/bonds/:isin/history', validateRequest(isinParamSchema, 'params'), (req, res, next) => {
+  try {
+    const { isin } = req.params as { isin: string };
+    const before = req.query.before ? Number(req.query.before) : null;
+    const limit = req.query.limit ? Number(req.query.limit) : null;
+    const events = composeBondHistory(historyDb, isin, { before, limit });
+    okResponse(req, res, events);
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.post(
   '/v1/bonds/:isin/coupon-payments',
@@ -172,9 +164,7 @@ app.post(
     try {
       const { isin } = req.params as { isin: string };
       const { holders } = req.body as HoldersBody;
-      const targetHolders = holders && holders.length > 0
-        ? holders
-        : (await getActiveHolders(isin));
+      const targetHolders = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
       if (!targetHolders.length) {
         throw notFound('no holders found for coupon payment');
       }
@@ -201,9 +191,7 @@ app.post(
     try {
       const { isin } = req.params as { isin: string };
       const { holders } = req.body as HoldersBody;
-      const targetHolders = holders && holders.length > 0
-        ? holders
-        : (await getActiveHolders(isin));
+      const targetHolders = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
       if (!targetHolders.length) {
         throw notFound('no holders found for redemption');
       }
@@ -264,9 +252,7 @@ app.post(
       }
 
       const bondAuctionContract = await getBondAuction();
-      const auctionCount = await bondAuctionContract
-        .isinToAuctionCount(isin)
-        .catch(() => 0n);
+      const auctionCount = await bondAuctionContract.isinToAuctionCount(isin).catch(() => 0n);
       if (auctionCount === 0n && auctionType !== 'RATE') {
         throw badRequest('first auction for ISIN must be RATE');
       }
@@ -452,8 +438,7 @@ app.put(
         bidder: entry.bidder,
         units: BigInt(entry.units),
         rate: BigInt(entry.rate),
-        auctionType:
-          auction.type === 'RATE' ? 0 : auction.type === 'PRICE' ? 1 : 2,
+        auctionType: auction.type === 'RATE' ? 0 : auction.type === 'PRICE' ? 1 : 2,
       }));
 
       const unsealedFromCompose = auction.bids.filter((b) => b.state === 'unsealed');
@@ -465,11 +450,13 @@ app.put(
       const { unsealBid, normalizeSealedBid } = await import('./bid');
       const bondManager = await getBondManager();
       const sealed = await bondManager.getSealedBids(isin);
-      const sealedBids = (sealed as Array<{
-        bidder: string;
-        ciphertext: string;
-        plaintextHash: string;
-      }>).map(normalizeSealedBid);
+      const sealedBids = (
+        sealed as Array<{
+          bidder: string;
+          ciphertext: string;
+          plaintextHash: string;
+        }>
+      ).map(normalizeSealedBid);
       const unsealedBids = sealedBids.map((b, i) => unsealBid(isin, b, i));
 
       const usedBidIndexes = new Set<number>();
@@ -537,22 +524,15 @@ async function getActiveHolders(isin: string): Promise<string[]> {
 
 // #region Error middleware ───────────────────────────────────────────
 
-app.use(
-  (
-    err: unknown,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction,
-  ) => {
-    if (err instanceof HttpError) {
-      problemErrorMiddleware(err, req, res, next);
-      return;
-    }
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error(`unhandled: ${message}`);
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof HttpError) {
     problemErrorMiddleware(err, req, res, next);
-  },
-);
+    return;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error(`unhandled: ${message}`);
+  problemErrorMiddleware(err, req, res, next);
+});
 
 // #endregion
 

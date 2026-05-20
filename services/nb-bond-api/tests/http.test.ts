@@ -1,11 +1,6 @@
 import { Request, Response } from 'express';
 
-import {
-  buildProblem,
-  computeMd5,
-  okResponse,
-  withMd5,
-} from '../src/http';
+import { buildProblem, computeMd5, okResponse, withMd5 } from '../src/http';
 
 function mockRes() {
   const headers: Record<string, string> = {};
@@ -18,12 +13,19 @@ function mockRes() {
     end: jest.fn(),
     _headers: headers,
   };
-  return res as unknown as Response & { _headers: Record<string, string>; setHeader: jest.Mock; status: jest.Mock; json: jest.Mock; end: jest.Mock };
+  return res as unknown as Response & {
+    _headers: Record<string, string>;
+    setHeader: jest.Mock;
+    status: jest.Mock;
+    json: jest.Mock;
+    end: jest.Mock;
+  };
 }
 
 function mockReq(opts: { ifNoneMatch?: string; originalUrl?: string } = {}): Request {
   return {
-    header: (name: string) => (name.toLowerCase() === 'if-none-match' ? opts.ifNoneMatch : undefined),
+    header: (name: string) =>
+      name.toLowerCase() === 'if-none-match' ? opts.ifNoneMatch : undefined,
     originalUrl: opts.originalUrl ?? '/v1/test',
   } as unknown as Request;
 }

@@ -218,10 +218,7 @@ export function BondDetailPage({ isin, navigate }) {
           </div>
           <div className="card-body flush">
             {holders.length === 0 ? (
-              <EmptyState
-                title="No holders"
-                message="No allocations have been distributed yet."
-              />
+              <EmptyState title="No holders" message="No allocations have been distributed yet." />
             ) : (
               <table className="tbl">
                 <thead>

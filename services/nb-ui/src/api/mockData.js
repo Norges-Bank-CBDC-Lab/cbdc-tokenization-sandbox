@@ -88,8 +88,7 @@ function makeAuction({ isin, type, status, end, size, bidCount = 8, finalisedAll
   const bids = Array.from({ length: bidCount }, () =>
     isOpen ? makeSealedBid() : makeUnsealedBid(),
   );
-  const allocation =
-    !isOpen && bidCount > 0 ? makeAllocation(size, type) : null;
+  const allocation = !isOpen && bidCount > 0 ? makeAllocation(size, type) : null;
   return {
     id: makeAuctionId(),
     isin,
@@ -102,7 +101,7 @@ function makeAuction({ isin, type, status, end, size, bidCount = 8, finalisedAll
     sealingPubKey: randomHex(33),
     contracts: { auction: makeAddress(), token: makeAddress() },
     bids,
-    allocation: finalisedAllocation ? allocation : (status === 'closed' ? allocation : allocation),
+    allocation: finalisedAllocation ? allocation : status === 'closed' ? allocation : allocation,
     txs: {
       create: makeTxRef(),
       close: status !== 'open' ? makeTxRef() : null,

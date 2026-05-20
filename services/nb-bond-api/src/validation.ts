@@ -17,7 +17,9 @@ export function validateRequest(schema: ZodType, location: Location = 'body') {
       }));
       return res
         .status(400)
-        .json(buildProblem(req, 400, 'Validation failed', { detail: `Invalid ${location}`, errors }));
+        .json(
+          buildProblem(req, 400, 'Validation failed', { detail: `Invalid ${location}`, errors }),
+        );
     }
     // Some request properties (e.g. req.query in newer Express types) expose only
     // a getter, so merge into the existing object instead of reassigning the

@@ -171,10 +171,7 @@ export interface AuctionRow {
   bond: string | null;
 }
 
-export function getAuctionRowById(
-  db: IngestionDatabase,
-  auctionId: string,
-): AuctionRow | null {
+export function getAuctionRowById(db: IngestionDatabase, auctionId: string): AuctionRow | null {
   const stmt = db.prepare(
     `SELECT auction_id, isin, type, created_block, created_tx, bond
      FROM auctions

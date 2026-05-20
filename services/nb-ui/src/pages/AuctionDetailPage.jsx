@@ -27,12 +27,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   const reopenMut = useMutation(() => AuctionsApi.reopenAuction(auctionId));
   const cancelMut = useMutation(() => AuctionsApi.cancelAuction(auctionId));
   const finaliseMut = useMutation((approve, winners) =>
-    AuctionsApi.finaliseAuction(
-      auctionId,
-      auctionQ.data?.allocation?.hash,
-      approve,
-      winners,
-    ),
+    AuctionsApi.finaliseAuction(auctionId, auctionQ.data?.allocation?.hash, approve, winners),
   );
 
   if (auctionQ.loading)
@@ -163,9 +158,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
               <span className="muted">—</span>
             )}
           </div>
-          <div className="kpi-sub">
-            {auction.status === 'open' ? 'Awaiting close' : 'Computed'}
-          </div>
+          <div className="kpi-sub">{auction.status === 'open' ? 'Awaiting close' : 'Computed'}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Allocation hash</div>
