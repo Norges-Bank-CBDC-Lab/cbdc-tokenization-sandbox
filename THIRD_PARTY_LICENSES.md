@@ -112,7 +112,7 @@ License labels and deployment-time notes remain curated review items.
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
 | `@vitejs/plugin-react` | `6.0.2` | MIT |
-| `eslint` | `10.4.0` | MIT |
+| `eslint` | `9.18.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
