@@ -19,6 +19,20 @@ const envSchema = z.object({
   // Default targets the local sandbox frontend at http://web.cbdc-sandbox.local.
   // Override (e.g. with multiple origins) for any non-local deployment.
   CORS_ALLOWED_ORIGINS: z.string().default('http://web.cbdc-sandbox.local'),
+
+  // Auth mode. `none` (sandbox default) accepts and ignores the
+  // Authorization header. `entra` validates the bearer token as a JWT
+  // issued by Microsoft Entra ID. ArgoCD must keep this in sync with
+  // the nb-ui AUTH_MODE — mismatches fail fast at startup, not silently.
+  NB_BOND_API_AUTH_MODE: z.enum(['none', 'entra']).default('none'),
+  NB_BOND_API_AUTH_ENTRA_TENANT_ID: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v : undefined)),
+  NB_BOND_API_AUTH_ENTRA_AUDIENCE: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v : undefined)),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -26,6 +40,23 @@ const parsedEnv = envSchema.safeParse(process.env);
 if (!parsedEnv.success) {
   const formatted = parsedEnv.error.format();
   throw new Error(`Invalid environment configuration: ${JSON.stringify(formatted, null, 2)}`);
+}
+
+// Fail fast when entra is requested without the required config.
+if (parsedEnv.data.NB_BOND_API_AUTH_MODE === 'entra') {
+  const missing: string[] = [];
+  if (!parsedEnv.data.NB_BOND_API_AUTH_ENTRA_TENANT_ID) {
+    missing.push('NB_BOND_API_AUTH_ENTRA_TENANT_ID');
+  }
+  if (!parsedEnv.data.NB_BOND_API_AUTH_ENTRA_AUDIENCE) {
+    missing.push('NB_BOND_API_AUTH_ENTRA_AUDIENCE');
+  }
+  if (missing.length) {
+    throw new Error(
+      `NB_BOND_API_AUTH_MODE=entra requires: ${missing.join(', ')}. ` +
+        'Mode and config must be kept in sync by ArgoCD.',
+    );
+  }
 }
 
 export const envVariables = parsedEnv.data;

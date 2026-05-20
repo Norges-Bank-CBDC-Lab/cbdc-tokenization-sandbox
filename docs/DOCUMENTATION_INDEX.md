@@ -16,6 +16,7 @@ This file lists the documentation that is most likely to need updates when behav
 - `docs/post-mortems/README.md`: Incident reports and historical troubleshooting write-ups.
 - `docs/jupyter-removal-plan.md`: Deferred decommission plan for the JupyterHub-based script runner and its replacement path.
 - `docs/nb-ui-frontend-plan.md`: Implementation plan for the `services/nb-ui/` operator frontend (React + Vite), NB Bond API aggregate endpoints + CORS, and pluggable auth (none / Entra-MSAL).
+- `docs/openapi-v2-plan.md`: NB Bond API v2 design — bulky resource tree, md5 / ETag caching protocol, RFC 7807 problem+json errors, and dual auth modes (`none` / `entra`).
 
 ## Infra and services
 - `infra/README.md`: Infra overview and command entrypoint.

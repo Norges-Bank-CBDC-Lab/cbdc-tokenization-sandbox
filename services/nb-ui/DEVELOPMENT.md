@@ -40,6 +40,42 @@ The mock client in `src/api/mockClient.js` is shape-compatible with the
 real backend — it returns the exact response envelopes defined in
 `services/nb-bond-api/openapi.json`.
 
+## API surface and cache-first data flow
+
+The backend serves a bulky resource tree (see
+[`docs/openapi-v2-plan.md`](../../docs/openapi-v2-plan.md)). A single
+`BondsApi.listBonds()` call returns every bond with its nested
+`auctions[]`, `bids[]`, `allocation`, and `holders[]`. Pages slice
+that tree client-side via selectors in
+[`src/api/selectors.js`](src/api/selectors.js) — there are no
+per-feature endpoints like `getBondHolders` or `getAuctionBids` in v2.
+
+`src/api/httpClient.js` maintains a path-keyed ETag cache:
+
+- GETs send `If-None-Match` from cache; a `304` response serves the
+  cached body.
+- Mutations (POST / PUT / PATCH / DELETE) clear the cache and return
+  the updated parent DTO — components swap their local state with the
+  response body and the next GET re-primes naturally.
+- Per-DTO `md5` fields (on `Bond`, `Auction`, `Bid`, `Allocation`,
+  `HolderBalance`) let components compare subtree identity without
+  diffing fields — useful for React keys and partial re-render
+  short-circuits.
+
+When adding a new page:
+
+1. Fetch the bulky parent (`listBonds` or `getBond` / `getAuction`)
+   via `useApi`.
+2. Slice with `selectBond` / `selectAuction` / `selectBids` /
+   `selectHolders` rather than calling a feature endpoint.
+3. Mutations should use `useMutation` and either reload the parent
+   via the hook's `reload()` or splice the returned DTO into local
+   state directly.
+
+The mock client in `src/api/mockClient.js` returns shapes that match
+the OpenAPI document exactly, including `md5` fields. Mock-mode
+exercises the same selector paths as the real backend.
+
 ## Tests
 
 ```bash

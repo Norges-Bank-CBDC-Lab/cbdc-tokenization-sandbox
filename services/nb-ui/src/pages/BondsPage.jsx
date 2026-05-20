@@ -22,8 +22,7 @@ export function BondsPage({ navigate }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const toast = useToast();
 
-  const rawBonds = data?.bonds;
-  const bonds = useMemo(() => rawBonds ?? [], [rawBonds]);
+  const bonds = useMemo(() => data ?? [], [data]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
@@ -42,12 +41,13 @@ export function BondsPage({ navigate }) {
     return acc;
   }, [bonds]);
 
-  function handleCreated(result) {
+  function handleCreated(bond) {
     setShowCreate(false);
+    const newAuction = bond?.auctions?.[0];
     toast.push({
       kind: 'ok',
       title: 'Bond issued',
-      body: `${result.isin} — issuing auction ${Fmt.shortHex(result.auctionId)}`,
+      body: `${bond.isin} — issuing auction ${newAuction ? Fmt.shortHex(newAuction.id) : ''}`,
     });
     // First reload races the backend ingestion loop (default 3s tick): the
     // create POST returns once the tx is mined, but ingestion may not have
@@ -158,11 +158,11 @@ export function BondsPage({ navigate }) {
                   <td>
                     <StatusBadge status={b.status} />
                   </td>
-                  <td className="num mono">{Fmt.bpsToPct(b.couponYield)}</td>
-                  <td className="num">{Fmt.formatUnixDate(b.maturityDate)}</td>
+                  <td className="num mono">{Fmt.bpsToPct(b.coupon?.yieldBps)}</td>
+                  <td className="num">{Fmt.formatUnixDate(b.maturity?.date)}</td>
                   <td className="num mono">{Fmt.formatUnits(b.totalSupply)}</td>
                   <td className="num mono">
-                    {b.couponPaymentsMade ?? '0'} / {b.couponPaymentsTotal ?? '—'}
+                    {b.coupon?.payments?.made ?? '0'} / {b.coupon?.payments?.total ?? '—'}
                   </td>
                   <td className="right">
                     <a

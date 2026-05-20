@@ -29,8 +29,9 @@ export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose
       const now = Math.floor(Date.now() / 1000);
       const body = {
         type: auctionType,
-        end: now + Math.round(Number(endDays) * 86400),
-        size: Math.round(Number(size)),
+        end: String(now + Math.round(Number(endDays) * 86400)),
+        size: String(Math.round(Number(size))),
+        maturityDuration: null,
       };
       const res = await mutation.run({ isin, body });
       onCreated(res);
