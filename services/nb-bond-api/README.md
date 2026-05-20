@@ -9,6 +9,16 @@ service-layer overview.
 
 When running inside the sandbox, the API is reachable via the gateway at `http://bond-api.cbdc-sandbox.local/` (the start scripts add the `/etc/hosts` entry).
 
+The HTTP surface is the v2 bulky-tree contract described in
+[`docs/openapi-v2-plan.md`](../../docs/openapi-v2-plan.md): a single
+`GET /v1/bonds` returns every bond with its nested auctions, bids,
+allocations, and holders, and mutations return the updated parent
+resource so the UI can swap its cache atomically. Each cacheable DTO
+carries an `md5` field, and every successful response sets an `ETag`
+header — clients send `If-None-Match` to get a `304` short-circuit
+during polling. See `DEVELOPMENT.md` §7.6 for the caching protocol
+and §7.7 for the two auth modes (`none`, `entra`).
+
 ## Sandbox Helm Config
 
 Before deploying the service through `./nb-bond-api.sh start` or
@@ -51,6 +61,11 @@ host source mount is required and the chart no longer runs `npm ci` /
 - `CORS_ALLOWED_ORIGINS` – comma-separated list of origins the CORS middleware accepts.
   Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend).
   Override (with multiple comma-separated origins if needed) for a non-local deployment.
+- `NB_BOND_API_AUTH_MODE` – `none` (sandbox default, header accepted but
+  ignored) or `entra` (JWT validated against the configured Entra ID tenant).
+- `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE` –
+  required when `NB_BOND_API_AUTH_MODE=entra`. ArgoCD must keep these in
+  sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
 
 ## Scripts
 
@@ -62,4 +77,7 @@ host source mount is required and the chart no longer runs `npm ci` /
 
 ## OpenAPI
 
-An OpenAPI 3.1 spec is served at `GET /docs`.
+An OpenAPI 3.1 spec is served at `GET /docs` and `GET /v1/openapi.json`.
+The on-disk snapshot at [`openapi.json`](openapi.json) is regenerated from
+[`src/schemas.ts`](src/schemas.ts) via `npm run regen:openapi`; keep them in
+sync after every schema change.

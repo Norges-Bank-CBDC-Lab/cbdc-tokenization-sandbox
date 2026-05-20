@@ -157,6 +157,15 @@ The NB Bond API is the privileged operator service. It:
   bidder proofs
 - maintains a local SQLite database for ingestion and operational views such as
   holders and history
+- exposes a v2 OpenAPI surface designed as a **bulky resource tree**: a single
+  `GET /v1/bonds` returns every bond with its nested auctions, bids,
+  allocations, and holders. Mutations return the updated parent so the
+  frontend can swap its cache atomically without a follow-up GET. The full
+  design — DTOs, endpoint catalog, ETag/md5 caching protocol, and two
+  auth modes (`none`, `entra`) — is documented in
+  [`docs/openapi-v2-plan.md`](openapi-v2-plan.md). This design deliberately
+  decouples the API shape from UI feature evolution: pages slice from the
+  cached tree client-side rather than driving new endpoints.
 
 Operational caveat:
 

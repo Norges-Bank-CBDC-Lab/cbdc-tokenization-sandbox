@@ -1,10 +1,17 @@
 /**
- * httpClient — the single fetch surface.
+ * httpClient — fetch surface with ETag cache.
  *
- * Every API call goes through here. Auth headers are pulled from the
- * configured AuthProvider per request, so flipping AUTH_MODE at runtime
- * (via /config.js) immediately changes the wire behaviour without any
- * caller-side change.
+ * Every API call goes through here. GETs are cached by URL path: the
+ * client stores the response's ETag and replays it on the next request
+ * via `If-None-Match`. A 304 from the server short-circuits to the
+ * cached body, so polling is cheap even with bulky-tree responses.
+ *
+ * Mutations (POST/PUT/PATCH/DELETE) clear the cache — the server
+ * returns the updated parent DTO, which the caller can store directly
+ * if they wish. Next GET re-primes the cache.
+ *
+ * Auth headers are pulled from the configured AuthProvider per request
+ * (none / entra), so AUTH_MODE swaps at runtime without caller changes.
  */
 import { AppConfig } from '../config.js';
 import { auth } from '../auth/index.js';
@@ -26,6 +33,10 @@ export class NotImplementedError extends Error {
   }
 }
 
+// In-memory ETag cache: path → { etag, body }.
+// One entry per URL. Cleared on any mutation.
+const cache = new Map();
+
 async function authHeaders() {
   const value = await auth.getAuthHeader();
   return value ? { Authorization: value } : {};
@@ -39,19 +50,48 @@ async function request(method, path, { body, query } = {}) {
     url += (url.includes('?') ? '&' : '?') + qs;
   }
 
+  const isCacheable = method === 'GET';
+  const cacheKey = url;
+
   const headers = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     ...(await authHeaders()),
   };
 
+  if (isCacheable) {
+    const cached = cache.get(cacheKey);
+    if (cached) headers['If-None-Match'] = cached.etag;
+  }
+
   const init = { method, headers };
   if (body !== undefined) init.body = JSON.stringify(body);
 
   const res = await fetch(url, init);
+
+  if (isCacheable && res.status === 304) {
+    const cached = cache.get(cacheKey);
+    if (cached) return cached.body;
+    // Server said 304 but we have nothing cached — should not happen.
+    // Fall through to refetch without the header.
+    return request(method, path, { body, query });
+  }
+
   const text = await res.text();
   const data = text ? safeJson(text) : null;
+
   if (!res.ok) throw new HttpError(res.status, res.statusText, data);
+
+  if (isCacheable) {
+    const etag = res.headers?.get?.('ETag');
+    if (etag) cache.set(cacheKey, { etag, body: data });
+  } else {
+    // Any mutation invalidates the entire GET cache. Subsequent reads
+    // will refetch fresh. The mutation response itself is the new
+    // truth for the parent resource.
+    cache.clear();
+  }
+
   return data;
 }
 
@@ -63,11 +103,18 @@ function safeJson(text) {
   }
 }
 
+/** Manually clear the cache. Useful for "force refresh" buttons. */
+export function clearHttpCache() {
+  cache.clear();
+}
+
 export const HttpClient = {
   get: (path, opts) => request('GET', path, opts),
   post: (path, body, opts) => request('POST', path, { ...opts, body }),
   put: (path, body, opts) => request('PUT', path, { ...opts, body }),
+  patch: (path, body, opts) => request('PATCH', path, { ...opts, body }),
   del: (path, opts) => request('DELETE', path, opts),
+  clearCache: clearHttpCache,
   HttpError,
   NotImplementedError,
 };

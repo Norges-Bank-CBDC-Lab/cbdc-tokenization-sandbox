@@ -6,9 +6,9 @@
  *   (cancelled is a terminal state reachable from open or closed)
  *
  * Surfaces three actions, gated by current status:
- *   - Close auction       (open → closed)
- *   - Approve / Reject    (closed → finalised|rejected)
- *   - Cancel auction      (open|closed → cancelled)
+ *   - Close auction       (open → closed, PATCH)
+ *   - Approve / Reject    (closed → finalised|rejected, PUT)
+ *   - Cancel auction      (open|closed → cancelled, DELETE)
  *
  * "Reopen" is rendered when status is "closed" but the backend / on-chain
  * has no closed→open transition yet — see docs/KNOWN_ISSUES.md
@@ -16,15 +16,11 @@
  * throws NotImplementedError so the UI shows a clear toast.
  */
 import { useState, useMemo } from 'react';
-import { AuctionsApi } from '../api/auctionsApi.js';
-import { useApi } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
-  ErrorState,
   Field,
   Input,
-  LoadingState,
   Modal,
   RadioGroup,
   StatusBadge,
@@ -132,8 +128,8 @@ function TerminalBanner({ status }) {
   return null;
 }
 
-function CloseModal({ status, onClose, onConfirm, busy }) {
-  const sealed = status.cached?.sealedCount ?? 0;
+function CloseModal({ auction, onClose, onConfirm, busy }) {
+  const sealed = auction.bids.filter((b) => b.state === 'sealed').length;
   return (
     <Modal
       title="Close auction"
@@ -156,16 +152,16 @@ function CloseModal({ status, onClose, onConfirm, busy }) {
       </p>
       <dl className="kv-grid lc-modal-kv">
         <dt>Auction</dt>
-        <dd className="mono">{Fmt.shortHex(status.auctionId, 10, 8)}</dd>
+        <dd className="mono">{Fmt.shortHex(auction.id, 10, 8)}</dd>
         <dt>ISIN</dt>
-        <dd className="mono">{status.isin}</dd>
+        <dd className="mono">{auction.isin}</dd>
         <dt>Sealed bids</dt>
         <dd className="mono">{sealed}</dd>
         <dt>Offering</dt>
-        <dd className="mono">{Fmt.formatUnits(status.metadata.offering)} units</dd>
+        <dd className="mono">{Fmt.formatUnits(auction.size)} units</dd>
         <dt>Scheduled end</dt>
         <dd>
-          {Fmt.formatUnixDate(status.metadata.end)} ({Fmt.formatRelative(status.metadata.end)})
+          {Fmt.formatUnixDate(auction.end)} ({Fmt.formatRelative(auction.end)})
         </dd>
       </dl>
       {sealed === 0 && (
@@ -177,23 +173,24 @@ function CloseModal({ status, onClose, onConfirm, busy }) {
   );
 }
 
-function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy }) {
-  const bidsQ = useApi(() => AuctionsApi.getAuctionBids(auctionId), [auctionId]);
+function FinaliseModal({ auction, onClose, onConfirm, busy }) {
+  // Bids come from the auction subtree — no separate fetch.
+  const bids = useMemo(
+    () => auction.bids.filter((b) => b.state === 'unsealed'),
+    [auction.bids],
+  );
+  const unsealed = bids.length > 0;
   const [mode, setMode] = useState('approve');
   const [ack, setAck] = useState(false);
   const [selectionOverride, setSelectionOverride] = useState(null);
-  const offering = Number(status.metadata.offering || 0);
+  const offering = Number(auction.size || 0);
 
-  const rawBids = bidsQ.data?.bids;
-  const bids = useMemo(() => rawBids ?? [], [rawBids]);
-  const unsealed = bidsQ.data?.state === 'unsealed';
   const selected = useMemo(() => {
-    if (!bidsQ.data) return null;
     return selectionOverride ?? new Set(bids.map((_, i) => i));
-  }, [bidsQ.data, bids, selectionOverride]);
+  }, [bids, selectionOverride]);
 
   const summary = useMemo(() => {
-    if (!selected || !unsealed) return null;
+    if (!unsealed) return null;
     const picked = [...selected].map((i) => bids[i]).filter(Boolean);
     const totalUnits = picked.reduce((s, b) => s + Number(b.units || 0), 0);
     const clearingBps = picked.reduce((max, b) => Math.max(max, Number(b.rate || 0)), 0);
@@ -233,10 +230,9 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
     setSelectionOverride(next);
   }
 
-  const allocationHash = status.cached?.allocationHash || allocation?.allocationHash || null;
-
+  const allocationHash = auction.allocation?.hash || null;
   const disabled =
-    busy || !allocationHash || !ack || !selected || (mode === 'approve' && selected.size === 0);
+    busy || !allocationHash || !ack || (mode === 'approve' && selected.size === 0);
 
   return (
     <Modal
@@ -291,16 +287,14 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
       </div>
 
       <div className="lc-bids-table-wrap">
-        {bidsQ.loading && <LoadingState />}
-        {bidsQ.error && <ErrorState error={bidsQ.error} onRetry={bidsQ.reload} />}
-        {!bidsQ.loading && !bidsQ.error && !unsealed && (
+        {!unsealed && (
           <div className="state" style={{ padding: 'var(--sp-5)' }}>
             <div className="state-msg">
               Bids are still sealed. Close the auction first to unseal them.
             </div>
           </div>
         )}
-        {!bidsQ.loading && !bidsQ.error && unsealed && bids.length > 0 && (
+        {unsealed && (
           <table className="tbl lc-bids-table">
             <thead>
               <tr>
@@ -404,7 +398,7 @@ function FinaliseModal({ auctionId, status, allocation, onClose, onConfirm, busy
   );
 }
 
-function ReopenModal({ status, onClose, onConfirm, busy }) {
+function ReopenModal({ auction, onClose, onConfirm, busy }) {
   return (
     <Modal
       title="Reopen auction"
@@ -427,12 +421,12 @@ function ReopenModal({ status, onClose, onConfirm, busy }) {
       </p>
       <dl className="kv-grid lc-modal-kv">
         <dt>Auction</dt>
-        <dd className="mono">{Fmt.shortHex(status.auctionId, 10, 8)}</dd>
+        <dd className="mono">{Fmt.shortHex(auction.id, 10, 8)}</dd>
         <dt>ISIN</dt>
-        <dd className="mono">{status.isin}</dd>
+        <dd className="mono">{auction.isin}</dd>
         <dt>Current status</dt>
         <dd>
-          <StatusBadge status={status.status} />
+          <StatusBadge status={auction.status} />
         </dd>
       </dl>
       <div className="lc-warning">
@@ -443,7 +437,7 @@ function ReopenModal({ status, onClose, onConfirm, busy }) {
   );
 }
 
-function CancelModal({ status, onClose, onConfirm, busy }) {
+function CancelModal({ auction, onClose, onConfirm, busy }) {
   const [reason, setReason] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const matches = confirmText.trim().toUpperCase() === 'CANCEL';
@@ -469,12 +463,12 @@ function CancelModal({ status, onClose, onConfirm, busy }) {
       </div>
       <dl className="kv-grid lc-modal-kv">
         <dt>Auction</dt>
-        <dd className="mono">{Fmt.shortHex(status.auctionId, 10, 8)}</dd>
+        <dd className="mono">{Fmt.shortHex(auction.id, 10, 8)}</dd>
         <dt>ISIN</dt>
-        <dd className="mono">{status.isin}</dd>
+        <dd className="mono">{auction.isin}</dd>
         <dt>Current status</dt>
         <dd>
-          <StatusBadge status={status.status} />
+          <StatusBadge status={auction.status} />
         </dd>
       </dl>
       <Field label="Reason (optional, for audit log)">
@@ -500,8 +494,7 @@ function CancelModal({ status, onClose, onConfirm, busy }) {
 }
 
 export function AuctionLifecyclePanel({
-  status,
-  allocation,
+  auction,
   onClose,
   onReopen,
   onFinalise,
@@ -509,7 +502,7 @@ export function AuctionLifecyclePanel({
   busy,
 }) {
   const [modal, setModal] = useState(null);
-  const s = status.status;
+  const s = auction.status;
 
   const canClose = s === 'open';
   const canFinalise = s === 'closed';
@@ -600,7 +593,7 @@ export function AuctionLifecyclePanel({
 
       {modal === 'close' && (
         <CloseModal
-          status={status}
+          auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
           onConfirm={() => handle(onClose)}
@@ -608,9 +601,7 @@ export function AuctionLifecyclePanel({
       )}
       {modal === 'finalise' && (
         <FinaliseModal
-          auctionId={status.auctionId}
-          status={status}
-          allocation={allocation}
+          auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
           onConfirm={(approve, winners) => handle(onFinalise, approve, winners)}
@@ -618,7 +609,7 @@ export function AuctionLifecyclePanel({
       )}
       {modal === 'reopen' && (
         <ReopenModal
-          status={status}
+          auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
           onConfirm={() => handle(onReopen)}
@@ -626,7 +617,7 @@ export function AuctionLifecyclePanel({
       )}
       {modal === 'cancel' && (
         <CancelModal
-          status={status}
+          auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
           onConfirm={(reason) => handle(onCancel, reason)}

@@ -26,7 +26,14 @@ describe('validateRequest', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Invalid request', details: expect.any(Object) }),
+      expect.objectContaining({
+        type: 'about:blank',
+        title: 'Validation failed',
+        status: 400,
+        errors: expect.arrayContaining([
+          expect.objectContaining({ field: 'size', message: expect.any(String) }),
+        ]),
+      }),
     );
     expect(next).not.toHaveBeenCalled();
   });

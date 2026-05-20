@@ -1,5 +1,5 @@
 /**
- * mockClient — in-memory implementation of the NB Bond API surface.
+ * mockClient — in-memory implementation of the v2 bond API.
  *
  * Every method returns a Promise (with a small simulated latency) so call
  * sites are identical to the real client. Mutations write back to the
@@ -10,10 +10,10 @@
  * the real backend too.
  */
 import { AppConfig } from '../config.js';
-import { store } from './mockData.js';
+import { helpers, store } from './mockData.js';
 
-const { bonds, auctions, helpers } = store;
-const { now, days, randomHex, makeAuctionId, makeAddress } = helpers;
+const { bonds } = store;
+const { mockMd5, randomHex, makeAuction, makeBond } = helpers;
 
 function delay() {
   const ms = AppConfig.MOCK_LATENCY_MS ?? 0;
@@ -26,331 +26,216 @@ function notFound(what) {
   throw err;
 }
 
-// ---------- bonds ----------------------------------------------------
+function findBond(isin) {
+  return bonds.find((b) => b.isin === isin);
+}
+
+function findAuction(auctionId) {
+  for (const b of bonds) {
+    const a = b.auctions?.find((x) => x.id === auctionId);
+    if (a) return { bond: b, auction: a };
+  }
+  return null;
+}
+
+function restampBond(bond) {
+  bond.md5 = mockMd5();
+  return bond;
+}
+
+function restampAuction(auction) {
+  auction.md5 = mockMd5();
+  return auction;
+}
+
+// #region Bonds ──────────────────────────────────────────────────────
 
 async function listBonds() {
   await delay();
-  return { bonds: bonds.map((b) => ({ ...b })) };
+  return bonds.map((b) => ({ ...b }));
 }
 
 async function getBond(isin) {
   await delay();
-  const b = bonds.find((x) => x.isin === isin);
+  const b = findBond(isin);
   if (!b) notFound('Bond');
   return { ...b };
 }
 
-async function getBondHolders(isin) {
+async function listBondHistory(isin, _opts = {}) {
   await delay();
-  return {
+  const b = findBond(isin);
+  if (!b) return [];
+  const events = (b.auctions ?? []).map((a) => ({
     isin,
-    holders: [
-      { isin, holder: makeAddress(), balance: '2500000' },
-      { isin, holder: makeAddress(), balance: '1200000' },
-      { isin, holder: makeAddress(), balance: '800000' },
-      { isin, holder: makeAddress(), balance: '500000' },
-    ],
-  };
-}
-
-async function getBondHistory(isin) {
-  await delay();
-  return {
-    isin,
-    events: auctions
-      .filter((a) => a.isin === isin)
-      .map((a) => ({
-        auctionId: a.auctionId,
-        isin,
-        type: 'AuctionCreated',
-        block: 1_000_000 + Math.floor(Math.random() * 100_000),
-        txHash: randomHex(32),
-        payload: { auctionType: a.type, size: a.size },
-      })),
-    bondEvents: [],
-  };
-}
-
-async function payCoupon(isin, body) {
-  await delay();
-  return {
-    isin,
+    auctionId: a.id,
+    type: a.type, // mock: re-use auction type as the create-event type
+    block: 1_000_000 + Math.floor(Math.random() * 100_000),
     txHash: randomHex(32),
-    blockNumber: 1_500_000,
-    status: 'submitted',
-    holderCount: body?.holders?.length ?? 0,
-  };
+    payload: { size: a.size, status: a.status },
+  }));
+  return events.sort((x, y) => y.block - x.block);
 }
 
-async function redeem(isin, body) {
+async function payCoupon(isin, _body) {
   await delay();
-  return {
-    isin,
-    txHash: randomHex(32),
-    blockNumber: 1_500_001,
-    status: 'submitted',
-    holderCount: body?.holders?.length ?? 0,
-  };
+  const b = findBond(isin);
+  if (!b) notFound('Bond');
+  // Bump payments-made for visual feedback.
+  if (b.coupon?.payments) {
+    const made = Number(b.coupon.payments.made ?? '0') + 1;
+    const total = Number(b.coupon.payments.total ?? '0');
+    b.coupon.payments.made = String(made);
+    b.coupon.payments.remaining = String(Math.max(0, total - made));
+  }
+  return restampBond({ ...b });
 }
 
-// ---------- auctions -------------------------------------------------
-
-async function listAllAuctions() {
+async function redeem(isin, _body) {
   await delay();
-  return { auctions: auctions.map((a) => ({ ...a })) };
+  const b = findBond(isin);
+  if (!b) notFound('Bond');
+  b.status = 'redeemed';
+  b.totalSupply = '0';
+  return restampBond({ ...b });
 }
 
-async function listAuctionsForBond(isin) {
+// #endregion
+
+// #region Auctions ───────────────────────────────────────────────────
+
+async function listAuctions() {
   await delay();
-  return { auctions: auctions.filter((a) => a.isin === isin).map((a) => ({ ...a })) };
+  return bonds.flatMap((b) => (b.auctions ?? []).map((a) => ({ ...a })));
+}
+
+async function getAuction(auctionId) {
+  await delay();
+  const hit = findAuction(auctionId);
+  if (!hit) notFound('Auction');
+  return { ...hit.auction };
 }
 
 async function createAuction(isin, body) {
   await delay();
-  let bond = bonds.find((b) => b.isin === isin);
+  let bond = findBond(isin);
   if (!bond) {
-    const maturityDuration = body.maturityDuration
-      ? String(body.maturityDuration)
-      : String(days(365 * 5));
-    bond = {
+    bond = makeBond({
       isin,
-      maturityDuration,
-      maturityDate: String(now() + Number(maturityDuration)),
-      timeToMaturity: maturityDuration,
-      couponDuration: String(days(365)),
-      couponYield: '0',
-      couponPaymentsTotal: '0',
-      couponPaymentsMade: '0',
-      couponPaymentsRemaining: '0',
       status: 'minting',
       totalSupply: '0',
-    };
+      couponYieldBps: '0',
+      paymentsTotal: 0,
+      paymentsMade: 0,
+      auctions: [],
+    });
     bonds.unshift(bond);
   }
-
-  const auctionId = makeAuctionId();
-  const summary = {
-    auctionId,
+  const auction = makeAuction({
     isin,
     type: body.type,
     status: 'open',
     end: String(body.end),
     size: String(body.size),
-    allocationHash: null,
-    finalised: false,
-    rejected: false,
-    cancelled: false,
-  };
-  auctions.unshift(summary);
-
-  return {
-    auctionId,
-    isin,
-    type: body.type,
-    status: 'open',
-    end: String(body.end),
-    size: String(body.size),
-    maturityDuration: body.maturityDuration ? String(body.maturityDuration) : null,
-    auctionPubKey: randomHex(33),
-    bondAuction: makeAddress(),
-    bondToken: makeAddress(),
-    txHash: randomHex(32),
-    blockNumber: 1_600_000 + Math.floor(Math.random() * 1000),
-  };
-}
-
-async function getAuctionStatus(auctionId) {
-  await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  return {
-    auctionId,
-    isin: a.isin,
-    status: a.status,
-    metadata: {
-      owner: makeAddress(),
-      end: a.end,
-      auctionPubKey: randomHex(33),
-      bond: makeAddress(),
-      offering: a.size,
-      auctionType: a.type,
-    },
-    cached: {
-      sealedCount: 12,
-      unsealedCount: a.status === 'open' ? 0 : 12,
-      allocationHash: a.allocationHash,
-      finalised: a.finalised,
-      rejected: a.rejected,
-      cancelled: a.cancelled,
-      auctionType: a.type,
-    },
-    allocations: [],
-  };
-}
-
-async function getAuctionBids(auctionId) {
-  await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  const sealed = a.status === 'open';
-  const bids = Array.from({ length: 8 }).map(() =>
-    sealed
-      ? { bidder: makeAddress(), ciphertext: randomHex(64), plaintextHash: randomHex(32) }
-      : {
-          bidder: makeAddress(),
-          rate: String(350 + Math.floor(Math.random() * 200)),
-          units: String(50_000 + Math.floor(Math.random() * 500_000)),
-        },
-  );
-  return {
-    auctionId,
-    isin: a.isin,
-    state: sealed ? 'sealed' : 'unsealed',
-    bidCount: bids.length,
-    bids,
-    allocation: null,
-    auctionType: a.type,
-  };
-}
-
-async function getAuctionAllocations(auctionId) {
-  await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  const allocations = Array.from({ length: 5 }).map(() => ({
-    bidder: makeAddress(),
-    units: String(100_000 + Math.floor(Math.random() * 400_000)),
-    rate: String(400 + Math.floor(Math.random() * 100)),
-    auctionType: a.type,
-  }));
-  return {
-    auctionId,
-    isin: a.isin,
-    allocation: {
-      clearingRate: '425',
-      totalAllocated: a.size,
-      allocationHash: a.allocationHash || randomHex(32),
-      auctionType: a.type,
-      computedAt: Date.now(),
-      allocations,
-    },
-    status: a.status,
-    auctionType: a.type,
-    finalised: a.finalised,
-    rejected: a.rejected,
-    cancelled: a.cancelled,
-  };
+    bidCount: 0,
+  });
+  bond.auctions = [auction, ...(bond.auctions ?? [])];
+  return restampBond({ ...bond });
 }
 
 async function closeAuction(auctionId) {
   await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  a.status = 'closed';
-  a.allocationHash = randomHex(32);
-  return {
-    auctionId,
-    isin: a.isin,
-    status: 'closed',
-    txHash: randomHex(32),
-    blockNumber: 1_700_000,
-    bidCount: 8,
-    bids: [],
-    allocation: {
-      clearingRate: '425',
-      totalAllocated: a.size,
-      allocationHash: a.allocationHash,
-      auctionType: a.type,
-      computedAt: Date.now(),
-      allocations: [],
-    },
-    auctionType: a.type,
-  };
-}
-
-async function reopenAuction(auctionId) {
-  await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  if (a.status !== 'closed') {
-    const err = new Error(`Cannot reopen auction in status "${a.status}"`);
+  const hit = findAuction(auctionId);
+  if (!hit) notFound('Auction');
+  if (hit.auction.status !== 'open') {
+    const err = new Error(`Cannot close auction in status "${hit.auction.status}"`);
     err.status = 409;
     throw err;
   }
-  a.status = 'open';
-  a.allocationHash = null;
-  return {
-    auctionId,
-    isin: a.isin,
-    status: 'open',
-    txHash: randomHex(32),
-    blockNumber: 1_700_010,
-  };
-}
-
-async function finaliseAuction(auctionId, body) {
-  await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  if (body.approve) {
-    a.status = 'finalised';
-    a.finalised = true;
-  } else {
-    a.status = 'rejected';
-    a.rejected = true;
+  hit.auction.status = 'closed';
+  hit.auction.bids = hit.auction.bids.map((b) => {
+    if (b.state === 'unsealed') return b;
+    return {
+      bidder: b.bidder,
+      state: 'unsealed',
+      rate: String(350 + Math.floor(Math.random() * 200)),
+      units: String(50_000 + Math.floor(Math.random() * 500_000)),
+      md5: mockMd5(),
+    };
+  });
+  if (!hit.auction.allocation) {
+    hit.auction.allocation = {
+      clearingRate: '425',
+      totalAllocated: hit.auction.size,
+      hash: randomHex(32),
+      auctionType: hit.auction.type,
+      computedAt: Date.now(),
+      entries: hit.auction.bids.slice(0, 3).map((b) => ({
+        bidder: b.bidder,
+        units: b.units ?? '100000',
+        rate: b.rate ?? '425',
+      })),
+      md5: mockMd5(),
+    };
   }
-  return {
-    auctionId,
-    isin: a.isin,
-    status: a.status,
-    allocationHash: body.allocationHash,
-    txHash: randomHex(32),
-    blockNumber: 1_700_001,
-  };
+  hit.auction.txs.close = { hash: randomHex(32), block: 1_700_000 };
+  return restampAuction({ ...hit.auction });
 }
 
 async function cancelAuction(auctionId) {
   await delay();
-  const a = auctions.find((x) => x.auctionId === auctionId);
-  if (!a) notFound('Auction');
-  a.status = 'cancelled';
-  a.cancelled = true;
-  return {
-    auctionId,
-    isin: a.isin,
-    status: 'cancelled',
-    txHash: randomHex(32),
-    blockNumber: 1_700_002,
-  };
+  const hit = findAuction(auctionId);
+  if (!hit) notFound('Auction');
+  if (hit.auction.status === 'finalised' || hit.auction.status === 'cancelled') {
+    const err = new Error(`Cannot cancel auction in status "${hit.auction.status}"`);
+    err.status = 409;
+    throw err;
+  }
+  hit.auction.status = 'cancelled';
+  hit.auction.txs.cancel = { hash: randomHex(32), block: 1_700_002 };
+  return restampAuction({ ...hit.auction });
 }
 
-async function getHealth() {
+async function reopenAuction(auctionId) {
+  // Mock-only — see auctionsApi.reopenAuction docs.
   await delay();
-  return {
-    status: 'ok (mock)',
-    bondManager: makeAddress(),
-    bondAuction: makeAddress(),
-    bondToken: makeAddress(),
-    sealingPublicKey: randomHex(33),
-  };
+  const hit = findAuction(auctionId);
+  if (!hit) notFound('Auction');
+  if (hit.auction.status !== 'closed') {
+    const err = new Error(`Cannot reopen auction in status "${hit.auction.status}"`);
+    err.status = 409;
+    throw err;
+  }
+  hit.auction.status = 'open';
+  hit.auction.allocation = null;
+  hit.auction.txs.close = null;
+  return restampAuction({ ...hit.auction });
 }
+
+async function finaliseAuction(auctionId, body) {
+  await delay();
+  const hit = findAuction(auctionId);
+  if (!hit) notFound('Auction');
+  hit.auction.status = body.approve ? 'finalised' : 'rejected';
+  if (body.approve) {
+    hit.auction.txs.finalise = { hash: randomHex(32), block: 1_700_001 };
+  }
+  return restampAuction({ ...hit.auction });
+}
+
+// #endregion
 
 export const MockClient = {
   listBonds,
   getBond,
-  getBondHolders,
-  getBondHistory,
+  listBondHistory,
   payCoupon,
   redeem,
-  listAllAuctions,
-  listAuctionsForBond,
+  listAuctions,
+  getAuction,
   createAuction,
-  getAuctionStatus,
-  getAuctionBids,
-  getAuctionAllocations,
   closeAuction,
+  cancelAuction,
   reopenAuction,
   finaliseAuction,
-  cancelAuction,
-  getHealth,
 };

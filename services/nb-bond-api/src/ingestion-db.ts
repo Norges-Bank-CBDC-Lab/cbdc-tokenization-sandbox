@@ -171,6 +171,44 @@ export interface AuctionRow {
   bond: string | null;
 }
 
+export function getAuctionRowById(
+  db: IngestionDatabase,
+  auctionId: string,
+): AuctionRow | null {
+  const stmt = db.prepare(
+    `SELECT auction_id, isin, type, created_block, created_tx, bond
+     FROM auctions
+     WHERE auction_id = ?`,
+  );
+  return (stmt.get(auctionId) as AuctionRow | undefined) ?? null;
+}
+
+export function getAuctionEventsById(
+  db: IngestionDatabase,
+  auctionId: string,
+  limit = 200,
+  offset = 0,
+): AuctionEventRow[] {
+  const stmt = db.prepare(
+    `SELECT auction_id, isin, type, block, tx_hash, payload
+     FROM auction_events
+     WHERE auction_id = ?
+     ORDER BY block, id
+     LIMIT ? OFFSET ?`,
+  );
+  return stmt.all(auctionId, limit, offset) as AuctionEventRow[];
+}
+
+export function listAuctionRowsByIsin(db: IngestionDatabase, isin: string): AuctionRow[] {
+  const stmt = db.prepare(
+    `SELECT auction_id, isin, type, created_block, created_tx, bond
+     FROM auctions
+     WHERE isin = ?
+     ORDER BY created_block, auction_id`,
+  );
+  return stmt.all(isin) as AuctionRow[];
+}
+
 export function listAllAuctions(db: IngestionDatabase): AuctionRow[] {
   const stmt = db.prepare(
     `SELECT auction_id, isin, type, created_block, created_tx, bond

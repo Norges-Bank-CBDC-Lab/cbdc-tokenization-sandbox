@@ -1,5 +1,9 @@
 /**
- * AuctionDetailPage — single auction: metadata, bids, allocations, actions.
+ * AuctionDetailPage — single auction subtree.
+ *
+ * One GET /v1/auctions/{id} returns the auction with its bids and
+ * allocation. Mutations (close/cancel/finalise) return the updated
+ * Auction; we splice it into local state via reload.
  */
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
@@ -16,9 +20,7 @@ import {
 import { AuctionLifecyclePanel } from './AuctionLifecyclePanel.jsx';
 
 export function AuctionDetailPage({ auctionId, navigate }) {
-  const statusQ = useApi(() => AuctionsApi.getAuctionStatus(auctionId), [auctionId]);
-  const bidsQ = useApi(() => AuctionsApi.getAuctionBids(auctionId), [auctionId]);
-  const allocQ = useApi(() => AuctionsApi.getAuctionAllocations(auctionId), [auctionId]);
+  const auctionQ = useApi(() => AuctionsApi.getAuction(auctionId), [auctionId]);
   const toast = useToast();
 
   const closeMut = useMutation(() => AuctionsApi.closeAuction(auctionId));
@@ -27,62 +29,54 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   const finaliseMut = useMutation((approve, winners) =>
     AuctionsApi.finaliseAuction(
       auctionId,
-      statusQ.data?.cached?.allocationHash || allocQ.data?.allocation?.allocationHash,
+      auctionQ.data?.allocation?.hash,
       approve,
       winners,
     ),
   );
 
-  if (statusQ.loading)
+  if (auctionQ.loading)
     return (
       <div className="card">
         <LoadingState />
       </div>
     );
-  if (statusQ.error)
+  if (auctionQ.error)
     return (
       <div className="card">
-        <ErrorState error={statusQ.error} onRetry={statusQ.reload} />
+        <ErrorState error={auctionQ.error} onRetry={auctionQ.reload} />
       </div>
     );
 
-  const s = statusQ.data;
-  const meta = s.metadata;
-
-  function reloadAll() {
-    statusQ.reload();
-    bidsQ.reload();
-    allocQ.reload();
-  }
+  const auction = auctionQ.data;
+  const sealedCount = auction.bids.filter((b) => b.state === 'sealed').length;
+  const unsealedCount = auction.bids.filter((b) => b.state === 'unsealed').length;
 
   async function doClose() {
     try {
       await closeMut.run();
       toast.push({ kind: 'ok', title: 'Auction closed' });
-      reloadAll();
+      auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Close failed', body: e.message });
-      return false;
     }
   }
   async function doReopen() {
     try {
       await reopenMut.run();
       toast.push({ kind: 'ok', title: 'Auction reopened' });
-      reloadAll();
+      auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Reopen failed', body: e.message });
-      return false;
     }
   }
   async function doCancel() {
     try {
       await cancelMut.run();
       toast.push({ kind: 'ok', title: 'Auction cancelled' });
-      reloadAll();
+      auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Cancel failed', body: e.message });
-      return false;
     }
   }
   async function doFinalise(approve, winners) {
@@ -96,10 +90,9 @@ export function AuctionDetailPage({ auctionId, navigate }) {
             ? `${winners.length} winner${winners.length === 1 ? '' : 's'} finalised`
             : undefined,
       });
-      reloadAll();
+      auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Finalise failed', body: e.message });
-      return false;
     }
   }
 
@@ -122,29 +115,29 @@ export function AuctionDetailPage({ auctionId, navigate }) {
             </a>{' '}
             ·{' '}
             <a
-              href={`#/bonds/${s.isin}`}
+              href={`#/bonds/${auction.isin}`}
               onClick={(e) => {
                 e.preventDefault();
-                navigate(`/bonds/${s.isin}`);
+                navigate(`/bonds/${auction.isin}`);
               }}
             >
-              {s.isin}
+              {auction.isin}
             </a>
           </div>
           <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 22 }}>
-            {Fmt.shortHex(s.auctionId, 10, 8)}
+            {Fmt.shortHex(auction.id, 10, 8)}
           </h1>
           <div className="subtitle row" style={{ gap: 12 }}>
-            <StatusBadge status={s.status} />
-            <TypeBadge type={meta.auctionType} />
+            <StatusBadge status={auction.status} />
+            <TypeBadge type={auction.type} />
             <span className="muted">·</span>
             <span>
-              Ends {Fmt.formatUnixDate(meta.end)} ({Fmt.formatRelative(meta.end)})
+              Ends {Fmt.formatUnixDate(auction.end)} ({Fmt.formatRelative(auction.end)})
             </span>
           </div>
         </div>
         <div className="actions">
-          <Button variant="ghost" onClick={reloadAll}>
+          <Button variant="ghost" onClick={auctionQ.reload}>
             Refresh
           </Button>
         </div>
@@ -153,40 +146,45 @@ export function AuctionDetailPage({ auctionId, navigate }) {
       <div className="kpi-grid">
         <div className="kpi">
           <div className="kpi-label">Offering size</div>
-          <div className="kpi-value mono">{Fmt.formatUnits(meta.offering)}</div>
-          <div className="kpi-sub">{Fmt.formatNok(meta.offering)}</div>
+          <div className="kpi-value mono">{Fmt.formatUnits(auction.size)}</div>
+          <div className="kpi-sub">{Fmt.formatNok(auction.size)}</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Sealed bids</div>
-          <div className="kpi-value">{s.cached?.sealedCount ?? 0}</div>
-          <div className="kpi-sub">{s.cached?.unsealedCount ?? 0} unsealed</div>
+          <div className="kpi-value">{sealedCount}</div>
+          <div className="kpi-sub">{unsealedCount} unsealed</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Clearing rate</div>
           <div className="kpi-value">
-            {allocQ.data?.allocation?.clearingRate ? (
-              Fmt.bpsToPct(allocQ.data.allocation.clearingRate)
+            {auction.allocation?.clearingRate ? (
+              Fmt.bpsToPct(auction.allocation.clearingRate)
             ) : (
               <span className="muted">—</span>
             )}
           </div>
-          <div className="kpi-sub">{s.status === 'open' ? 'Awaiting close' : 'Computed'}</div>
+          <div className="kpi-sub">
+            {auction.status === 'open' ? 'Awaiting close' : 'Computed'}
+          </div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Allocation hash</div>
           <div className="kpi-value mono" style={{ fontSize: 14 }}>
-            {Fmt.shortHex(s.cached?.allocationHash, 10, 6)}
+            {Fmt.shortHex(auction.allocation?.hash, 10, 6)}
           </div>
           <div className="kpi-sub">
-            {s.cached?.finalised ? 'Finalised' : s.cached?.rejected ? 'Rejected' : 'Pending'}
+            {auction.status === 'finalised'
+              ? 'Finalised'
+              : auction.status === 'rejected'
+                ? 'Rejected'
+                : 'Pending'}
           </div>
         </div>
       </div>
 
       <div className="stack-5">
         <AuctionLifecyclePanel
-          status={s}
-          allocation={allocQ.data?.allocation}
+          auction={auction}
           busy={mutating}
           onClose={doClose}
           onReopen={doReopen}
@@ -201,145 +199,140 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           <div className="card-body">
             <dl className="kv-grid">
               <dt>Auction ID</dt>
-              <dd className="mono">{s.auctionId}</dd>
+              <dd className="mono">{auction.id}</dd>
               <dt>ISIN</dt>
-              <dd className="mono">{s.isin}</dd>
+              <dd className="mono">{auction.isin}</dd>
               <dt>Type</dt>
               <dd>
-                <TypeBadge type={meta.auctionType} />
+                <TypeBadge type={auction.type} />
               </dd>
               <dt>Status</dt>
               <dd>
-                <StatusBadge status={s.status} />
+                <StatusBadge status={auction.status} />
               </dd>
               <dt>Owner</dt>
-              <dd className="mono">{meta.owner}</dd>
-              <dt>Bond contract</dt>
-              <dd className="mono">{meta.bond}</dd>
+              <dd className="mono">{auction.owner}</dd>
+              <dt>Auction contract</dt>
+              <dd className="mono">{auction.contracts.auction}</dd>
+              <dt>Bond token</dt>
+              <dd className="mono">{auction.contracts.token}</dd>
               <dt>Offering</dt>
-              <dd className="mono">{Fmt.formatUnits(meta.offering)} units</dd>
+              <dd className="mono">{Fmt.formatUnits(auction.size)} units</dd>
               <dt>End</dt>
-              <dd>{Fmt.formatUnixDate(meta.end)}</dd>
-              <dt>Auction public key</dt>
-              <dd className="mono">{Fmt.shortHex(meta.auctionPubKey, 12, 8)}</dd>
+              <dd>{Fmt.formatUnixDate(auction.end)}</dd>
+              <dt>Sealing public key</dt>
+              <dd className="mono">{Fmt.shortHex(auction.sealingPubKey, 12, 8)}</dd>
             </dl>
           </div>
         </div>
 
-        <BidsCard bidsQ={bidsQ} />
-        <AllocationCard allocQ={allocQ} status={s.status} />
+        <BidsCard bids={auction.bids} />
+        <AllocationCard allocation={auction.allocation} status={auction.status} />
       </div>
     </div>
   );
 }
 
-function BidsCard({ bidsQ }) {
+function BidsCard({ bids }) {
+  const state = bids.length > 0 ? bids[0].state : 'unsealed';
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">Bids</h3>
         <span className="muted mono" style={{ fontSize: 12 }}>
-          {bidsQ.data ? `${bidsQ.data.bidCount} ${bidsQ.data.state}` : ''}
+          {bids.length} {state}
         </span>
       </div>
       <div className="card-body flush">
-        {bidsQ.loading && <LoadingState />}
-        {bidsQ.error && <ErrorState error={bidsQ.error} onRetry={bidsQ.reload} />}
-        {!bidsQ.loading &&
-          !bidsQ.error &&
-          (bidsQ.data.bids.length === 0 ? (
-            <EmptyState title="No bids yet" />
-          ) : bidsQ.data.state === 'sealed' ? (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Bidder</th>
-                  <th>Ciphertext</th>
-                  <th>Plaintext hash</th>
+        {bids.length === 0 ? (
+          <EmptyState title="No bids yet" />
+        ) : state === 'sealed' ? (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Bidder</th>
+                <th>Ciphertext</th>
+                <th>Plaintext hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bids.map((b, i) => (
+                <tr key={i}>
+                  <td className="mono">{b.bidder}</td>
+                  <td className="mono">{Fmt.shortHex(b.ciphertext, 8, 6)}</td>
+                  <td className="mono">{Fmt.shortHex(b.plaintextHash, 8, 6)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {bidsQ.data.bids.map((b, i) => (
-                  <tr key={i}>
-                    <td className="mono">{b.bidder}</td>
-                    <td className="mono">{Fmt.shortHex(b.ciphertext, 8, 6)}</td>
-                    <td className="mono">{Fmt.shortHex(b.plaintextHash, 8, 6)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Bidder</th>
-                  <th className="num">Rate</th>
-                  <th className="num">Units</th>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Bidder</th>
+                <th className="num">Rate</th>
+                <th className="num">Units</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bids.map((b, i) => (
+                <tr key={i}>
+                  <td className="mono">{b.bidder}</td>
+                  <td className="num mono">{Fmt.bpsToPct(b.rate)}</td>
+                  <td className="num mono">{Fmt.formatUnits(b.units)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {bidsQ.data.bids.map((b, i) => (
-                  <tr key={i}>
-                    <td className="mono">{b.bidder}</td>
-                    <td className="num mono">{Fmt.bpsToPct(b.rate)}</td>
-                    <td className="num mono">{Fmt.formatUnits(b.units)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ))}
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 }
 
-function AllocationCard({ allocQ, status }) {
+function AllocationCard({ allocation, status }) {
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">Allocation</h3>
-        {allocQ.data?.allocation && (
+        {allocation && (
           <span className="muted mono" style={{ fontSize: 12 }}>
-            Clearing rate {Fmt.bpsToPct(allocQ.data.allocation.clearingRate)}
+            Clearing rate {Fmt.bpsToPct(allocation.clearingRate)}
           </span>
         )}
       </div>
       <div className="card-body flush">
-        {allocQ.loading && <LoadingState />}
-        {allocQ.error && <ErrorState error={allocQ.error} onRetry={allocQ.reload} />}
-        {!allocQ.loading &&
-          !allocQ.error &&
-          (!allocQ.data?.allocation || status === 'open' ? (
-            <EmptyState
-              title="No allocation yet"
-              message={
-                status === 'open'
-                  ? 'Allocation is computed when the auction closes.'
-                  : 'Allocation data unavailable.'
-              }
-            />
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Bidder</th>
-                  <th className="num">Allocated units</th>
-                  <th className="num">Rate</th>
-                  <th className="num">Value</th>
+        {!allocation || status === 'open' ? (
+          <EmptyState
+            title="No allocation yet"
+            message={
+              status === 'open'
+                ? 'Allocation is computed when the auction closes.'
+                : 'Allocation data unavailable.'
+            }
+          />
+        ) : (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Bidder</th>
+                <th className="num">Allocated units</th>
+                <th className="num">Rate</th>
+                <th className="num">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allocation.entries.map((a, i) => (
+                <tr key={i}>
+                  <td className="mono">{a.bidder}</td>
+                  <td className="num mono">{Fmt.formatUnits(a.units)}</td>
+                  <td className="num mono">{Fmt.bpsToPct(a.rate)}</td>
+                  <td className="num">{Fmt.formatNok(a.units)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {allocQ.data.allocation.allocations.map((a, i) => (
-                  <tr key={i}>
-                    <td className="mono">{a.bidder}</td>
-                    <td className="num mono">{Fmt.formatUnits(a.units)}</td>
-                    <td className="num mono">{Fmt.bpsToPct(a.rate)}</td>
-                    <td className="num">{Fmt.formatNok(a.units)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ))}
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
