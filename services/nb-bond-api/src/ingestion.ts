@@ -15,6 +15,7 @@ type IssueAction = {
   holder: string;
   delta: bigint;
   block: number;
+  logIndex: number;
   txHash: string;
   partition: string;
 };
@@ -24,6 +25,7 @@ type RedeemAction = {
   holder: string;
   delta: bigint;
   block: number;
+  logIndex: number;
   txHash: string;
   partition: string;
 };
@@ -34,6 +36,7 @@ type TransferAction = {
   to: string;
   value: bigint;
   block: number;
+  logIndex: number;
   txHash: string;
 };
 type TokenAction = IssueAction | RedeemAction | TransferAction;
@@ -85,13 +88,17 @@ function decodeTokenEvents(logs: Log[], bondToken: Contract) {
     .filter(Boolean) as { log: Log; parsed: ParsedLog }[];
 }
 
-function upsertAuctionEvent(
+// Exported for direct unit-test coverage of idempotency behaviour
+// (tests/ingestion-idempotency.test.ts). Not part of the runtime
+// API consumed by other modules.
+export function upsertAuctionEvent(
   db: IngestionDatabase,
   data: {
     auctionId: string;
     isin: string;
     type: string;
     block: number;
+    logIndex: number;
     txHash: string;
     payload: unknown;
   },
@@ -107,53 +114,74 @@ function upsertAuctionEvent(
     data.txHash ?? '',
   );
 
+  // `INSERT OR IGNORE` paired with the UNIQUE INDEX on
+  // (tx_hash, log_index) makes re-processing the same chain log a
+  // no-op. See docs/ingestion-idempotency-plan.md §"Dedup keys".
   const insertEvent = db.prepare(
-    `INSERT INTO auction_events (auction_id, isin, type, block, tx_hash, payload) VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO auction_events (auction_id, isin, type, block, log_index, tx_hash, payload)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   );
   insertEvent.run(
     data.auctionId ?? '',
     data.isin ?? '',
     data.type ?? '',
     Number(data.block ?? 0),
+    Number(data.logIndex ?? 0),
     data.txHash ?? '',
     JSON.stringify(toPlainObject(data.payload ?? {})),
   );
 }
 
-function applyBalanceDelta(
+// Exported for direct unit-test coverage of idempotency behaviour.
+export function applyBalanceDelta(
   db: IngestionDatabase,
   data: {
     isin: string;
     holder: string;
     delta: bigint;
     block: number;
+    logIndex: number;
     txHash: string;
     kind: string;
   },
 ) {
+  // The balance projection is idempotent because we INSERT OR IGNORE
+  // the event row first and only mutate `balances` if the event row
+  // was actually written. Without this guard a replay would
+  // double-apply the delta. See docs/ingestion-idempotency-plan.md.
+  const insertEvent = db.prepare(
+    `INSERT OR IGNORE INTO balance_events (isin, holder, delta, balance_after, block, log_index, tx_hash, kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  // We need balance_after before the row is committed; compute it
+  // from current state and apply the delta only if the dedup write
+  // succeeds.
   const getBalance = db.prepare(`SELECT balance FROM balances WHERE isin = ? AND holder = ?`);
   const row = getBalance.get(data.isin ?? '', data.holder ?? '') as { balance: string } | undefined;
   const current = BigInt(row?.balance ?? '0');
   const next = current + data.delta;
-  const upsert = db.prepare(
-    `INSERT INTO balances (isin, holder, balance) VALUES (?, ?, ?)
-     ON CONFLICT(isin, holder) DO UPDATE SET balance=excluded.balance`,
-  );
-  upsert.run(data.isin ?? '', data.holder ?? '', next.toString());
-
-  const insertEvent = db.prepare(
-    `INSERT INTO balance_events (isin, holder, delta, balance_after, block, tx_hash, kind)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  );
-  insertEvent.run(
+  const result = insertEvent.run(
     data.isin ?? '',
     data.holder ?? '',
     data.delta.toString(),
     next.toString(),
     Number(data.block ?? 0),
+    Number(data.logIndex ?? 0),
     data.txHash ?? '',
     data.kind ?? '',
   );
+  const wrote = Number(result?.changes ?? 0) > 0;
+  if (!wrote) {
+    // Duplicate (tx_hash, log_index, holder) — already applied. Skip
+    // the balance mutation to keep the projection consistent under
+    // replay.
+    return;
+  }
+  const upsert = db.prepare(
+    `INSERT INTO balances (isin, holder, balance) VALUES (?, ?, ?)
+     ON CONFLICT(isin, holder) DO UPDATE SET balance=excluded.balance`,
+  );
+  upsert.run(data.isin ?? '', data.holder ?? '', next.toString());
 }
 
 function upsertPartition(
@@ -177,17 +205,27 @@ function getIsinForPartition(db: IngestionDatabase, partition: string): string |
   return row?.isin ?? null;
 }
 
-function insertBondEvent(
+// Exported for direct unit-test coverage of idempotency behaviour.
+export function insertBondEvent(
   db: IngestionDatabase,
-  data: { isin: string; type: string; block: number; txHash: string; payload?: unknown },
+  data: {
+    isin: string;
+    type: string;
+    block: number;
+    logIndex: number;
+    txHash: string;
+    payload?: unknown;
+  },
 ) {
   const stmt = db.prepare(
-    `INSERT INTO bond_events (isin, type, block, tx_hash, payload) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO bond_events (isin, type, block, log_index, tx_hash, payload)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   );
   stmt.run(
     data.isin ?? '',
     data.type ?? '',
     Number(data.block ?? 0),
+    Number(data.logIndex ?? 0),
     data.txHash ?? '',
     JSON.stringify(toPlainObject(data.payload ?? {})),
   );
@@ -277,6 +315,7 @@ async function processBlockRange(
           holder: dst,
           delta: value,
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           partition,
         } satisfies IssueAction;
@@ -291,6 +330,7 @@ async function processBlockRange(
           holder,
           delta: -value,
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           partition,
         } satisfies RedeemAction;
@@ -306,6 +346,7 @@ async function processBlockRange(
           to,
           value,
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
         } satisfies TransferAction;
       }
@@ -346,6 +387,7 @@ async function processBlockRange(
           isin,
           type,
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {},
         });
@@ -365,6 +407,7 @@ async function processBlockRange(
           isin,
           type: 'CLOSED',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {},
         });
@@ -376,6 +419,7 @@ async function processBlockRange(
           isin,
           type: 'FINALISED',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {},
         });
@@ -387,6 +431,7 @@ async function processBlockRange(
           isin,
           type: 'CANCELLED',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {},
         });
@@ -396,6 +441,7 @@ async function processBlockRange(
           isin: isin ?? '',
           type: 'COUPON_PAID',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {
             holder: args.holder,
@@ -409,6 +455,7 @@ async function processBlockRange(
           isin: isin ?? '',
           type: 'COUPON_COMPLETE',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {},
         });
@@ -418,6 +465,7 @@ async function processBlockRange(
           isin: isin ?? '',
           type: 'REDEEMED',
           block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
           payload: {
             holder: args.holder,
@@ -431,17 +479,21 @@ async function processBlockRange(
     for (const action of tokenActions as Array<TokenAction | null>) {
       if (!action) continue;
       if (action.kind === 'transfer') {
-        const { partition, from, to, value, block, txHash } = action;
+        const { partition, from, to, value, block, logIndex, txHash } = action;
         const mappedIsin = getIsinForPartition(db, partition) ?? null;
         if (!mappedIsin) {
           logger.debug(`ingestion missing partition mapping for transfer; skipping ${partition}`);
           continue;
         }
+        // Both rows share (tx_hash, log_index) — the UNIQUE INDEX on
+        // balance_events also includes `holder` so the debit/credit
+        // pair stays distinct under replay.
         applyBalanceDelta(db, {
           isin: mappedIsin,
           holder: from,
           delta: -value,
           block,
+          logIndex,
           txHash,
           kind: 'transfer',
         });
@@ -450,6 +502,7 @@ async function processBlockRange(
           holder: to,
           delta: value,
           block,
+          logIndex,
           txHash,
           kind: 'transfer',
         });
@@ -462,6 +515,7 @@ async function processBlockRange(
           holder: action.holder,
           delta: action.delta,
           block: action.block,
+          logIndex: action.logIndex,
           txHash: action.txHash,
           kind: action.kind,
         });
