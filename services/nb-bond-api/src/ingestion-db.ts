@@ -22,7 +22,7 @@ import { logger } from './logger';
  *        event inserts were not idempotent under re-processing).
  *  - v2: added `log_index` + UNIQUE INDEX on `(tx_hash, log_index, …)`
  *        across the three event tables so re-processing the same
- *        chain log is a no-op. See docs/ingestion-idempotency-plan.md.
+ *        chain log is a no-op.
  */
 const SCHEMA_VERSION = 2;
 
@@ -64,7 +64,6 @@ function createTables(db: IngestionDatabase) {
   // tiebreaker for `ORDER BY block, id`) and a `log_index` column.
   // The UNIQUE indexes on `(tx_hash, log_index, …)` enforce per-chain-log
   // idempotency so re-processing the same block range is a no-op.
-  // See docs/ingestion-idempotency-plan.md for the rationale.
   db.exec(`
     PRAGMA journal_mode=WAL;
     CREATE TABLE IF NOT EXISTS ingestion_state (

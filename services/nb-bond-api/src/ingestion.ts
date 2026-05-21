@@ -116,7 +116,7 @@ export function upsertAuctionEvent(
 
   // `INSERT OR IGNORE` paired with the UNIQUE INDEX on
   // (tx_hash, log_index) makes re-processing the same chain log a
-  // no-op. See docs/ingestion-idempotency-plan.md §"Dedup keys".
+  // no-op.
   const insertEvent = db.prepare(
     `INSERT OR IGNORE INTO auction_events (auction_id, isin, type, block, log_index, tx_hash, payload)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -148,7 +148,7 @@ export function applyBalanceDelta(
   // The balance projection is idempotent because we INSERT OR IGNORE
   // the event row first and only mutate `balances` if the event row
   // was actually written. Without this guard a replay would
-  // double-apply the delta. See docs/ingestion-idempotency-plan.md.
+  // double-apply the delta.
   const insertEvent = db.prepare(
     `INSERT OR IGNORE INTO balance_events (isin, holder, delta, balance_after, block, log_index, tx_hash, kind)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

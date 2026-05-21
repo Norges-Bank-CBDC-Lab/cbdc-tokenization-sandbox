@@ -365,8 +365,7 @@ whole story. The migration logs `ingestion DB schema migrated from
 v<old> to v<new>` once at startup. **Portability note:** for any
 non-sandbox deployment that backs `data/` with a real volume, the
 drop-and-rebuild migration would be unacceptable — replace it with a
-proper additive in-place migration before promoting. See
-`docs/ingestion-idempotency-plan.md`.
+proper additive in-place migration before promoting.
 
 Event-table writes are idempotent. Each of `auction_events`,
 `balance_events`, and `bond_events` carries a `log_index` column and a

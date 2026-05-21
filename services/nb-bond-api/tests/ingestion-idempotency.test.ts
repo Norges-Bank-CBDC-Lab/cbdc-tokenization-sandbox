@@ -7,8 +7,6 @@
  * `log_index` plumbing — a regression that "forgets" to thread
  * `log.index` from a handler would show as duplicates flooding the
  * dedup tests below.
- *
- * See docs/ingestion-idempotency-plan.md.
  */
 import * as fs from 'fs';
 import * as os from 'os';
