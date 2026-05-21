@@ -55,5 +55,5 @@ Components and hooks call those modules; the modules dispatch to
 `Authorization: Bearer …` per request using whichever `AuthProvider` was
 resolved at startup (`src/auth/index.js`).
 
-See `docs/nb-ui-frontend-plan.md` for the full implementation plan and the
+See `docs/plans/nb-ui-frontend-plan.md` for the full implementation plan and the
 follow-up items tracked in `docs/KNOWN_ISSUES.md`.

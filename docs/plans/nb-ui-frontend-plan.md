@@ -99,7 +99,7 @@ What was inspected and what was actually verified in this session.
 | Gateway route | `infra/gateway/templates/nb-ui.yaml` (or extend the existing template) | One HTTPRoute for `web.cbdc-sandbox.local`. |
 | Hostname | `web.cbdc-sandbox.local` | Matches the short-name convention used by `besu` / `bond-api`. |
 | Aggregate endpoint code | `services/nb-bond-api/src/index.ts` + `services/nb-bond-api/src/ingestion-db.ts` + `services/nb-bond-api/src/schemas.ts` | Routes + DB helpers + Zod + OpenAPI doc all live in nb-bond-api today. |
-| Plan doc (this file) | `docs/nb-ui-frontend-plan.md` | Single-file plan, matches the existing `docs/jupyter-removal-plan.md` convention. |
+| Plan doc (this file) | `docs/plans/nb-ui-frontend-plan.md` | Single-file plan, lives alongside the other plan docs under `docs/plans/` (e.g. `docs/plans/jupyter-removal-plan.md`). |
 
 ## Decisions Already Made
 
@@ -646,7 +646,7 @@ Documentation files only. No source / chart / config changes.
 **5d — Index:**
 
 - `docs/DOCUMENTATION_INDEX.md`:
-  - Add `docs/nb-ui-frontend-plan.md` (this file) under "Core entrypoints" or "Operations and reports".
+  - Add `docs/plans/nb-ui-frontend-plan.md` (this file) under "Core entrypoints" or "Operations and reports".
   - Add `services/nb-ui/README.md`, `services/nb-ui/AGENTS.md`, `services/nb-ui/DEVELOPMENT.md` under "Infra and services".
 
 **5e — Hygiene + license re-check (sanity):**

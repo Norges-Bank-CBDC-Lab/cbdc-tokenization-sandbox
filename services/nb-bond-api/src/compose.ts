@@ -7,7 +7,7 @@
  * content excluding the md5 field itself) so the UI can do subtree
  * diffing without re-hashing client-side.
  *
- * See docs/openapi-v2-plan.md §3, §4.
+ * See docs/plans/openapi-v2-plan.md §3, §4.
  */
 import { keccak256, toUtf8Bytes } from 'ethers';
 
