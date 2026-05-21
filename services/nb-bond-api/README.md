@@ -34,7 +34,7 @@ Two sandbox-only resource families sit alongside the bond tree:
 - **`central-bank`** — Norges Bank operator surface against the WNOK
   contract. `GET /v1/central-bank` returns the CB summary (address,
   balance, allowlist size, `available` flag); `GET/PUT/DELETE
-  /v1/central-bank/allowlist[/{address}]` manage the allowlist; and
+/v1/central-bank/allowlist[/{address}]` manage the allowlist; and
   `POST /v1/central-bank/wnok/{mint,burn,transfer}` drive WNOK
   operations from the CB account. All `central-bank` endpoints respond
   `503 Service Unavailable` when `CENTRAL_BANK_PK` is unset or WNOK

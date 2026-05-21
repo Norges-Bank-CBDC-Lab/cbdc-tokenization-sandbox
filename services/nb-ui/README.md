@@ -58,14 +58,14 @@ resolved at startup (`src/auth/index.js`).
 
 ## Pages
 
-| Route | Purpose |
-| --- | --- |
-| `#/bonds` | Bond registry — list + filter, opens "issue new bond" modal. |
-| `#/bonds/{isin}` | Single bond — coupon, maturity, holders, auction history. |
-| `#/auctions` | Flat list of every auction across bonds. |
+| Route             | Purpose                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `#/bonds`         | Bond registry — list + filter, opens "issue new bond" modal.                                                           |
+| `#/bonds/{isin}`  | Single bond — coupon, maturity, holders, auction history.                                                              |
+| `#/auctions`      | Flat list of every auction across bonds.                                                                               |
 | `#/auctions/{id}` | Single auction — bids, allocation, lifecycle actions. "Place bid" button is visible while the auction is in `BIDDING`. |
-| `#/bidders` | Sandbox bidder roster. Add / remove bidders, reveal stored keys, launch the impersonated-bid modal. |
-| `#/central-bank` | Norges Bank operator surface against WNOK — allowlist editor, mint / burn / transfer modals. |
+| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys, launch the impersonated-bid modal.                    |
+| `#/central-bank`  | Norges Bank operator surface against WNOK — allowlist editor, mint / burn / transfer modals.                           |
 
 Both `#/bidders` and `#/central-bank` carry a visible **sandbox-only**
 banner; private keys are stored in plaintext server-side and these

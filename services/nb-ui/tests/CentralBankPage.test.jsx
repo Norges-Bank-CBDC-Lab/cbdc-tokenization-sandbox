@@ -25,9 +25,7 @@ describe('CentralBankPage', () => {
 
     // The page renders a loading card until the CB summary lands; everything
     // (heading included) only mounts after the mock client resolves.
-    expect(
-      await screen.findByRole('heading', { name: 'Central Bank' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Central Bank' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/Sandbox only/i);
     await waitFor(() => {
       expect(screen.getByText('WNOK balance')).toBeInTheDocument();
