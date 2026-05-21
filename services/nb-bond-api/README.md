@@ -19,6 +19,27 @@ header — clients send `If-None-Match` to get a `304` short-circuit
 during polling. See `DEVELOPMENT.md` §7.6 for the caching protocol
 and §7.7 for the two auth modes (`none`, `entra`).
 
+Two sandbox-only resource families sit alongside the bond tree:
+
+- **`bidders`** — sandbox impersonable bidder roster. `GET /v1/bidders`
+  lists the roster, `POST /v1/bidders` creates a bidder (generating a
+  fresh secp256k1 keypair, or importing one), `DELETE /v1/bidders/{address}`
+  removes a bidder (hard-blocked when the bidder has unrevealed bids on
+  an open auction), and `POST /v1/bidders/{address}/bids` submits a
+  sealed bid on the bidder's behalf — the API constructs the plaintext,
+  signs the EIP-712 `BidIntent`, dual-wraps with the auctioneer sealing
+  key, and submits on-chain from a wallet bound to the bidder's stored
+  key. Private keys are stored in plaintext in the local SQLite DB;
+  see [`docs/plans/bidders-and-central-bank-plan.md`](../../docs/plans/bidders-and-central-bank-plan.md).
+- **`central-bank`** — Norges Bank operator surface against the WNOK
+  contract. `GET /v1/central-bank` returns the CB summary (address,
+  balance, allowlist size, `available` flag); `GET/PUT/DELETE
+/v1/central-bank/allowlist[/{address}]` manage the allowlist; and
+  `POST /v1/central-bank/wnok/{mint,burn,transfer}` drive WNOK
+  operations from the CB account. All `central-bank` endpoints respond
+  `503 Service Unavailable` when `CENTRAL_BANK_PK` is unset or WNOK
+  isn't registered in `GlobalRegistry`.
+
 ## Sandbox Helm Config
 
 Before deploying the service through `./nb-bond-api.sh start` or
@@ -53,9 +74,16 @@ host source mount is required and the chart no longer runs `npm ci` /
 - `RPC_URL` – JSON-RPC endpoint
 - `GLOBAL_REGISTRY_ADDRESS` – deployed GlobalRegistry used to resolve BondManager
 - `BOND_MANAGER_CONTRACT_NAME` – registry key for BondManager (default: "Bond Manager")
+- `WNOK_CONTRACT_NAME` – registry key for the WNOK contract (default: "Wholesale NOK")
+  Used by the Central Bank endpoints; matches `WNOK_CONTRACT_NAME` in `contracts/.env`.
 - `BOND_ADMIN_PK` – hex key with `BOND_ADMIN_ROLE`
 - `AUCTION_OWNER_SEAL_PK` – optional; generated on boot if omitted
   The local sandbox generator sets this to a stable fixture value in the Helm secret.
+- `CENTRAL_BANK_PK` – optional; Central Bank operator key that must hold
+  `MINTER_ROLE`, `BURNER_ROLE`, and `ALLOWLIST_ADMIN_ROLE` on WNOK. The local fixture
+  maps this to `PK_NORGES_BANK`. When unset, every `/v1/central-bank/*` endpoint
+  responds `503 Service Unavailable`. Sandbox-only — never deploy this key path
+  against real funds.
 - `LOG_LEVEL` – defaults to `info`
 - `EXPRESS_PORT` – defaults to `8080`
 - `CORS_ALLOWED_ORIGINS` – comma-separated list of origins the CORS middleware accepts.

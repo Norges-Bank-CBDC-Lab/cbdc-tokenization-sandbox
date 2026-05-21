@@ -13,17 +13,22 @@
 import { AppConfig } from '../config.js';
 import { HttpClient } from './httpClient.js';
 import { MockClient } from './mockClient.js';
+import { getTestMode } from '../utils/debugSettings.js';
 
 const isMockMode = () => AppConfig.USE_MOCK;
 
+function testModeQuery() {
+  return getTestMode() ? { testMode: 'true' } : {};
+}
+
 async function listBonds() {
   if (isMockMode()) return MockClient.listBonds();
-  return HttpClient.get('/v1/bonds');
+  return HttpClient.get('/v1/bonds', { query: testModeQuery() });
 }
 
 async function getBond(isin) {
   if (isMockMode()) return MockClient.getBond(isin);
-  return HttpClient.get(`/v1/bonds/${encodeURIComponent(isin)}`);
+  return HttpClient.get(`/v1/bonds/${encodeURIComponent(isin)}`, { query: testModeQuery() });
 }
 
 async function listBondHistory(isin, { before, limit } = {}) {

@@ -10,6 +10,8 @@ import { BondsPage } from './pages/BondsPage.jsx';
 import { BondDetailPage } from './pages/BondDetailPage.jsx';
 import { AuctionsPage } from './pages/AuctionsPage.jsx';
 import { AuctionDetailPage } from './pages/AuctionDetailPage.jsx';
+import { BiddersPage } from './pages/BiddersPage.jsx';
+import { CentralBankPage } from './pages/CentralBankPage.jsx';
 
 export function App() {
   const { route, navigate } = useRoute();
@@ -31,6 +33,8 @@ export function App() {
     page = (
       <AuctionDetailPage key={route.auctionId} auctionId={route.auctionId} navigate={navigate} />
     );
+  else if (route.name === 'bidders') page = <BiddersPage navigate={navigate} />;
+  else if (route.name === 'central-bank') page = <CentralBankPage navigate={navigate} />;
   else page = <BondsPage navigate={navigate} />;
 
   return (

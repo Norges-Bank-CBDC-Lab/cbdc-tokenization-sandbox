@@ -41,6 +41,8 @@ import {
   getBondAuctionAddress,
   getBondManager,
   getBondToken,
+  getWnok,
+  getWnokAddress,
   sendWithManagedNonce,
 } from './chain';
 import { getBalancesByIsin, openDatabase } from './ingestion-db';
@@ -50,17 +52,51 @@ import { parseBigInt } from './parsing';
 import {
   type CloseAuctionBody,
   type CreateAuctionBody,
+  type CreateBidderBody,
   type FinaliseBody,
   type HoldersBody,
+  type SubmitBidBody,
+  type WnokMintBurnBody,
+  type WnokTransferBody,
   auctionIdParamSchema,
+  bidderAddressParamSchema,
   closeAuctionBodySchema,
   createAuctionBodySchema,
+  createBidderBodySchema,
   finaliseBodySchema,
   holdersBodySchema,
   isinParamSchema,
   openApiDocument,
+  submitBidBodySchema,
+  wnokMintBurnBodySchema,
+  wnokTransferBodySchema,
 } from './schemas';
 import { validateRequest } from './validation';
+import {
+  BidderConflictError,
+  BidderValidationError,
+  createBidder,
+  deleteBidder,
+  getBidderByAddress,
+  listBidders,
+  seedFixtureBiddersIfEmpty,
+} from './bidders';
+import { BidderBidError, submitImpersonatedBid } from './bidder-bid';
+import {
+  CentralBankNotConfiguredError,
+  WnokUnavailableError,
+  addToAllowlist,
+  burnWnok,
+  getCbAddress,
+  getCbWnokBalance,
+  isCentralBankReady,
+  listAllowlist,
+  mintWnok,
+  removeFromAllowlist,
+  transferWnokFromCb,
+} from './central-bank';
+import { withMd5 } from './http';
+import { provider } from './chain';
 
 const sealingKeys: SealingKeypair = initSealingKeypair(envVariables.AUCTION_OWNER_SEAL_PK);
 
@@ -96,6 +132,19 @@ app.use(
 
 const historyDb = openDatabase({ dbPath: envVariables.DB_PATH, readonly: true });
 
+// Bidders use their own writable handle. The `bidders` table is a
+// system-of-record (not a chain projection) so seeding + mutation
+// happen here, not via the ingestion loop. SQLite WAL mode serialises
+// writes across this connection, the ingestion loop, and the read-only
+// `historyDb`.
+const biddersDb = openDatabase({ dbPath: envVariables.DB_PATH, readonly: false });
+try {
+  const seed = seedFixtureBiddersIfEmpty(biddersDb);
+  logger.debug(`bidders seed: ${JSON.stringify(seed)}`);
+} catch (err) {
+  logger.warn(`bidders seed failed: ${(err as Error).message}`);
+}
+
 // #region Unauthenticated routes (mounted before authMiddleware) ─────
 
 // OpenAPI doc is always public — it's the contract.
@@ -112,12 +161,14 @@ app.get('/v1/health', async (req, res, next) => {
     const bondManager = await getBondManager();
     const bondAuctionAddress = await getBondAuctionAddress();
     const bondTokenAddress = await bondManager.BOND_TOKEN();
+    const wnokAddr = await getWnokAddress().catch(() => null);
     okResponse(req, res, {
       status: 'ok' as const,
       contracts: {
         bondManager: bondManager.target.toString(),
         bondAuction: bondAuctionAddress,
         bondToken: bondTokenAddress,
+        wnok: wnokAddr,
       },
       sealingPubKey: sealingKeys.publicKey,
     });
@@ -138,9 +189,31 @@ app.use(authMiddleware);
 
 // #region Bonds ──────────────────────────────────────────────────────
 
+/**
+ * Sandbox-only umbrella "test mode" flag. The operator UI flips this
+ * from the top-bar toggle and propagates it on every bond / auction
+ * read as well as on close / finalise. Today it gates:
+ *
+ *  - composeBond / composeAuction unseal sealed bids on still-open
+ *    auctions (`revealOpenBids` internally).
+ *  - PATCH /v1/auctions/{id} (close) skips the end-time pre-check so
+ *    the operator can attempt close before the bidding window expires.
+ *    The on-chain contract still enforces `block.timestamp >
+ *    metadata.end` and will revert with `InBidPhase()` if it's early.
+ *
+ * Future test affordances should plumb through this same parameter so
+ * a single toggle controls them all.
+ */
+function parseTestMode(req: express.Request): boolean {
+  const raw = req.query.testMode;
+  return raw === 'true' || raw === '1';
+}
+
 app.get('/v1/bonds', async (req, res, next) => {
   try {
-    const bonds = await composeAllBonds(historyDb);
+    const bonds = await composeAllBonds(historyDb, {
+      revealOpenBids: parseTestMode(req),
+    });
     okResponse(req, res, bonds);
   } catch (err) {
     next(err);
@@ -150,7 +223,9 @@ app.get('/v1/bonds', async (req, res, next) => {
 app.get('/v1/bonds/:isin', validateRequest(isinParamSchema, 'params'), async (req, res, next) => {
   try {
     const { isin } = req.params as { isin: string };
-    const bond = await composeBond(historyDb, isin);
+    const bond = await composeBond(historyDb, isin, {
+      revealOpenBids: parseTestMode(req),
+    });
     if (!bond) throw notFound(`bond ${isin} not found`);
     okResponse(req, res, bond);
   } catch (err) {
@@ -327,7 +402,9 @@ app.post(
 
 app.get('/v1/auctions', async (req, res, next) => {
   try {
-    const auctions = await composeAllAuctions(historyDb);
+    const auctions = await composeAllAuctions(historyDb, {
+      revealOpenBids: parseTestMode(req),
+    });
     okResponse(req, res, auctions);
   } catch (err) {
     next(err);
@@ -340,7 +417,9 @@ app.get(
   async (req, res, next) => {
     try {
       const { auctionId } = req.params as { auctionId: string };
-      const auction = await composeAuction(historyDb, auctionId);
+      const auction = await composeAuction(historyDb, auctionId, {
+        revealOpenBids: parseTestMode(req),
+      });
       if (!auction) throw notFound(`auction ${auctionId} not found`);
       okResponse(req, res, auction);
     } catch (err) {
@@ -370,6 +449,25 @@ app.patch(
       if (currentStatus === 2) throw conflict('auction already closed');
       if (currentStatus === 3) throw conflict('auction already finalised');
       if (currentStatus === 4) throw conflict('auction cancelled');
+
+      // Pre-check the bidding window so we don't surface a raw revert.
+      // BondAuction.closeAuction reverts with `InBidPhase()` (selector
+      // 0xeec5b85e) when `block.timestamp <= metadata.end`. Skipped
+      // when `?testMode=true` so the operator can attempt close before
+      // the end timestamp — the on-chain contract still enforces the
+      // window and the operator sees the revert directly.
+      const testMode = parseTestMode(req);
+      const endSeconds = BigInt(metadata.end?.toString?.() ?? '0');
+      const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+      if (!testMode && endSeconds > nowSeconds) {
+        const secondsLeft = endSeconds - nowSeconds;
+        throw conflict(
+          `auction is still in BIDDING phase; the bidding window ends in ${secondsLeft.toString()}s` +
+            ` (at unix ${endSeconds.toString()}). Close is only permitted after the end timestamp.` +
+            ` Enable Test mode in the operator UI to attempt anyway — the on-chain contract will` +
+            ` still revert with InBidPhase() until the window expires.`,
+        );
+      }
 
       await sendWithManagedNonce(async (nonce) => {
         const bondManager = await getBondManager();
@@ -502,6 +600,375 @@ app.put(
       const refreshed = await composeAuction(historyDb, auctionId);
       if (!refreshed) throw notFound(`auction ${auctionId} not found after finalisation`);
       okResponse(req, res, refreshed);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// #endregion
+
+// #region Bidders ────────────────────────────────────────────────────
+
+async function composeBidderDto(record: {
+  address: string;
+  name: string;
+  publicKey: string;
+  privateKey: string;
+  createdAt: number;
+}) {
+  const [ethBalance, wnok] = await Promise.all([
+    provider.getBalance(record.address).catch(() => 0n),
+    getWnok().catch(() => null),
+  ]);
+  const wnokBalanceRaw = wnok
+    ? await (wnok.balanceOf(record.address) as Promise<bigint>).catch(() => 0n)
+    : 0n;
+  return withMd5({
+    address: record.address,
+    name: record.name,
+    publicKey: record.publicKey,
+    privateKey: record.privateKey,
+    ethBalance: ethBalance.toString(),
+    wnokBalance: wnokBalanceRaw.toString(),
+    createdAt: record.createdAt,
+  });
+}
+
+app.get('/v1/bidders', async (req, res, next) => {
+  try {
+    const bidders = listBidders(biddersDb);
+    const dtos = await Promise.all(bidders.map(composeBidderDto));
+    okResponse(req, res, dtos);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/v1/bidders', validateRequest(createBidderBodySchema), async (req, res, next) => {
+  try {
+    const body = req.body as CreateBidderBody;
+    let record;
+    try {
+      record = createBidder(biddersDb, { name: body.name, privateKey: body.privateKey });
+    } catch (err) {
+      if (err instanceof BidderValidationError) {
+        throw badRequest(err.message);
+      }
+      if (err instanceof BidderConflictError) {
+        throw conflict(err.message);
+      }
+      throw err;
+    }
+    const dto = await composeBidderDto(record);
+    okResponse(req, res, dto);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete(
+  '/v1/bidders/:address',
+  validateRequest(bidderAddressParamSchema, 'params'),
+  async (req, res, next) => {
+    try {
+      const { address } = req.params as { address: string };
+      const existing = getBidderByAddress(biddersDb, address);
+      if (!existing) throw notFound(`bidder ${address} not found`);
+
+      const conflicts = await findOpenAuctionsWithBidsByBidder(existing.address);
+      if (conflicts.length > 0) {
+        throw new HttpError(409, 'Conflict', {
+          detail: 'bidder has unrevealed bids on open auctions',
+          errors: conflicts.map((auctionId) => ({
+            field: 'address',
+            message: `unrevealed bid on auction ${auctionId}`,
+          })),
+        });
+      }
+
+      const removed = deleteBidder(biddersDb, existing.address);
+      if (!removed) throw notFound(`bidder ${address} not found`);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+app.post(
+  '/v1/bidders/:address/bids',
+  validateRequest(bidderAddressParamSchema, 'params'),
+  validateRequest(submitBidBodySchema),
+  async (req, res, next) => {
+    try {
+      const { address } = req.params as { address: string };
+      const body = req.body as SubmitBidBody;
+
+      const bidder = getBidderByAddress(biddersDb, address);
+      if (!bidder) throw notFound(`bidder ${address} not found`);
+
+      let result;
+      try {
+        result = await submitImpersonatedBid({
+          bidder,
+          auctionId: body.auctionId,
+          units: body.units,
+          rate: body.rate,
+        });
+      } catch (err) {
+        if (err instanceof BidderBidError) {
+          if (err.code === 'AUCTION_NOT_FOUND') throw notFound(err.message);
+          if (err.code === 'AUCTION_NOT_BIDDING' || err.code === 'BIDDING_WINDOW_CLOSED') {
+            throw conflict(err.message);
+          }
+          // TX_FAILED / EVENT_NOT_FOUND → 500-equivalent (let the error middleware handle)
+        }
+        throw err;
+      }
+
+      const dto = withMd5({
+        bidder: result.bidder,
+        state: 'sealed' as const,
+        ciphertext: result.ciphertext,
+        plaintextHash: result.plaintextHash,
+      });
+      okResponse(req, res, dto);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Return the list of auction ids in `BIDDING` phase that currently
+ * carry at least one sealed bid from `bidderAddress`. Used to block
+ * delete-bidder while in-flight commitments exist.
+ */
+async function findOpenAuctionsWithBidsByBidder(bidderAddress: string): Promise<string[]> {
+  try {
+    const bondAuction = await getBondAuction();
+    const all = await composeAllAuctions(historyDb);
+    const conflicts: string[] = [];
+    for (const a of all) {
+      if (a.status !== 'open') continue;
+      try {
+        // BondAuction.getSealedBids takes the bytes32 auction id, not the ISIN.
+        const sealed = (await bondAuction.getSealedBids(a.id)) as Array<{ bidder: string }>;
+        if (sealed.some((b) => b.bidder.toLowerCase() === bidderAddress.toLowerCase())) {
+          conflicts.push(a.id);
+        }
+      } catch (err) {
+        logger.debug(
+          `findOpenAuctionsWithBidsByBidder: getSealedBids failed for ${a.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+    return conflicts;
+  } catch (err) {
+    logger.warn(
+      `findOpenAuctionsWithBidsByBidder failed: ${(err as Error).message}; allowing delete`,
+    );
+    return [];
+  }
+}
+
+// #endregion
+
+// #region Central Bank ───────────────────────────────────────────────
+
+function mapCentralBankError(err: unknown): never {
+  if (err instanceof CentralBankNotConfiguredError) {
+    throw new HttpError(503, 'Service Unavailable', { detail: err.message });
+  }
+  if (err instanceof WnokUnavailableError) {
+    throw new HttpError(503, 'Service Unavailable', { detail: err.message });
+  }
+  throw err;
+}
+
+function toAllowlistEntry(address: string) {
+  return withMd5({ address });
+}
+
+app.get('/v1/central-bank', async (req, res, next) => {
+  try {
+    const ready = await isCentralBankReady();
+    if (!ready) {
+      okResponse(
+        req,
+        res,
+        withMd5({
+          address: envVariables.CENTRAL_BANK_PK
+            ? getCbAddress()
+            : '0x0000000000000000000000000000000000000000',
+          available: false,
+          wnok: null,
+        }),
+      );
+      return;
+    }
+    const wnokAddr = await getWnokAddress();
+    if (!wnokAddr) {
+      okResponse(
+        req,
+        res,
+        withMd5({
+          address: getCbAddress(),
+          available: false,
+          wnok: null,
+        }),
+      );
+      return;
+    }
+    const [balance, allowlist] = await Promise.all([
+      getCbWnokBalance().catch(() => 0n),
+      listAllowlist().catch(() => [] as string[]),
+    ]);
+    okResponse(
+      req,
+      res,
+      withMd5({
+        address: getCbAddress(),
+        available: true,
+        wnok: {
+          contractAddress: wnokAddr,
+          balance: balance.toString(),
+          allowlistSize: allowlist.length,
+        },
+      }),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/v1/central-bank/allowlist', async (req, res, next) => {
+  try {
+    const addresses = await listAllowlist();
+    okResponse(req, res, addresses.map(toAllowlistEntry));
+  } catch (err) {
+    try {
+      mapCentralBankError(err);
+    } catch (mapped) {
+      next(mapped);
+    }
+  }
+});
+
+app.put('/v1/central-bank/allowlist/:address', async (req, res, next) => {
+  try {
+    const { address } = req.params as { address: string };
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      throw badRequest('address must be a valid EVM address');
+    }
+    let ref;
+    try {
+      ref = await addToAllowlist(address);
+    } catch (err) {
+      mapCentralBankError(err);
+      return;
+    }
+    okResponse(req, res, ref);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete('/v1/central-bank/allowlist/:address', async (req, res, next) => {
+  try {
+    const { address } = req.params as { address: string };
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      throw badRequest('address must be a valid EVM address');
+    }
+    let ref;
+    try {
+      ref = await removeFromAllowlist(address);
+    } catch (err) {
+      mapCentralBankError(err);
+      return;
+    }
+    okResponse(req, res, ref);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post(
+  '/v1/central-bank/wnok/mint',
+  validateRequest(wnokMintBurnBodySchema),
+  async (req, res, next) => {
+    try {
+      const body = req.body as WnokMintBurnBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      let ref;
+      try {
+        ref = await mintWnok(body.address, amount);
+      } catch (err) {
+        mapCentralBankError(err);
+        return;
+      }
+      okResponse(req, res, ref);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+app.post(
+  '/v1/central-bank/wnok/burn',
+  validateRequest(wnokMintBurnBodySchema),
+  async (req, res, next) => {
+    try {
+      const body = req.body as WnokMintBurnBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      let ref;
+      try {
+        ref = await burnWnok(body.address, amount);
+      } catch (err) {
+        mapCentralBankError(err);
+        return;
+      }
+      okResponse(req, res, ref);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+app.post(
+  '/v1/central-bank/wnok/transfer',
+  validateRequest(wnokTransferBodySchema),
+  async (req, res, next) => {
+    try {
+      const body = req.body as WnokTransferBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      let ref;
+      try {
+        ref = await transferWnokFromCb(body.to, amount);
+      } catch (err) {
+        mapCentralBankError(err);
+        return;
+      }
+      okResponse(req, res, ref);
     } catch (err) {
       next(err);
     }

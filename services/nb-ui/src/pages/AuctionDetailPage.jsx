@@ -5,7 +5,9 @@
  * allocation. Mutations (close/cancel/finalise) return the updated
  * Auction; we splice it into local state via reload.
  */
+import { useState } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
+import { BiddersApi } from '../api/biddersApi.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
@@ -18,9 +20,12 @@ import {
   useToast,
 } from '../components/ui.jsx';
 import { AuctionLifecyclePanel } from './AuctionLifecyclePanel.jsx';
+import { PlaceBidModal } from './PlaceBidModal.jsx';
 
 export function AuctionDetailPage({ auctionId, navigate }) {
   const auctionQ = useApi(() => AuctionsApi.getAuction(auctionId), [auctionId]);
+  const biddersQ = useApi(() => BiddersApi.listBidders(), []);
+  const [showPlaceBid, setShowPlaceBid] = useState(false);
   const toast = useToast();
 
   const closeMut = useMutation(() => AuctionsApi.closeAuction(auctionId));
@@ -132,6 +137,11 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           </div>
         </div>
         <div className="actions">
+          {auction.status === 'open' && (
+            <Button variant="primary" onClick={() => setShowPlaceBid(true)}>
+              Place bid
+            </Button>
+          )}
           <Button variant="ghost" onClick={auctionQ.reload}>
             Refresh
           </Button>
@@ -222,6 +232,19 @@ export function AuctionDetailPage({ auctionId, navigate }) {
         <BidsCard bids={auction.bids} />
         <AllocationCard allocation={auction.allocation} status={auction.status} />
       </div>
+
+      {showPlaceBid && (
+        <PlaceBidModal
+          bidders={biddersQ.data ?? []}
+          defaultAuctionId={auction.id}
+          onClose={() => setShowPlaceBid(false)}
+          onSubmitted={() => {
+            setShowPlaceBid(false);
+            toast.push({ kind: 'ok', title: 'Sealed bid submitted' });
+            auctionQ.reload();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -42,6 +42,15 @@ export function selectAllAuctions(bonds) {
   return bonds.flatMap((b) => b.auctions ?? []);
 }
 
+/**
+ * Auctions in the on-chain `BIDDING` phase — the only auctions a
+ * bidder is allowed to submit against. Returns a flat array with the
+ * auction's parent ISIN attached for convenient labelling.
+ */
+export function selectOpenAuctions(bonds) {
+  return selectAllAuctions(bonds).filter((a) => a.status === 'open');
+}
+
 /** Holders for a bond. Returns [] if bond missing. */
 export function selectHolders(bonds, isin) {
   return selectBond(bonds, isin)?.holders ?? [];

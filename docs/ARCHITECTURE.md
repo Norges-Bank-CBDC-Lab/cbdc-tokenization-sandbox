@@ -209,8 +209,13 @@ tooling.
 ### NB UI (`services/nb-ui`)
 
 The NB UI is a React + Vite browser-facing operator frontend, served by an
-nginx container at `http://web.cbdc-sandbox.local/`. It is a thin client over
-the NB Bond API:
+nginx container at `http://web.cbdc-sandbox.local/`. Pages: bond registry
+(`#/bonds`), auction list and detail (`#/auctions`), the sandbox bidder
+roster (`#/bidders`), and the Norges Bank operator surface against WNOK
+(`#/central-bank`). The two latter pages are **sandbox-only** —
+private keys for impersonable bidders and the CB operator are stored
+in plaintext server-side, and a visible banner says so on every render.
+The UI is a thin client over the NB Bond API:
 
 - the only network seam is `services/nb-ui/src/api/`; the rest of the UI does
   not call `fetch` directly

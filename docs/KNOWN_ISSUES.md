@@ -50,6 +50,63 @@
   subset (with validation that the subset matches the previously-published
   `allocationHash` to prevent inconsistent on-chain state).
 
+## Auction close timing is chain-enforced — no operator discretion
+- `BondAuction.closeAuction` reverts with `InBidPhase()` (selector
+  `0xeec5b85e`) when `block.timestamp <= metadata.end`. Once an auction
+  is created, no one — not even the issuer admin — can close it before
+  the scheduled end time, even with a legitimate operational reason
+  (data error, network event, regulatory pause, etc.).
+- The Test-mode toggle in the operator UI (`services/nb-ui/`) lets the
+  operator bypass the API-side end-time pre-check, but the chain
+  itself still rejects the close transaction. This is acceptable in
+  the sandbox but limits the testbed when bidders / auctioneer
+  workflows need to be exercised end-to-end without waiting on
+  wall-clock time.
+- Planned follow-up — asymmetric timing model:
+  - Keep the chain check on `submitBid` (`block.timestamp <=
+    metadata.end`) so bidders retain a hard-enforced submit deadline.
+  - Drop the timing check on `closeAuction`. The operator can close
+    any time after BIDDING begins.
+  - Require an on-chain `reason` argument when closing before
+    `metadata.end` and emit `AuctionClosedEarly(auctionId,
+    scheduledEnd, actualClose, reason)` for audit.
+  - UI: confirmation modal asks for a reason when closing early;
+    surfaces an informational warning when closing past schedule but
+    proceeds without one.
+- Touches `BondAuction.sol`, `IBondAuction.sol`, `BondManager`,
+  `nb-bond-api` ingestion + schemas, `nb-ui` `AuctionLifecyclePanel`,
+  and tests across all four layers. Warrants its own iteration plan
+  via the `sandbox-implementation-planner` skill before implementation.
+
+## BondAuction has no `cancelBid` — bids are final once sealed
+- `contracts/src/norges-bank/BondAuction.sol` does not expose a
+  `cancelBid` / `withdrawBid` function. Once `submitBid()` succeeds in
+  the `BIDDING` phase, the bid stays on-chain until the auction
+  closes — neither the bidder nor the operator can withdraw it.
+- The Bidders page (`services/nb-ui/#/bidders`) reflects this: there
+  is no "remove bid" affordance, and the API hard-blocks bidder
+  deletion while the bidder has unrevealed bids on an open auction
+  (409 with the offending auction id in `errors[]`).
+- Planned follow-up: if real-world auction semantics require revision
+  before close, add `cancelBid(bytes32 auctionId, uint256 bidIndex)`
+  guarded by `msg.sender == bid.bidder` and the `BIDDING` phase, with
+  a `BidCancelled` event picked up by ingestion. Tracked in
+  [`docs/plans/bidders-and-central-bank-plan.md`](plans/bidders-and-central-bank-plan.md).
+
+## Central Bank operator is not on its own WNOK allowlist by default
+- The local WNOK deploy (`contracts/script/norges-bank/03_Wnok.s.sol`
+  + `11_BondSetup.s.sol`) allowlists Nordea, DNB, and the relevant
+  protocol contracts, but does **not** add the Norges Bank operator
+  account itself. As a result, `POST /v1/central-bank/wnok/transfer`
+  from CB reverts on-chain with `originator not on allowlist` until
+  the operator explicitly adds the CB to its own allowlist.
+- The Central Bank page (`services/nb-ui/#/central-bank`) detects this
+  and surfaces a hint on both the action card and the transfer modal.
+- Planned follow-up: decide whether the deploy script should self-add
+  the CB to the allowlist by default. For now the explicit step is
+  retained because it mirrors the "CB normally only mints, doesn't
+  hold" pattern.
+
 ## sandbox.sh build-images is Blockscout-only today
 - `./sandbox.sh build-images` only wraps
   `services/blockscout/build-images.sh`, which clones upstream Blockscout

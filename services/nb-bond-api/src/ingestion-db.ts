@@ -23,6 +23,14 @@ import { logger } from './logger';
  *  - v2: added `log_index` + UNIQUE INDEX on `(tx_hash, log_index, …)`
  *        across the three event tables so re-processing the same
  *        chain log is a no-op.
+ *
+ * Note on the `bidders` table: unlike every other table in this file,
+ * `bidders` is a *system of record*, not a chain projection. It is
+ * created additively via `CREATE TABLE IF NOT EXISTS` and must NEVER
+ * be added to the drop list in `migrateToCurrentVersion` — that
+ * function only drops projection tables that can be rebuilt from
+ * chain. Bidders are sandbox-impersonation keypairs and cannot be
+ * recovered from chain state.
  */
 const SCHEMA_VERSION = 2;
 
@@ -142,6 +150,17 @@ function createTables(db: IngestionDatabase) {
     );
     CREATE INDEX IF NOT EXISTS idx_bond_events_isin_block ON bond_events(isin, block, id);
     CREATE UNIQUE INDEX IF NOT EXISTS uq_bond_events_dedup ON bond_events(tx_hash, log_index);
+
+    -- System-of-record table: sandbox bidder roster used by the
+    -- impersonated-bid flow. NEVER add this to the drop list in
+    -- migrateToCurrentVersion — see the SCHEMA_VERSION doc comment.
+    CREATE TABLE IF NOT EXISTS bidders (
+      address TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      public_key TEXT NOT NULL,
+      private_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -318,6 +337,67 @@ export interface BondRow {
   bond: string | null;
   created_block: number | null;
 }
+
+// #region Bidders (system-of-record) ────────────────────────────────
+
+export interface BidderRow {
+  address: string;
+  name: string;
+  public_key: string;
+  private_key: string;
+  created_at: number;
+}
+
+export function listBidderRows(db: IngestionDatabase): BidderRow[] {
+  return db
+    .prepare(
+      `SELECT address, name, public_key, private_key, created_at
+       FROM bidders
+       ORDER BY created_at, address`,
+    )
+    .all() as BidderRow[];
+}
+
+export function getBidderRowByAddress(db: IngestionDatabase, address: string): BidderRow | null {
+  const row = db
+    .prepare(
+      `SELECT address, name, public_key, private_key, created_at
+       FROM bidders
+       WHERE LOWER(address) = LOWER(?)`,
+    )
+    .get(address);
+  return (row as BidderRow | undefined) ?? null;
+}
+
+export function getBidderRowByName(db: IngestionDatabase, name: string): BidderRow | null {
+  const row = db
+    .prepare(
+      `SELECT address, name, public_key, private_key, created_at
+       FROM bidders
+       WHERE name = ?`,
+    )
+    .get(name);
+  return (row as BidderRow | undefined) ?? null;
+}
+
+export function insertBidderRow(db: IngestionDatabase, row: BidderRow): void {
+  db.prepare(
+    `INSERT INTO bidders(address, name, public_key, private_key, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).run(row.address, row.name, row.public_key, row.private_key, row.created_at);
+}
+
+export function deleteBidderRow(db: IngestionDatabase, address: string): number {
+  const result = db.prepare(`DELETE FROM bidders WHERE LOWER(address) = LOWER(?)`).run(address);
+  return result.changes ?? 0;
+}
+
+export function countBidderRows(db: IngestionDatabase): number {
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM bidders`).get() as { n: number };
+  return row.n;
+}
+
+// #endregion
 
 export function listAllBonds(db: IngestionDatabase): BondRow[] {
   // One row per (isin, bond) tuple. Multiple partitions can share an ISIN

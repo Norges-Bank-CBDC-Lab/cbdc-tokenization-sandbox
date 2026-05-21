@@ -49,11 +49,29 @@ tenant / client IDs.**
 
 ## Architecture
 
-The single network seam is `src/api/bondsApi.js` + `src/api/auctionsApi.js`.
-Components and hooks call those modules; the modules dispatch to
-`MockClient` or `HttpClient` based on `USE_MOCK`. `HttpClient` injects
+The single network seam is `src/api/bondsApi.js`, `src/api/auctionsApi.js`,
+`src/api/biddersApi.js`, and `src/api/centralBankApi.js`. Components and
+hooks call those modules; the modules dispatch to `MockClient` or
+`HttpClient` based on `USE_MOCK`. `HttpClient` injects
 `Authorization: Bearer …` per request using whichever `AuthProvider` was
 resolved at startup (`src/auth/index.js`).
 
-See `docs/plans/nb-ui-frontend-plan.md` for the full implementation plan and the
-follow-up items tracked in `docs/KNOWN_ISSUES.md`.
+## Pages
+
+| Route             | Purpose                                                                                                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `#/bonds`         | Bond registry — list + filter, opens "issue new bond" modal.                                                           |
+| `#/bonds/{isin}`  | Single bond — coupon, maturity, holders, auction history.                                                              |
+| `#/auctions`      | Flat list of every auction across bonds.                                                                               |
+| `#/auctions/{id}` | Single auction — bids, allocation, lifecycle actions. "Place bid" button is visible while the auction is in `BIDDING`. |
+| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys, launch the impersonated-bid modal.                    |
+| `#/central-bank`  | Norges Bank operator surface against WNOK — allowlist editor, mint / burn / transfer modals.                           |
+
+Both `#/bidders` and `#/central-bank` carry a visible **sandbox-only**
+banner; private keys are stored in plaintext server-side and these
+pages must never be enabled outside the local sandbox.
+
+See `docs/plans/nb-ui-frontend-plan.md` for the original frontend plan
+and `docs/plans/bidders-and-central-bank-plan.md` for the bidders +
+Central Bank iteration. Follow-ups are tracked in
+`docs/KNOWN_ISSUES.md`.
