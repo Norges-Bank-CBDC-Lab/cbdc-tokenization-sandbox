@@ -1,7 +1,18 @@
 # nb-bond-api OpenAPI v2 — implementation plan
 
-Status: draft, iterating with operator. Not yet executed.
-Created: 2026-05-20.
+**Status:** ✅ Implemented and shipped. No outstanding work items.
+Retained as design rationale — production code in
+`services/nb-bond-api/src/` and `services/nb-ui/src/api/` deep-links
+into specific sections of this document (e.g. "See §3.7" for auth
+modes, "§3.5–§3.6" for the caching protocol).
+
+**Shipped via:** PR #105 (initial implementation, 2026-05-20),
+followed by PR #107 (CreateAuctionModal RATE-default fix),
+PR #108 (ingestion-DB idempotency precondition),
+PR #109 (disabled RATE radio UX),
+PR #111 (move into `docs/plans/`).
+
+**Created:** 2026-05-20. **Completed:** 2026-05-21.
 
 ## 1. Goals
 
@@ -527,8 +538,11 @@ paths: { ... }
 
 - **Breaking change for the UI** — accepted; UI and API ship in the
   same branch.
-- **CLI consumers under `scripts/`** — must be audited and updated in
-  the same PR. (TODO during phase 1: grep for the old endpoints.)
+- **CLI consumers under `scripts/`** — ✅ audited during PR #105.
+  `grep -rn "/v1/auctions\|/v1/bonds" scripts/` returned no HTTP
+  callers; the bid CLIs (`scripts/bid-encryption`, `scripts/bid-submitter`)
+  talk to the chain directly via ethers / JSON-RPC, not to the
+  operator service. No `scripts/` changes required.
 - **Bulky payload size** — at sandbox scale (~10 bonds × ~5 auctions ×
   ~20 bids) ≈ 50KB worst case. Acceptable.
 - **md5 agreement** — server-computed only. Client compares strings,
@@ -567,12 +581,13 @@ paths: { ... }
    License → Apache-2.0 (fixed).
    Caching protocol → keep, per §3.8 cost/benefit.
 
-### Still open
-7. `HistoryEvent.payload: unknown` — type-narrow per event type via
-   `oneOf` discriminator? (My take: not yet — payloads vary widely
-   and the UI treats them opaquely today. Punt to a later iteration.)
-
 ### Resolved (continued)
 2. ✅ PATCH body is `{ status: "closed" }` (REST-idiomatic state assignment).
+7. ⏸ ~~`HistoryEvent.payload: unknown` — type-narrow per event type via
+   `oneOf` discriminator?~~ **Deferred (not pending).** Payloads vary
+   widely and the UI treats them opaquely; the `unknown` shape is
+   sufficient for current and foreseeable needs. Revisit only if a
+   future consumer needs typed payload access — at that point this
+   becomes a fresh ticket, not leftover work from this plan.
 9. ✅ DELETE for cancel, PATCH for close. Two separate verbs for two
    semantically different actions.
