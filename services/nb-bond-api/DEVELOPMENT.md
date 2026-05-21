@@ -353,6 +353,30 @@ visible immediately after a write (see `services/nb-ui/src/pages/BondsPage.jsx`
 `POLL_INTERVAL_MS` past the immediate one to cover the worst-case race
 between the create POST returning and the next ingestion tick.
 
+The schema is versioned via `PRAGMA user_version` (current version `2`).
+When the on-disk value is lower than the current `SCHEMA_VERSION` in
+`src/ingestion-db.ts`, `openDatabase` runs a one-shot migration that
+drops the full projection (`auction_events`, `balance_events`,
+`bond_events`, `auctions`, `partitions`, `balances`, `ingestion_state`)
+and stamps the new version. The polling loop then rebuilds every table
+from chain on its next tick. This works because the database is a
+projection of chain state, not a system of record; rebuildability is the
+whole story. The migration logs `ingestion DB schema migrated from
+v<old> to v<new>` once at startup. **Portability note:** for any
+non-sandbox deployment that backs `data/` with a real volume, the
+drop-and-rebuild migration would be unacceptable — replace it with a
+proper additive in-place migration before promoting. See
+`docs/ingestion-idempotency-plan.md`.
+
+Event-table writes are idempotent. Each of `auction_events`,
+`balance_events`, and `bond_events` carries a `log_index` column and a
+unique constraint on `(tx_hash, log_index, …)`, so re-processing the
+same chain log is a no-op. `applyBalanceDelta` only mutates `balances`
+when the corresponding event row was actually written, so a replay
+never double-counts the delta. This guarantee is the precondition for
+any future move to event-driven ingestion (WebSocket + watchdog) where
+the same log can legitimately be delivered more than once.
+
 ### 7.5 Cache behaviour
 
 Auction bid sets and computed allocations are derived per-request from
