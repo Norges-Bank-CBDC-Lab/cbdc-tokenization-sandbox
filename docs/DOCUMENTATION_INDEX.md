@@ -17,7 +17,6 @@ This file lists the documentation that is most likely to need updates when behav
 - `docs/jupyter-removal-plan.md`: Deferred decommission plan for the JupyterHub-based script runner and its replacement path.
 - `docs/nb-ui-frontend-plan.md`: Implementation plan for the `services/nb-ui/` operator frontend (React + Vite), NB Bond API aggregate endpoints + CORS, and pluggable auth (none / Entra-MSAL).
 - `docs/openapi-v2-plan.md`: NB Bond API v2 design — bulky resource tree, md5 / ETag caching protocol, RFC 7807 problem+json errors, and dual auth modes (`none` / `entra`).
-- `docs/ingestion-idempotency-plan.md`: schema-v2 plan for the nb-bond-api ingestion DB — adds `log_index` + unique constraints on the three event tables so re-processing the same chain log is a no-op. Precondition for any future move to event-driven ingestion.
 
 ## Infra and services
 - `infra/README.md`: Infra overview and command entrypoint.
