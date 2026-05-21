@@ -1,9 +1,11 @@
 /**
- * CreateAuctionModal — start a new auction.
+ * CreateAuctionModal — start a new auction on an existing bond.
  *
- * RATE / PRICE auctions issue new units; BUYBACK auctions retire them.
- * For new ISINs (i.e. issuing a new bond) the maturityDuration is required —
- * that flow lives in CreateBondModal. This modal targets existing ISINs.
+ * PRICE auctions issue new units at a uniform price; BUYBACK auctions
+ * retire them. RATE auctions are intentionally NOT offered here — the
+ * backend rejects RATE for any ISIN that already has an auction
+ * ("subsequent auctions cannot be RATE"), and RATE is the bond-issuance
+ * path which lives in CreateBondModal.
  */
 import { useState } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
@@ -12,7 +14,7 @@ import { Button, Field, Input, Modal, RadioGroup } from '../components/ui.jsx';
 
 export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose, onCreated }) {
   const [isin, setIsin] = useState(defaultIsin);
-  const [auctionType, setAuctionType] = useState('RATE');
+  const [auctionType, setAuctionType] = useState('PRICE');
   const [size, setSize] = useState('1000000');
   const [endDays, setEndDays] = useState('3');
   const [submitErr, setSubmitErr] = useState(null);
@@ -73,11 +75,9 @@ export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose
       <Field
         label="Auction type"
         hint={
-          auctionType === 'RATE'
-            ? 'Bidders bid a yield rate; lowest rates win.'
-            : auctionType === 'PRICE'
-              ? 'Bidders bid a price; highest prices win.'
-              : 'Treasury repurchases outstanding bonds from holders.'
+          auctionType === 'PRICE'
+            ? 'Bidders bid a price; highest prices win. Issues new units.'
+            : 'Treasury repurchases outstanding bonds from holders.'
         }
       >
         <RadioGroup
@@ -85,12 +85,15 @@ export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose
           value={auctionType}
           onChange={setAuctionType}
           options={[
-            { value: 'RATE', label: 'RATE' },
             { value: 'PRICE', label: 'PRICE' },
             { value: 'BUYBACK', label: 'BUYBACK' },
           ]}
         />
       </Field>
+      <div className="muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 8 }}>
+        To issue a new bond (RATE auction), use the <strong>+ New bond</strong> action on the Bonds
+        page.
+      </div>
 
       <div className="field-row">
         <Field label="Size" hint="Whole 1,000 NOK units.">

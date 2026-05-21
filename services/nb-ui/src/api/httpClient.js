@@ -16,9 +16,24 @@
 import { AppConfig } from '../config.js';
 import { auth } from '../auth/index.js';
 
+/**
+ * Format an HttpError message from an RFC 7807 problem+json body so
+ * `e.message` shown in toasts and form errors is informative ("subsequent
+ * auctions cannot be RATE") instead of generic ("HTTP 400 Bad Request").
+ * Callers that need the structured body still get it on `e.body`.
+ */
+function formatProblemMessage(body, status, statusText) {
+  const fallback = `HTTP ${status} ${statusText}`;
+  if (!body || typeof body !== 'object') return fallback;
+  if (Array.isArray(body.errors) && body.errors.length) {
+    return body.errors.map((e) => `${e.field}: ${e.message}`).join('; ');
+  }
+  return body.detail || body.title || fallback;
+}
+
 export class HttpError extends Error {
   constructor(status, statusText, body) {
-    super(`HTTP ${status} ${statusText}`);
+    super(formatProblemMessage(body, status, statusText));
     this.status = status;
     this.statusText = statusText;
     this.body = body;
