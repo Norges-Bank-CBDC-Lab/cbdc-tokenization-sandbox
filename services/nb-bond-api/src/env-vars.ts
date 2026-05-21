@@ -12,6 +12,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v && v.trim().length > 0 ? v : undefined)),
+  // Central Bank private key — must hold MINTER/BURNER/ALLOWLIST_ADMIN roles on WNOK.
+  // Sandbox-only: maps to the `PK_NORGES_BANK` fixture via the local sandbox
+  // helm values. When unset, the Central Bank endpoints respond 503.
+  CENTRAL_BANK_PK: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v : undefined)),
+  // Registry name for the WNOK contract. Matches WNOK_CONTRACT_NAME in
+  // contracts/.env. Default matches the local sandbox deploy.
+  WNOK_CONTRACT_NAME: z.string().min(1).default('Wholesale NOK'),
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),

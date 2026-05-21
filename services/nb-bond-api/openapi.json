@@ -27,6 +27,14 @@
     {
       "name": "auctions",
       "description": "Auction resources (bid/allocation subtree of a bond)"
+    },
+    {
+      "name": "bidders",
+      "description": "Sandbox bidder roster used by the impersonated-bid flow. Private keys are stored in plaintext — sandbox-only, never deploy against real funds."
+    },
+    {
+      "name": "central-bank",
+      "description": "Central Bank (Norges Bank) operator surface against the WNOK contract: mint, burn, transfer, allowlist add/remove. Sandbox-only."
     }
   ],
   "security": [
@@ -75,6 +83,18 @@
         ],
         "operationId": "listBonds",
         "summary": "List all bonds with full subtree (auctions, bids, allocations, holders)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "testMode",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+          }
+        ],
         "responses": {
           "200": {
             "description": "All bonds. Primary cache-priming call for the UI.",
@@ -130,6 +150,16 @@
             "schema": {
               "$ref": "#/components/schemas/Isin"
             }
+          },
+          {
+            "in": "query",
+            "name": "testMode",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -446,6 +476,18 @@
         ],
         "operationId": "listAuctions",
         "summary": "List all auctions across bonds (flat view of the full tree)",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "testMode",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+          }
+        ],
         "responses": {
           "200": {
             "description": "All auctions with bids and allocations",
@@ -501,6 +543,16 @@
             "schema": {
               "$ref": "#/components/schemas/AuctionId"
             }
+          },
+          {
+            "in": "query",
+            "name": "testMode",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -553,6 +605,16 @@
             "schema": {
               "$ref": "#/components/schemas/AuctionId"
             }
+          },
+          {
+            "in": "query",
+            "name": "testMode",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "requestBody": {
@@ -632,6 +694,567 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bidders": {
+      "get": {
+        "tags": [
+          "bidders"
+        ],
+        "operationId": "listBidders",
+        "summary": "List the sandbox bidder roster",
+        "responses": {
+          "200": {
+            "description": "All bidders in the roster",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Bidder"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bidders"
+        ],
+        "operationId": "createBidder",
+        "summary": "Create a bidder (generates a fresh keypair when privateKey is omitted)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBidderBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Newly created bidder",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bidder"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bidders/{address}": {
+      "delete": {
+        "tags": [
+          "bidders"
+        ],
+        "operationId": "deleteBidder",
+        "summary": "Delete a bidder. Hard-blocked while the bidder has unrevealed bids on an open auction.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content — operation succeeded; response body intentionally empty."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/bidders/{address}/bids": {
+      "post": {
+        "tags": [
+          "bidders"
+        ],
+        "operationId": "submitBidderBid",
+        "summary": "Submit a sealed bid on behalf of a roster bidder",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitBidBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sealed bid as accepted on-chain",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SealedBid"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank": {
+      "get": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "getCentralBank",
+        "summary": "Central Bank operator summary (CB address, WNOK balance, allowlist size)",
+        "responses": {
+          "200": {
+            "description": "Central Bank summary",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CentralBank"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank/allowlist": {
+      "get": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "listWnokAllowlist",
+        "summary": "List addresses on the WNOK allowlist",
+        "responses": {
+          "200": {
+            "description": "Allowlist entries",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AllowlistEntry"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank/allowlist/{address}": {
+      "put": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "addToWnokAllowlist",
+        "summary": "Add an address to the WNOK allowlist (idempotent)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the on-chain add",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "removeFromWnokAllowlist",
+        "summary": "Remove an address from the WNOK allowlist (idempotent)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the on-chain remove",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank/wnok/mint": {
+      "post": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "mintWnok",
+        "summary": "Mint WNOK to an allowlisted address",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WnokMintBurnBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the mint",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank/wnok/burn": {
+      "post": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "burnWnok",
+        "summary": "Burn WNOK from an allowlisted address",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WnokMintBurnBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the burn",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/central-bank/wnok/transfer": {
+      "post": {
+        "tags": [
+          "central-bank"
+        ],
+        "operationId": "transferWnok",
+        "summary": "Transfer WNOK from the CB account to an allowlisted recipient",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WnokTransferBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the transfer",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
                 }
               }
             }
@@ -822,6 +1445,100 @@
         ],
         "description": "PATCH body for the close transition"
       },
+      "CreateBidderBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Human-readable bidder label"
+          },
+          "privateKey": {
+            "description": "Optional import of an existing 32-byte hex key. Generated if omitted.",
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{64}$"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "description": "Request body for creating a bidder"
+      },
+      "SubmitBidBody": {
+        "type": "object",
+        "properties": {
+          "auctionId": {
+            "$ref": "#/components/schemas/AuctionId"
+          },
+          "units": {
+            "description": "Bid size in 1000-NOK units",
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "rate": {
+            "description": "Bid rate (bps). Interpretation depends on auction type — yield for RATE, price-per-100 for PRICE/BUYBACK.",
+            "$ref": "#/components/schemas/Bps"
+          }
+        },
+        "required": [
+          "auctionId",
+          "units",
+          "rate"
+        ],
+        "description": "Request body for impersonated bid submission. The server builds the plaintext, signs the EIP-712 BidIntent with the stored bidder key, dual-wraps with the auctioneer sealing key, and calls BondAuction.submitBid from the bidder’s wallet."
+      },
+      "AuctionId": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]{64}$",
+        "description": "Auction identifier (bytes32 hex)",
+        "examples": [
+          "0x1234abcd00000000000000000000000000000000000000000000000000000000"
+        ]
+      },
+      "Bps": {
+        "type": "string",
+        "pattern": "^[0-9]+$",
+        "description": "Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.",
+        "examples": [
+          "425",
+          "9875",
+          "10123"
+        ]
+      },
+      "WnokMintBurnBody": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Target address (must be on the WNOK allowlist)",
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "description": "Amount in 1-NOK units (uint256)",
+            "$ref": "#/components/schemas/BigIntString"
+          }
+        },
+        "required": [
+          "address",
+          "amount"
+        ],
+        "description": "Body for mint / burn operations"
+      },
+      "WnokTransferBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/BigIntString"
+          }
+        },
+        "required": [
+          "to",
+          "amount"
+        ],
+        "description": "Body for a transfer from the CB account"
+      },
       "FinaliseBody": {
         "type": "object",
         "properties": {
@@ -968,12 +1685,24 @@
           },
           "bondToken": {
             "$ref": "#/components/schemas/Address"
+          },
+          "wnok": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WNOK contract address; null when WNOK is not registered in GlobalRegistry"
           }
         },
         "required": [
           "bondManager",
           "bondAuction",
-          "bondToken"
+          "bondToken",
+          "wnok"
         ],
         "additionalProperties": false,
         "description": "Contract addresses the service is bound to"
@@ -1180,16 +1909,6 @@
         "additionalProperties": false,
         "description": "Coupon configuration and payment progress"
       },
-      "Bps": {
-        "type": "string",
-        "pattern": "^[0-9]+$",
-        "description": "Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.",
-        "examples": [
-          "425",
-          "9875",
-          "10123"
-        ]
-      },
       "CouponPayments": {
         "type": "object",
         "properties": {
@@ -1361,14 +2080,6 @@
         ],
         "additionalProperties": false,
         "description": "Auction resource with bids and allocation subtree"
-      },
-      "AuctionId": {
-        "type": "string",
-        "pattern": "^0x[a-fA-F0-9]{64}$",
-        "description": "Auction identifier (bytes32 hex)",
-        "examples": [
-          "0x1234abcd00000000000000000000000000000000000000000000000000000000"
-        ]
       },
       "AuctionStatus": {
         "type": "string",
@@ -1670,6 +2381,166 @@
         ],
         "additionalProperties": false,
         "description": "Auction or bond event observed on-chain"
+      },
+      "Bidder": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable bidder label, unique per sandbox"
+          },
+          "publicKey": {
+            "description": "Compressed secp256k1 public key (33-byte hex)",
+            "$ref": "#/components/schemas/HexString"
+          },
+          "privateKey": {
+            "description": "Private key, hex (0x + 64 chars). Returned in plaintext because this surface is sandbox-only.",
+            "$ref": "#/components/schemas/HexString"
+          },
+          "ethBalance": {
+            "description": "Current ETH balance in wei",
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "wnokBalance": {
+            "description": "Current WNOK balance in 1-NOK units. \"0\" until WNOK is reachable.",
+            "$ref": "#/components/schemas/BigIntString"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Creation timestamp (unix milliseconds)"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "name",
+          "publicKey",
+          "privateKey",
+          "ethBalance",
+          "wnokBalance",
+          "createdAt",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "Sandbox bidder roster entry. The same private key signs transactions, signs EIP-712 bid intents, and acts as the bidder pubkey for the dual-wrap encryption."
+      },
+      "CentralBank": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "The CB operator's EVM address",
+            "$ref": "#/components/schemas/Address"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "False when CENTRAL_BANK_PK is unset or the WNOK contract is not registered — endpoints respond 503"
+          },
+          "wnok": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "contractAddress": {
+                    "$ref": "#/components/schemas/Address"
+                  },
+                  "balance": {
+                    "description": "CB account balance in 1-NOK units",
+                    "$ref": "#/components/schemas/BigIntString"
+                  },
+                  "allowlistSize": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "contractAddress",
+                  "balance",
+                  "allowlistSize"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "WNOK binding state. Null when WNOK is unreachable."
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "available",
+          "wnok",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "Central Bank operator summary"
+      },
+      "AllowlistEntry": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "A single allowlisted address"
+      },
+      "TransactionRef": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "$ref": "#/components/schemas/HexString"
+          },
+          "block": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Block number, or null if not yet mined / unknown."
+          }
+        },
+        "required": [
+          "hash",
+          "block"
+        ],
+        "additionalProperties": false,
+        "description": "On-chain transaction reference (hash + block)"
       }
     },
     "responses": {

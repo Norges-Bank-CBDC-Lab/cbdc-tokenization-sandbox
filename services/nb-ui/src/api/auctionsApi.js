@@ -13,17 +13,24 @@
 import { AppConfig } from '../config.js';
 import { HttpClient, NotImplementedError } from './httpClient.js';
 import { MockClient } from './mockClient.js';
+import { getTestMode } from '../utils/debugSettings.js';
 
 const isMockMode = () => AppConfig.USE_MOCK;
 
+function testModeQuery() {
+  return getTestMode() ? { testMode: 'true' } : {};
+}
+
 async function listAuctions() {
   if (isMockMode()) return MockClient.listAuctions();
-  return HttpClient.get('/v1/auctions');
+  return HttpClient.get('/v1/auctions', { query: testModeQuery() });
 }
 
 async function getAuction(auctionId) {
   if (isMockMode()) return MockClient.getAuction(auctionId);
-  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}`);
+  return HttpClient.get(`/v1/auctions/${encodeURIComponent(auctionId)}`, {
+    query: testModeQuery(),
+  });
 }
 
 async function createAuction(isin, payload) {
@@ -35,9 +42,11 @@ async function createAuction(isin, payload) {
 
 async function closeAuction(auctionId) {
   if (isMockMode()) return MockClient.closeAuction(auctionId);
-  return HttpClient.patch(`/v1/auctions/${encodeURIComponent(auctionId)}`, {
-    status: 'closed',
-  });
+  return HttpClient.patch(
+    `/v1/auctions/${encodeURIComponent(auctionId)}`,
+    { status: 'closed' },
+    { query: testModeQuery() },
+  );
 }
 
 async function cancelAuction(auctionId) {
@@ -71,7 +80,9 @@ async function reopenAuction(auctionId) {
 async function finaliseAuction(auctionId, allocationHash, approve, winners) {
   const body = { allocationHash, approve };
   if (isMockMode()) return MockClient.finaliseAuction(auctionId, { ...body, winners });
-  return HttpClient.put(`/v1/auctions/${encodeURIComponent(auctionId)}/finalisation`, body);
+  return HttpClient.put(`/v1/auctions/${encodeURIComponent(auctionId)}/finalisation`, body, {
+    query: testModeQuery(),
+  });
 }
 
 export const AuctionsApi = {

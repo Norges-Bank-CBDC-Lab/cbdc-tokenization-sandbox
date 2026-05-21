@@ -1,5 +1,5 @@
 import { Contract, JsonRpcProvider, TransactionReceipt, TransactionResponse, Wallet } from 'ethers';
-import { bondAuctionAbi, bondManagerAbi, bondTokenAbi, globalRegistryAbi } from './abi';
+import { bondAuctionAbi, bondManagerAbi, bondTokenAbi, globalRegistryAbi, wnokAbi } from './abi';
 import { envVariables } from './env-vars';
 
 export const provider = new JsonRpcProvider(envVariables.RPC_URL);
@@ -139,4 +139,37 @@ export async function getBondToken(): Promise<Contract> {
   const address = await manager.BOND_TOKEN();
   bondToken = new Contract(address, bondTokenAbi, signer);
   return bondToken;
+}
+
+let wnokAddress: string | null = null;
+
+/**
+ * Resolve the WNOK contract address from GlobalRegistry. Returns `null`
+ * if the contract isn't registered (e.g. mid-deploy or a non-WNOK
+ * sandbox). Cached after first successful lookup.
+ */
+export async function getWnokAddress(): Promise<string | null> {
+  if (wnokAddress) {
+    return wnokAddress;
+  }
+  await assertProviderReady();
+  const [found, address] = await registry.tryGetContract(envVariables.WNOK_CONTRACT_NAME);
+  if (!found) {
+    return null;
+  }
+  wnokAddress = address;
+  return address;
+}
+
+/**
+ * Build a WNOK contract bound to a specific wallet. The wallet is the
+ * Central Bank signer for mutations or any read-only provider for
+ * queries. Returns `null` if WNOK isn't registered.
+ */
+export async function getWnok(
+  wallet: Wallet | JsonRpcProvider = provider,
+): Promise<Contract | null> {
+  const address = await getWnokAddress();
+  if (!address) return null;
+  return new Contract(address, wnokAbi, wallet);
 }

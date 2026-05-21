@@ -301,9 +301,25 @@ async function fetchAuctionChainState(auctionId: string): Promise<AuctionChainSt
   }
 }
 
+export interface ComposeOptions {
+  /**
+   * Reveal sealed bid contents on auctions still in `open` (BIDDING) phase.
+   *
+   * Default `false` — bids on open auctions render as sealed (ciphertext +
+   * plaintext hash only), matching the sealed-bid auction model. The
+   * operator UI flips this to `true` via a debug toggle that appends
+   * `?revealOpenBids=true` on bonds/auctions GETs when a sandbox operator
+   * wants to inspect plaintext during BIDDING (purely informational —
+   * does not change anything on chain). Closed / finalised / cancelled
+   * auctions always render unsealed regardless of this flag.
+   */
+  revealOpenBids?: boolean;
+}
+
 export async function composeAuction(
   db: IngestionDatabase,
   auctionId: string,
+  opts: ComposeOptions = {},
 ): Promise<Auction | null> {
   const chain = await fetchAuctionChainState(auctionId);
   if (!chain) return null;
@@ -312,22 +328,27 @@ export async function composeAuction(
   const row = getAuctionRowById(db, auctionId);
   const events = getAuctionEventsById(db, auctionId, 500, 0);
 
-  // Bids: prefer unsealed if available (closed/finalised); otherwise sealed.
-  const bidsOut: Bid[] = unsealedBids
-    ? unsealedBids.map((b) =>
-        composeUnsealedBid({
-          bidder: b.bidder,
-          rate: parseBigInt(b.plaintext.rate, 'rate'),
-          units: parseBigInt(b.plaintext.units, 'units'),
-        }),
-      )
-    : sealedBids.map((b) =>
-        composeSealedBid({
-          bidder: b.bidder,
-          ciphertext: b.ciphertext,
-          plaintextHash: b.plaintextHash,
-        }),
-      );
+  // Bids: only reveal plaintext after the bidding window has closed, OR
+  // when the caller explicitly requests it via `revealOpenBids` (operator
+  // debug toggle). During BIDDING the operator UI shows sealed view to
+  // match the sealed-bid auction model.
+  const allowReveal = status !== 'open' || opts.revealOpenBids === true;
+  const bidsOut: Bid[] =
+    allowReveal && unsealedBids
+      ? unsealedBids.map((b) =>
+          composeUnsealedBid({
+            bidder: b.bidder,
+            rate: parseBigInt(b.plaintext.rate, 'rate'),
+            units: parseBigInt(b.plaintext.units, 'units'),
+          }),
+        )
+      : sealedBids.map((b) =>
+          composeSealedBid({
+            bidder: b.bidder,
+            ciphertext: b.ciphertext,
+            plaintextHash: b.plaintextHash,
+          }),
+        );
 
   // Allocation: on-chain takes precedence; fall back to a fresh local
   // computation if we have unsealed bids and an offering but no on-chain
@@ -444,7 +465,11 @@ function deriveBondStatus(opts: {
   return 'unknown';
 }
 
-export async function composeBond(db: IngestionDatabase, isin: string): Promise<Bond | null> {
+export async function composeBond(
+  db: IngestionDatabase,
+  isin: string,
+  opts: ComposeOptions = {},
+): Promise<Bond | null> {
   let bondToken;
   let bondManager;
   let bondAuctionAddress: string;
@@ -539,7 +564,7 @@ export async function composeBond(db: IngestionDatabase, isin: string): Promise<
   // Auctions for this bond, in chronological order.
   const auctionRows = listAuctionRowsByIsin(db, isin);
   const auctions = (
-    await Promise.all(auctionRows.map((r) => composeAuction(db, r.auction_id)))
+    await Promise.all(auctionRows.map((r) => composeAuction(db, r.auction_id, opts)))
   ).filter((a): a is Auction => a !== null);
 
   const holders = await composeHolders(db, isin);
@@ -582,15 +607,21 @@ export async function composeBond(db: IngestionDatabase, isin: string): Promise<
 
 // #region Multi-resource composers ───────────────────────────────────
 
-export async function composeAllBonds(db: IngestionDatabase): Promise<Bond[]> {
+export async function composeAllBonds(
+  db: IngestionDatabase,
+  opts: ComposeOptions = {},
+): Promise<Bond[]> {
   const rows = listBondRows(db);
-  const bonds = await Promise.all(rows.map((r) => composeBond(db, r.isin)));
+  const bonds = await Promise.all(rows.map((r) => composeBond(db, r.isin, opts)));
   return bonds.filter((b): b is Bond => b !== null);
 }
 
-export async function composeAllAuctions(db: IngestionDatabase): Promise<Auction[]> {
+export async function composeAllAuctions(
+  db: IngestionDatabase,
+  opts: ComposeOptions = {},
+): Promise<Auction[]> {
   const rows = listAuctionRows(db);
-  const auctions = await Promise.all(rows.map((r) => composeAuction(db, r.auction_id)));
+  const auctions = await Promise.all(rows.map((r) => composeAuction(db, r.auction_id, opts)));
   return auctions.filter((a): a is Auction => a !== null);
 }
 

@@ -50,6 +50,9 @@ livenessProbe:
 env:
   RPC_URL: http://besu.besu:8545
   BOND_MANAGER_CONTRACT_NAME: "Bond Manager"
+  # Registry name for the WNOK contract, used by the Central Bank endpoints
+  # (/v1/central-bank/*). Matches WNOK_CONTRACT_NAME in contracts/.env.
+  WNOK_CONTRACT_NAME: "Wholesale NOK"
   # Auth mode. `none` (sandbox default) accepts the Authorization header but
   # does not validate it. `entra` validates the bearer token as a JWT issued
   # by Microsoft Entra ID and requires NB_BOND_API_AUTH_ENTRA_* below.
@@ -61,3 +64,8 @@ env:
 secret:
   BOND_ADMIN_PK: "<base64-encoded-local-sandbox-private-key>"
   AUCTION_OWNER_SEAL_PK: "<base64-encoded-local-seal-private-key>"
+  # Central Bank operator key — must hold MINTER/BURNER/ALLOWLIST_ADMIN roles
+  # on the WNOK contract. The local fixture maps this to PK_NORGES_BANK,
+  # which `contracts/script/norges-bank/03_Wnok.s.sol` grants at deploy.
+  # When unset, /v1/central-bank/* endpoints respond 503 (Service Unavailable).
+  CENTRAL_BANK_PK: "<base64-encoded-local-central-bank-private-key>"

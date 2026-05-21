@@ -232,6 +232,10 @@ function buildNbBondApiHelmValues(txAccounts, auctionOwnerSealPrivateKey) {
     '<base64-encoded-local-seal-private-key>',
     Buffer.from(auctionOwnerSealPrivateKey).toString('base64'),
   );
+  rendered = rendered.replace(
+    '<base64-encoded-local-central-bank-private-key>',
+    Buffer.from(txAccounts.PK_NORGES_BANK.privateKey).toString('base64'),
+  );
   return rendered;
 }
 

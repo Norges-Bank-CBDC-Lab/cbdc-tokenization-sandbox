@@ -356,6 +356,140 @@ const historyEventSchema = z
 
 // #endregion
 
+// #region Bidder ─────────────────────────────────────────────────────
+
+const bidderSchema = z
+  .object({
+    address: addressSchema,
+    name: z.string().meta({ description: 'Human-readable bidder label, unique per sandbox' }),
+    publicKey: hexStringSchema.meta({
+      description: 'Compressed secp256k1 public key (33-byte hex)',
+    }),
+    privateKey: hexStringSchema.meta({
+      description:
+        'Private key, hex (0x + 64 chars). Returned in plaintext because this surface is sandbox-only.',
+    }),
+    ethBalance: bigIntStringSchema.meta({ description: 'Current ETH balance in wei' }),
+    wnokBalance: bigIntStringSchema.meta({
+      description: 'Current WNOK balance in 1-NOK units. "0" until WNOK is reachable.',
+    }),
+    createdAt: unixMillisSchema.meta({ description: 'Creation timestamp (unix milliseconds)' }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'Bidder',
+    description:
+      'Sandbox bidder roster entry. The same private key signs transactions, ' +
+      'signs EIP-712 bid intents, and acts as the bidder pubkey for the dual-wrap encryption.',
+  });
+
+const createBidderBodySchema = z
+  .object({
+    name: z.string().min(1).max(64).meta({ description: 'Human-readable bidder label' }),
+    privateKey: z
+      .string()
+      .regex(/^0x[a-fA-F0-9]{64}$/)
+      .optional()
+      .meta({
+        description: 'Optional import of an existing 32-byte hex key. Generated if omitted.',
+      }),
+  })
+  .meta({
+    id: 'CreateBidderBody',
+    description: 'Request body for creating a bidder',
+  });
+
+const submitBidBodySchema = z
+  .object({
+    auctionId: auctionIdSchema,
+    units: bigIntStringSchema.meta({
+      description: 'Bid size in 1000-NOK units',
+    }),
+    rate: bpsSchema.meta({
+      description:
+        'Bid rate (bps). Interpretation depends on auction type — yield for RATE, price-per-100 for PRICE/BUYBACK.',
+    }),
+  })
+  .meta({
+    id: 'SubmitBidBody',
+    description:
+      'Request body for impersonated bid submission. The server builds the plaintext, signs the ' +
+      'EIP-712 BidIntent with the stored bidder key, dual-wraps with the auctioneer sealing key, ' +
+      'and calls BondAuction.submitBid from the bidder’s wallet.',
+  });
+
+// #endregion
+
+// #region Central Bank ───────────────────────────────────────────────
+
+const allowlistEntrySchema = z
+  .object({
+    address: addressSchema,
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'AllowlistEntry',
+    description: 'A single allowlisted address',
+  });
+
+const transactionRefSchema = z
+  .object({
+    hash: hexStringSchema,
+    block: blockNumberSchema,
+  })
+  .meta({
+    id: 'TransactionRef',
+    description: 'On-chain transaction reference (hash + block)',
+  });
+
+const centralBankSchema = z
+  .object({
+    address: addressSchema.meta({ description: "The CB operator's EVM address" }),
+    available: z.boolean().meta({
+      description:
+        'False when CENTRAL_BANK_PK is unset or the WNOK contract is not registered — endpoints respond 503',
+    }),
+    wnok: z
+      .object({
+        contractAddress: addressSchema,
+        balance: bigIntStringSchema.meta({ description: 'CB account balance in 1-NOK units' }),
+        allowlistSize: z.number().int().nonnegative(),
+      })
+      .nullable()
+      .meta({
+        description: 'WNOK binding state. Null when WNOK is unreachable.',
+      }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'CentralBank',
+    description: 'Central Bank operator summary',
+  });
+
+const wnokMintBurnBodySchema = z
+  .object({
+    address: addressSchema.meta({
+      description: 'Target address (must be on the WNOK allowlist)',
+    }),
+    amount: bigIntStringSchema.meta({ description: 'Amount in 1-NOK units (uint256)' }),
+  })
+  .meta({
+    id: 'WnokMintBurnBody',
+    description: 'Body for mint / burn operations',
+  });
+
+const wnokTransferBodySchema = z
+  .object({
+    to: addressSchema,
+    amount: bigIntStringSchema,
+  })
+  .meta({
+    id: 'WnokTransferBody',
+    description: 'Body for a transfer from the CB account',
+  });
+
+// #endregion
+
 // #region Health ─────────────────────────────────────────────────────
 
 const healthContractsSchema = z
@@ -363,6 +497,9 @@ const healthContractsSchema = z
     bondManager: addressSchema,
     bondAuction: addressSchema,
     bondToken: addressSchema,
+    wnok: addressSchema.nullable().meta({
+      description: 'WNOK contract address; null when WNOK is not registered in GlobalRegistry',
+    }),
   })
   .meta({
     id: 'HealthContracts',
@@ -478,6 +615,10 @@ const auctionIdParamSchema = z
   .object({ auctionId: auctionIdSchema })
   .meta({ id: 'AuctionIdParam', description: 'Auction id path parameter' });
 
+const bidderAddressParamSchema = z
+  .object({ address: addressSchema })
+  .meta({ id: 'BidderAddressParam', description: 'Bidder address path parameter' });
+
 const historyQuerySchema = z
   .object({
     before: z.coerce.number().int().nonnegative().nullable().meta({
@@ -541,6 +682,32 @@ const auctionIdPathParam = {
   schema: { $ref: '#/components/schemas/AuctionId' },
 };
 
+const testModeQueryParam = {
+  in: 'query' as const,
+  name: 'testMode',
+  required: false,
+  schema: { type: 'boolean' as const, default: false },
+  description:
+    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar; ArgoCD- ' +
+    'managed deployments should ignore it. Today `testMode=true` enables: ' +
+    '(a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; ' +
+    '(b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the ' +
+    'operator can attempt close before the bidding window expires — the on-chain contract still ' +
+    'enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is ' +
+    'open. Future test affordances will plumb through this same flag.',
+};
+
+const bidderAddressPathParam = {
+  in: 'path' as const,
+  name: 'address',
+  required: true,
+  schema: { $ref: '#/components/schemas/Address' },
+};
+
+const noContent204 = {
+  description: 'No Content — operation succeeded; response body intentionally empty.',
+};
+
 const paths: ZodOpenApiPathsObject = {
   // system ─────────────────────────────────────────
   '/v1/health': {
@@ -562,6 +729,7 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['bonds'],
       operationId: 'listBonds',
       summary: 'List all bonds with full subtree (auctions, bids, allocations, holders)',
+      parameters: [testModeQueryParam],
       responses: {
         200: successJson('All bonds. Primary cache-priming call for the UI.', z.array(bondSchema)),
         ...errorRefs.read,
@@ -573,7 +741,7 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['bonds'],
       operationId: 'getBond',
       summary: 'Get a single bond with full subtree',
-      parameters: [isinPathParam],
+      parameters: [isinPathParam, testModeQueryParam],
       responses: {
         200: successJson('Bond resource', bondSchema),
         ...errorRefs.read,
@@ -662,6 +830,7 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'listAuctions',
       summary: 'List all auctions across bonds (flat view of the full tree)',
+      parameters: [testModeQueryParam],
       responses: {
         200: successJson('All auctions with bids and allocations', z.array(auctionSchema)),
         ...errorRefs.read,
@@ -673,7 +842,7 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'getAuction',
       summary: 'Get a single auction subtree',
-      parameters: [auctionIdPathParam],
+      parameters: [auctionIdPathParam, testModeQueryParam],
       responses: {
         200: successJson('Auction resource', auctionSchema),
         ...errorRefs.read,
@@ -683,7 +852,7 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'closeAuction',
       summary: 'Transition auction to a new status. Only "closed" accepted today.',
-      parameters: [auctionIdPathParam],
+      parameters: [auctionIdPathParam, testModeQueryParam],
       requestBody: {
         required: true,
         content: { 'application/json': { schema: closeAuctionBodySchema } },
@@ -704,6 +873,166 @@ const paths: ZodOpenApiPathsObject = {
       },
     },
   },
+  // bidders ────────────────────────────────────────
+  '/v1/bidders': {
+    get: {
+      tags: ['bidders'],
+      operationId: 'listBidders',
+      summary: 'List the sandbox bidder roster',
+      responses: {
+        200: successJson('All bidders in the roster', z.array(bidderSchema)),
+        ...errorRefs.read,
+      },
+    },
+    post: {
+      tags: ['bidders'],
+      operationId: 'createBidder',
+      summary: 'Create a bidder (generates a fresh keypair when privateKey is omitted)',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: createBidderBodySchema } },
+      },
+      responses: {
+        200: successJson('Newly created bidder', bidderSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/bidders/{address}': {
+    delete: {
+      tags: ['bidders'],
+      operationId: 'deleteBidder',
+      summary:
+        'Delete a bidder. Hard-blocked while the bidder has unrevealed bids on an open auction.',
+      parameters: [bidderAddressPathParam],
+      responses: {
+        204: noContent204,
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/bidders/{address}/bids': {
+    post: {
+      tags: ['bidders'],
+      operationId: 'submitBidderBid',
+      summary: 'Submit a sealed bid on behalf of a roster bidder',
+      parameters: [bidderAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: submitBidBodySchema } },
+      },
+      responses: {
+        200: successJson('Sealed bid as accepted on-chain', sealedBidSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+
+  // central-bank ────────────────────────────────────
+  '/v1/central-bank': {
+    get: {
+      tags: ['central-bank'],
+      operationId: 'getCentralBank',
+      summary: 'Central Bank operator summary (CB address, WNOK balance, allowlist size)',
+      responses: {
+        200: successJson('Central Bank summary', centralBankSchema),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/central-bank/allowlist': {
+    get: {
+      tags: ['central-bank'],
+      operationId: 'listWnokAllowlist',
+      summary: 'List addresses on the WNOK allowlist',
+      responses: {
+        200: successJson('Allowlist entries', z.array(allowlistEntrySchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/central-bank/allowlist/{address}': {
+    put: {
+      tags: ['central-bank'],
+      operationId: 'addToWnokAllowlist',
+      summary: 'Add an address to the WNOK allowlist (idempotent)',
+      parameters: [
+        {
+          in: 'path' as const,
+          name: 'address',
+          required: true,
+          schema: { $ref: '#/components/schemas/Address' },
+        },
+      ],
+      responses: {
+        200: successJson('Transaction reference for the on-chain add', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+    delete: {
+      tags: ['central-bank'],
+      operationId: 'removeFromWnokAllowlist',
+      summary: 'Remove an address from the WNOK allowlist (idempotent)',
+      parameters: [
+        {
+          in: 'path' as const,
+          name: 'address',
+          required: true,
+          schema: { $ref: '#/components/schemas/Address' },
+        },
+      ],
+      responses: {
+        200: successJson('Transaction reference for the on-chain remove', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/central-bank/wnok/mint': {
+    post: {
+      tags: ['central-bank'],
+      operationId: 'mintWnok',
+      summary: 'Mint WNOK to an allowlisted address',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: wnokMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the mint', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/central-bank/wnok/burn': {
+    post: {
+      tags: ['central-bank'],
+      operationId: 'burnWnok',
+      summary: 'Burn WNOK from an allowlisted address',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: wnokMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the burn', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/central-bank/wnok/transfer': {
+    post: {
+      tags: ['central-bank'],
+      operationId: 'transferWnok',
+      summary: 'Transfer WNOK from the CB account to an allowlisted recipient',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: wnokTransferBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the transfer', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+
   '/v1/auctions/{auctionId}/finalisation': {
     put: {
       tags: ['auctions'],
@@ -746,6 +1075,18 @@ export const openApiDocument = createDocument({
     { name: 'system', description: 'Service health' },
     { name: 'bonds', description: 'Bond resources (root of the resource tree)' },
     { name: 'auctions', description: 'Auction resources (bid/allocation subtree of a bond)' },
+    {
+      name: 'bidders',
+      description:
+        'Sandbox bidder roster used by the impersonated-bid flow. Private keys are stored ' +
+        'in plaintext — sandbox-only, never deploy against real funds.',
+    },
+    {
+      name: 'central-bank',
+      description:
+        'Central Bank (Norges Bank) operator surface against the WNOK contract: mint, burn, ' +
+        'transfer, allowlist add/remove. Sandbox-only.',
+    },
   ],
   security: [{ bearerAuth: [] }],
   paths,
@@ -814,6 +1155,15 @@ export {
   isinParamSchema,
   auctionIdParamSchema,
   historyQuerySchema,
+  bidderAddressParamSchema,
+  createBidderBodySchema,
+  bidderSchema,
+  submitBidBodySchema,
+  centralBankSchema,
+  allowlistEntrySchema,
+  transactionRefSchema,
+  wnokMintBurnBodySchema,
+  wnokTransferBodySchema,
 };
 
 export type Address = z.infer<typeof addressSchema>;
@@ -846,5 +1196,13 @@ export type CloseAuctionBody = z.infer<typeof closeAuctionBodySchema>;
 export type FinaliseBody = z.infer<typeof finaliseBodySchema>;
 export type HoldersBody = z.infer<typeof holdersBodySchema>;
 export type HistoryQuery = z.infer<typeof historyQuerySchema>;
+export type Bidder = z.infer<typeof bidderSchema>;
+export type CreateBidderBody = z.infer<typeof createBidderBodySchema>;
+export type SubmitBidBody = z.infer<typeof submitBidBodySchema>;
+export type CentralBank = z.infer<typeof centralBankSchema>;
+export type AllowlistEntry = z.infer<typeof allowlistEntrySchema>;
+export type TransactionRefDto = z.infer<typeof transactionRefSchema>;
+export type WnokMintBurnBody = z.infer<typeof wnokMintBurnBodySchema>;
+export type WnokTransferBody = z.infer<typeof wnokTransferBodySchema>;
 
 // #endregion

@@ -203,3 +203,31 @@ export function ToastProvider({ children }) {
 export function useToast() {
   return useContext(ToastCtx);
 }
+
+/**
+ * SandboxOnlyBanner — visible warning that the surface stores plaintext
+ * private keys and is not safe outside the local sandbox. Used at the
+ * top of the Bidders and Central Bank pages.
+ */
+export function SandboxOnlyBanner({ children }) {
+  return (
+    <div
+      role="alert"
+      className="sandbox-banner"
+      style={{
+        background: '#fff7e6',
+        border: '1px solid #f3c969',
+        color: '#5a3a00',
+        padding: '10px 14px',
+        borderRadius: 6,
+        marginBottom: 16,
+        fontSize: 13,
+        lineHeight: 1.5,
+      }}
+    >
+      <strong>Sandbox only.</strong>{' '}
+      {children ||
+        'Private keys are stored in plaintext in the local SQLite DB and the operator config. Never deploy this configuration against real funds.'}
+    </div>
+  );
+}
