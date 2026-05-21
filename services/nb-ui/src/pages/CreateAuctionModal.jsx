@@ -84,16 +84,25 @@ export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose
           name="auction-type"
           value={auctionType}
           onChange={setAuctionType}
+          // RATE is shown so the full lifecycle is visible at a glance,
+          // but it's intentionally disabled here: the chain rejects RATE
+          // for any ISIN that already has an auction. To issue a new
+          // bond (which IS a RATE auction), the operator goes through
+          // CreateBondModal on the Bonds page. The `title` is the
+          // browser tooltip on hover.
           options={[
+            {
+              value: 'RATE',
+              label: 'RATE',
+              disabled: true,
+              title:
+                'RATE auctions are only valid when issuing a new bond. Use the "+ New bond" action on the Bonds page.',
+            },
             { value: 'PRICE', label: 'PRICE' },
             { value: 'BUYBACK', label: 'BUYBACK' },
           ]}
         />
       </Field>
-      <div className="muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 8 }}>
-        To issue a new bond (RATE auction), use the <strong>+ New bond</strong> action on the Bonds
-        page.
-      </div>
 
       <div className="field-row">
         <Field label="Size" hint="Whole 1,000 NOK units.">
