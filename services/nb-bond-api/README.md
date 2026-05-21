@@ -10,7 +10,7 @@ service-layer overview.
 When running inside the sandbox, the API is reachable via the gateway at `http://bond-api.cbdc-sandbox.local/` (the start scripts add the `/etc/hosts` entry).
 
 The HTTP surface is the v2 bulky-tree contract described in
-[`docs/openapi-v2-plan.md`](../../docs/openapi-v2-plan.md): a single
+[`docs/openapi-v2-plan.md`](../../docs/plans/openapi-v2-plan.md): a single
 `GET /v1/bonds` returns every bond with its nested auctions, bids,
 allocations, and holders, and mutations return the updated parent
 resource so the UI can swap its cache atomically. Each cacheable DTO

@@ -163,7 +163,7 @@ The NB Bond API is the privileged operator service. It:
   frontend can swap its cache atomically without a follow-up GET. The full
   design — DTOs, endpoint catalog, ETag/md5 caching protocol, and two
   auth modes (`none`, `entra`) — is documented in
-  [`docs/openapi-v2-plan.md`](openapi-v2-plan.md). This design deliberately
+  [`docs/plans/openapi-v2-plan.md`](plans/openapi-v2-plan.md). This design deliberately
   decouples the API shape from UI feature evolution: pages slice from the
   cached tree client-side rather than driving new endpoints.
 
