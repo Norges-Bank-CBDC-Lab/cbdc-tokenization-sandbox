@@ -88,6 +88,20 @@ export function Select({ children, ...rest }) {
   );
 }
 
+/**
+ * Single-select radio group with built-in support for non-selectable
+ * options.
+ *
+ * Each option may carry:
+ *   - `disabled?: boolean` — renders the option visibly but blocks
+ *     selection. The native `disabled` attribute on the input also
+ *     suppresses onChange, so callers don't need to re-guard.
+ *   - `title?: string` — text shown as a browser tooltip on hover,
+ *     primarily used to explain *why* a disabled option is unavailable
+ *     (e.g. "RATE auctions are only valid when issuing a new bond").
+ *     Set on both label and input so the tooltip appears wherever the
+ *     user hovers within the chip.
+ */
 export function RadioGroup({ name, value, onChange, options }) {
   return (
     <div className="radio-group">
@@ -98,9 +112,17 @@ export function RadioGroup({ name, value, onChange, options }) {
             id={`${name}-${o.value}`}
             name={name}
             checked={value === o.value}
+            disabled={Boolean(o.disabled)}
+            title={o.title}
             onChange={() => onChange(o.value)}
           />
-          <label htmlFor={`${name}-${o.value}`}>{o.label}</label>
+          <label
+            htmlFor={`${name}-${o.value}`}
+            data-disabled={o.disabled ? 'true' : undefined}
+            title={o.title}
+          >
+            {o.label}
+          </label>
         </React.Fragment>
       ))}
     </div>
