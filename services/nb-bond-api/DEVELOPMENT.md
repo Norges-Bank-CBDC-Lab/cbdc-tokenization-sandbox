@@ -139,9 +139,10 @@ failures populate `errors[]` with `{ field, message }` entries.
 ### 4.1 Health and OpenAPI
 
 - `GET /v1/health`
-  - Purpose: health check and discovery of contract addresses and sealing public key.
+  - Purpose: health check, discovery of contract addresses and sealing public key, and runtime visibility into chain reachability + ingestion-loop liveness for the operator UI's `HealthBadge`.
   - Public — bypasses the auth gate (`security: []` in the OpenAPI document).
-  - Response: `Health` — `{ status, contracts: { bondManager, bondAuction, bondToken }, sealingPubKey }`.
+  - Never 5xx: each chain read is wrapped individually so a Besu outage surfaces as `status: "down"` with zero-address contract fields rather than as an upstream error. See [§7.8](#78-health-payload-and-status-derivation).
+  - Response: `Health` — `{ status: "ok" | "degraded" | "down", contracts, sealingPubKey, chain, ingestion }`.
 - `GET /docs` and `GET /v1/openapi.json`
   - Purpose: fetch the OpenAPI JSON. Public.
   - On-disk snapshot: [`openapi.json`](openapi.json). Regenerate after any schema change with `npm run regen:openapi`.
@@ -186,6 +187,14 @@ failures populate `errors[]` with `{ field, message }` entries.
   - When `approve=true`: rebuilds per-allocation proofs from the unsealed plaintext, sends `BondManager.finaliseAuction(isin, allocations, proofs)`.
   - When `approve=false`: marks the allocation rejected; no on-chain transaction.
   - Returns the updated `Auction`.
+
+### 4.4 Admin
+
+- `POST /v1/admin/restart-ingestion` (`operationId: restartIngestion`)
+  - Sits under the standard auth gate (no-op in `none` mode, JWT-validated in `entra` mode). Today there is no additional role check — see [§7.9](#79-admin-restart-ingestion) for the portability flag before promoting outside the sandbox.
+  - `POST /v1/admin/restart-ingestion` — plain restart. Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. Projection survives.
+  - `POST /v1/admin/restart-ingestion?fromBlock=0` — destructive reset. Drops every projection table (`auctions`, `auction_events`, `bond_events`, `balance_events`, `balances`, `partitions`, `ingestion_state`) and restarts the loop, which will rebuild from `START_BLOCK`. The `bidders` table is **preserved** because it holds sandbox impersonation keypairs that cannot be recovered from chain.
+  - Returns `RestartOutcome` — `{ restarted: boolean, status: HealthIngestion }`. `200` when the loop confirmed `loopRunning=true` within the 5s timeout, `202` when it's still coming up (e.g. Besu still unreachable). The operator UI polls `/v1/health` to track the rest of the rebuild either way.
 
 ## 5. Bid submission (dealer workflow, CLIs)
 
@@ -434,3 +443,82 @@ through the middleware.
 ArgoCD-managed deployments must keep `NB_BOND_API_AUTH_MODE` and the
 nb-ui `AUTH_MODE` in sync. A mismatch (e.g. backend `entra`, frontend
 `none`) produces clear 401s rather than silent partial behaviour.
+
+### 7.8 Health payload and status derivation
+
+`GET /v1/health` returns a three-state `status` plus two diagnostic
+blocks. The operator UI's [`HealthBadge`](../nb-ui/src/components/HealthBadge.jsx)
+polls this every 7s and renders the colour from `status`. The full
+shape:
+
+```jsonc
+{
+  "status": "ok" | "degraded" | "down",
+  "contracts": { "bondManager", "bondAuction", "bondToken", "wnok" },
+  "sealingPubKey": "0x…",
+  "chain": {
+    "rpcUrl": "http://besu-rpc.besu:8545",  // sanitised — protocol://host[:port] only
+    "chainId": 1337,
+    "head": 12345,
+    "headReachable": true
+  },
+  "ingestion": {
+    "loopRunning": true,
+    "lastBlockProcessed": 12345,
+    "lag": 0,                          // chain.head - ingestion.lastBlockProcessed
+    "pollIntervalMs": 3000,
+    "lastTickAt": 1716387245123,       // unix-epoch ms
+    "lastEventTxHash": "0x…",          // most-recent ingested log (null pre-first-event)
+    "consecutiveFailures": 0,
+    "recentErrors": [                  // ring buffer, newest first, max 10
+      { "ts": 1716387243111, "message": "rpc timeout", "code": "TIMEOUT" }
+    ]
+  }
+}
+```
+
+Status derivation lives in
+[`src/health.ts`](src/health.ts) as a pure function so it can be unit-tested
+without spinning up the express app:
+
+- `down` — chain unreachable, OR loop has never started, OR last tick > 60s ago.
+- `degraded` — on-chain healthy but ingestion lag > 5 blocks, OR consecutive
+  failures > 0, OR last tick 30–60s old.
+- `ok` — everything inside thresholds.
+
+`chain.rpcUrl` is rendered via `sanitiseRpcUrl()` to strip credentials,
+query, and path before exposure. In the sandbox this is cosmetic; for
+future non-local deployments it's the minimum surface.
+
+Self-heal: the ingestion loop boot is wrapped in
+[`startIngestionLoopWithRetry()`](src/ingestion.ts) (exponential backoff
+1s → 2s → … → 30s, retries forever) so a transient `getaddrinfo
+EAI_AGAIN` at PC/Docker restart no longer leaves the API silently
+serving stale data.
+
+### 7.9 Admin restart-ingestion
+
+`POST /v1/admin/restart-ingestion` exposes the same lifecycle the
+self-heal path uses, but operator-driven from the
+[`NetworkHealthModal`](../nb-ui/src/pages/NetworkHealthModal.jsx).
+
+Two modes, dispatched in [`src/admin.ts`](src/admin.ts):
+
+| Mode            | Query          | Behaviour                                                                                                                                                                                                                                                 |
+| --------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plain restart   | `?` (none)     | `stopIngestionLoop()` clears the interval, then `startIngestionLoopWithRetry()` boots a fresh loop. Projection survives.                                                                                                                                  |
+| Reset + restart | `?fromBlock=0` | Plain restart, plus drops every projection table via `dropProjectionTables()` from [`ingestion-db.ts`](src/ingestion-db.ts). On restart, `createTables` re-creates the empty shells and the loop rebuilds from `START_BLOCK`. **`bidders` is preserved.** |
+
+The projection table list is centralised in
+`PROJECTION_TABLE_NAMES` (ingestion-db.ts) and reused by both the
+schema migration and the admin reset path. **Adding a new projection
+table?** Append its name to that constant — both paths pick it up.
+**Adding a new system-of-record table?** Do NOT add it to that
+constant; document it next to the `bidders` exception.
+
+Auth: the endpoint sits under the standard `authMiddleware` (no-op in
+`none` mode, JWT-validated in `entra` mode). There is **no extra
+role check** in entra mode today — sandbox-acceptable, but **before
+promoting to a non-local deployment** the destructive `?fromBlock=0`
+variant should be gated behind a tenant-admin role and emit an
+audit-log entry on every fire. Tracked in Plan C's portability flags.

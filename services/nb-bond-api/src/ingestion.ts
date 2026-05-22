@@ -2,7 +2,7 @@ import { Contract, JsonRpcProvider, Log, keccak256, toUtf8Bytes } from 'ethers';
 
 import { bondManagerAbi, bondTokenAbi } from './abi';
 import { envVariables } from './env-vars';
-import { getBondManagerAddress } from './chain';
+import { RpcUnavailableError, getBondManagerAddress } from './chain';
 import { logger } from './logger';
 import { type IngestionDatabase, openDatabase } from './ingestion-db';
 import { toPlainObject } from './utils';
@@ -42,6 +42,93 @@ type TransferAction = {
 type TokenAction = IssueAction | RedeemAction | TransferAction;
 
 const provider = new JsonRpcProvider(envVariables.RPC_URL);
+
+// Module-level runtime state for /v1/health. Lost on pod restart and
+// rebuilt by the next tick — none of it is authoritative.
+let loopRunning = false;
+let lastTickAt: number | null = null;
+let consecutiveFailures = 0;
+let lastBlockProcessed: number | null = null;
+let lastEventTxHash: string | null = null;
+let intervalHandle: ReturnType<typeof setInterval> | null = null;
+
+const RECENT_ERRORS_MAX = 10;
+let recentErrors: RecentIngestionError[] = [];
+
+export type RecentIngestionError = {
+  ts: number;
+  message: string;
+  code: string | null;
+};
+
+export type IngestionStatus = {
+  loopRunning: boolean;
+  lastTickAt: number | null;
+  consecutiveFailures: number;
+  lastBlockProcessed: number | null;
+  lastEventTxHash: string | null;
+  pollIntervalMs: number;
+  recentErrors: RecentIngestionError[];
+};
+
+function pushError(err: unknown): void {
+  const e = err as { message?: unknown; code?: unknown; name?: unknown };
+  const message = typeof e?.message === 'string' ? e.message : String(err);
+  const codeRaw =
+    typeof e?.code === 'string' ? e.code : typeof e?.name === 'string' ? e.name : null;
+  recentErrors = [{ ts: Date.now(), message, code: codeRaw }, ...recentErrors].slice(
+    0,
+    RECENT_ERRORS_MAX,
+  );
+}
+
+export function getIngestionStatus(): IngestionStatus {
+  return {
+    loopRunning,
+    lastTickAt,
+    consecutiveFailures,
+    lastBlockProcessed,
+    lastEventTxHash,
+    pollIntervalMs: envVariables.POLL_INTERVAL_MS,
+    recentErrors: [...recentErrors],
+  };
+}
+
+/**
+ * Tear down the running ingestion interval so a fresh one can take
+ * over. Safe to call when the loop never started (e.g. mid-retry
+ * during boot) — leaves `consecutiveFailures` / `recentErrors` intact
+ * because they're informational, not loop-state.
+ *
+ * `loopRunning` flips to false so a concurrent /v1/health poll sees
+ * the transient state and the operator UI shows `down` briefly.
+ */
+export function stopIngestionLoop(): void {
+  if (intervalHandle) {
+    clearInterval(intervalHandle);
+    intervalHandle = null;
+  }
+  loopRunning = false;
+}
+
+/**
+ * Test seam — admin.test.ts forces specific module state to validate
+ * the reset path without spinning up a real loop. Not part of the
+ * runtime API.
+ */
+export function __resetIngestionStateForTests(): void {
+  stopIngestionLoop();
+  lastTickAt = null;
+  consecutiveFailures = 0;
+  lastBlockProcessed = null;
+  lastEventTxHash = null;
+  recentErrors = [];
+}
+
+/** Test seam — exposes pushError() so tests can verify ring-buffer behaviour. */
+export function __pushIngestionErrorForTests(err: unknown): void {
+  pushError(err);
+}
 
 function loadCheckpoint(db: IngestionDatabase, contract: string): Checkpoint {
   const stmt = db.prepare(
@@ -269,7 +356,7 @@ async function processBlockRange(
   bondToken: Contract,
   fromBlock: number,
   toBlock: number,
-) {
+): Promise<{ latestTxHash: string | null }> {
   const managerAddress = bondManager.target.toString();
   const tokenAddress = bondToken.target.toString();
 
@@ -524,6 +611,35 @@ async function processBlockRange(
   });
 
   tx();
+
+  // The most recent log across both decoded sets — block, then logIndex
+  // — picks one deterministic "latest" hash so the health endpoint can
+  // show "what did we last ingest?".
+  type Located = { blockNumber: number | null; index: number | null; txHash: string };
+  const located: Located[] = [
+    ...parsedManager.map((e) => ({
+      blockNumber: e.log.blockNumber ?? null,
+      index: e.log.index ?? null,
+      txHash: e.log.transactionHash,
+    })),
+    ...parsedToken.map((e) => ({
+      blockNumber: e.log.blockNumber ?? null,
+      index: e.log.index ?? null,
+      txHash: e.log.transactionHash,
+    })),
+  ];
+  let latest: Located | null = null;
+  for (const entry of located) {
+    if (entry.blockNumber === null || entry.index === null) continue;
+    if (
+      !latest ||
+      entry.blockNumber > (latest.blockNumber ?? -1) ||
+      (entry.blockNumber === latest.blockNumber && entry.index > (latest.index ?? -1))
+    ) {
+      latest = entry;
+    }
+  }
+  return { latestTxHash: latest?.txHash ?? null };
 }
 
 /**
@@ -565,25 +681,81 @@ export async function startIngestionLoop() {
   );
 
   async function tick() {
+    lastTickAt = Date.now();
     try {
       const latest = await provider.getBlockNumber();
       const window = computeIngestionWindow(nextBlock, latest);
       if (!window) {
+        consecutiveFailures = 0;
         return;
       }
       const { from, to } = window;
 
       logger.debug(`ingestion processing blocks [${from}, ${to}]`);
-      await processBlockRange(db, bondManager, bondToken, from, to);
+      const { latestTxHash } = await processBlockRange(db, bondManager, bondToken, from, to);
       saveCheckpoint(db, { contract: 'bond-manager', last_block: to + 1, last_tx_index: 0 });
       nextBlock = to + 1;
+      lastBlockProcessed = to;
+      if (latestTxHash) lastEventTxHash = latestTxHash;
+      consecutiveFailures = 0;
       logger.debug(`ingestion advanced checkpoint to block ${nextBlock}`);
     } catch (err) {
+      consecutiveFailures++;
+      pushError(err);
       logger.warn(`ingestion tick failed: ${err as Error}`);
     }
   }
 
   // Backfill and poll
   await tick();
-  setInterval(tick, envVariables.POLL_INTERVAL_MS);
+  intervalHandle = setInterval(tick, envVariables.POLL_INTERVAL_MS);
+  loopRunning = true;
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export type RetryOptions = {
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  factor?: number;
+  // Test seam — defaults to the real startIngestionLoop.
+  start?: () => Promise<void>;
+  // Test seam — defaults to the real setTimeout sleep.
+  sleepFn?: (ms: number) => Promise<void>;
+};
+
+/**
+ * Wrap `startIngestionLoop()` in retry-with-backoff so the API self-heals
+ * when Besu is briefly unreachable at boot (PC/Docker restart). The inner
+ * `tick()` already tolerates failures — the failure mode this guards
+ * against is the setup before `tick()` (registry lookup, BOND_TOKEN read)
+ * throwing during the first call.
+ *
+ * Retries forever. The only "give up" path is a module-load failure,
+ * handled in index.ts.
+ */
+export async function startIngestionLoopWithRetry(options: RetryOptions = {}): Promise<void> {
+  const initialDelayMs = options.initialDelayMs ?? 1000;
+  const maxDelayMs = options.maxDelayMs ?? 30000;
+  const factor = options.factor ?? 2;
+  const start = options.start ?? startIngestionLoop;
+  const sleepFn = options.sleepFn ?? sleep;
+
+  let delay = initialDelayMs;
+  for (;;) {
+    try {
+      await start();
+      return;
+    } catch (err) {
+      pushError(err);
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof RpcUnavailableError) {
+        logger.info(`ingestion boot: RPC not ready yet — retrying in ${delay}ms (${message})`);
+      } else {
+        logger.warn(`ingestion boot failed; retrying in ${delay}ms: ${message}`);
+      }
+      await sleepFn(delay);
+      delay = Math.min(delay * factor, maxDelayMs);
+    }
+  }
 }

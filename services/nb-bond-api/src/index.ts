@@ -19,6 +19,7 @@ import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
+import { resetProjectionAndRestart, restartIngestionLoop } from './admin';
 import { authMiddleware } from './auth';
 import {
   composeAllAuctions,
@@ -28,6 +29,7 @@ import {
   composeBondHistory,
 } from './compose';
 import { envVariables } from './env-vars';
+import { computeLag, deriveStatus, sanitiseRpcUrl } from './health';
 import {
   HttpError,
   badRequest,
@@ -45,6 +47,7 @@ import {
   getWnokAddress,
   sendWithManagedNonce,
 } from './chain';
+import { getIngestionStatus } from './ingestion';
 import { getBalancesByIsin, openDatabase } from './ingestion-db';
 import { initSealingKeypair, type SealingKeypair } from './keys';
 import { logger } from './logger';
@@ -156,21 +159,70 @@ app.get('/v1/openapi.json', (_req, res) => {
 });
 
 // Health intentionally bypasses auth (per OpenAPI security: []).
+// Must never 5xx — the operator's UI poll depends on a consistent
+// shape regardless of chain reachability. Each chain read is wrapped
+// individually so a Besu outage surfaces as `status: 'down'` with
+// nulls/zeros, not as an upstream error.
+const ZERO_ADDR = '0x0000000000000000000000000000000000000000';
 app.get('/v1/health', async (req, res, next) => {
   try {
-    const bondManager = await getBondManager();
-    const bondAuctionAddress = await getBondAuctionAddress();
-    const bondTokenAddress = await bondManager.BOND_TOKEN();
-    const wnokAddr = await getWnokAddress().catch(() => null);
+    // Chain probe drives both `chain` and any contract reads that fail.
+    let head: number | null = null;
+    let chainId: number | null = null;
+    let headReachable = true;
+    try {
+      head = await provider.getBlockNumber();
+      const net = await provider.getNetwork();
+      chainId = Number(net.chainId);
+    } catch {
+      headReachable = false;
+    }
+
+    let bondManagerAddress = ZERO_ADDR;
+    let bondAuctionAddress = ZERO_ADDR;
+    let bondTokenAddress = ZERO_ADDR;
+    let wnokAddr: string | null = null;
+    try {
+      const bondManager = await getBondManager();
+      bondManagerAddress = bondManager.target.toString();
+      bondAuctionAddress = await getBondAuctionAddress();
+      bondTokenAddress = await bondManager.BOND_TOKEN();
+      wnokAddr = await getWnokAddress().catch(() => null);
+    } catch {
+      // Chain unreachable at boot — contract addresses unknown. The
+      // status derivation handles this via headReachable=false.
+    }
+
+    const ingestion = getIngestionStatus();
+    const chain = { chainId, head, headReachable };
+    const status = deriveStatus(chain, ingestion);
+    const lag = computeLag(chain, ingestion);
+
     okResponse(req, res, {
-      status: 'ok' as const,
+      status,
       contracts: {
-        bondManager: bondManager.target.toString(),
+        bondManager: bondManagerAddress,
         bondAuction: bondAuctionAddress,
         bondToken: bondTokenAddress,
         wnok: wnokAddr,
       },
       sealingPubKey: sealingKeys.publicKey,
+      chain: {
+        rpcUrl: sanitiseRpcUrl(envVariables.RPC_URL),
+        chainId,
+        head,
+        headReachable,
+      },
+      ingestion: {
+        loopRunning: ingestion.loopRunning,
+        lastBlockProcessed: ingestion.lastBlockProcessed,
+        lag,
+        pollIntervalMs: ingestion.pollIntervalMs,
+        lastTickAt: ingestion.lastTickAt,
+        lastEventTxHash: ingestion.lastEventTxHash,
+        consecutiveFailures: ingestion.consecutiveFailures,
+        recentErrors: ingestion.recentErrors,
+      },
     });
   } catch (err) {
     next(err);
@@ -184,6 +236,31 @@ app.get('/v1/health', async (req, res, next) => {
 // Everything below this line goes through the auth middleware (no-op
 // in `none` mode, JWT validation in `entra` mode).
 app.use(authMiddleware);
+
+// #endregion
+
+// #region Admin ──────────────────────────────────────────────────────
+
+/**
+ * Restart the in-process ingestion loop. With `?fromBlock=0`, also
+ * drops the projection so the loop rebuilds from `START_BLOCK`.
+ * Bidder roster is preserved. See services/nb-bond-api/src/admin.ts.
+ *
+ * 200 when the loop confirmed running within the 5s timeout, 202 when
+ * it's still coming up (e.g. chain still unreachable and the retry
+ * helper is backing off). The operator UI polls /v1/health to track
+ * post-restart readiness either way.
+ */
+app.post('/v1/admin/restart-ingestion', async (req, res, next) => {
+  try {
+    const fromBlock = req.query.fromBlock;
+    const isReset = fromBlock === '0';
+    const outcome = isReset ? await resetProjectionAndRestart() : await restartIngestionLoop();
+    res.status(outcome.restarted ? 200 : 202).json(outcome);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // #endregion
 
@@ -1022,7 +1099,10 @@ app.listen(port, () => {
   logger.info(`nb-bond-api listening on ${port}`);
 });
 
-// Start ingestion in-process (background).
+// Start ingestion in-process (background). The retry wrapper handles
+// the case where Besu is briefly unreachable at boot (e.g. after a
+// PC/Docker restart) — the loop self-heals once the chain comes back.
+// The only "give up" path here is a module-load failure.
 import('./ingestion')
-  .then(({ startIngestionLoop }) => startIngestionLoop())
-  .catch((err) => logger.warn(`failed to start ingestion loop: ${(err as Error).message}`));
+  .then(({ startIngestionLoopWithRetry }) => startIngestionLoopWithRetry())
+  .catch((err) => logger.error(`ingestion module load failed: ${(err as Error).message}`));

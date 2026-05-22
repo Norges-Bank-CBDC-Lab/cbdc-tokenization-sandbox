@@ -35,6 +35,10 @@
     {
       "name": "central-bank",
       "description": "Central Bank (Norges Bank) operator surface against the WNOK contract: mint, burn, transfer, allowlist add/remove. Sandbox-only."
+    },
+    {
+      "name": "admin",
+      "description": "Operator-only ingestion lifecycle (restart loop, drop-and-rebuild projection). Sits under the standard auth gate; no extra RBAC today — see the Plan-C portability flag before promoting to a non-local deployment."
     }
   ],
   "security": [
@@ -1277,6 +1281,83 @@
         }
       }
     },
+    "/v1/admin/restart-ingestion": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "restartIngestion",
+        "summary": "Restart the in-process ingestion loop",
+        "description": "Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. With `?fromBlock=0`, also drops every projection table (auctions, bond_events, balance_events, balances, partitions, ingestion_state, auction_events) so the rebuild starts from `START_BLOCK`. The bidder roster (`bidders` table) is preserved — it is a sandbox system-of-record that cannot be recovered from chain. Returns once `loopRunning=true` or after a 5s timeout; the operator UI polls `/v1/health` to track the rest of the rebuild.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fromBlock",
+            "required": false,
+            "description": "Set to `0` to drop the projection before restarting (destructive — operator UI gates with a type-to-confirm phrase). Any other value, or absent, performs a plain restart without touching the projection.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restart completed within the timeout; payload reflects post-restart state.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartOutcome"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Restart accepted; loop is still coming up after the 5s timeout (e.g. chain still unreachable). Poll /v1/health to observe readiness.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/v1/auctions/{auctionId}/finalisation": {
       "put": {
         "tags": [
@@ -1656,7 +1737,8 @@
             "type": "string",
             "enum": [
               "ok",
-              "degraded"
+              "degraded",
+              "down"
             ]
           },
           "contracts": {
@@ -1664,12 +1746,20 @@
           },
           "sealingPubKey": {
             "$ref": "#/components/schemas/HexString"
+          },
+          "chain": {
+            "$ref": "#/components/schemas/HealthChain"
+          },
+          "ingestion": {
+            "$ref": "#/components/schemas/HealthIngestion"
           }
         },
         "required": [
           "status",
           "contracts",
-          "sealingPubKey"
+          "sealingPubKey",
+          "chain",
+          "ingestion"
         ],
         "additionalProperties": false,
         "description": "Service health and binding information"
@@ -1706,6 +1796,163 @@
         ],
         "additionalProperties": false,
         "description": "Contract addresses the service is bound to"
+      },
+      "HealthChain": {
+        "type": "object",
+        "properties": {
+          "rpcUrl": {
+            "type": "string",
+            "description": "Sanitised RPC endpoint — protocol://host[:port] only, no credentials or path",
+            "examples": [
+              "http://besu-rpc.besu:8545"
+            ]
+          },
+          "chainId": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "EVM chainId reported by the provider, or null when unreachable"
+          },
+          "head": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chain head block number, or null when unreachable"
+          },
+          "headReachable": {
+            "type": "boolean",
+            "description": "True iff the backend could read the chain head at the time of this request"
+          }
+        },
+        "required": [
+          "rpcUrl",
+          "chainId",
+          "head",
+          "headReachable"
+        ],
+        "additionalProperties": false,
+        "description": "On-chain reachability and head state"
+      },
+      "HealthIngestion": {
+        "type": "object",
+        "properties": {
+          "loopRunning": {
+            "type": "boolean",
+            "description": "True once startIngestionLoop() has wired its setInterval"
+          },
+          "lastBlockProcessed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last block the loop wrote to the projection, or null before the first tick"
+          },
+          "lag": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "chain.head - ingestion.lastBlockProcessed; null when either side is unknown"
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "description": "Configured poll cadence for the ingestion loop"
+          },
+          "lastTickAt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Unix-epoch ms of the last tick (success or failure), or null pre-first-tick"
+          },
+          "lastEventTxHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Most recent tx hash whose log we ingested; null before any events have been seen this process"
+          },
+          "consecutiveFailures": {
+            "type": "number",
+            "description": "Count of tick failures since the last success; reset on each successful tick"
+          },
+          "recentErrors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentIngestionError"
+            },
+            "description": "Ring buffer (newest first, max 10) of the most recent ingestion-loop errors. Cleared on a successful restart via /v1/admin/restart-ingestion."
+          }
+        },
+        "required": [
+          "loopRunning",
+          "lastBlockProcessed",
+          "lag",
+          "pollIntervalMs",
+          "lastTickAt",
+          "lastEventTxHash",
+          "consecutiveFailures",
+          "recentErrors"
+        ],
+        "additionalProperties": false,
+        "description": "Runtime state of the in-process ingestion loop"
+      },
+      "RecentIngestionError": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "number",
+            "description": "Unix-epoch ms when the error was observed"
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message from the failing tick"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Error code (ethers `err.code`) or class name; null when neither set"
+          }
+        },
+        "required": [
+          "ts",
+          "message",
+          "code"
+        ],
+        "additionalProperties": false,
+        "description": "Single entry in the ring buffer of recent ingestion errors"
       },
       "Bond": {
         "type": "object",
@@ -2541,6 +2788,25 @@
         ],
         "additionalProperties": false,
         "description": "On-chain transaction reference (hash + block)"
+      },
+      "RestartOutcome": {
+        "type": "object",
+        "properties": {
+          "restarted": {
+            "type": "boolean",
+            "description": "True when the ingestion loop confirmed `loopRunning=true` within the 5s timeout. False means the loop is still coming up (e.g. chain unreachable); operator UI should poll /v1/health to track readiness."
+          },
+          "status": {
+            "description": "Post-restart snapshot of the ingestion-loop state",
+            "$ref": "#/components/schemas/HealthIngestion"
+          }
+        },
+        "required": [
+          "restarted",
+          "status"
+        ],
+        "additionalProperties": false,
+        "description": "Result of POST /v1/admin/restart-ingestion"
       }
     },
     "responses": {

@@ -187,6 +187,28 @@ function createTables(db: IngestionDatabase) {
  * user_version is set unconditionally, so on a brand-new file the
  * migration is a no-op except for stamping the version.
  */
+/**
+ * Names of every projection table the ingestion loop owns. **Excludes
+ * `bidders`** — that table is a sandbox system-of-record (impersonation
+ * keypairs that can't be recovered from chain) and must never be added
+ * here. Adding a new projection table? Add its name here AND it will
+ * be picked up by both the schema migration and the admin reset path.
+ */
+export const PROJECTION_TABLE_NAMES = [
+  'ingestion_state',
+  'auctions',
+  'auction_events',
+  'partitions',
+  'balances',
+  'balance_events',
+  'bond_events',
+] as const;
+
+export function dropProjectionTables(db: IngestionDatabase): void {
+  const stmts = PROJECTION_TABLE_NAMES.map((t) => `DROP TABLE IF EXISTS ${t};`).join('\n');
+  db.exec(stmts);
+}
+
 function migrateToCurrentVersion(db: IngestionDatabase): {
   ran: boolean;
   from: number;
@@ -196,16 +218,8 @@ function migrateToCurrentVersion(db: IngestionDatabase): {
   if (current >= SCHEMA_VERSION) {
     return { ran: false, from: current, to: current };
   }
-  db.exec(`
-    DROP TABLE IF EXISTS ingestion_state;
-    DROP TABLE IF EXISTS auctions;
-    DROP TABLE IF EXISTS auction_events;
-    DROP TABLE IF EXISTS partitions;
-    DROP TABLE IF EXISTS balances;
-    DROP TABLE IF EXISTS balance_events;
-    DROP TABLE IF EXISTS bond_events;
-    PRAGMA user_version = ${SCHEMA_VERSION};
-  `);
+  dropProjectionTables(db);
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return { ran: true, from: current, to: SCHEMA_VERSION };
 }
 

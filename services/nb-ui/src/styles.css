@@ -504,6 +504,7 @@ footer.app-footer {
 }
 .modal {
   background: var(--surface);
+  color: var(--ink);
   border-radius: var(--radius-md);
   box-shadow: 0 20px 60px -10px rgba(20, 35, 58, 0.35);
   width: 100%;
@@ -519,6 +520,7 @@ footer.app-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  color: var(--ink);
 }
 .modal-header h2 {
   font-family: var(--font-serif);
@@ -529,6 +531,7 @@ footer.app-footer {
 .modal-body {
   padding: var(--sp-5);
   overflow: auto;
+  color: var(--ink);
 }
 .modal-footer {
   padding: var(--sp-4) var(--sp-5);
@@ -537,6 +540,7 @@ footer.app-footer {
   justify-content: flex-end;
   gap: var(--sp-2);
   background: var(--surface-2);
+  color: var(--ink);
 }
 .modal-close {
   border: none;
