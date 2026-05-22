@@ -50,6 +50,59 @@
   subset (with validation that the subset matches the previously-published
   `allocationHash` to prevent inconsistent on-chain state).
 
+## nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable
+- Reproduces every time the operator restarts the PC / Docker host. Besu
+  takes a few seconds longer to become reachable than `nb-bond-api`
+  expects; the API pod boots first, fails its initial RPC handshake
+  with `getaddrinfo EAI_AGAIN besu.besu` (DNS not yet ready in the
+  cluster), logs a warning, and **gives up permanently**.
+- Symptom: after the restart, the API responds to `/v1/bonds`,
+  `/v1/auctions`, etc. with **stale data** — whatever the SQLite
+  ingestion DB held before the restart. New on-chain creates and bids
+  are accepted by the chain but never appear in API responses or the
+  UI lists, because the ingestion loop is no longer running.
+- Today's workaround: `kubectl -n nb-bond-api rollout restart deployment/nb-bond-api`
+  once Besu is up. The fresh pod handshakes successfully and ingestion
+  rebuilds the projection from `START_BLOCK`.
+- Root cause in `services/nb-bond-api/src/index.ts`:
+
+  ```ts
+  import('./ingestion')
+    .then(({ startIngestionLoop }) => startIngestionLoop())
+    .catch((err) => logger.warn(`failed to start ingestion loop: ${(err as Error).message}`));
+  ```
+
+  No retry, no backoff, no self-heal on transient RPC failures.
+
+- Planned follow-up: wrap `startIngestionLoop()` in a retry loop with
+  exponential backoff (e.g. 1s → 2s → 5s → 10s → 30s, max 30s),
+  capped at "forever — keep trying". Bonus: the inner ingestion poll
+  also catches `RpcUnavailableError` and logs at `warn`, but it
+  doesn't surface a degraded `/v1/health` status — the readiness
+  probe should reflect "ingestion lagging" so operators know to wait
+  vs restart.
+
+## nb-bond-api request-path chain reads bubble up as opaque 500s
+- Same root trigger as the ingestion bug above. When the operator runs
+  a request that needs a fresh chain read (auction create, close,
+  finalise, central-bank tx, bidder bid submission, even GETs that
+  resolve contract addresses), and the chain is unreachable, the
+  request fails with `500 Internal Server Error` and a `detail` like
+  `unhandled: RPC unavailable: request timeout (code=TIMEOUT,
+  version=6.16.0)`.
+- The operator can't tell from the response whether the contract
+  reverted (a real domain error worth understanding) or the chain
+  is simply unreachable (a wait-and-retry condition). The UI surfaces
+  the raw 500 as a toast, which is unhelpful.
+- Planned follow-up: in `services/nb-bond-api/src/index.ts`'s error
+  middleware, detect `RpcUnavailableError` (already exported by
+  `chain.ts`) and `getaddrinfo EAI_AGAIN` / `ECONNREFUSED` /
+  `request timeout` patterns from raw ethers errors, and translate
+  them to `503 Service Unavailable` with `detail: "RPC unavailable
+  — wait for the Besu pod to become ready, then retry"`. The
+  frontend's `httpClient.js` already maps `detail` into the toast
+  body, so the change lands without UI work.
+
 ## Auction close timing is chain-enforced — no operator discretion
 - `BondAuction.closeAuction` reverts with `InBidPhase()` (selector
   `0xeec5b85e`) when `block.timestamp <= metadata.end`. Once an auction
