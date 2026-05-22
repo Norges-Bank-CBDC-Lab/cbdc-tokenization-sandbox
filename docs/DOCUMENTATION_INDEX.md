@@ -15,6 +15,7 @@ This file lists the documentation that is most likely to need updates when behav
 - `docs/AZURE_BOUNDARY.md`: What this repo's charts and scripts can vs cannot be reused from a non-local (ArgoCD / Azure) deployment.
 - `docs/post-mortems/README.md`: Incident reports and historical troubleshooting write-ups.
 - `docs/plans/jupyter-removal-plan.md`: Deferred decommission plan for the JupyterHub-based script runner and its replacement path.
+- `docs/plans/operator-ui-backlog.md`: Follow-up backlog for the operator UI — items from the post-PR-#115 feedback list that were not landed in #117/#118. Working list; items move out as PRs land.
 - `docs/plans/archive/`: Reference-only archive of plans whose implementation has shipped. Status lines inside each plan link to the merging PRs:
   - `docs/plans/archive/openapi-v2-plan.md`: NB Bond API v2 design — bulky resource tree, md5 / ETag caching protocol, RFC 7807 problem+json errors, and dual auth modes (`none` / `entra`).
   - `docs/plans/archive/nb-ui-frontend-plan.md`: Implementation plan for the `services/nb-ui/` operator frontend (React + Vite), NB Bond API aggregate endpoints + CORS, and pluggable auth (none / Entra-MSAL).
