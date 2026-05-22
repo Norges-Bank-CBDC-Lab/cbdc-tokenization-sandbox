@@ -1,0 +1,27 @@
+{{- if .Values.persistence.enabled }}
+# Persistent volume for nb-bond-api's SQLite DB. Holds the chain-projection
+# tables (auctions, balances, bond_events, ...) AND the bidders
+# system-of-record (impersonation keypairs that cannot be recovered from
+# chain). Without this, every nb-bond-api pod restart wipes the bidder
+# roster — see "bidders disappear on helm upgrade" in docs/KNOWN_ISSUES.md.
+#
+# In the local Kind sandbox the storageClass defaults to `standard`, which
+# is the local-path-provisioner that ships with Kind. The backing directory
+# survives helm upgrades + pod restarts; it is gone on `kind delete cluster`.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nb-bond-api-data
+  namespace: {{ .Values.namespace | default "nb-bond-api" }}
+spec:
+  accessModes:
+    {{- range .Values.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | default "256Mi" | quote }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}

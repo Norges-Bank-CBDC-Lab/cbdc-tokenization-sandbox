@@ -358,28 +358,72 @@ function BidsCard({ bids }) {
   );
 }
 
+// Header badge that labels the allocation card's current lifecycle
+// state. The card differentiates three states with allocation data:
+//   - closed    — allocation computed, NOT yet on-chain ("Proposed")
+//   - finalised — allocation minted on-chain ("Minted")
+//   - rejected  — operator rejected the allocation
+// Plus the no-data states (open / cancelled). This matches the operator
+// feedback that "bids show all submitted bids; allocations show what was
+// actually minted", while still letting the operator preview the
+// proposed allocation between close and finalise — which is the whole
+// point of the approval gate.
+function allocationBadge(status) {
+  if (status === 'finalised') {
+    return { label: 'Minted on chain', color: '#10b981', bg: '#d1fae5' };
+  }
+  if (status === 'rejected') {
+    return { label: 'Allocation rejected', color: '#b91c1c', bg: '#fee2e2' };
+  }
+  if (status === 'closed') {
+    return { label: 'Proposed — pending finalisation', color: '#92400e', bg: '#fef3c7' };
+  }
+  return null;
+}
+
 function AllocationCard({ allocation, status }) {
+  const badge = allocationBadge(status);
+  const showTable = allocation && status !== 'open' && status !== 'cancelled';
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">Allocation</h3>
-        {allocation && (
+        {badge && (
+          <span
+            style={{
+              background: badge.bg,
+              color: badge.color,
+              padding: '2px 10px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {badge.label}
+          </span>
+        )}
+        {allocation && status !== 'open' && (
           <span className="muted mono" style={{ fontSize: 12 }}>
             Clearing rate {Fmt.bpsToPct(allocation.clearingRate)}
           </span>
         )}
       </div>
       <div className="card-body flush">
-        {!allocation || status === 'open' ? (
+        {status === 'open' && (
           <EmptyState
             title="No allocation yet"
-            message={
-              status === 'open'
-                ? 'Allocation is computed when the auction closes.'
-                : 'Allocation data unavailable.'
-            }
+            message="Bids are sealed and unrevealed. Allocation is computed when the auction closes."
           />
-        ) : (
+        )}
+        {status === 'cancelled' && (
+          <EmptyState
+            title="Auction cancelled"
+            message="No allocation was computed. All sealed bids stay on-chain but are not minted."
+          />
+        )}
+        {showTable && (
           <table className="tbl">
             <thead>
               <tr>
@@ -400,6 +444,12 @@ function AllocationCard({ allocation, status }) {
               ))}
             </tbody>
           </table>
+        )}
+        {showTable === false && allocation && status !== 'open' && status !== 'cancelled' && (
+          <EmptyState
+            title="No allocation data"
+            message="Auction was processed but the allocation block is empty."
+          />
         )}
       </div>
     </div>
