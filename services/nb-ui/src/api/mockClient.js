@@ -389,7 +389,50 @@ async function transferWnok({ to, amount }) {
 
 // #endregion
 
+// #region Health ─────────────────────────────────────────────────────
+
+async function getHealth() {
+  await delay();
+  const now = Date.now();
+  return {
+    status: 'ok',
+    contracts: {
+      bondManager: '0x0000000000000000000000000000000000000001',
+      bondAuction: '0x0000000000000000000000000000000000000002',
+      bondToken: '0x0000000000000000000000000000000000000003',
+      wnok: '0x0000000000000000000000000000000000000004',
+    },
+    sealingPubKey: '0x02bb5b47346ad274329f7a710362eae9230f83c6fb7c49027fafe668e9618371ea',
+    chain: {
+      rpcUrl: 'http://mock-rpc:8545',
+      chainId: 1337,
+      head: 1_700_000,
+      headReachable: true,
+    },
+    ingestion: {
+      loopRunning: true,
+      lastBlockProcessed: 1_700_000,
+      lag: 0,
+      pollIntervalMs: 3000,
+      lastTickAt: now,
+      lastEventTxHash: '0x' + 'ab'.repeat(32),
+      consecutiveFailures: 0,
+      recentErrors: [],
+    },
+  };
+}
+
+async function restartIngestion(_args = {}) {
+  await delay();
+  const health = await getHealth();
+  return { restarted: true, status: health.ingestion };
+}
+
+// #endregion
+
 export const MockClient = {
+  getHealth,
+  restartIngestion,
   listBonds,
   getBond,
   listBondHistory,

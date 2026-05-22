@@ -73,37 +73,18 @@
   `409 bidding window has closed` for expired auctions; the UI fix
   prevents the operator from triggering it by accident.
 
-## nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable
-- Reproduces every time the operator restarts the PC / Docker host. Besu
-  takes a few seconds longer to become reachable than `nb-bond-api`
-  expects; the API pod boots first, fails its initial RPC handshake
-  with `getaddrinfo EAI_AGAIN besu.besu` (DNS not yet ready in the
-  cluster), logs a warning, and **gives up permanently**.
-- Symptom: after the restart, the API responds to `/v1/bonds`,
-  `/v1/auctions`, etc. with **stale data** — whatever the SQLite
-  ingestion DB held before the restart. New on-chain creates and bids
-  are accepted by the chain but never appear in API responses or the
-  UI lists, because the ingestion loop is no longer running.
-- Today's workaround: `kubectl -n nb-bond-api rollout restart deployment/nb-bond-api`
-  once Besu is up. The fresh pod handshakes successfully and ingestion
-  rebuilds the projection from `START_BLOCK`.
-- Root cause in `services/nb-bond-api/src/index.ts`:
+## ~~nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable~~ — resolved
 
-  ```ts
-  import('./ingestion')
-    .then(({ startIngestionLoop }) => startIngestionLoop())
-    .catch((err) => logger.warn(`failed to start ingestion loop: ${(err as Error).message}`));
-  ```
-
-  No retry, no backoff, no self-heal on transient RPC failures.
-
-- Planned follow-up: wrap `startIngestionLoop()` in a retry loop with
-  exponential backoff (e.g. 1s → 2s → 5s → 10s → 30s, max 30s),
-  capped at "forever — keep trying". Bonus: the inner ingestion poll
-  also catches `RpcUnavailableError` and logs at `warn`, but it
-  doesn't surface a degraded `/v1/health` status — the readiness
-  probe should reflect "ingestion lagging" so operators know to wait
-  vs restart.
+Resolved by Plan B
+([`docs/plans/health-indicator-and-self-healing-plan.md`](plans/health-indicator-and-self-healing-plan.md)).
+`startIngestionLoopWithRetry()` in
+[`services/nb-bond-api/src/ingestion.ts`](../services/nb-bond-api/src/ingestion.ts)
+now wraps the boot in exponential backoff (1s → 2s → … → 30s, retries
+forever), so a transient `getaddrinfo EAI_AGAIN` at PC/Docker restart
+no longer leaves the API silently serving stale data. The same plan
+adds `chain` + `ingestion` blocks to `/v1/health` and a polling
+`HealthBadge` in the operator UI top bar so any future degradation is
+visible at a glance.
 
 ## nb-bond-api request-path chain reads bubble up as opaque 500s
 - Same root trigger as the ingestion bug above. When the operator runs

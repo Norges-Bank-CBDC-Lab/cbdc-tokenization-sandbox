@@ -10,6 +10,7 @@ import { AppConfig } from '../config.js';
 import { auth, authMode } from '../auth/index.js';
 import { getTestMode, setTestMode, subscribeTestMode } from '../utils/debugSettings.js';
 import { HttpClient } from '../api/httpClient.js';
+import { HealthBadge } from './HealthBadge.jsx';
 import { NorgesBankLogo } from './NorgesBankLogo.jsx';
 import { Button } from './ui.jsx';
 
@@ -165,9 +166,7 @@ export function Layout({ route, navigate, children }) {
           <div className="top-bar-right">
             <AuthChrome />
             <TestModeToggle />
-            <span className={`env-pill ${isMock ? 'mock' : ''}`}>
-              {isMock ? 'MOCK API' : 'LIVE'}
-            </span>
+            <HealthBadge />
             <span>v1.0.0</span>
           </div>
         </div>
