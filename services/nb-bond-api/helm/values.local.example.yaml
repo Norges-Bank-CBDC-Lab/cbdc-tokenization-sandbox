@@ -13,11 +13,27 @@ namespace: nb-bond-api
 imagePullPolicy: IfNotPresent
 
 # Sandbox-conservative hardening defaults. The image already pins USER node
-# (uid 1000); fsGroup makes the /app/data emptyDir writable for that uid.
+# (uid 1000); fsGroup makes the /app/data volume writable for that uid.
 # Override these blocks for non-local deployments to tighten further (e.g.
 # readOnlyRootFilesystem: true with appropriate writable tmp mounts).
 podSecurityContext:
   fsGroup: 1000
+
+# /app/data holds the SQLite DB: the chain-projection tables (auctions,
+# balances, bond_events, ...) which the ingestion loop can rebuild from
+# chain on its own, AND the bidders system-of-record (impersonation
+# keypairs that cannot be recovered from chain). Without persistence,
+# every pod restart wipes the bidder roster — the seed fixture then
+# repopulates the canonical set, but any operator-added bidders are gone.
+# In the local Kind sandbox the default storageClass `standard` is the
+# local-path-provisioner that ships with Kind; the data survives helm
+# upgrades + pod restarts and goes away on `kind delete cluster`.
+persistence:
+  enabled: true
+  size: 256Mi
+  accessModes:
+    - ReadWriteOnce
+  # storageClass: standard   # explicit override; default uses cluster default
 
 securityContext:
   runAsNonRoot: true

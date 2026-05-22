@@ -16,12 +16,35 @@ import {
 } from '../components/ui.jsx';
 import { CreateAuctionModal } from './CreateAuctionModal.jsx';
 
+const HIDE_CANCELLED_KEY = 'nb-ui:auctions:hideCancelled';
+
+function readHideCancelled() {
+  try {
+    const raw = window.localStorage.getItem(HIDE_CANCELLED_KEY);
+    if (raw == null) return true; // default: hide
+    return raw === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function writeHideCancelled(value) {
+  try {
+    window.localStorage.setItem(HIDE_CANCELLED_KEY, value ? 'true' : 'false');
+  } catch {
+    /* ignore — non-essential preference */
+  }
+}
+
 export function AuctionsPage({ navigate }) {
   const { data, loading, error, reload } = useApi(() => AuctionsApi.listAuctions(), []);
   const [showCreate, setShowCreate] = useState(false);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  // Default ON: cancelled auctions are clutter when an operator is
+  // looking at active state. Setting persists across reloads.
+  const [hideCancelled, setHideCancelled] = useState(() => readHideCancelled());
   const toast = useToast();
 
   const auctions = useMemo(() => data ?? [], [data]);
@@ -29,13 +52,14 @@ export function AuctionsPage({ navigate }) {
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     return auctions.filter((a) => {
+      if (hideCancelled && a.status === 'cancelled' && statusFilter !== 'cancelled') return false;
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       if (typeFilter !== 'all' && a.type !== typeFilter) return false;
       if (ql && !(a.isin.toLowerCase().includes(ql) || a.id.toLowerCase().includes(ql)))
         return false;
       return true;
     });
-  }, [auctions, q, statusFilter, typeFilter]);
+  }, [auctions, q, statusFilter, typeFilter, hideCancelled]);
 
   const counts = useMemo(() => {
     const acc = { total: auctions.length, open: 0, closed: 0, finalised: 0 };
@@ -128,6 +152,31 @@ export function AuctionsPage({ navigate }) {
           <option value="PRICE">PRICE</option>
           <option value="BUYBACK">BUYBACK</option>
         </select>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 13,
+            color: 'var(--ink-2, #4b5563)',
+            cursor: 'pointer',
+          }}
+          title={
+            'Cancelled auctions remain in the chain log; hiding keeps the working list focused ' +
+            'on active state. Setting persists across page reloads.'
+          }
+        >
+          <input
+            type="checkbox"
+            checked={hideCancelled}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setHideCancelled(next);
+              writeHideCancelled(next);
+            }}
+          />
+          Hide cancelled
+        </label>
         <span className="count">
           {filtered.length} of {auctions.length}
         </span>
@@ -160,6 +209,12 @@ export function AuctionsPage({ navigate }) {
                 <th>Type</th>
                 <th>Status</th>
                 <th className="num">Size (units)</th>
+                <th
+                  className="num"
+                  title="Number of bids submitted on this auction. Sealed while the auction is open; revealed at close."
+                >
+                  Bids
+                </th>
                 <th className="num">Ends</th>
                 <th></th>
               </tr>
@@ -187,6 +242,7 @@ export function AuctionsPage({ navigate }) {
                     <StatusBadge status={a.status} />
                   </td>
                   <td className="num mono">{Fmt.formatUnits(a.size)}</td>
+                  <td className="num mono">{a.bids?.length ?? 0}</td>
                   <td className="num">
                     <div>{Fmt.formatUnixDate(a.end)}</div>
                     <div className="muted" style={{ fontSize: 11 }}>

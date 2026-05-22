@@ -46,10 +46,18 @@ spec:
                 optional: true
           volumeMounts:
             # The image bakes /app/{dist,node_modules,package.json}. The only
-            # writable runtime path is the SQLite ingestion DB under /app/data,
-            # made writable for the runtime uid via the pod-level fsGroup.
+            # writable runtime path is the SQLite ingestion DB under /app/data.
+            # When persistence.enabled (default for sandbox), this is backed by
+            # a PVC so the bidders system-of-record survives pod restarts.
+            # Otherwise an emptyDir fallback keeps the chart deployable in
+            # environments without a storage class.
             - name: nb-bond-api-data
               mountPath: /app/data
       volumes:
         - name: nb-bond-api-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: nb-bond-api-data
+          {{- else }}
           emptyDir: {}
+          {{- end }}
