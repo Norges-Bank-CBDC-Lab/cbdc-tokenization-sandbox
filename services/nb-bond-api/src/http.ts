@@ -2,7 +2,7 @@
  * HTTP response helpers: md5, ETag/304, RFC 7807 problem+json.
  *
  * Used by every handler to keep responses uniform. See
- * docs/plans/openapi-v2-plan.md §3.5–§3.6.
+ * docs/plans/archive/openapi-v2-plan.md §3.5–§3.6.
  */
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';

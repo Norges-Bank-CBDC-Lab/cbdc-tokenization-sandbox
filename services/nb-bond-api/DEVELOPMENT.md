@@ -118,7 +118,7 @@ The API treats bond quantities as whole "units". In this sandbox, `size` and `un
 
 Base path is `/v1`. All request and response bodies are JSON. The full
 v2 design (rationale + DTO catalog) lives in
-[`docs/openapi-v2-plan.md`](../../docs/plans/openapi-v2-plan.md).
+[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md).
 
 Two architectural rules apply across the surface:
 

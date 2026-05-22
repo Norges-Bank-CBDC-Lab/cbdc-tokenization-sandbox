@@ -1,7 +1,7 @@
 /**
  * auctionsApi — auction-resource API surface.
  *
- * Maps to the v2 endpoint catalog (docs/plans/openapi-v2-plan.md §5):
+ * Maps to the v2 endpoint catalog (docs/plans/archive/openapi-v2-plan.md §5):
  *   - PATCH /v1/auctions/{id} { status: "closed" }  → close
  *   - DELETE /v1/auctions/{id}                       → cancel
  *   - PUT /v1/auctions/{id}/finalisation             → approve/reject

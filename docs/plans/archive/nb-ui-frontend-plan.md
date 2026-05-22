@@ -1,7 +1,7 @@
 # NB UI Frontend — Implementation Plan
 
-**Status:** Planned
-**Branch:** `feature-frontend/nb-ui`
+**Status:** ✅ Implemented and shipped. Initial frontend landed in [PR #78](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/78) ("Add nb-ui operator frontend with pluggable auth"); follow-up hardening in PRs #80, #89, #90, #97. Subsequent iterations layered on additional pages (bidders + central bank in [PR #113](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/113), expiry-aware bid UI in [PR #114](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/114), and the health-indicator/recovery surface in [PR #115](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/115)). No outstanding work items from this plan.
+**Branch:** `feature-frontend/nb-ui` (planned name) — actual PR branches per-iteration
 **Component:** new `services/nb-ui/` (React + Vite) + supporting `services/nb-bond-api/` changes + `infra/gateway/` route + `sandbox.sh` wiring
 
 ## Goal
