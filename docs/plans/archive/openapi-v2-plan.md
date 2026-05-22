@@ -112,9 +112,9 @@ the intended secure deployment and one spec serves both modes.
   - Issuer auto-derived from tenant; JWKS fetched and cached.
 
 **Frontend (nb-ui)** already has the abstraction in place:
-- [services/nb-ui/src/auth/noneAuth.js](../../services/nb-ui/src/auth/noneAuth.js) returns no Authorization header
-- [services/nb-ui/src/auth/entraAuth.js](../../services/nb-ui/src/auth/entraAuth.js) acquires a token (MSAL-style) and returns `Authorization: Bearer <token>`
-- [services/nb-ui/src/api/httpClient.js](../../services/nb-ui/src/api/httpClient.js) already pulls auth headers per request
+- [services/nb-ui/src/auth/noneAuth.js](../../../services/nb-ui/src/auth/noneAuth.js) returns no Authorization header
+- [services/nb-ui/src/auth/entraAuth.js](../../../services/nb-ui/src/auth/entraAuth.js) acquires a token (MSAL-style) and returns `Authorization: Bearer <token>`
+- [services/nb-ui/src/api/httpClient.js](../../../services/nb-ui/src/api/httpClient.js) already pulls auth headers per request
 
 This means: SPA stays as-is, backend gains the validation layer.
 Helm values (configured by ArgoCD) must keep the two ends in sync —

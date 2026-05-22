@@ -43,7 +43,7 @@ real backend — it returns the exact response envelopes defined in
 ## API surface and cache-first data flow
 
 The backend serves a bulky resource tree (see
-[`docs/openapi-v2-plan.md`](../../docs/plans/openapi-v2-plan.md)). A single
+[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md)). A single
 `BondsApi.listBonds()` call returns every bond with its nested
 `auctions[]`, `bids[]`, `allocation`, and `holders[]`. Pages slice
 that tree client-side via selectors in
@@ -198,7 +198,7 @@ _doesn't_ bust the cache.
 - The CSP / security headers from nginx-unprivileged's defaults are
   permissive enough to load the React bundle in a sandbox context. A
   non-local deployment should tighten CSP via a custom nginx config —
-  flagged in `docs/plans/nb-ui-frontend-plan.md` Portability Flags.
+  flagged in `docs/plans/archive/nb-ui-frontend-plan.md` Portability Flags.
 
 ## Follow-ups
 

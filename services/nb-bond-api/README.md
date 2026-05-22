@@ -10,7 +10,7 @@ service-layer overview.
 When running inside the sandbox, the API is reachable via the gateway at `http://bond-api.cbdc-sandbox.local/` (the start scripts add the `/etc/hosts` entry).
 
 The HTTP surface is the v2 bulky-tree contract described in
-[`docs/openapi-v2-plan.md`](../../docs/plans/openapi-v2-plan.md): a single
+[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md): a single
 `GET /v1/bonds` returns every bond with its nested auctions, bids,
 allocations, and holders, and mutations return the updated parent
 resource so the UI can swap its cache atomically. Each cacheable DTO
@@ -30,7 +30,7 @@ Two sandbox-only resource families sit alongside the bond tree:
   signs the EIP-712 `BidIntent`, dual-wraps with the auctioneer sealing
   key, and submits on-chain from a wallet bound to the bidder's stored
   key. Private keys are stored in plaintext in the local SQLite DB;
-  see [`docs/plans/bidders-and-central-bank-plan.md`](../../docs/plans/bidders-and-central-bank-plan.md).
+  see [`docs/plans/archive/bidders-and-central-bank-plan.md`](../../docs/plans/archive/bidders-and-central-bank-plan.md).
 - **`central-bank`** — Norges Bank operator surface against the WNOK
   contract. `GET /v1/central-bank` returns the CB summary (address,
   balance, allowlist size, `available` flag); `GET/PUT/DELETE

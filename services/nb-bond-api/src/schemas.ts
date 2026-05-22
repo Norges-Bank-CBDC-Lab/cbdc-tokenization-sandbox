@@ -6,7 +6,7 @@
  * this module. The runtime serves the same document at /v1/openapi.json
  * and /docs.
  *
- * Plan reference: docs/plans/openapi-v2-plan.md.
+ * Plan reference: docs/plans/archive/openapi-v2-plan.md.
  */
 import { createDocument, type ZodOpenApiPathsObject } from 'zod-openapi';
 import { z } from 'zod';
@@ -1189,7 +1189,7 @@ export const openApiDocument = createDocument({
     description:
       'Public API for the CBDC tokenization sandbox bond service. ' +
       'Sandbox-scale demo backing the nb-ui reference frontend. ' +
-      'See docs/plans/openapi-v2-plan.md for design notes.',
+      'See docs/plans/archive/openapi-v2-plan.md for design notes.',
     license: {
       name: 'Apache-2.0',
       url: 'https://www.apache.org/licenses/LICENSE-2.0',

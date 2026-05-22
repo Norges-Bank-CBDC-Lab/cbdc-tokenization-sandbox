@@ -76,7 +76,7 @@
 ## ~~nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable~~ — resolved
 
 Resolved by Plan B
-([`docs/plans/health-indicator-and-self-healing-plan.md`](plans/health-indicator-and-self-healing-plan.md)).
+([`docs/plans/archive/health-indicator-and-self-healing-plan.md`](plans/archive/health-indicator-and-self-healing-plan.md)).
 `startIngestionLoopWithRetry()` in
 [`services/nb-bond-api/src/ingestion.ts`](../services/nb-bond-api/src/ingestion.ts)
 now wraps the boot in exponential backoff (1s → 2s → … → 30s, retries
@@ -148,7 +148,7 @@ visible at a glance.
   before close, add `cancelBid(bytes32 auctionId, uint256 bidIndex)`
   guarded by `msg.sender == bid.bidder` and the `BIDDING` phase, with
   a `BidCancelled` event picked up by ingestion. Tracked in
-  [`docs/plans/bidders-and-central-bank-plan.md`](plans/bidders-and-central-bank-plan.md).
+  [`docs/plans/archive/bidders-and-central-bank-plan.md`](plans/archive/bidders-and-central-bank-plan.md).
 
 ## Central Bank operator is not on its own WNOK allowlist by default
 - The local WNOK deploy (`contracts/script/norges-bank/03_Wnok.s.sol`

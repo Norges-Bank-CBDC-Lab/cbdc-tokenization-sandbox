@@ -3,7 +3,7 @@
   "info": {
     "title": "NB Bond Auction Service",
     "version": "2.0.0",
-    "description": "Public API for the CBDC tokenization sandbox bond service. Sandbox-scale demo backing the nb-ui reference frontend. See docs/plans/openapi-v2-plan.md for design notes.",
+    "description": "Public API for the CBDC tokenization sandbox bond service. Sandbox-scale demo backing the nb-ui reference frontend. See docs/plans/archive/openapi-v2-plan.md for design notes.",
     "license": {
       "name": "Apache-2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0"

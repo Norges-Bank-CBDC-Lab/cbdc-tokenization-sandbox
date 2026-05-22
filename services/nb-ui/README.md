@@ -71,7 +71,7 @@ Both `#/bidders` and `#/central-bank` carry a visible **sandbox-only**
 banner; private keys are stored in plaintext server-side and these
 pages must never be enabled outside the local sandbox.
 
-See `docs/plans/nb-ui-frontend-plan.md` for the original frontend plan
-and `docs/plans/bidders-and-central-bank-plan.md` for the bidders +
+See `docs/plans/archive/nb-ui-frontend-plan.md` for the original frontend plan
+and `docs/plans/archive/bidders-and-central-bank-plan.md` for the bidders +
 Central Bank iteration. Follow-ups are tracked in
 `docs/KNOWN_ISSUES.md`.

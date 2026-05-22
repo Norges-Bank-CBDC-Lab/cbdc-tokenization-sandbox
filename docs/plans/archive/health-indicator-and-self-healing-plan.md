@@ -1,7 +1,7 @@
 # Health Indicator + Self-Healing Ingestion — Implementation Plan (Plan B)
 
-**Status:** Planned
-**Branch:** `feature/health-indicator-and-self-healing`
+**Status:** ✅ Implemented and shipped in [PR #115](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/115). Plan B and Plan C landed together as one squashed commit on `feature/health-indicator-and-modal` (the original `feature/health-indicator-and-self-healing` branch was renamed when the two plans were combined into a single PR). No outstanding work items.
+**Branch:** `feature/health-indicator-and-modal` (combined Plan B + Plan C)
 **Components:** `services/nb-bond-api/` (ingestion self-heal + extended `/v1/health` payload) and `services/nb-ui/` (top-bar `HealthBadge` polling).
 
 This is **Plan B** of a two-iteration design. See [`network-health-modal-and-reconnect-plan.md`](network-health-modal-and-reconnect-plan.md) for **Plan C** (modal + manual reconnect) which builds on the foundations laid here.

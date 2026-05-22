@@ -1,7 +1,7 @@
 /**
  * nb-bond-api HTTP server.
  *
- * Routes the v2 endpoint catalog described in docs/plans/openapi-v2-plan.md
+ * Routes the v2 endpoint catalog described in docs/plans/archive/openapi-v2-plan.md
  * §5. Each handler:
  *   - validates request params/body via Zod (validation.ts)
  *   - composes the bulky-tree response DTO via compose.ts

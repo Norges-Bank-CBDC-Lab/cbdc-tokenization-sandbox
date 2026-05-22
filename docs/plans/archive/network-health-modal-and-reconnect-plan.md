@@ -1,7 +1,7 @@
 # Network Health Modal + Manual Reconnect — Implementation Plan (Plan C)
 
-**Status:** Planned — depends on Plan B
-**Branch:** `feature/network-health-modal-and-reconnect`
+**Status:** ✅ Implemented and shipped in [PR #115](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/115). Combined with Plan B into a single squashed commit on `feature/health-indicator-and-modal`. No outstanding work items.
+**Branch:** `feature/health-indicator-and-modal` (combined Plan B + Plan C)
 **Components:** `services/nb-bond-api/` (recent-error ring buffer + new admin endpoint) and `services/nb-ui/` (clickable HealthBadge → modal with reconnect action).
 
 This is **Plan C**, the additive delta on top of **Plan B** ([`health-indicator-and-self-healing-plan.md`](health-indicator-and-self-healing-plan.md)). **Do not start Plan C until Plan B is shipped and merged.** Plan C assumes Plan B's foundations (`getIngestionStatus()`, extended `/v1/health`, `HealthBadge`) already exist.
