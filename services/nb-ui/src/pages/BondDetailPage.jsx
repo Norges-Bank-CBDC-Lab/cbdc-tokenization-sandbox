@@ -78,7 +78,7 @@ export function BondDetailPage({ isin, navigate }) {
             <StatusBadge status={b.status} />
             <span>·</span>
             <span>
-              Coupon rate {Fmt.bpsToPct(b.coupon?.yieldBps)} · matures{' '}
+              Coupon rate {Fmt.bpsToPct(b.coupon?.rateBps)} · matures{' '}
               {Fmt.formatUnixDate(b.maturity?.date)}
             </span>
           </div>
@@ -109,7 +109,7 @@ export function BondDetailPage({ isin, navigate }) {
           }
         >
           <div className="kpi-label">Coupon rate</div>
-          <div className="kpi-value">{Fmt.bpsToPct(b.coupon?.yieldBps)}</div>
+          <div className="kpi-value">{Fmt.bpsToPct(b.coupon?.rateBps)}</div>
           <div className="kpi-sub">Annualised, fixed at issuance</div>
         </div>
         <div className="kpi">
@@ -169,7 +169,7 @@ export function BondDetailPage({ isin, navigate }) {
               >
                 Coupon rate
               </dt>
-              <dd>{Fmt.bpsToPct(b.coupon?.yieldBps)}</dd>
+              <dd>{Fmt.bpsToPct(b.coupon?.rateBps)}</dd>
               <dt>Coupon payments (total)</dt>
               <dd className="mono">{b.coupon?.payments?.total ?? '—'}</dd>
               <dt>Total supply</dt>

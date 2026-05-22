@@ -127,7 +127,7 @@ function makeBond(opts) {
     },
     coupon: {
       duration: couponDuration,
-      yieldBps: couponYieldBps,
+      rateBps: couponYieldBps,
       payments: {
         total: String(paymentsTotal),
         made: String(paymentsMade),

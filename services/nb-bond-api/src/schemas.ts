@@ -290,8 +290,12 @@ const couponSchema = z
     duration: bigIntStringSchema.nullable().meta({
       description: 'Seconds between coupon payments',
     }),
-    yieldBps: bpsSchema.nullable().meta({
-      description: 'Annualised coupon yield in bps',
+    rateBps: bpsSchema.nullable().meta({
+      description:
+        'Contractual annualised coupon rate in bps, fixed at bond issuance. ' +
+        'Not the same as yield-to-maturity, which depends on the secondary-market ' +
+        'price the holder paid; the sandbox has no secondary market so they coincide ' +
+        'at par issuance.',
     }),
     payments: couponPaymentsSchema,
   })

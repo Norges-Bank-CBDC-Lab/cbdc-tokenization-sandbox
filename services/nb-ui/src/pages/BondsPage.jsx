@@ -158,7 +158,7 @@ export function BondsPage({ navigate }) {
                   <td>
                     <StatusBadge status={b.status} />
                   </td>
-                  <td className="num mono">{Fmt.bpsToPct(b.coupon?.yieldBps)}</td>
+                  <td className="num mono">{Fmt.bpsToPct(b.coupon?.rateBps)}</td>
                   <td className="num">{Fmt.formatUnixDate(b.maturity?.date)}</td>
                   <td className="num mono">{Fmt.formatUnits(b.totalSupply)}</td>
                   <td className="num mono">

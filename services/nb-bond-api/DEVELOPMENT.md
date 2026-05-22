@@ -114,6 +114,15 @@ Important: the same field name `rate` is reused across auction types:
 
 The API treats bond quantities as whole "units". In this sandbox, `size` and `units` are expressed in whole 1,000 NOK nominal units (see `CreateAuctionRequest.size` description in `services/nb-bond-api/src/schemas.ts`).
 
+### 3.5 Rate vs yield (naming convention)
+
+The DTO uses **rate** for any contractually fixed-at-issuance value and reserves **yield** for market-derived returns. Concretely:
+
+- `Bond.coupon.rateBps` — contractual annual coupon rate, fixed when the bond is issued.
+- `Auction.bids[].rate` and `Auction.allocation.clearingRate` — bidder-quoted / cleared rate for the auction; in a RATE auction this is a yield in bps, in PRICE / BUYBACK it's a price per 100 nominal in bps precision (see §3.3).
+
+The sandbox has no secondary-market price discovery, so at par issuance the coupon rate equals the buyer's yield-to-maturity. Once secondary trading is added, **yield** can re-enter the surface as a derived field on holder views; until then no DTO uses `yield*` keys.
+
 ## 4. Endpoint reference (v2)
 
 Base path is `/v1`. All request and response bodies are JSON. The full
