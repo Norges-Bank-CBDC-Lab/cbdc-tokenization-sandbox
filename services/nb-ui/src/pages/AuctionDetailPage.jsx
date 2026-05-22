@@ -24,6 +24,45 @@ import { AuctionLifecyclePanel } from './AuctionLifecyclePanel.jsx';
 import { PlaceBidModal } from './PlaceBidModal.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
 
+/**
+ * Renders a long hex string in full, wrappable + monospace, with a
+ * one-click Copy button. Falls back to a select-all hint when the
+ * clipboard API is unavailable (e.g. non-secure context).
+ */
+function CopyableHex({ value }) {
+  const [copied, setCopied] = useState(false);
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — user can still triple-click to select */
+    }
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <code
+        className="mono"
+        style={{
+          flex: 1,
+          wordBreak: 'break-all',
+          background: 'var(--surface-2, #f5f6fa)',
+          padding: '4px 6px',
+          borderRadius: 4,
+          fontSize: 12,
+          userSelect: 'all',
+        }}
+      >
+        {value}
+      </code>
+      <Button size="sm" variant="ghost" onClick={onCopy} title="Copy to clipboard">
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
+}
+
 export function AuctionDetailPage({ auctionId, navigate }) {
   const auctionQ = useApi(() => AuctionsApi.getAuction(auctionId), [auctionId]);
   const biddersQ = useApi(() => BiddersApi.listBidders(), []);
@@ -225,8 +264,19 @@ export function AuctionDetailPage({ auctionId, navigate }) {
               <dd className="mono">{Fmt.formatUnits(auction.size)} units</dd>
               <dt>End</dt>
               <dd>{Fmt.formatUnixDate(auction.end)}</dd>
-              <dt>Sealing public key</dt>
-              <dd className="mono">{Fmt.shortHex(auction.sealingPubKey, 12, 8)}</dd>
+              <dt
+                title={
+                  'Bidders encrypt the plaintext of their bid against this public key before ' +
+                  'submitting it on-chain. The auctioneer holds the matching private key and ' +
+                  'unseals every bid only after closeAuction(). Copy the full value below into ' +
+                  'the bid-encryption CLI.'
+                }
+              >
+                Sealing public key
+              </dt>
+              <dd>
+                <CopyableHex value={auction.sealingPubKey} />
+              </dd>
             </dl>
           </div>
         </div>

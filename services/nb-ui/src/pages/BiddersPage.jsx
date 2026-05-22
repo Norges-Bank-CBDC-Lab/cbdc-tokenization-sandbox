@@ -124,10 +124,25 @@ export function BiddersPage() {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Address</th>
-                <th>Public key</th>
+                <th
+                  title={
+                    'On-chain identity: 20-byte EVM address derived from the public key ' +
+                    '(last 20 bytes of keccak256 of the uncompressed pubkey). Used as ' +
+                    'msg.sender when the API submits this bidder’s transactions.'
+                  }
+                >
+                  Address
+                </th>
+                <th
+                  title={
+                    'Compressed secp256k1 public key (33 bytes, SEC1). Used to verify ECDSA ' +
+                    'signatures on this bidder’s bid intents. Bid plaintexts are encrypted to ' +
+                    'the auction’s separate sealing key — not to this key.'
+                  }
+                >
+                  Public key
+                </th>
                 <th className="num">WNOK</th>
-                <th className="num">ETH (wei)</th>
                 <th></th>
               </tr>
             </thead>
@@ -135,10 +150,13 @@ export function BiddersPage() {
               {bidders.map((b) => (
                 <tr key={b.address}>
                   <td>{b.name}</td>
-                  <td className="mono">{b.address}</td>
-                  <td className="mono">{Fmt.shortHex(b.publicKey, 8, 6)}</td>
+                  <td className="mono" title={b.address}>
+                    {b.address}
+                  </td>
+                  <td className="mono" title={b.publicKey}>
+                    {Fmt.shortHex(b.publicKey, 8, 6)}
+                  </td>
                   <td className="num mono">{Fmt.formatUnits(b.wnokBalance)}</td>
-                  <td className="num mono">{Fmt.formatUnits(b.ethBalance)}</td>
                   <td className="right" style={{ whiteSpace: 'nowrap' }}>
                     <Button
                       size="sm"
@@ -209,19 +227,42 @@ function RevealKeyModal({ bidder, onClose }) {
         this sandbox.
       </SandboxOnlyBanner>
       <div className="field">
-        <label>Address</label>
+        <label
+          title={
+            'On-chain identity. 20-byte EVM address derived from the public key ' +
+            '(last 20 bytes of keccak256 of the uncompressed pubkey). Appears as ' +
+            'msg.sender on every transaction the API submits on this bidder’s behalf.'
+          }
+        >
+          Address
+        </label>
         <div className="mono" style={{ wordBreak: 'break-all' }}>
           {bidder.address}
         </div>
       </div>
       <div className="field">
-        <label>Public key (compressed)</label>
+        <label
+          title={
+            'Compressed secp256k1 public key (33 bytes, SEC1). Used to verify ECDSA ' +
+            'signatures on bid intents from this bidder. NOT used to encrypt bids — ' +
+            'that uses the auction’s separate sealingPubKey.'
+          }
+        >
+          Public key (compressed)
+        </label>
         <div className="mono" style={{ wordBreak: 'break-all' }}>
           {bidder.publicKey}
         </div>
       </div>
       <div className="field">
-        <label>Private key</label>
+        <label
+          title={
+            'secp256k1 private key. Signs every tx and bid intent the API sends on this ' +
+            'bidder’s behalf. Stored in plaintext in the sandbox SQLite DB — sandbox-only.'
+          }
+        >
+          Private key (signing)
+        </label>
         <div className="mono" style={{ wordBreak: 'break-all', color: '#7a3a00' }}>
           {bidder.privateKey}
         </div>

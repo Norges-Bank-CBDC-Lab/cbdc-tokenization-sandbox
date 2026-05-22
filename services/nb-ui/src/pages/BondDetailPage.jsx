@@ -78,7 +78,7 @@ export function BondDetailPage({ isin, navigate }) {
             <StatusBadge status={b.status} />
             <span>·</span>
             <span>
-              Coupon {Fmt.bpsToPct(b.coupon?.yieldBps)} · matures{' '}
+              Coupon rate {Fmt.bpsToPct(b.coupon?.yieldBps)} · matures{' '}
               {Fmt.formatUnixDate(b.maturity?.date)}
             </span>
           </div>
@@ -99,10 +99,18 @@ export function BondDetailPage({ isin, navigate }) {
           <div className="kpi-value mono">{Fmt.formatUnits(b.totalSupply)}</div>
           <div className="kpi-sub">{Fmt.formatNok(b.totalSupply)}</div>
         </div>
-        <div className="kpi">
-          <div className="kpi-label">Coupon yield</div>
+        <div
+          className="kpi"
+          title={
+            'Contractual annual coupon rate fixed at bond creation. ' +
+            'Not the same as yield-to-maturity, which would depend on the market price the ' +
+            'investor paid — there is no secondary-market pricing in this sandbox, so the two ' +
+            'coincide at par issuance.'
+          }
+        >
+          <div className="kpi-label">Coupon rate</div>
           <div className="kpi-value">{Fmt.bpsToPct(b.coupon?.yieldBps)}</div>
-          <div className="kpi-sub">Annualised</div>
+          <div className="kpi-sub">Annualised, fixed at issuance</div>
         </div>
         <div className="kpi">
           <div className="kpi-label">Time to maturity</div>
@@ -131,13 +139,36 @@ export function BondDetailPage({ isin, navigate }) {
               <dd>
                 <StatusBadge status={b.status} />
               </dd>
-              <dt>Maturity duration</dt>
+              <dt
+                title={
+                  'Time from bond issuance until principal is redeemed to holders. After ' +
+                  'maturity, the bond stops paying coupons and the issuer redeems the units.'
+                }
+              >
+                Maturity duration
+              </dt>
               <dd>{Fmt.durationToYears(b.maturity?.duration)}</dd>
               <dt>Maturity date</dt>
               <dd>{Fmt.formatUnixDate(b.maturity?.date)}</dd>
-              <dt>Coupon duration</dt>
+              <dt
+                title={
+                  'Time between coupon payments. Coupons are paid out periodically until ' +
+                  'maturity (or early redemption); the issuer’s next coupon payment is due ' +
+                  'one coupon-duration after the previous one.'
+                }
+              >
+                Coupon duration
+              </dt>
               <dd>{Fmt.durationToYears(b.coupon?.duration)}</dd>
-              <dt>Coupon yield</dt>
+              <dt
+                title={
+                  'Contractual annual rate paid per coupon — fixed at issuance. Distinct from ' +
+                  'yield-to-maturity, which adjusts for market price; the sandbox has no ' +
+                  'secondary-market pricing so the two are equal at par issuance.'
+                }
+              >
+                Coupon rate
+              </dt>
               <dd>{Fmt.bpsToPct(b.coupon?.yieldBps)}</dd>
               <dt>Coupon payments (total)</dt>
               <dd className="mono">{b.coupon?.payments?.total ?? '—'}</dd>
