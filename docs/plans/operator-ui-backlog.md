@@ -17,6 +17,7 @@ Already landed on `development` via PR #115 + #117 (PR #118 squash-merged into #
 - Allocation card lifecycle gating with five-state coloured pill (item 9)
 - Sealing public key rendered in full with one-click Copy + role tooltip (item 10)
 - Coupon-rate vs coupon-yield UI relabel + tooltips (items 13 + 14 surface)
+- Backend DTO rename `coupon.yieldBps` → `coupon.rateBps` (item 14b — paired with the UI relabel above)
 - Health-indicator self-heal + admin reconnect/resync (Plans B + C, from PR #115)
 - `nb-bond-api` SQLite persistence via PVC (item 2, bidders survive pod restarts)
 
@@ -88,24 +89,6 @@ Two closely related contract-level gaps that are worth designing together so the
 **Suggested first step next session:** invoke the `sandbox-implementation-planner` skill with both items as input. Expected output is a single Plan D doc covering contract + ingestion + API + UI + tests, with phased delivery and rollback paths.
 
 **Effort estimate (rough, pre-plan):** ~3–5 days of focused work spread across the four layers. Contract changes need Slither + Foundry tests, the rest follows the Plan B/C pattern.
-
----
-
-### 14b — Rename DTO field `couponYieldBps` → `couponRateBps`
-
-**Status:** TODO (paired with item 14's UI relabel that already shipped).
-
-PR #117 relabelled "Coupon yield" → "Coupon rate" in the UI but left the backend DTO field as `b.coupon.yieldBps` because the rename has blast radius across:
-
-- `services/nb-bond-api/src/schemas.ts` — Zod schema field
-- `services/nb-bond-api/openapi.json` — generated snapshot (regen)
-- `services/nb-bond-api/src/compose.ts` — DTO assembly
-- Any frontend type / accessor that reads `coupon.yieldBps`
-- Tests on either side
-
-**Suggested approach:** single PR, mechanical rename, with a brief deprecation note in `DEVELOPMENT.md` §3 explaining the field naming convention going forward (use "rate" for contractual rates fixed at issuance; reserve "yield" for market-derived yields if/when a secondary market is added).
-
-**Effort:** ~1–2 hours including the regen.
 
 ## Done criteria for this backlog doc
 

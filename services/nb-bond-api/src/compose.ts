@@ -590,7 +590,7 @@ export async function composeBond(
       couponDuration !== null || couponYield !== null || couponPaymentsTotal !== null
         ? {
             duration: couponDuration ? couponDuration.toString() : null,
-            yieldBps: couponYield ? couponYield.toString() : null,
+            rateBps: couponYield ? couponYield.toString() : null,
             payments: {
               total: couponPaymentsTotal ? couponPaymentsTotal.toString() : null,
               made: couponPaymentCount !== null ? couponPaymentCount.toString() : null,

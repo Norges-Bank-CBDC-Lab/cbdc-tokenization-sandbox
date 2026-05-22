@@ -2133,7 +2133,7 @@
             ],
             "description": "Seconds between coupon payments"
           },
-          "yieldBps": {
+          "rateBps": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/Bps"
@@ -2142,7 +2142,7 @@
                 "type": "null"
               }
             ],
-            "description": "Annualised coupon yield in bps"
+            "description": "Contractual annualised coupon rate in bps, fixed at bond issuance. Not the same as yield-to-maturity, which depends on the secondary-market price the holder paid; the sandbox has no secondary market so they coincide at par issuance."
           },
           "payments": {
             "$ref": "#/components/schemas/CouponPayments"
@@ -2150,7 +2150,7 @@
         },
         "required": [
           "duration",
-          "yieldBps",
+          "rateBps",
           "payments"
         ],
         "additionalProperties": false,
