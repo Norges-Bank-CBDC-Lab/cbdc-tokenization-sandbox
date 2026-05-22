@@ -43,12 +43,39 @@ export function selectAllAuctions(bonds) {
 }
 
 /**
- * Auctions in the on-chain `BIDDING` phase — the only auctions a
- * bidder is allowed to submit against. Returns a flat array with the
- * auction's parent ISIN attached for convenient labelling.
+ * Auctions in the on-chain `BIDDING` phase. Note this is status-only
+ * and includes auctions whose `end` timestamp has already passed —
+ * such auctions sit in a "limbo" (chain rejects new bids but the
+ * `status` doesn't flip to `closed` until someone calls
+ * `closeAuction`). Use `selectBidAcceptingAuctions` for the stricter
+ * "still-takes-bids" filter the PlaceBidModal needs.
  */
 export function selectOpenAuctions(bonds) {
   return selectAllAuctions(bonds).filter((a) => a.status === 'open');
+}
+
+/**
+ * Auctions that will actually accept a new bid right now — `status`
+ * is `open` AND `end` is in the future. Mirrors what the chain
+ * enforces in `BondAuction.submitBid`:
+ *
+ *   require(status == BIDDING && block.timestamp <= metadata.end);
+ *
+ * Pass `nowSec` to override "now" (useful for tests). Defaults to the
+ * current browser clock.
+ */
+export function selectBidAcceptingAuctions(bonds, nowSec = Math.floor(Date.now() / 1000)) {
+  return selectOpenAuctions(bonds).filter((a) => Number(a.end) > nowSec);
+}
+
+/**
+ * True when an auction is `open` but its bidding window has already
+ * passed — the limbo state described above. The UI uses this to
+ * render the auction visibly but mark it un-pickable.
+ */
+export function isAuctionExpired(auction, nowSec = Math.floor(Date.now() / 1000)) {
+  if (!auction || auction.status !== 'open') return false;
+  return Number(auction.end) <= nowSec;
 }
 
 /** Holders for a bond. Returns [] if bond missing. */

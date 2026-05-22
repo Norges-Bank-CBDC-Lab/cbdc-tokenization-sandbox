@@ -50,6 +50,29 @@
   subset (with validation that the subset matches the previously-published
   `allocationHash` to prevent inconsistent on-chain state).
 
+## Auction `status: open` doesn't flip when end-time passes (chain semantic)
+- `BondAuction.AuctionStatus` only transitions from `BIDDING` to
+  `CLOSED` when `closeAuction()` is explicitly called. The end-time
+  passing alone doesn't change the status — auctions sit in a
+  "limbo": chain refuses new bids (`submitBid` requires
+  `block.timestamp <= metadata.end`), but the on-chain status still
+  reads `open`.
+- This is correct chain behaviour and matches the asymmetric-timing
+  follow-up tracked further down — the two windows (bid-accept and
+  close-permitted) don't overlap. The UI, however, must reflect the
+  time edge so it doesn't offer the operator an un-bidable auction.
+- Fixed in the UI by `selectBidAcceptingAuctions(bonds)` (selectors)
+  + `isAuctionExpired(auction)` predicate. `PlaceBidModal` shows
+  expired-but-open auctions in the dropdown disabled with an inline
+  "ended X ago" note; `AuctionDetailPage` hides the "Place bid"
+  button on expired auctions; `BiddersPage` disables the per-row
+  Place bid button when nothing is biddable. Test mode bypasses the
+  UI filter so the operator can confirm the chain-level revert path.
+- No backend change needed — the API's pre-check on
+  `POST /v1/bidders/{address}/bids` already returns
+  `409 bidding window has closed` for expired auctions; the UI fix
+  prevents the operator from triggering it by accident.
+
 ## nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable
 - Reproduces every time the operator restarts the PC / Docker host. Besu
   takes a few seconds longer to become reachable than `nb-bond-api`

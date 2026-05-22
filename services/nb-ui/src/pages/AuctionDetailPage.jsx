@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { BiddersApi } from '../api/biddersApi.js';
+import { isAuctionExpired } from '../api/selectors.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
@@ -21,6 +22,7 @@ import {
 } from '../components/ui.jsx';
 import { AuctionLifecyclePanel } from './AuctionLifecyclePanel.jsx';
 import { PlaceBidModal } from './PlaceBidModal.jsx';
+import { getTestMode } from '../utils/debugSettings.js';
 
 export function AuctionDetailPage({ auctionId, navigate }) {
   const auctionQ = useApi(() => AuctionsApi.getAuction(auctionId), [auctionId]);
@@ -137,7 +139,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           </div>
         </div>
         <div className="actions">
-          {auction.status === 'open' && (
+          {auction.status === 'open' && (!isAuctionExpired(auction) || getTestMode()) && (
             <Button variant="primary" onClick={() => setShowPlaceBid(true)}>
               Place bid
             </Button>

@@ -1,12 +1,18 @@
 /**
  * PlaceBidModal — submit a sealed bid on behalf of a bidder.
  *
- * The auction picker is filtered to BIDDING-phase auctions only; the
- * server-side endpoint enforces the same constraint and surfaces a
- * 409 if the auction has since closed. Units + rate are sent as
- * BigInt strings; the API constructs the plaintext, signs the
- * EIP-712 intent, dual-wraps, and submits on-chain from the bidder's
- * wallet.
+ * The auction picker lists every BIDDING-phase auction (`status` ==
+ * `open`), but only auctions whose `end` is still in the future are
+ * selectable — past-end-time auctions are shown disabled with an
+ * inline note, mirroring the chain rule:
+ *
+ *     submitBid: require(status == BIDDING && block.timestamp <= end)
+ *
+ * Test mode flips this off: when the top-bar toggle is ON, even
+ * expired auctions become selectable so the operator can confirm the
+ * chain-level rejection path. Units + rate are sent as BigInt
+ * strings; the API constructs the plaintext, signs the EIP-712 bid
+ * intent, dual-wraps, and submits on-chain from the bidder's wallet.
  *
  * The `defaultAuctionId` prop lets the AuctionDetailPage launch this
  * modal with the auction pre-locked.
@@ -14,10 +20,11 @@
 import { useState } from 'react';
 import { BiddersApi } from '../api/biddersApi.js';
 import { BondsApi } from '../api/bondsApi.js';
-import { selectOpenAuctions } from '../api/selectors.js';
+import { isAuctionExpired, selectOpenAuctions } from '../api/selectors.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import { Button, Field, Input, Modal, Select } from '../components/ui.jsx';
+import { getTestMode } from '../utils/debugSettings.js';
 
 export function PlaceBidModal({
   bidder = null,
@@ -28,6 +35,14 @@ export function PlaceBidModal({
 }) {
   const bondsQ = useApi(() => BondsApi.listBonds(), []);
   const openAuctions = selectOpenAuctions(bondsQ.data ?? []);
+  const testMode = getTestMode();
+  // Decorate each option with `expired` (status open AND end <= now).
+  // Test mode lets the operator pick expired anyway — the chain will
+  // still reject with NotInBidPhase(), but the API skips its pre-check
+  // so the operator sees the chain's "no" directly.
+  const auctionOptions = openAuctions.map((a) => ({ ...a, expired: isAuctionExpired(a) }));
+  const acceptingCount = auctionOptions.filter((a) => !a.expired).length;
+  const firstAcceptingId = auctionOptions.find((a) => !a.expired)?.id ?? '';
 
   const [selectedAuctionId, setSelectedAuctionId] = useState(defaultAuctionId ?? '');
   const [selectedBidderAddress, setSelectedBidderAddress] = useState('');
@@ -50,14 +65,19 @@ export function PlaceBidModal({
 
   const mutation = useMutation((payload) => BiddersApi.placeBid(effectiveBidder.address, payload));
 
-  // Effective auction id is derived from state + open auctions during render
-  // (no effect / no cascading renders). When the user hasn't picked one yet
-  // and at least one auction is open, fall back to the first one.
-  const auctionId = selectedAuctionId || (openAuctions.length > 0 ? openAuctions[0].id : '');
-  const auction = openAuctions.find((a) => a.id === auctionId) ?? null;
+  // Effective auction id is derived from state + open auctions during
+  // render (no effect / no cascading renders). When the user hasn't
+  // picked one yet, fall back to the first auction that's actually
+  // accepting bids — never default to an expired one.
+  const auctionId = selectedAuctionId || firstAcceptingId;
+  const auction = auctionOptions.find((a) => a.id === auctionId) ?? null;
+  const auctionExpired = Boolean(auction?.expired);
   const unitsValid = Number(units) > 0 && /^\d+$/.test(units);
   const rateValid = /^\d+$/.test(rate) && Number(rate) > 0;
-  const valid = effectiveBidder && auctionId && unitsValid && rateValid;
+  // Submit is allowed when the selection is currently accepting bids,
+  // OR when Test mode is ON (operator wants the chain rejection).
+  const auctionAllowed = !auctionExpired || testMode;
+  const valid = effectiveBidder && auctionId && auctionAllowed && unitsValid && rateValid;
 
   async function submit() {
     if (!valid) return;
@@ -117,20 +137,30 @@ export function PlaceBidModal({
       <Field
         label="Auction"
         hint={
-          openAuctions.length === 0
+          auctionOptions.length === 0
             ? 'No auctions are in the BIDDING phase. Create or wait for one.'
-            : `${openAuctions.length} auction${openAuctions.length === 1 ? '' : 's'} accepting bids.`
+            : acceptingCount === 0
+              ? testMode
+                ? 'All open auctions have passed their end timestamp. Test mode lets you submit anyway — the chain will reject with InBidPhase().'
+                : 'All open auctions have passed their end timestamp. Close them or wait for a new one.'
+              : `${acceptingCount} of ${auctionOptions.length} open auction${auctionOptions.length === 1 ? '' : 's'} accepting bids.`
+        }
+        error={
+          auctionExpired && !testMode
+            ? `Auction ended ${Fmt.formatRelative(auction.end)}. Chain refuses bids after end. Enable Test mode in the top bar to attempt anyway.`
+            : null
         }
       >
         <Select
           value={auctionId}
           onChange={(e) => setSelectedAuctionId(e.target.value)}
-          disabled={Boolean(defaultAuctionId) || openAuctions.length === 0}
+          disabled={Boolean(defaultAuctionId) || auctionOptions.length === 0}
         >
-          {openAuctions.length === 0 && <option value="">Select auction…</option>}
-          {openAuctions.map((a) => (
-            <option key={a.id} value={a.id}>
+          {auctionOptions.length === 0 && <option value="">Select auction…</option>}
+          {auctionOptions.map((a) => (
+            <option key={a.id} value={a.id} disabled={a.expired && !testMode}>
               {a.isin} — {a.type} — {Fmt.shortHex(a.id, 8, 6)}
+              {a.expired ? ` — ended ${Fmt.formatRelative(a.end)}` : ''}
             </option>
           ))}
         </Select>

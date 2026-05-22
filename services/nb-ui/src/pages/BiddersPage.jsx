@@ -12,6 +12,8 @@
  */
 import { useState } from 'react';
 import { BiddersApi } from '../api/biddersApi.js';
+import { BondsApi } from '../api/bondsApi.js';
+import { selectBidAcceptingAuctions } from '../api/selectors.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
@@ -25,9 +27,15 @@ import {
 } from '../components/ui.jsx';
 import { AddBidderModal } from './AddBidderModal.jsx';
 import { PlaceBidModal } from './PlaceBidModal.jsx';
+import { getTestMode } from '../utils/debugSettings.js';
 
 export function BiddersPage() {
   const { data, loading, error, reload } = useApi(() => BiddersApi.listBidders(), []);
+  // Side query for the "is anything bid-acceptable right now?" check
+  // used to disable the per-row Place bid button when there's nothing
+  // for the operator to bid on. Cheap — same bondsApi cache as the
+  // PlaceBidModal itself.
+  const bondsQ = useApi(() => BondsApi.listBonds(), []);
   const [showAdd, setShowAdd] = useState(false);
   const [placeBidFor, setPlaceBidFor] = useState(null);
   const [revealedKey, setRevealedKey] = useState(null);
@@ -37,6 +45,14 @@ export function BiddersPage() {
 
   const bidders = data ?? [];
   const totalWnok = bidders.reduce((sum, b) => sum + BigInt(b.wnokBalance ?? '0'), 0n);
+  const testMode = getTestMode();
+  // In test mode the operator can submit against any open auction
+  // (including time-expired ones), so the gate is `status === 'open'`.
+  // Otherwise it's the stricter "open AND end > now".
+  const biddableCount = testMode
+    ? (bondsQ.data ?? []).flatMap((b) => b.auctions ?? []).filter((a) => a.status === 'open').length
+    : selectBidAcceptingAuctions(bondsQ.data ?? []).length;
+  const placeBidEnabled = biddableCount > 0;
 
   async function onDelete(bidder) {
     const ok = window.confirm(
@@ -124,7 +140,17 @@ export function BiddersPage() {
                   <td className="num mono">{Fmt.formatUnits(b.wnokBalance)}</td>
                   <td className="num mono">{Fmt.formatUnits(b.ethBalance)}</td>
                   <td className="right" style={{ whiteSpace: 'nowrap' }}>
-                    <Button size="sm" variant="primary" onClick={() => setPlaceBidFor(b)}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => setPlaceBidFor(b)}
+                      disabled={!placeBidEnabled}
+                      title={
+                        placeBidEnabled
+                          ? undefined
+                          : 'No auctions are currently accepting bids — either none are open or all have passed their end timestamp. Enable Test mode in the top bar to force submit (chain will reject expired).'
+                      }
+                    >
                       Place bid
                     </Button>{' '}
                     <Button size="sm" variant="ghost" onClick={() => setRevealedKey(b)}>
