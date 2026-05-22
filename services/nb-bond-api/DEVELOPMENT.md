@@ -522,3 +522,32 @@ role check** in entra mode today — sandbox-acceptable, but **before
 promoting to a non-local deployment** the destructive `?fromBlock=0`
 variant should be gated behind a tenant-admin role and emit an
 audit-log entry on every fire. Tracked in Plan C's portability flags.
+
+### 7.10 Data persistence (/app/data PVC)
+
+The SQLite database under `/app/data` holds two very different things:
+
+- **Chain projection** — `auctions`, `auction_events`, `bond_events`,
+  `balance_events`, `balances`, `partitions`, `ingestion_state`. These
+  are derivable from chain logs; the ingestion loop rebuilds them on
+  next tick after a wipe.
+- **System-of-record** — the `bidders` table holds sandbox
+  impersonation keypairs. Plaintext, sandbox-only, **cannot be
+  recovered from chain**. If this is wiped the canonical fixture
+  bidders re-seed but any operator-added bidder is permanently gone.
+
+To prevent that, the helm chart mounts a `PersistentVolumeClaim`
+(`nb-bond-api-data`) on `/app/data`. Defaults:
+
+| Knob                       | Default                 | Notes                                                                        |
+| -------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `persistence.enabled`      | `true`                  | Disable to fall back to `emptyDir` for environments without a storage class. |
+| `persistence.size`         | `256Mi`                 | Way more than the sandbox SQLite needs; safe headroom.                       |
+| `persistence.accessModes`  | `[ReadWriteOnce]`       | Matches a single-replica deployment.                                         |
+| `persistence.storageClass` | unset (cluster default) | Local Kind uses `standard` (local-path-provisioner).                         |
+
+The Kind local-path-provisioner stores the backing directory under the
+Kind node's filesystem. **Survives** helm upgrades, `./nb-bond-api.sh
+start`, `kubectl rollout restart`. **Does not survive** `kind delete
+cluster` — bidders will need to be re-added (or wait for re-seeding of
+the fixtures) after a full sandbox tear-down.

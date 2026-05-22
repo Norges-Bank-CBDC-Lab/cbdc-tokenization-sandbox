@@ -1,0 +1,19 @@
+# Chart-level defaults for nb-bond-api. Override via values.local.yaml
+# (gitignored) or via `--set` / `--values` flags. Only values that need a
+# sandbox-safe default live here; secrets and per-deployment fixtures
+# stay in values.local.yaml.
+
+# Persistent volume for /app/data (SQLite DB). Enabled by default because
+# the bidders system-of-record cannot be recovered from chain — without
+# persistence, every pod restart wipes the bidder roster. See
+# services/nb-bond-api/helm/values.local.example.yaml for the full
+# rationale.
+#
+# When disabled (e.g. environments without a storage class), deployment
+# falls back to emptyDir and the operator gets the pre-PR-118 behaviour.
+persistence:
+  enabled: true
+  size: 256Mi
+  accessModes:
+    - ReadWriteOnce
+  # storageClass: ""   # empty = use cluster default. Override to a specific class if needed.
