@@ -281,7 +281,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           </div>
         </div>
 
-        <BidsCard bids={auction.bids} />
+        <BidsCard bids={auction.bids} auctionType={auction.type} auctionStatus={auction.status} />
         <AllocationCard allocation={auction.allocation} status={auction.status} />
       </div>
 
@@ -301,8 +301,29 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   );
 }
 
-function BidsCard({ bids }) {
+// "Best" direction depends on auction type: lowest yield wins for RATE,
+// highest price wins for PRICE, lowest repurchase price wins for BUYBACK.
+function bestBidRate(bids, auctionType) {
+  if (bids.length === 0) return null;
+  const rates = bids.map((b) => BigInt(b.rate));
+  const pickMax = auctionType === 'PRICE';
+  let best = rates[0];
+  for (const r of rates) {
+    if (pickMax ? r > best : r < best) best = r;
+  }
+  return best.toString();
+}
+
+function sumUnits(bids) {
+  let total = 0n;
+  for (const b of bids) total += BigInt(b.units);
+  return total.toString();
+}
+
+export function BidsCard({ bids, auctionType, auctionStatus }) {
   const state = bids.length > 0 ? bids[0].state : 'unsealed';
+  const rateLabel = Fmt.rateColumnLabel(auctionType);
+  const totalsLabel = Fmt.bestRateLabel(auctionType);
   return (
     <div className="card">
       <div className="card-header">
@@ -332,13 +353,24 @@ function BidsCard({ bids }) {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3} className="muted">
+                  Total bids: <span className="mono">{bids.length}</span>{' '}
+                  <span className="muted">
+                    (rates are encrypted until the auction closes
+                    {auctionStatus === 'open' ? ' or test mode is enabled' : ''})
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         ) : (
           <table className="tbl">
             <thead>
               <tr>
                 <th>Bidder</th>
-                <th className="num">Rate</th>
+                <th className="num">{rateLabel}</th>
                 <th className="num">Units</th>
               </tr>
             </thead>
@@ -346,11 +378,22 @@ function BidsCard({ bids }) {
               {bids.map((b, i) => (
                 <tr key={i}>
                   <td className="mono">{b.bidder}</td>
-                  <td className="num mono">{Fmt.bpsToPct(b.rate)}</td>
+                  <td className="num mono">{Fmt.formatBidRate(b.rate, auctionType)}</td>
                   <td className="num mono">{Fmt.formatUnits(b.units)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr>
+                <td className="muted">
+                  Total ({bids.length} bid{bids.length === 1 ? '' : 's'})
+                </td>
+                <td className="num mono" title={totalsLabel}>
+                  {Fmt.formatBidRate(bestBidRate(bids, auctionType), auctionType)}
+                </td>
+                <td className="num mono">{Fmt.formatUnits(sumUnits(bids))}</td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>

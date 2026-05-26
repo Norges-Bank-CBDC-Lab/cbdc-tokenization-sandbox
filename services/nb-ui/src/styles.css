@@ -411,6 +411,12 @@ footer.app-footer {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.tbl tfoot td {
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  font-weight: 500;
+}
 
 /* ----- badges ------------------------------------------------ */
 

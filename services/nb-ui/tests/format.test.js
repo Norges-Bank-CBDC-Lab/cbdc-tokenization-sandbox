@@ -23,4 +23,26 @@ describe('format helpers', () => {
     expect(Fmt.formatNok('1000')).toBe('1.00 M NOK');
     expect(Fmt.formatNok('1000000')).toBe('1.00 B NOK');
   });
+
+  it('labels the bid-rate column per auction type', () => {
+    expect(Fmt.rateColumnLabel('RATE')).toBe('Yield');
+    expect(Fmt.rateColumnLabel('PRICE')).toBe('Price');
+    expect(Fmt.rateColumnLabel('BUYBACK')).toBe('Repurchase price');
+    expect(Fmt.rateColumnLabel(undefined)).toBe('Yield');
+  });
+
+  it('labels the totals-row "best" direction per auction type', () => {
+    expect(Fmt.bestRateLabel('RATE')).toBe('Best (lowest) yield');
+    expect(Fmt.bestRateLabel('PRICE')).toBe('Best (highest) price');
+    expect(Fmt.bestRateLabel('BUYBACK')).toBe('Best (lowest) repurchase price');
+    expect(Fmt.bestRateLabel(undefined)).toBe('Best (lowest) yield');
+  });
+
+  it('formats bid rate per auction type', () => {
+    expect(Fmt.formatBidRate('425', 'RATE')).toBe('4.25%');
+    expect(Fmt.formatBidRate('10123', 'PRICE')).toBe('101.23');
+    expect(Fmt.formatBidRate('9980', 'BUYBACK')).toBe('99.80');
+    expect(Fmt.formatBidRate(null, 'RATE')).toBe('—');
+    expect(Fmt.formatBidRate('', 'PRICE')).toBe('—');
+  });
 });

@@ -20,6 +20,7 @@ Already landed on `development` via PR #115 + #117 (PR #118 squash-merged into #
 - Backend DTO rename `coupon.yieldBps` → `coupon.rateBps` (item 14b — paired with the UI relabel above)
 - Health-indicator self-heal + admin reconnect/resync (Plans B + C, from PR #115)
 - `nb-bond-api` SQLite persistence via PVC (item 2, bidders survive pod restarts)
+- Totals row on the bids table + auction-type-aware "best" rate / column label / per-row rendering (item 8)
 
 ## Open items
 
@@ -34,36 +35,6 @@ The operator UI does not display name-resolved addresses via the Blockscout BENS
 **Trigger to revisit:** a concrete operator workflow that displays an external address and would benefit from a name (e.g., a future "all transfers across all bonds" view).
 
 **Effort if picked up:** ~½ day for client wiring + a name-resolver hook + a few render sites. No contract or backend change.
-
----
-
-### 8 — Totals row on the bids table
-
-**Status:** TODO.
-
-**Goal:** Add a summary row at the bottom of `AuctionDetailPage`'s bids table showing total units bid and the best clearing rate / price.
-
-**Auction-type sensitivity (the reason this wasn't a one-line change):** "best" depends on the auction type:
-
-| Type | What bidders bid | "Best" direction | Header label |
-|---|---|---|---|
-| `RATE` | Yield (bps) | Lowest | "Best (lowest) yield" |
-| `PRICE` | Price per 100 nominal | Highest | "Best (highest) price" |
-| `BUYBACK` | Repurchase price | Lowest | "Best (lowest) repurchase price" |
-
-**Visibility rules (match the bid-state gate):**
-
-- Auction `open`, not in test mode → bids are sealed; totals row shows total bid count only, no rates (they're encrypted).
-- Auction `open`, test mode on → bids are unsealed; show units + best-rate.
-- Auction `closed` / `finalised` / `rejected` → unsealed; show units + best-rate.
-- Auction `cancelled` → still useful to see the totals that would have cleared.
-
-**Files:**
-
-- `services/nb-ui/src/pages/AuctionDetailPage.jsx` — `BidsCard` component (currently around line 280).
-- `services/nb-ui/src/utils/format.js` — possibly a new `bestRateLabel(auctionType)` helper.
-
-**Effort:** ~half a day including a Vitest test asserting label and value per auction type.
 
 ---
 
