@@ -45,4 +45,11 @@ describe('format helpers', () => {
     expect(Fmt.formatBidRate(null, 'RATE')).toBe('—');
     expect(Fmt.formatBidRate('', 'PRICE')).toBe('—');
   });
+
+  it('labels the clearing-rate KPI per auction type', () => {
+    expect(Fmt.clearingLabel('RATE')).toBe('Clearing yield');
+    expect(Fmt.clearingLabel('PRICE')).toBe('Clearing price');
+    expect(Fmt.clearingLabel('BUYBACK')).toBe('Clearing repurchase price');
+    expect(Fmt.clearingLabel(undefined)).toBe('Clearing yield');
+  });
 });

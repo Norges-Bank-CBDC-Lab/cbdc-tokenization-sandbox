@@ -105,6 +105,12 @@ export function bestRateLabel(auctionType) {
   return 'Best (lowest) yield';
 }
 
+export function clearingLabel(auctionType) {
+  if (auctionType === 'PRICE') return 'Clearing price';
+  if (auctionType === 'BUYBACK') return 'Clearing repurchase price';
+  return 'Clearing yield';
+}
+
 export const Fmt = {
   shortHex,
   bpsToPct,
@@ -116,4 +122,5 @@ export const Fmt = {
   formatBidRate,
   rateColumnLabel,
   bestRateLabel,
+  clearingLabel,
 };

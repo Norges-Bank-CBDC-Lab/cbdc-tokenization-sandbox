@@ -201,10 +201,10 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           <div className="kpi-sub">{unsealedCount} unsealed</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Clearing rate</div>
+          <div className="kpi-label">{Fmt.clearingLabel(auction.type)}</div>
           <div className="kpi-value">
             {auction.allocation?.clearingRate ? (
-              Fmt.bpsToPct(auction.allocation.clearingRate)
+              Fmt.formatBidRate(auction.allocation.clearingRate, auction.type)
             ) : (
               <span className="muted">—</span>
             )}
@@ -282,7 +282,11 @@ export function AuctionDetailPage({ auctionId, navigate }) {
         </div>
 
         <BidsCard bids={auction.bids} auctionType={auction.type} auctionStatus={auction.status} />
-        <AllocationCard allocation={auction.allocation} status={auction.status} />
+        <AllocationCard
+          allocation={auction.allocation}
+          status={auction.status}
+          auctionType={auction.type}
+        />
       </div>
 
       {showPlaceBid && (
@@ -424,9 +428,10 @@ function allocationBadge(status) {
   return null;
 }
 
-function AllocationCard({ allocation, status }) {
+export function AllocationCard({ allocation, status, auctionType }) {
   const badge = allocationBadge(status);
   const showTable = allocation && status !== 'open' && status !== 'cancelled';
+  const rateLabel = Fmt.rateColumnLabel(auctionType);
   return (
     <div className="card">
       <div className="card-header">
@@ -449,7 +454,8 @@ function AllocationCard({ allocation, status }) {
         )}
         {allocation && status !== 'open' && (
           <span className="muted mono" style={{ fontSize: 12 }}>
-            Clearing rate {Fmt.bpsToPct(allocation.clearingRate)}
+            {Fmt.clearingLabel(auctionType)}{' '}
+            {Fmt.formatBidRate(allocation.clearingRate, auctionType)}
           </span>
         )}
       </div>
@@ -472,7 +478,7 @@ function AllocationCard({ allocation, status }) {
               <tr>
                 <th>Bidder</th>
                 <th className="num">Allocated units</th>
-                <th className="num">Rate</th>
+                <th className="num">{rateLabel}</th>
                 <th className="num">Value</th>
               </tr>
             </thead>
@@ -481,7 +487,7 @@ function AllocationCard({ allocation, status }) {
                 <tr key={i}>
                   <td className="mono">{a.bidder}</td>
                   <td className="num mono">{Fmt.formatUnits(a.units)}</td>
-                  <td className="num mono">{Fmt.bpsToPct(a.rate)}</td>
+                  <td className="num mono">{Fmt.formatBidRate(a.rate, auctionType)}</td>
                   <td className="num">{Fmt.formatNok(a.units)}</td>
                 </tr>
               ))}
