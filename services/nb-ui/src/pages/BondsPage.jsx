@@ -15,8 +15,35 @@ import {
 } from '../components/ui.jsx';
 import { CreateBondModal } from './CreateBondModal.jsx';
 
+const SHOW_DISABLED_KEY = 'nb-ui:bonds:showDisabled';
+
+function readShowDisabled() {
+  try {
+    const raw = window.localStorage.getItem(SHOW_DISABLED_KEY);
+    if (raw == null) return false; // default: hide disabled
+    return raw === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeShowDisabled(value) {
+  try {
+    window.localStorage.setItem(SHOW_DISABLED_KEY, value ? 'true' : 'false');
+  } catch {
+    /* ignore — non-essential preference */
+  }
+}
+
 export function BondsPage({ navigate }) {
-  const { data, loading, error, reload } = useApi(() => BondsApi.listBonds(), []);
+  // Default OFF: disabled bonds are clutter when looking at active state.
+  // Setting persists across reloads, mirrors the "Hide cancelled" pattern
+  // on AuctionsPage (PR #117).
+  const [showDisabled, setShowDisabled] = useState(() => readShowDisabled());
+  const { data, loading, error, reload } = useApi(
+    () => BondsApi.listBonds({ includeDisabled: showDisabled }),
+    [showDisabled],
+  );
   const [showCreate, setShowCreate] = useState(false);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -43,19 +70,14 @@ export function BondsPage({ navigate }) {
 
   function handleCreated(bond) {
     setShowCreate(false);
-    const newAuction = bond?.auctions?.[0];
     toast.push({
       kind: 'ok',
-      title: 'Bond issued',
-      body: `${bond.isin} — issuing auction ${newAuction ? Fmt.shortHex(newAuction.id) : ''}`,
+      title: 'Bond created',
+      body: `${bond.isin} pre-staged. Schedule its first auction from the detail page.`,
     });
-    // First reload races the backend ingestion loop (default 3s tick): the
-    // create POST returns once the tx is mined, but ingestion may not have
-    // re-scanned the head block yet. Fire the immediate reload (so the UI
-    // updates as soon as the head IS ingested), then a delayed second one
-    // to cover the worst case where we just missed a tick.
-    reload();
-    setTimeout(reload, 4000);
+    // Decoupled flow (D2): land the operator on the new bond's detail
+    // page so they can schedule the first auction in the next step.
+    navigate(`/bonds/${bond.isin}`);
   }
 
   return (
@@ -113,6 +135,31 @@ export function BondsPage({ navigate }) {
           <option value="matured">Matured</option>
           <option value="redeemed">Redeemed</option>
         </select>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 13,
+            color: 'var(--ink-2, #4b5563)',
+            cursor: 'pointer',
+          }}
+          title={
+            'Disabled bonds remain in the chain log; hiding keeps the working list focused on ' +
+            'active state. Setting persists across page reloads.'
+          }
+        >
+          <input
+            type="checkbox"
+            checked={showDisabled}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setShowDisabled(next);
+              writeShowDisabled(next);
+            }}
+          />
+          Show disabled
+        </label>
         <span className="count">
           {filtered.length} of {bonds.length}
         </span>
@@ -126,7 +173,7 @@ export function BondsPage({ navigate }) {
             title="No bonds match"
             message={
               bonds.length === 0
-                ? 'Issue your first bond to get started.'
+                ? 'Create your first bond to get started.'
                 : 'Adjust the filters above.'
             }
             action={
@@ -153,10 +200,17 @@ export function BondsPage({ navigate }) {
             </thead>
             <tbody>
               {filtered.map((b) => (
-                <tr key={b.isin} className="clickable" onClick={() => navigate(`/bonds/${b.isin}`)}>
+                <tr
+                  key={b.isin}
+                  className={`clickable ${b.disabled ? 'row-muted' : ''}`}
+                  onClick={() => navigate(`/bonds/${b.isin}`)}
+                >
                   <td className="mono">{b.isin}</td>
                   <td>
-                    <StatusBadge status={b.status} />
+                    <span className="row" style={{ gap: 6 }}>
+                      <StatusBadge status={b.status} />
+                      {b.disabled && <span className="badge badge-disabled no-dot">DISABLED</span>}
+                    </span>
                   </td>
                   <td className="num mono">{Fmt.bpsToPct(b.coupon?.rateBps)}</td>
                   <td className="num">{Fmt.formatUnixDate(b.maturity?.date)}</td>

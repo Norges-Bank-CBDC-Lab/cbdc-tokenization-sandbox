@@ -15,12 +15,27 @@ function testModeQuery() {
   return getTestMode() ? { testMode: 'true' } : {};
 }
 
-async function listBonds() {
-  return HttpClient.get('/v1/bonds', { query: testModeQuery() });
+async function listBonds({ includeDisabled = false } = {}) {
+  const query = testModeQuery();
+  if (includeDisabled) query.includeDisabled = 'true';
+  return HttpClient.get('/v1/bonds', { query });
 }
 
 async function getBond(isin) {
   return HttpClient.get(`/v1/bonds/${encodeURIComponent(isin)}`, { query: testModeQuery() });
+}
+
+async function createBond({ isin, maturityDuration }) {
+  // Standalone bond create — no auction. The operator schedules the first
+  // auction from BondDetailPage afterward (per the decoupled flow).
+  return HttpClient.post('/v1/bonds', { isin, maturityDuration });
+}
+
+async function disableBond(isin) {
+  // Idempotent soft-delete. Backend returns 204 on success or when the
+  // bond is already disabled; HTTP 409 surfaces gate failures with a
+  // structured problem+json body.
+  return HttpClient.del(`/v1/bonds/${encodeURIComponent(isin)}`);
 }
 
 async function listBondHistory(isin, { before, limit } = {}) {
@@ -43,6 +58,8 @@ async function redeem(isin, holders) {
 export const BondsApi = {
   listBonds,
   getBond,
+  createBond,
+  disableBond,
   listBondHistory,
   payCoupon,
   redeem,

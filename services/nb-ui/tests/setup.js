@@ -12,3 +12,33 @@ window.__APP_CONFIG__ = {
   AUTH_SCOPES: '',
   AUTH_REDIRECT_URI: '',
 };
+
+// Vitest 4's default localStorage shim is partial (warning:
+// "--localstorage-file was provided without a valid path"). Replace it
+// with a Map-backed Storage that implements the full Web Storage API the
+// production code relies on (debugSettings, BondsPage Show-disabled
+// toggle, etc.).
+{
+  const store = new Map();
+  const storage = {
+    get length() {
+      return store.size;
+    },
+    key(i) {
+      return Array.from(store.keys())[i] ?? null;
+    },
+    getItem(k) {
+      return store.has(k) ? store.get(k) : null;
+    },
+    setItem(k, v) {
+      store.set(String(k), String(v));
+    },
+    removeItem(k) {
+      store.delete(k);
+    },
+    clear() {
+      store.clear();
+    },
+  };
+  Object.defineProperty(window, 'localStorage', { value: storage, configurable: true });
+}
