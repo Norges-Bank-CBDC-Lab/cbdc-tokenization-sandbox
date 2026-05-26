@@ -336,6 +336,16 @@ contract BondAuction is IBondAuction, AccessControl, EIP712 {
     }
 
     /**
+     * @notice Return a specific auction ID in the ISIN's history.
+     * @param _isin ISIN for target bond.
+     * @param _index 1-based auction index (1 == first auction for this ISIN).
+     * @return Auction ID for the given index.
+     */
+    function getAuctionIdAt(string memory _isin, uint256 _index) external pure returns (bytes32) {
+        return _auctionId(_isin, _index);
+    }
+
+    /**
      * @notice Return auction metadata by ID.
      * @param _id Auction identifier.
      * @return auction Auction data.

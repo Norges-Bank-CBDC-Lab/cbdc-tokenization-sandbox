@@ -5,6 +5,8 @@ pragma solidity ^0.8.29;
  * @notice Interface for the Bond Manager contract.
  */
 interface IBondManager {
+    event BondCreated(string isin, address bondAddress, uint256 maturityDurationSeconds);
+    event BondDisabled(string isin);
     event BondAuctionInitialised(
         bytes32 indexed id, string isin, address bondAddress, uint256 offering, uint256 maturityDurationSeconds
     );

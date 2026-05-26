@@ -101,15 +101,41 @@ contract BondManager is IBondManager, AccessControl {
     }
 
     /**
-     * @notice Deploys a new bond with a rate auction (initial bond issuance).
+     * @notice Deploys a new bond without scheduling an auction.
      * @param _isin Human ISIN string for the issuance (used as partition identifier).
+     * @param _maturityDuration Duration in years from bond distribution until maturity.
+     * @dev Creates a partition with offering 0; the first auction added via
+     *      `deployAuctionForBond` bumps the offering to its size.
+     * @dev Maturity duration is converted to seconds using DURATION_SCALAR.
+     */
+    function deployBond(string calldata _isin, uint256 _maturityDuration) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+        _deployBond(_isin, _maturityDuration);
+    }
+
+    /**
+     * @notice Schedules an auction for an existing bond partition.
+     * @param _isin ISIN of an existing partition.
      * @param _end Timestamp when sealed bidding closes.
      * @param _pubKey Auctioneer public key that matches client-side sealing keys.
-     * @param _offering Total supply ceiling (offering size) for this partition.
-     * @param _maturityDuration Duration in years from bond distribution until maturity.
-     * @dev Always creates a RATE auction for initial bond issuance.
-     * @dev Coupon yield is set from clearing rate when finalising the auction.
-     * @dev Maturity duration is converted to seconds using DURATION_SCALAR (years * scalar = seconds).
+     * @param _offering Auction size. For RATE/PRICE: added to the partition offering ceiling.
+     *        For BUYBACK: must not exceed current supply (and the offering ceiling is unchanged).
+     * @param _auctionType RATE, PRICE, or BUYBACK. The first auction for an ISIN must be RATE
+     *        (enforced by BondAuction); subsequent auctions must be PRICE or BUYBACK.
+     */
+    function deployAuctionForBond(
+        string calldata _isin,
+        uint64 _end,
+        bytes calldata _pubKey,
+        uint256 _offering,
+        IBondAuction.AuctionType _auctionType
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+        _deployAuctionForBond(_isin, _end, _pubKey, _offering, _auctionType);
+    }
+
+    /**
+     * @notice Deploys a new bond and its initial RATE auction in one call.
+     * @dev Back-compat composition of `deployBond` + `deployAuctionForBond(.., RATE)` so
+     *      existing call sites and tests keep their semantics.
      */
     function deployBondWithAuction(
         string calldata _isin,
@@ -117,73 +143,52 @@ contract BondManager is IBondManager, AccessControl {
         bytes calldata _pubKey,
         uint256 _offering,
         uint256 _maturityDuration
-    ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
-        bondActive[_isin] = true;
-        if (_offering == 0) revert Errors.OfferingZero();
-        if (_maturityDuration == 0) revert Errors.MaturityDurationZero();
-
-        // Convert maturity duration from years to seconds using scalar
-        uint256 maturityDurationSeconds = _maturityDuration * DURATION_SCALAR;
-
-        // Create partition with offering size and maturity duration in seconds (coupon parameters set later)
-        BOND_TOKEN.createPartition(_isin, _offering, maturityDurationSeconds);
-
-        // Create RATE auction for initial bond issuance
-        bytes32 id = BOND_AUCTION.createAuction(
-            _isin, msg.sender, _end, _pubKey, address(BOND_TOKEN), _offering, IBondAuction.AuctionType.RATE
-        );
-
-        emit BondAuctionInitialised(id, _isin, address(BOND_TOKEN), _offering, maturityDurationSeconds);
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+        _deployBond(_isin, _maturityDuration);
+        _deployAuctionForBond(_isin, _end, _pubKey, _offering, IBondAuction.AuctionType.RATE);
     }
 
     /**
-     * @notice Extends an existing bond with a price auction (bond extension).
-     * @param _isin Human ISIN string for the existing bond.
-     * @param _end Timestamp when sealed bidding closes.
-     * @param _pubKey Auctioneer public key that matches client-side sealing keys.
-     * @param _additionalOffering Additional offering size to add to the partition.
-     * @dev Always creates a PRICE auction for bond extensions.
-     * @dev Extends the partition offering size before creating the auction.
+     * @notice Schedule a PRICE auction (bond extension) for an existing bond.
+     * @dev Back-compat wrapper for `deployAuctionForBond(.., PRICE)`.
      */
     function extendBondWithAuction(
         string calldata _isin,
         uint64 _end,
         bytes calldata _pubKey,
         uint256 _additionalOffering
-    ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
-        bondActive[_isin] = true;
-
-        // Verify the bond exists by checking if partition is active in BondToken
-        bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
-        if (!BOND_TOKEN.activePartitions(partition)) {
-            revert Errors.BondDoesNotExist(_isin);
-        }
-
-        if (_additionalOffering == 0) revert Errors.AdditionalOfferingZero();
-
-        // Extend partition offering size
-        BOND_TOKEN.extendPartitionOffering(_isin, _additionalOffering);
-
-        // Create PRICE auction for bond extension
-        bytes32 id = BOND_AUCTION.createAuction(
-            _isin, msg.sender, _end, _pubKey, address(BOND_TOKEN), _additionalOffering, IBondAuction.AuctionType.PRICE
-        );
-
-        emit BondExtensionAuctionInitialised(id, _isin, address(BOND_TOKEN), _additionalOffering);
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+        _deployAuctionForBond(_isin, _end, _pubKey, _additionalOffering, IBondAuction.AuctionType.PRICE);
     }
 
     /**
-     * @notice Creates a buyback auction for an existing bond without changing the offering ceiling.
-     * @param _isin Existing ISIN to buy back from.
-     * @param _end Timestamp when sealed bidding closes.
-     * @param _pubKey Auctioneer public key that matches client-side sealing keys.
-     * @param _buybackSize Maximum units targeted for buyback (must not exceed current supply).
+     * @notice Schedule a BUYBACK auction for an existing bond.
+     * @dev Back-compat wrapper for `deployAuctionForBond(.., BUYBACK)`.
      */
     function buybackWithAuction(string calldata _isin, uint64 _end, bytes calldata _pubKey, uint256 _buybackSize)
         external
         onlyRole(Roles.BOND_MANAGER_ROLE)
-        isBondActive(_isin, false)
     {
+        _deployAuctionForBond(_isin, _end, _pubKey, _buybackSize, IBondAuction.AuctionType.BUYBACK);
+    }
+
+    function _deployBond(string calldata _isin, uint256 _maturityDuration) internal isBondActive(_isin, false) {
+        if (_maturityDuration == 0) revert Errors.MaturityDurationZero();
+
+        uint256 maturityDurationSeconds = _maturityDuration * DURATION_SCALAR;
+
+        BOND_TOKEN.createPartition(_isin, 0, maturityDurationSeconds);
+
+        emit BondCreated(_isin, address(BOND_TOKEN), maturityDurationSeconds);
+    }
+
+    function _deployAuctionForBond(
+        string calldata _isin,
+        uint64 _end,
+        bytes calldata _pubKey,
+        uint256 _offering,
+        IBondAuction.AuctionType _auctionType
+    ) internal isBondActive(_isin, false) {
         bondActive[_isin] = true;
 
         bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
@@ -191,18 +196,38 @@ contract BondManager is IBondManager, AccessControl {
             revert Errors.BondDoesNotExist(_isin);
         }
 
-        if (_buybackSize == 0) revert Errors.BuybackOfferingZero(_isin);
-
-        uint256 currentSupply = BOND_TOKEN.totalSupplyByPartition(partition);
-        if (_buybackSize > currentSupply) {
-            revert Errors.BuybackExceedsSupply(_isin, _buybackSize, currentSupply);
+        if (_offering == 0) {
+            if (_auctionType == IBondAuction.AuctionType.BUYBACK) {
+                revert Errors.BuybackOfferingZero(_isin);
+            }
+            if (_auctionType == IBondAuction.AuctionType.PRICE) {
+                revert Errors.AdditionalOfferingZero();
+            }
+            revert Errors.OfferingZero();
         }
 
-        bytes32 id = BOND_AUCTION.createAuction(
-            _isin, msg.sender, _end, _pubKey, address(BOND_TOKEN), _buybackSize, IBondAuction.AuctionType.BUYBACK
-        );
+        if (_auctionType == IBondAuction.AuctionType.BUYBACK) {
+            uint256 currentSupply = BOND_TOKEN.totalSupplyByPartition(partition);
+            if (_offering > currentSupply) {
+                revert Errors.BuybackExceedsSupply(_isin, _offering, currentSupply);
+            }
+        } else {
+            // RATE and PRICE auctions both grow the partition offering ceiling.
+            BOND_TOKEN.extendPartitionOffering(_isin, _offering);
+        }
 
-        emit BondBuybackAuctionInitialised(id, _isin, address(BOND_TOKEN), _buybackSize);
+        bytes32 id =
+            BOND_AUCTION.createAuction(_isin, msg.sender, _end, _pubKey, address(BOND_TOKEN), _offering, _auctionType);
+
+        if (_auctionType == IBondAuction.AuctionType.RATE) {
+            emit BondAuctionInitialised(
+                id, _isin, address(BOND_TOKEN), _offering, BOND_TOKEN.maturityDuration(partition)
+            );
+        } else if (_auctionType == IBondAuction.AuctionType.PRICE) {
+            emit BondExtensionAuctionInitialised(id, _isin, address(BOND_TOKEN), _offering);
+        } else {
+            emit BondBuybackAuctionInitialised(id, _isin, address(BOND_TOKEN), _offering);
+        }
     }
 
     /**
@@ -357,6 +382,31 @@ contract BondManager is IBondManager, AccessControl {
         emit BondBuybackComplete(_id, _isin, _total);
 
         return dvpSuccess;
+    }
+
+    /**
+     * @notice Disable a bond that has no minted units, no in-flight auction, and no FINALISED auction history.
+     * @param _isin Target ISIN to disable.
+     * @dev Gates: `bondActive[_isin] == false` (no in-flight auction — modifier), partition has zero
+     *      supply (checked by BondToken.disablePartition), and no auction for this ISIN has reached
+     *      FINALISED status (checked here).
+     * @dev On success the partition is soft-deleted in BondToken: `activePartitions[partition]` flips
+     *      to false and every per-partition mapping is cleared. The ISIN can be re-used with a fresh
+     *      `deployBond` afterward.
+     */
+    function disableBond(string calldata _isin) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
+        uint256 auctionCount = BOND_AUCTION.isinToAuctionCount(_isin);
+        for (uint256 i = 1; i <= auctionCount; i++) {
+            bytes32 auctionId = BOND_AUCTION.getAuctionIdAt(_isin, i);
+            if (BOND_AUCTION.getAuctionStatus(auctionId) == IBondAuction.AuctionStatus.FINALISED) {
+                revert Errors.BondHasFinalisedAuction(_isin, auctionId);
+            }
+        }
+
+        // Supply gate + storage clearing happen atomically in BondToken.
+        BOND_TOKEN.disablePartition(_isin);
+
+        emit BondDisabled(_isin);
     }
 
     /**

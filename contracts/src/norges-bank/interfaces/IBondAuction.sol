@@ -108,6 +108,10 @@ interface IBondAuction {
 
     function getAuctionId(string memory _isin) external view returns (bytes32);
 
+    function getAuctionIdAt(string memory _isin, uint256 _index) external pure returns (bytes32);
+
+    function isinToAuctionCount(string memory _isin) external view returns (uint256);
+
     function submitBid(bytes32 _id, bytes calldata _ciphertext, bytes32 _plaintextHash)
         external
         returns (uint256 bidIndex);

@@ -138,7 +138,11 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
     /**
      * @notice Create a partition for an ISIN (initializes partition without minting)
      * @param _isin ISIN string
-     * @param _offering Total supply ceiling (offering size) for this partition
+     * @param _offering Initial total supply ceiling (offering size) for this partition. Pass 0 to
+     *        stage a bond ahead of any auction; the offering is then added later via
+     *        `extendPartitionOffering` when an auction is scheduled. Mint-time safety
+     *        (`mintByIsin`) still enforces `supply + value <= offering`, so a 0-offering
+     *        partition cannot be minted into until the offering is bumped.
      * @param _maturityDuration Duration in seconds from bond distribution until maturity
      * @dev This explicitly creates the partition in the ERC1410 tracking before any real minting
      * @dev Sets the partition as active in the activePartitions mapping and stores the offering size and maturity duration
@@ -152,7 +156,6 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
         if (activePartitions[partition]) {
             revert Errors.DuplicatePartition(_isin);
         }
-        if (_offering == 0) revert Errors.OfferingZero();
         if (_maturityDuration == 0) revert Errors.MaturityDurationZero();
 
         _partitionIsin[partition] = _isin;
@@ -170,7 +173,6 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
             revert Errors.DuplicatePartition(_partitionIsin[partition]);
         }
 
-        if (_offering == 0) revert Errors.OfferingZero();
         if (_maturityDuration == 0) revert Errors.MaturityDurationZero();
 
         activePartitions[partition] = true;
@@ -297,6 +299,49 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
 
         partitionOffering[partition] = offeringAfterReduction;
         return offeringAfterReduction;
+    }
+
+    /**
+     * @notice Disable a partition that has no outstanding supply.
+     * @param _isin ISIN string identifying the partition.
+     * @dev Soft-delete: flips `activePartitions[partition]` to false, clears every
+     *      per-partition mapping back to its zero value, and untracks the partition
+     *      from the ERC1410 index. The reverse-lookup `_partitionIsin[partition]` is
+     *      intentionally retained so historical events can still be decoded to a
+     *      human-readable ISIN.
+     * @dev Reverts if the partition is not currently active (BondAlreadyDisabled)
+     *      or if the partition has any outstanding supply (BondNotEmpty).
+     * @dev After this call, `createPartition(_isin, ...)` can be invoked again to
+     *      re-use the ISIN with fresh parameters.
+     */
+    function disablePartition(string memory _isin) external onlyRole(Roles.BOND_CONTROLLER_ROLE) {
+        bytes32 partition = isinToPartition(_isin);
+
+        if (!activePartitions[partition]) {
+            revert Errors.BondAlreadyDisabled(_isin);
+        }
+
+        uint256 supply = _totalSupplyOfPartition(partition);
+        if (supply != 0) {
+            revert Errors.BondNotEmpty(_isin, supply);
+        }
+
+        activePartitions[partition] = false;
+        partitionOffering[partition] = 0;
+        maturityDuration[partition] = 0;
+        maturityDate[partition] = 0;
+        couponDuration[partition] = 0;
+        couponYield[partition] = 0;
+        lastCouponPayment[partition] = 0;
+        couponPaymentCount[partition] = 0;
+        isMatured[partition] = false;
+
+        // Remove the partition from the ERC1410 total-partitions index so it
+        // stops appearing in totalPartitions(). Supply is already zero so the
+        // helper's safety guard is satisfied.
+        _untrackPartition(partition);
+
+        emit IsinDisabled(_isin);
     }
 
     /**
