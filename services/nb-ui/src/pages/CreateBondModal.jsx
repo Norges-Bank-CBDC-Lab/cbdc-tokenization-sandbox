@@ -1,27 +1,23 @@
 /**
- * CreateBondModal — issue a new bond.
+ * CreateBondModal — pre-stage a new bond, no auction.
  *
- * The API has no "create bond" endpoint. A bond is created on-chain by its
- * first issuing auction (POST /v1/bonds/{isin}/auctions with maturityDuration).
- * This form captures both the bond's maturity and the issuing-auction
- * parameters in one step.
+ * Per the decoupled-lifecycle flow (operator-ui-backlog item 12): the modal
+ * collects only the bond's ISIN and maturity. The first auction is
+ * scheduled separately from BondDetailPage afterward — `onCreated` hands
+ * the freshly-created Bond DTO back to the parent which navigates to the
+ * detail page.
  */
 import { useState } from 'react';
-import { AuctionsApi } from '../api/auctionsApi.js';
+import { BondsApi } from '../api/bondsApi.js';
 import { useMutation } from '../hooks/useApi.js';
-import { Button, Field, Input, Modal, RadioGroup } from '../components/ui.jsx';
-
-const YEAR_SECS = 365 * 86400;
+import { Button, Field, Input, Modal } from '../components/ui.jsx';
 
 export function CreateBondModal({ existingIsins, onClose, onCreated }) {
   const [isin, setIsin] = useState('NO00');
   const [maturityYears, setMaturityYears] = useState('5');
-  const [auctionType, setAuctionType] = useState('RATE');
-  const [size, setSize] = useState('1000000');
-  const [endDays, setEndDays] = useState('7');
   const [submitErr, setSubmitErr] = useState(null);
 
-  const mutation = useMutation((payload) => AuctionsApi.createAuction(payload.isin, payload.body));
+  const mutation = useMutation((payload) => BondsApi.createBond(payload));
 
   const isinError =
     isin.length < 12
@@ -30,23 +26,24 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
         ? 'An ISIN with this code already exists.'
         : null;
 
-  const valid = !isinError && Number(maturityYears) > 0 && Number(size) > 0 && Number(endDays) > 0;
+  const valid = !isinError && Number(maturityYears) > 0;
 
   async function submit() {
     if (!valid) return;
     setSubmitErr(null);
     try {
-      const now = Math.floor(Date.now() / 1000);
-      const body = {
-        type: auctionType,
-        end: String(now + Math.round(Number(endDays) * 86400)),
-        size: String(Math.round(Number(size))),
-        maturityDuration: String(Math.round(Number(maturityYears) * YEAR_SECS)),
-      };
-      const res = await mutation.run({ isin, body });
-      onCreated(res);
+      // maturityDuration is the count of DURATION_SCALAR units (= years
+      // on a real chain; 60-second "years" on the local sandbox). The
+      // contract multiplies by DURATION_SCALAR to get seconds. Send the
+      // year-count verbatim — sending seconds here causes the contract
+      // to double-multiply and store an astronomical lifetime.
+      const bond = await mutation.run({
+        isin,
+        maturityDuration: String(Math.round(Number(maturityYears))),
+      });
+      onCreated(bond);
     } catch (e) {
-      setSubmitErr(e.message || 'Failed to issue bond.');
+      setSubmitErr(e.message || 'Failed to create bond.');
     }
   }
 
@@ -56,16 +53,16 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
         Cancel
       </Button>
       <Button onClick={submit} variant="primary" disabled={!valid || mutation.loading}>
-        {mutation.loading ? 'Issuing…' : 'Issue bond'}
+        {mutation.loading ? 'Creating…' : 'Create bond'}
       </Button>
     </>
   );
 
   return (
-    <Modal title="Issue new bond" onClose={onClose} footer={footer}>
+    <Modal title="Create new bond" onClose={onClose} footer={footer}>
       <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
-        A bond is created on-chain by its first issuing auction. Set the bond&apos;s maturity and
-        the parameters for the auction that issues it.
+        A bond is pre-staged with its ISIN and maturity here. Schedule the first issuing auction
+        from the bond detail page once you&apos;re ready.
       </p>
 
       <Field
@@ -82,7 +79,7 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
         />
       </Field>
 
-      <Field label="Maturity" hint="Years from issuance until the bond matures.">
+      <Field label="Maturity" hint="Years from distribution until the bond matures.">
         <Input
           type="number"
           min="0.25"
@@ -91,53 +88,6 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
           onChange={(e) => setMaturityYears(e.target.value)}
         />
       </Field>
-
-      <div className="divider" />
-      <div
-        className="muted"
-        style={{
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          marginBottom: 12,
-        }}
-      >
-        Issuing auction
-      </div>
-
-      <Field label="Auction type">
-        <RadioGroup
-          name="auction-type"
-          value={auctionType}
-          onChange={setAuctionType}
-          options={[
-            { value: 'RATE', label: 'RATE' },
-            { value: 'PRICE', label: 'PRICE' },
-            { value: 'BUYBACK', label: 'BUYBACK' },
-          ]}
-        />
-      </Field>
-
-      <div className="field-row">
-        <Field label="Offering size" hint="In whole 1,000 NOK units.">
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-          />
-        </Field>
-        <Field label="Ends in" hint="Days from now until auction closes.">
-          <Input
-            type="number"
-            min="0.1"
-            step="0.5"
-            value={endDays}
-            onChange={(e) => setEndDays(e.target.value)}
-          />
-        </Field>
-      </div>
 
       {submitErr && (
         <div className="error" style={{ marginTop: 8 }}>

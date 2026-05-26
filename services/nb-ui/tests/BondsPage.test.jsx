@@ -21,6 +21,7 @@ const FIXTURE_BONDS = [
     },
     holders: [],
     auctions: [],
+    disabled: false,
     md5: 'abc',
   },
   {
@@ -36,6 +37,7 @@ const FIXTURE_BONDS = [
     },
     holders: [],
     auctions: [],
+    disabled: false,
     md5: 'def',
   },
   {
@@ -51,14 +53,34 @@ const FIXTURE_BONDS = [
     },
     holders: [],
     auctions: [],
+    disabled: false,
     md5: 'ghi',
   },
 ];
 
+const FIXTURE_BOND_DISABLED = {
+  isin: 'NO9999DISABLE',
+  status: 'unknown',
+  totalSupply: '0',
+  contracts: { token: '0x1', auction: '0x2' },
+  maturity: { duration: null, date: null, remaining: null },
+  coupon: null,
+  holders: [],
+  auctions: [],
+  disabled: true,
+  md5: 'jkl',
+};
+
+const listBondsMock = vi.fn(({ includeDisabled } = {}) =>
+  Promise.resolve(includeDisabled ? [...FIXTURE_BONDS, FIXTURE_BOND_DISABLED] : FIXTURE_BONDS),
+);
+
 vi.mock('../src/api/bondsApi.js', () => ({
   BondsApi: {
-    listBonds: vi.fn().mockResolvedValue(FIXTURE_BONDS),
+    listBonds: listBondsMock,
     getBond: vi.fn(),
+    createBond: vi.fn(),
+    disableBond: vi.fn(),
     listBondHistory: vi.fn(),
     payCoupon: vi.fn(),
     redeem: vi.fn(),
@@ -68,6 +90,14 @@ vi.mock('../src/api/bondsApi.js', () => ({
 describe('BondsPage', () => {
   beforeEach(() => {
     window.location.hash = '#/bonds';
+    // The shipped localStorage shim in this vitest setup doesn't implement
+    // .clear(); remove just the key we care about.
+    try {
+      window.localStorage.removeItem('nb-ui:bonds:showDisabled');
+    } catch {
+      /* ignore — best effort */
+    }
+    listBondsMock.mockClear();
   });
 
   it('renders the bond list from the API', async () => {
@@ -110,7 +140,7 @@ describe('BondsPage', () => {
     expect(screen.getByText('NO0098765432')).toBeInTheDocument();
   });
 
-  it('opens the create-bond modal when the action button is clicked', async () => {
+  it('opens the bond-only create modal when the action button is clicked', async () => {
     const { BondsPage } = await import('../src/pages/BondsPage.jsx');
     const { ToastProvider } = await import('../src/components/ui.jsx');
     const user = userEvent.setup();
@@ -124,6 +154,77 @@ describe('BondsPage', () => {
     const newBondButtons = await screen.findAllByRole('button', { name: /\+ New bond/i });
     await user.click(newBondButtons[0]);
 
-    expect(await screen.findByText('Issue new bond')).toBeInTheDocument();
+    // Per D2: the modal collects only ISIN + maturity. No auction fields.
+    expect(await screen.findByRole('heading', { name: 'Create new bond' })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/NO0012345678/i)).toBeInTheDocument();
+    // The modal's <label>Maturity</label> + the table column header both
+    // read "Maturity" — narrow to the <label> via the modal's parent div.
+    const modalLabels = Array.from(document.querySelectorAll('.modal label')).map(
+      (el) => el.textContent,
+    );
+    expect(modalLabels).toContain('Maturity');
+    expect(screen.queryByText(/Auction type/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Offering size/i)).not.toBeInTheDocument();
+  });
+
+  it('hides disabled bonds by default; "Show disabled" toggle surfaces them', async () => {
+    const { BondsPage } = await import('../src/pages/BondsPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const user = userEvent.setup();
+
+    render(
+      <ToastProvider>
+        <BondsPage navigate={() => {}} />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => screen.getByText('NO0012345678'));
+    expect(screen.queryByText('NO9999DISABLE')).not.toBeInTheDocument();
+
+    const toggle = screen.getByLabelText(/Show disabled/i);
+    await user.click(toggle);
+
+    await waitFor(() => expect(screen.getByText('NO9999DISABLE')).toBeInTheDocument());
+    // The DISABLED pill renders next to the row's status.
+    expect(screen.getByText('DISABLED')).toBeInTheDocument();
+  });
+
+  it('persists the Show-disabled toggle to localStorage', async () => {
+    const { BondsPage } = await import('../src/pages/BondsPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const user = userEvent.setup();
+
+    render(
+      <ToastProvider>
+        <BondsPage navigate={() => {}} />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => screen.getByText('NO0012345678'));
+    expect(window.localStorage.getItem('nb-ui:bonds:showDisabled')).toBeNull();
+
+    await user.click(screen.getByLabelText(/Show disabled/i));
+    expect(window.localStorage.getItem('nb-ui:bonds:showDisabled')).toBe('true');
+  });
+
+  it('passes includeDisabled to listBonds based on the toggle state', async () => {
+    const { BondsPage } = await import('../src/pages/BondsPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const user = userEvent.setup();
+
+    render(
+      <ToastProvider>
+        <BondsPage navigate={() => {}} />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => expect(listBondsMock).toHaveBeenCalled());
+    expect(listBondsMock.mock.calls[0][0]).toMatchObject({ includeDisabled: false });
+
+    await user.click(screen.getByLabelText(/Show disabled/i));
+    await waitFor(() => {
+      const lastCall = listBondsMock.mock.calls[listBondsMock.mock.calls.length - 1];
+      expect(lastCall[0]).toMatchObject({ includeDisabled: true });
+    });
   });
 });

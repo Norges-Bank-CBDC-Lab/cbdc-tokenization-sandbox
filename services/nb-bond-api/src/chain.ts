@@ -91,6 +91,24 @@ async function assertProviderReady() {
   }
 }
 
+// DURATION_SCALAR is an immutable constant on the deployed BondManager
+// (seconds-per-year on real chains; small value like 60 on the sandbox
+// for fast testing). Cache it once after the first successful read so
+// every per-bond compose can convert raw seconds <-> scalar-unit years
+// without re-hitting the chain.
+let durationScalarCache: bigint | null = null;
+export async function getDurationScalar(): Promise<bigint | null> {
+  if (durationScalarCache !== null) return durationScalarCache;
+  try {
+    const manager = await getBondManager();
+    const value = await manager.DURATION_SCALAR();
+    durationScalarCache = BigInt(value.toString());
+    return durationScalarCache;
+  } catch {
+    return null;
+  }
+}
+
 export async function getBondManagerAddress(): Promise<string> {
   await assertProviderReady();
   const [found, address] = await registry.tryGetContract(envVariables.BOND_MANAGER_CONTRACT_NAME);

@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
-import { useApi } from '../hooks/useApi.js';
+import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -19,10 +19,13 @@ import {
   useToast,
 } from '../components/ui.jsx';
 import { CreateAuctionModal } from './CreateAuctionModal.jsx';
+import { ConfirmDisableBondModal } from './ConfirmDisableBondModal.jsx';
 
 export function BondDetailPage({ isin, navigate }) {
   const bondQ = useApi(() => BondsApi.getBond(isin), [isin]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showDisable, setShowDisable] = useState(false);
+  const disableMut = useMutation(() => BondsApi.disableBond(isin));
   const toast = useToast();
 
   if (bondQ.loading)
@@ -41,6 +44,38 @@ export function BondDetailPage({ isin, navigate }) {
   const b = bondQ.data;
   const auctions = b.auctions ?? [];
   const holders = b.holders ?? [];
+
+  // Disable gate: bond not already disabled, no minted supply, no auction
+  // in flight (open/closed/finalised). Cancelled auctions don't count —
+  // they're the limbo case this affordance is designed to clean up.
+  const blockingStatuses = new Set(['open', 'closed', 'finalised']);
+  const hasBlockingAuction = auctions.some((a) => blockingStatuses.has(a.status));
+  const canDisable =
+    !b.disabled && (b.totalSupply === '0' || b.totalSupply == null) && !hasBlockingAuction;
+
+  async function doDisable() {
+    try {
+      await disableMut.run();
+      toast.push({
+        kind: 'ok',
+        title: 'Bond disabled',
+        body: `${b.isin} is hidden from the default Bonds list.`,
+      });
+      setShowDisable(false);
+      // Drop the operator on the Bonds list with Show-disabled forced ON
+      // so they can see what they just disabled. Setting persists across
+      // reloads via localStorage; the toggle picks it up on mount.
+      try {
+        window.localStorage.setItem('nb-ui:bonds:showDisabled', 'true');
+      } catch {
+        /* non-essential */
+      }
+      navigate('/bonds');
+    } catch (e) {
+      toast.push({ title: 'Disable failed', body: e.message });
+      throw e;
+    }
+  }
 
   function handleCreated(updatedBond) {
     setShowCreate(false);
@@ -76,6 +111,7 @@ export function BondDetailPage({ isin, navigate }) {
           <h1 style={{ fontFamily: 'var(--font-mono)', fontSize: 26 }}>{b.isin}</h1>
           <div className="subtitle row" style={{ gap: 12 }}>
             <StatusBadge status={b.status} />
+            {b.disabled && <span className="badge badge-disabled no-dot">DISABLED</span>}
             <span>·</span>
             <span>
               Coupon rate {Fmt.bpsToPct(b.coupon?.rateBps)} · matures{' '}
@@ -87,9 +123,20 @@ export function BondDetailPage({ isin, navigate }) {
           <Button variant="ghost" onClick={bondQ.reload}>
             Refresh
           </Button>
-          <Button variant="primary" onClick={() => setShowCreate(true)}>
-            + New auction
-          </Button>
+          {!b.disabled && (
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              + New auction
+            </Button>
+          )}
+          {canDisable && (
+            <Button
+              variant="danger"
+              onClick={() => setShowDisable(true)}
+              title="Disable this bond. Requires no minted supply, no in-flight auction, and no finalised auction history."
+            >
+              Disable bond…
+            </Button>
+          )}
         </div>
       </div>
 
@@ -114,7 +161,7 @@ export function BondDetailPage({ isin, navigate }) {
         </div>
         <div className="kpi">
           <div className="kpi-label">Time to maturity</div>
-          <div className="kpi-value">{Fmt.durationToYears(b.maturity?.remaining)}</div>
+          <div className="kpi-value">{Fmt.formatYears(b.maturity?.remainingYears)}</div>
           <div className="kpi-sub">{Fmt.formatRelative(b.maturity?.date)}</div>
         </div>
         <div className="kpi">
@@ -147,7 +194,7 @@ export function BondDetailPage({ isin, navigate }) {
               >
                 Maturity duration
               </dt>
-              <dd>{Fmt.durationToYears(b.maturity?.duration)}</dd>
+              <dd>{Fmt.formatYears(b.maturity?.durationYears)}</dd>
               <dt>Maturity date</dt>
               <dd>{Fmt.formatUnixDate(b.maturity?.date)}</dd>
               <dt
@@ -159,7 +206,7 @@ export function BondDetailPage({ isin, navigate }) {
               >
                 Coupon duration
               </dt>
-              <dd>{Fmt.durationToYears(b.coupon?.duration)}</dd>
+              <dd>{Fmt.formatYears(b.coupon?.durationYears)}</dd>
               <dt
                 title={
                   'Contractual annual rate paid per coupon — fixed at issuance. Distinct from ' +
@@ -183,9 +230,11 @@ export function BondDetailPage({ isin, navigate }) {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Auctions for {b.isin}</h3>
-            <Button size="sm" variant="primary" onClick={() => setShowCreate(true)}>
-              + New auction
-            </Button>
+            {!b.disabled && (
+              <Button size="sm" variant="primary" onClick={() => setShowCreate(true)}>
+                + New auction
+              </Button>
+            )}
           </div>
           <div className="card-body flush">
             {auctions.length === 0 ? (
@@ -280,6 +329,14 @@ export function BondDetailPage({ isin, navigate }) {
           lockIsin
           onClose={() => setShowCreate(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {showDisable && (
+        <ConfirmDisableBondModal
+          isin={b.isin}
+          onCancel={() => setShowDisable(false)}
+          onConfirm={doDisable}
         />
       )}
     </div>

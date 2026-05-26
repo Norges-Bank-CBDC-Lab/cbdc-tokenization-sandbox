@@ -70,6 +70,9 @@ library Errors {
     error CouponNotReady(string isin, uint256 nextPaymentTime, uint256 currentTime);
     error AllCouponsPaid(string isin);
     error CouponPaymentBalanceMismatch(string isin, uint256 processedBalance, uint256 totalSupply);
+    error BondAlreadyDisabled(string isin);
+    error BondNotEmpty(string isin, uint256 supply);
+    error BondHasFinalisedAuction(string isin, bytes32 auctionId);
 
     // --- BondAuction ---
     error IncorrectAuctionPhase(bytes32 id, uint8 expected, uint8 actual);

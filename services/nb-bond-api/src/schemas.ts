@@ -260,13 +260,22 @@ const bondContractsSchema = z
 const maturitySchema = z
   .object({
     duration: bigIntStringSchema.nullable().meta({
-      description: 'Configured maturity duration in seconds',
+      description: 'Configured maturity duration in seconds (raw chain value)',
+    }),
+    durationYears: bigIntStringSchema.nullable().meta({
+      description:
+        'Maturity in DURATION_SCALAR units (= years on a real chain; sandbox compresses ' +
+        '1 unit to DURATION_SCALAR seconds). Derived as duration / DURATION_SCALAR — ' +
+        'use this for human-readable display; use `duration` for second-level arithmetic.',
     }),
     date: unixSecondsSchema.nullable().meta({
       description: 'Maturity date as unix timestamp',
     }),
     remaining: bigIntStringSchema.nullable().meta({
       description: 'Seconds until maturity; 0 once matured',
+    }),
+    remainingYears: bigIntStringSchema.nullable().meta({
+      description: 'Remaining time in DURATION_SCALAR units (see durationYears for semantics)',
     }),
   })
   .meta({
@@ -288,7 +297,12 @@ const couponPaymentsSchema = z
 const couponSchema = z
   .object({
     duration: bigIntStringSchema.nullable().meta({
-      description: 'Seconds between coupon payments',
+      description: 'Seconds between coupon payments (raw chain value)',
+    }),
+    durationYears: bigIntStringSchema.nullable().meta({
+      description:
+        'Coupon interval in DURATION_SCALAR units (= years on a real chain; see ' +
+        'BondMaturity.durationYears for the unit semantics).',
     }),
     rateBps: bpsSchema.nullable().meta({
       description:
@@ -319,6 +333,12 @@ const bondSchema = z
   .object({
     isin: isinSchema,
     status: bondStatusSchema,
+    disabled: z.boolean().meta({
+      description:
+        'True when the bond has been soft-deleted via DELETE /v1/bonds/{isin}. Disabled bonds ' +
+        'are excluded from the default GET /v1/bonds response — pass ?includeDisabled=true to ' +
+        'see them. Chain history (events) is preserved.',
+    }),
     totalSupply: bigIntStringSchema.nullable(),
     contracts: bondContractsSchema,
     maturity: maturitySchema.nullable(),
@@ -653,7 +673,10 @@ const createAuctionBodySchema = z
       description: 'Offering or buyback size in 1000-NOK units',
     }),
     maturityDuration: bigIntStringSchema.nullable().meta({
-      description: 'Seconds from distribution to maturity (required for RATE auctions)',
+      description:
+        'Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit ' +
+        'as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive ' +
+        'seconds — do not pre-convert. Required for RATE auctions; null otherwise.',
     }),
   })
   .meta({
@@ -796,6 +819,28 @@ const bidderAddressPathParam = {
   schema: { $ref: '#/components/schemas/Address' },
 };
 
+const includeDisabledQueryParam = {
+  in: 'query' as const,
+  name: 'includeDisabled',
+  required: false,
+  schema: { type: 'boolean' as const, default: false },
+  description:
+    'When true, include soft-deleted bonds in the response. Disabled bonds are hidden by ' +
+    'default to keep the operator working list focused. See DELETE /v1/bonds/{isin}.',
+};
+
+const createBondBodySchema = z
+  .object({
+    isin: isinSchema,
+    maturityDuration: bigIntStringSchema.meta({
+      description:
+        'Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit ' +
+        'as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive ' +
+        'seconds — do not pre-convert.',
+    }),
+  })
+  .meta({ id: 'CreateBondRequest', description: 'Request body for POST /v1/bonds' });
+
 const noContent204 = {
   description: 'No Content — operation succeeded; response body intentionally empty.',
 };
@@ -821,10 +866,25 @@ const paths: ZodOpenApiPathsObject = {
       tags: ['bonds'],
       operationId: 'listBonds',
       summary: 'List all bonds with full subtree (auctions, bids, allocations, holders)',
-      parameters: [testModeQueryParam],
+      parameters: [testModeQueryParam, includeDisabledQueryParam],
       responses: {
         200: successJson('All bonds. Primary cache-priming call for the UI.', z.array(bondSchema)),
         ...errorRefs.read,
+      },
+    },
+    post: {
+      tags: ['bonds'],
+      operationId: 'createBond',
+      summary:
+        'Create a bond partition without scheduling an auction. The first auction is scheduled ' +
+        'separately via POST /v1/bonds/{isin}/auctions.',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: createBondBodySchema } },
+      },
+      responses: {
+        201: successJson('Newly created bond with no auctions yet', bondSchema),
+        ...errorRefs.mutate,
       },
     },
   },
@@ -837,6 +897,18 @@ const paths: ZodOpenApiPathsObject = {
       responses: {
         200: successJson('Bond resource', bondSchema),
         ...errorRefs.read,
+      },
+    },
+    delete: {
+      tags: ['bonds'],
+      operationId: 'disableBond',
+      summary:
+        'Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED ' +
+        'auction in history. Idempotent — returns 204 even if the bond is already disabled.',
+      parameters: [isinPathParam],
+      responses: {
+        204: { description: 'Bond disabled (or was already disabled)' },
+        ...errorRefs.mutate,
       },
     },
   },
@@ -1291,6 +1363,7 @@ export const bidPlaintextSchema = z.object({
 export {
   closeAuctionBodySchema,
   createAuctionBodySchema,
+  createBondBodySchema,
   finaliseBodySchema,
   holdersBodySchema,
   isinParamSchema,
@@ -1333,6 +1406,7 @@ export type ProblemDetails = z.infer<typeof problemDetailsSchema>;
 export type TxRef = z.infer<typeof txRefSchema>;
 
 export type CreateAuctionBody = z.infer<typeof createAuctionBodySchema>;
+export type CreateBondBody = z.infer<typeof createBondBodySchema>;
 export type CloseAuctionBody = z.infer<typeof closeAuctionBodySchema>;
 export type FinaliseBody = z.infer<typeof finaliseBodySchema>;
 export type HoldersBody = z.infer<typeof holdersBodySchema>;

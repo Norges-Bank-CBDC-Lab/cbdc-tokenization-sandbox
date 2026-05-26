@@ -13,6 +13,9 @@ interface IBondToken is IERC1410 {
     event IsinReduced(string isin, uint256 delta, uint256 newOffering);
     event IsinMinted(string isin, address dst, uint256 value);
     event IsinRedeemed(string isin, address indexed holder, uint256 value, address operator);
+    event IsinDisabled(string isin);
+
+    function disablePartition(string memory _isin) external;
 
     function UNIT_NOMINAL() external view returns (uint256);
 

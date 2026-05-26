@@ -7,6 +7,7 @@ import {IBondManager} from "@norges-bank/interfaces/IBondManager.sol";
 import {BondAuction} from "@norges-bank/BondAuction.sol";
 import {IBondAuction} from "@norges-bank/interfaces/IBondAuction.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
+import {IBondToken} from "@norges-bank/interfaces/IBondToken.sol";
 import {BondDvP} from "@norges-bank/BondDvP.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 import {Tbd} from "@private-bank/Tbd.sol";
@@ -838,6 +839,183 @@ contract BondManagerTest is Test, AuctionHelper {
 
         auctionId = bondAuction.getAuctionId(ISIN);
         assertEq(uint256(bondAuction.getAuctionStatus(auctionId)), uint256(IBondAuction.AuctionStatus.CLOSED));
+    }
+
+    // ============ deployBond / deployAuctionForBond / disableBond Tests ============
+
+    function test_DeployBond_NoAuctionCreated() public {
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition), "partition should be active");
+        assertEq(bondToken.partitionOffering(partition), 0, "offering starts at 0 (D1)");
+        assertEq(bondToken.maturityDuration(partition), MATURITY_DURATION, "maturity in seconds");
+        assertFalse(bondManager.bondActive(ISIN), "no in-flight auction");
+
+        // No auction should exist for this ISIN.
+        vm.expectRevert(abi.encodeWithSelector(Errors.AuctionNotFoundForIsin.selector, ISIN));
+        bondAuction.getAuctionId(ISIN);
+    }
+
+    function test_DeployBond_RevertIf_DuplicateIsin() public {
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.DuplicatePartition.selector, ISIN));
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+    }
+
+    function test_DeployBond_RevertIf_NotBondAdmin() public {
+        vm.expectRevert();
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+    }
+
+    function test_DeployBond_RevertIf_MaturityZero() public {
+        vm.prank(bondAdmin);
+        vm.expectRevert(Errors.MaturityDurationZero.selector);
+        bondManager.deployBond(ISIN, 0);
+    }
+
+    function test_DeployAuctionForBond_RatePathMatchesDeployBondWithAuction() public {
+        // Step-by-step path: deployBond + deployAuctionForBond(RATE) must produce
+        // the same observable state as the legacy deployBondWithAuction.
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        vm.prank(bondAdmin);
+        bondManager.deployAuctionForBond(ISIN, _getEndTime(), PUB_KEY, OFFERING, IBondAuction.AuctionType.RATE);
+
+        assertTrue(bondManager.bondActive(ISIN));
+        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
+        assertEq(uint256(bondAuction.getAuctionStatus(auctionId)), uint256(IBondAuction.AuctionStatus.BIDDING));
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertEq(bondToken.partitionOffering(partition), OFFERING, "first auction bumps offering");
+    }
+
+    function test_DeployAuctionForBond_RevertIf_BondNotExists() public {
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.BondDoesNotExist.selector, ISIN));
+        bondManager.deployAuctionForBond(ISIN, _getEndTime(), PUB_KEY, OFFERING, IBondAuction.AuctionType.RATE);
+    }
+
+    function test_DeployBondWithAuction_BackwardCompat() public {
+        // The legacy entrypoint must keep producing the same observable state
+        // as the explicit two-step path. Compare against the prior test.
+        vm.prank(bondAdmin);
+        bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
+
+        assertTrue(bondManager.bondActive(ISIN));
+        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
+        assertEq(uint256(bondAuction.getAuctionStatus(auctionId)), uint256(IBondAuction.AuctionStatus.BIDDING));
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertEq(bondToken.partitionOffering(partition), OFFERING);
+        assertEq(bondToken.maturityDuration(partition), MATURITY_DURATION);
+    }
+
+    function test_DisableBond_AfterDeployBondNoAuction() public {
+        // The "item 12 + item 11 combo" path: pre-staged bond with no auction.
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition));
+
+        vm.expectEmit(false, false, false, true);
+        emit IBondToken.IsinDisabled(ISIN);
+        vm.expectEmit(false, false, false, true);
+        emit IBondManager.BondDisabled(ISIN);
+
+        vm.prank(bondAdmin);
+        bondManager.disableBond(ISIN);
+
+        assertFalse(bondToken.activePartitions(partition), "partition disabled");
+        assertEq(bondToken.partitionOffering(partition), 0);
+        assertEq(bondToken.maturityDuration(partition), 0);
+    }
+
+    function test_DisableBond_AfterCancelledAuction() public {
+        // The "limbo cleanup" path that item 11 standalone unlocks: bond was
+        // created via the legacy combined entrypoint, the auction was cancelled,
+        // partition is now sitting with zero supply and no in-flight auction.
+        vm.prank(bondAdmin);
+        bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
+        vm.prank(bondAdmin);
+        bondManager.cancelAuction(ISIN);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition), "partition still active post-cancel");
+        assertEq(bondToken.totalSupplyByPartition(partition), 0, "nothing minted");
+        assertFalse(bondManager.bondActive(ISIN), "no in-flight auction");
+
+        vm.prank(bondAdmin);
+        bondManager.disableBond(ISIN);
+
+        assertFalse(bondToken.activePartitions(partition));
+    }
+
+    function test_DisableBond_RevertIf_InFlightAuction() public {
+        // Open auction → bondActive[isin] == true → modifier rejects.
+        vm.prank(bondAdmin);
+        bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.IncorrectBondState.selector, ISIN, false));
+        bondManager.disableBond(ISIN);
+    }
+
+    function test_DisableBond_RevertIf_FinalisedAuctionExists() public {
+        _createAndFinalizeBond();
+
+        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
+        assertEq(uint256(bondAuction.getAuctionStatus(auctionId)), uint256(IBondAuction.AuctionStatus.FINALISED));
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.BondHasFinalisedAuction.selector, ISIN, auctionId));
+        bondManager.disableBond(ISIN);
+    }
+
+    function test_DisableBond_RevertIf_AlreadyDisabled() public {
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        vm.prank(bondAdmin);
+        bondManager.disableBond(ISIN);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.BondAlreadyDisabled.selector, ISIN));
+        bondManager.disableBond(ISIN);
+    }
+
+    function test_DisableBond_RevertIf_NotBondAdmin() public {
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+
+        vm.expectRevert();
+        bondManager.disableBond(ISIN);
+    }
+
+    function test_DisableBond_AllowsIsinReuse() public {
+        // After disable, the ISIN can be re-used with fresh parameters and the
+        // partition state must come back clean.
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, MATURITY_YEARS);
+        vm.prank(bondAdmin);
+        bondManager.disableBond(ISIN);
+
+        uint256 newMaturityYears = 7;
+        vm.prank(bondAdmin);
+        bondManager.deployBond(ISIN, newMaturityYears);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition), "re-created");
+        assertEq(bondToken.partitionOffering(partition), 0);
+        assertEq(bondToken.maturityDuration(partition), newMaturityYears * DURATION_SCALAR);
+        assertEq(bondToken.couponYield(partition), 0, "fresh partition has no coupon yield");
+        assertFalse(bondToken.isMatured(partition));
     }
 
     // ============ Helper Functions ============

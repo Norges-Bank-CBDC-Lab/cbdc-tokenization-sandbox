@@ -491,6 +491,18 @@ footer.app-footer {
   display: none;
 }
 
+.badge-disabled {
+  background: var(--surface-2);
+  color: var(--ink-3);
+  border: 1px solid var(--border);
+}
+.tbl tbody tr.row-muted td {
+  color: var(--ink-3);
+}
+.tbl tbody tr.row-muted td.mono {
+  opacity: 0.65;
+}
+
 /* ----- forms / modal ----------------------------------------- */
 
 .modal-backdrop {

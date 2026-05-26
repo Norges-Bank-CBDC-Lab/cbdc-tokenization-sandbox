@@ -64,16 +64,82 @@ contract BondTokenTest is Test {
         vm.stopPrank();
     }
 
-    function test_CreatePartition_RevertIf_ZeroOffering() public {
+    function test_CreatePartition_AcceptsZeroOffering() public {
+        // Pre-staged bond (D1): partition is created with offering 0; the offering
+        // is added later via extendPartitionOffering when an auction is scheduled.
+        // Mint-time safety (mintByIsin) still enforces supply + value <= offering.
         vm.prank(controller);
-        vm.expectRevert(abi.encodeWithSelector(Errors.OfferingZero.selector));
         bondToken.createPartition(ISIN, 0, MATURITY_DURATION);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition));
+        assertEq(bondToken.partitionOffering(partition), 0);
+        assertEq(bondToken.maturityDuration(partition), MATURITY_DURATION);
     }
 
     function test_CreatePartition_RevertIf_ZeroMaturityDuration() public {
         vm.prank(controller);
         vm.expectRevert(abi.encodeWithSelector(Errors.MaturityDurationZero.selector));
         bondToken.createPartition(ISIN, OFFERING, 0);
+    }
+
+    // ============ disablePartition Tests ============
+
+    function test_DisablePartition_HappyPath() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.disablePartition(ISIN);
+        vm.stopPrank();
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertFalse(bondToken.activePartitions(partition));
+        assertEq(bondToken.partitionOffering(partition), 0);
+        assertEq(bondToken.maturityDuration(partition), 0);
+        assertEq(bondToken.couponYield(partition), 0);
+        assertFalse(bondToken.isMatured(partition));
+    }
+
+    function test_DisablePartition_RevertIf_NonZeroSupply() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.BondNotEmpty.selector, ISIN, 100));
+        bondToken.disablePartition(ISIN);
+        vm.stopPrank();
+    }
+
+    function test_DisablePartition_RevertIf_AlreadyDisabled() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.disablePartition(ISIN);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.BondAlreadyDisabled.selector, ISIN));
+        bondToken.disablePartition(ISIN);
+        vm.stopPrank();
+    }
+
+    function test_DisablePartition_RevertIf_NotController() public {
+        vm.prank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+
+        vm.expectRevert();
+        bondToken.disablePartition(ISIN);
+    }
+
+    function test_DisablePartition_AllowsRecreateWithFreshParameters() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.disablePartition(ISIN);
+
+        uint256 newMaturity = 7 * 365 days;
+        bondToken.createPartition(ISIN, 500, newMaturity);
+        vm.stopPrank();
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.activePartitions(partition));
+        assertEq(bondToken.partitionOffering(partition), 500);
+        assertEq(bondToken.maturityDuration(partition), newMaturity);
     }
 
     // ============ mintByIsin Tests ============

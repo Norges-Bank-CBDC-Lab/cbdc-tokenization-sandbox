@@ -56,6 +56,7 @@ import {
   type CloseAuctionBody,
   type CreateAuctionBody,
   type CreateBidderBody,
+  type CreateBondBody,
   type FinaliseBody,
   type HoldersBody,
   type SubmitBidBody,
@@ -66,6 +67,7 @@ import {
   closeAuctionBodySchema,
   createAuctionBodySchema,
   createBidderBodySchema,
+  createBondBodySchema,
   finaliseBodySchema,
   holdersBodySchema,
   isinParamSchema,
@@ -288,8 +290,11 @@ function parseTestMode(req: express.Request): boolean {
 
 app.get('/v1/bonds', async (req, res, next) => {
   try {
+    const includeDisabled =
+      req.query.includeDisabled === 'true' || req.query.includeDisabled === '1';
     const bonds = await composeAllBonds(historyDb, {
       revealOpenBids: parseTestMode(req),
+      includeDisabled,
     });
     okResponse(req, res, bonds);
   } catch (err) {
@@ -309,6 +314,114 @@ app.get('/v1/bonds/:isin', validateRequest(isinParamSchema, 'params'), async (re
     next(err);
   }
 });
+
+// Pre-stage a bond without scheduling an auction. The first auction is
+// scheduled separately via POST /v1/bonds/{isin}/auctions.
+app.post('/v1/bonds', validateRequest(createBondBodySchema), async (req, res, next) => {
+  try {
+    const body = req.body as CreateBondBody;
+
+    let maturitySeconds: bigint;
+    try {
+      maturitySeconds = parseBigInt(body.maturityDuration, 'maturityDuration');
+    } catch (err) {
+      throw badRequest((err as Error).message);
+    }
+    if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
+
+    const bondManager = await getBondManager();
+    await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
+    await sendWithManagedNonce(async (nonce) =>
+      bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
+    );
+
+    const bond = await composeBond(historyDb, body.isin);
+    if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
+    res.status(201).json(bond);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Soft-delete a bond. Requires no minted supply, no in-flight auction,
+// and no FINALISED auction in history. Idempotent: 204 even if already
+// disabled (the contract's BondAlreadyDisabled is the no-op signal).
+app.delete(
+  '/v1/bonds/:isin',
+  validateRequest(isinParamSchema, 'params'),
+  async (req, res, next) => {
+    try {
+      const { isin } = req.params as { isin: string };
+      const bondManager = await getBondManager();
+
+      try {
+        await bondManager.disableBond.staticCall(isin);
+      } catch (err) {
+        // Decode the custom-error selector via the relevant contract
+        // interfaces. Ethers v6 puts revert bytes in `err.data` but the
+        // top-level message says "(unknown custom error)" — disable-path
+        // reverts can originate in BondManager itself (BondHasFinalisedAuction)
+        // or bubble up from BondToken (BondAlreadyDisabled / BondNotEmpty).
+        const data = (err as { data?: string }).data;
+        let errorName: string | null = null;
+        if (typeof data === 'string' && data.startsWith('0x')) {
+          const bondToken = await getBondToken();
+          for (const iface of [bondManager.interface, bondToken.interface]) {
+            try {
+              const parsed = iface.parseError(data);
+              if (parsed) {
+                errorName = parsed.name;
+                break;
+              }
+            } catch {
+              // try the next interface
+            }
+          }
+        }
+
+        // Idempotent disable: the contract's BondAlreadyDisabled means
+        // "no work to do" — return 204 instead of 409.
+        if (errorName === 'BondAlreadyDisabled') {
+          res.status(204).end();
+          return;
+        }
+
+        // Map known gate failures to a structured 409.
+        const errors: { field: string; message: string }[] = [];
+        if (errorName === 'IncorrectBondState') {
+          errors.push({
+            field: 'bondActive',
+            message: 'bond has an in-flight auction; cancel it before disabling',
+          });
+        } else if (errorName === 'BondNotEmpty') {
+          errors.push({
+            field: 'totalSupply',
+            message: 'bond has minted units; cannot be disabled',
+          });
+        } else if (errorName === 'BondHasFinalisedAuction') {
+          errors.push({
+            field: 'auctions',
+            message: 'bond has a FINALISED auction in history; cannot be disabled',
+          });
+        }
+        if (errors.length > 0) {
+          throw new HttpError(409, 'Bond cannot be disabled', {
+            detail: `bond ${isin} does not meet disable gates`,
+            errors,
+          });
+        }
+        // Unknown revert — surface it via the default error handler.
+        throw err;
+      }
+
+      await sendWithManagedNonce(async (nonce) => bondManager.disableBond(isin, { nonce }));
+
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 app.get('/v1/bonds/:isin/history', validateRequest(isinParamSchema, 'params'), (req, res, next) => {
   try {
@@ -425,15 +538,36 @@ app.post(
       if (auctionCount > 0n && auctionType === 'RATE') {
         throw badRequest('subsequent auctions cannot be RATE');
       }
-      if (auctionType === 'RATE' && maturitySeconds === undefined) {
-        throw badRequest('maturityDuration is required for RATE');
-      }
 
       const pubKey = sealingKeys.publicKey;
       const bondManager = await getBondManager();
 
-      // Static-call validation first so revert reasons surface cleanly.
+      // Distinguish "first RATE for an unstaged bond" (one-shot
+      // deployBondWithAuction) from "first RATE for a pre-staged bond"
+      // (deployAuctionForBond after a prior POST /v1/bonds).
+      let bondAlreadyStaged = false;
       if (auctionType === 'RATE') {
+        try {
+          const bondToken = await getBondToken();
+          const partition = keccak256(toUtf8Bytes(isin));
+          bondAlreadyStaged = await bondToken.activePartitions(partition);
+        } catch (err) {
+          logger.warn(`activePartitions read failed for ${isin}: ${(err as Error).message}`);
+        }
+      }
+
+      // maturityDuration is required only for the legacy combined path
+      // (RATE on a bond that doesn't exist yet). For RATE on a pre-staged
+      // bond the partition already carries its maturity from deployBond.
+      if (auctionType === 'RATE' && !bondAlreadyStaged && maturitySeconds === undefined) {
+        throw badRequest('maturityDuration is required for RATE on a new bond');
+      }
+
+      // Solidity enum mapping (must match IBondAuction.AuctionType).
+      const auctionTypeEnum = auctionType === 'RATE' ? 0 : auctionType === 'PRICE' ? 1 : 2;
+
+      // Static-call validation first so revert reasons surface cleanly.
+      if (auctionType === 'RATE' && !bondAlreadyStaged) {
         await bondManager.deployBondWithAuction.staticCall(
           isin,
           endSeconds,
@@ -441,14 +575,18 @@ app.post(
           sizeUnits,
           maturitySeconds!,
         );
-      } else if (auctionType === 'PRICE') {
-        await bondManager.extendBondWithAuction.staticCall(isin, endSeconds, pubKey, sizeUnits);
       } else {
-        await bondManager.buybackWithAuction.staticCall(isin, endSeconds, pubKey, sizeUnits);
+        await bondManager.deployAuctionForBond.staticCall(
+          isin,
+          endSeconds,
+          pubKey,
+          sizeUnits,
+          auctionTypeEnum,
+        );
       }
 
       await sendWithManagedNonce(async (nonce) => {
-        if (auctionType === 'RATE') {
+        if (auctionType === 'RATE' && !bondAlreadyStaged) {
           return bondManager.deployBondWithAuction(
             isin,
             endSeconds,
@@ -458,10 +596,14 @@ app.post(
             { nonce },
           );
         }
-        if (auctionType === 'PRICE') {
-          return bondManager.extendBondWithAuction(isin, endSeconds, pubKey, sizeUnits, { nonce });
-        }
-        return bondManager.buybackWithAuction(isin, endSeconds, pubKey, sizeUnits, { nonce });
+        return bondManager.deployAuctionForBond(
+          isin,
+          endSeconds,
+          pubKey,
+          sizeUnits,
+          auctionTypeEnum,
+          { nonce },
+        );
       });
 
       const bond = await composeBond(historyDb, isin);
