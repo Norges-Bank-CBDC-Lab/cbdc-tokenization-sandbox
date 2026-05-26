@@ -659,7 +659,10 @@ const createAuctionBodySchema = z
       description: 'Offering or buyback size in 1000-NOK units',
     }),
     maturityDuration: bigIntStringSchema.nullable().meta({
-      description: 'Seconds from distribution to maturity (required for RATE auctions)',
+      description:
+        'Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit ' +
+        'as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive ' +
+        'seconds — do not pre-convert. Required for RATE auctions; null otherwise.',
     }),
   })
   .meta({
@@ -817,8 +820,9 @@ const createBondBodySchema = z
     isin: isinSchema,
     maturityDuration: bigIntStringSchema.meta({
       description:
-        'Maturity duration. Unit follows the same convention as the create-auction body: years ' +
-        'on real chains, durationScalar-units on the local sandbox (see common/helpers).',
+        'Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit ' +
+        'as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive ' +
+        'seconds — do not pre-convert.',
     }),
   })
   .meta({ id: 'CreateBondRequest', description: 'Request body for POST /v1/bonds' });

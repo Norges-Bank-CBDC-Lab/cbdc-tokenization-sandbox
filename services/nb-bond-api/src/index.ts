@@ -538,9 +538,6 @@ app.post(
       if (auctionCount > 0n && auctionType === 'RATE') {
         throw badRequest('subsequent auctions cannot be RATE');
       }
-      if (auctionType === 'RATE' && maturitySeconds === undefined) {
-        throw badRequest('maturityDuration is required for RATE');
-      }
 
       const pubKey = sealingKeys.publicKey;
       const bondManager = await getBondManager();
@@ -557,6 +554,13 @@ app.post(
         } catch (err) {
           logger.warn(`activePartitions read failed for ${isin}: ${(err as Error).message}`);
         }
+      }
+
+      // maturityDuration is required only for the legacy combined path
+      // (RATE on a bond that doesn't exist yet). For RATE on a pre-staged
+      // bond the partition already carries its maturity from deployBond.
+      if (auctionType === 'RATE' && !bondAlreadyStaged && maturitySeconds === undefined) {
+        throw badRequest('maturityDuration is required for RATE on a new bond');
       }
 
       // Solidity enum mapping (must match IBondAuction.AuctionType).

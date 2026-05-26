@@ -12,8 +12,6 @@ import { BondsApi } from '../api/bondsApi.js';
 import { useMutation } from '../hooks/useApi.js';
 import { Button, Field, Input, Modal } from '../components/ui.jsx';
 
-const YEAR_SECS = 365 * 86400;
-
 export function CreateBondModal({ existingIsins, onClose, onCreated }) {
   const [isin, setIsin] = useState('NO00');
   const [maturityYears, setMaturityYears] = useState('5');
@@ -34,9 +32,14 @@ export function CreateBondModal({ existingIsins, onClose, onCreated }) {
     if (!valid) return;
     setSubmitErr(null);
     try {
+      // maturityDuration is the count of DURATION_SCALAR units (= years
+      // on a real chain; 60-second "years" on the local sandbox). The
+      // contract multiplies by DURATION_SCALAR to get seconds. Send the
+      // year-count verbatim — sending seconds here causes the contract
+      // to double-multiply and store an astronomical lifetime.
       const bond = await mutation.run({
         isin,
-        maturityDuration: String(Math.round(Number(maturityYears) * YEAR_SECS)),
+        maturityDuration: String(Math.round(Number(maturityYears))),
       });
       onCreated(bond);
     } catch (e) {

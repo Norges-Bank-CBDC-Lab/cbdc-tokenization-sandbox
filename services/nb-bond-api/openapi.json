@@ -1531,7 +1531,7 @@
             "$ref": "#/components/schemas/Isin"
           },
           "maturityDuration": {
-            "description": "Maturity duration. Unit follows the same convention as the create-auction body: years on real chains, durationScalar-units on the local sandbox (see common/helpers).",
+            "description": "Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive seconds — do not pre-convert.",
             "$ref": "#/components/schemas/BigIntString"
           }
         },
@@ -1616,7 +1616,7 @@
                 "type": "null"
               }
             ],
-            "description": "Seconds from distribution to maturity (required for RATE auctions)"
+            "description": "Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive seconds — do not pre-convert. Required for RATE auctions; null otherwise."
           }
         },
         "required": [
