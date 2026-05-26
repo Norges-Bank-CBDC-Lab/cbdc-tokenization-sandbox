@@ -108,7 +108,11 @@ contract BondManager is IBondManager, AccessControl {
      *      `deployAuctionForBond` bumps the offering to its size.
      * @dev Maturity duration is converted to seconds using DURATION_SCALAR.
      */
-    function deployBond(string calldata _isin, uint256 _maturityDuration) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+    function deployBond(string calldata _isin, uint256 _maturityDuration)
+        external
+        onlyRole(Roles.BOND_MANAGER_ROLE)
+        isBondActive(_isin, false)
+    {
         _deployBond(_isin, _maturityDuration);
     }
 
@@ -128,7 +132,11 @@ contract BondManager is IBondManager, AccessControl {
         bytes calldata _pubKey,
         uint256 _offering,
         IBondAuction.AuctionType _auctionType
-    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
+        // Set the in-flight lock BEFORE any external call so slither's
+        // cross-function reentrancy detector sees a check-effects-interactions
+        // ordering. Mirrors the pattern from the original entrypoints.
+        bondActive[_isin] = true;
         _deployAuctionForBond(_isin, _end, _pubKey, _offering, _auctionType);
     }
 
@@ -143,7 +151,10 @@ contract BondManager is IBondManager, AccessControl {
         bytes calldata _pubKey,
         uint256 _offering,
         uint256 _maturityDuration
-    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
+        // Same effects-before-interactions ordering as the standalone
+        // deployAuctionForBond wrapper above.
+        bondActive[_isin] = true;
         _deployBond(_isin, _maturityDuration);
         _deployAuctionForBond(_isin, _end, _pubKey, _offering, IBondAuction.AuctionType.RATE);
     }
@@ -157,7 +168,8 @@ contract BondManager is IBondManager, AccessControl {
         uint64 _end,
         bytes calldata _pubKey,
         uint256 _additionalOffering
-    ) external onlyRole(Roles.BOND_MANAGER_ROLE) {
+    ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false) {
+        bondActive[_isin] = true;
         _deployAuctionForBond(_isin, _end, _pubKey, _additionalOffering, IBondAuction.AuctionType.PRICE);
     }
 
@@ -168,11 +180,13 @@ contract BondManager is IBondManager, AccessControl {
     function buybackWithAuction(string calldata _isin, uint64 _end, bytes calldata _pubKey, uint256 _buybackSize)
         external
         onlyRole(Roles.BOND_MANAGER_ROLE)
+        isBondActive(_isin, false)
     {
+        bondActive[_isin] = true;
         _deployAuctionForBond(_isin, _end, _pubKey, _buybackSize, IBondAuction.AuctionType.BUYBACK);
     }
 
-    function _deployBond(string calldata _isin, uint256 _maturityDuration) internal isBondActive(_isin, false) {
+    function _deployBond(string calldata _isin, uint256 _maturityDuration) internal {
         if (_maturityDuration == 0) revert Errors.MaturityDurationZero();
 
         uint256 maturityDurationSeconds = _maturityDuration * DURATION_SCALAR;
@@ -188,9 +202,11 @@ contract BondManager is IBondManager, AccessControl {
         bytes calldata _pubKey,
         uint256 _offering,
         IBondAuction.AuctionType _auctionType
-    ) internal isBondActive(_isin, false) {
-        bondActive[_isin] = true;
-
+    ) internal {
+        // bondActive[_isin] is set to true and the isBondActive(false)
+        // pre-check is enforced by the public wrappers (so the state write
+        // happens before any external call — slither flags the inverse as
+        // cross-function reentrancy).
         bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
         if (!BOND_TOKEN.activePartitions(partition)) {
             revert Errors.BondDoesNotExist(_isin);
