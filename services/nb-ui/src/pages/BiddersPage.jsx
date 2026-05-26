@@ -7,8 +7,7 @@
  *  - Delete a bidder (hard-blocked when on-chain bids reference them)
  *  - "Place bid" → opens PlaceBidModal scoped to that bidder
  *
- * All actions go through BiddersApi, which dispatches to the real
- * NB Bond API or the in-memory mock depending on AppConfig.USE_MOCK.
+ * All actions go through BiddersApi → HttpClient → NB Bond API.
  */
 import { useState } from 'react';
 import { BiddersApi } from '../api/biddersApi.js';

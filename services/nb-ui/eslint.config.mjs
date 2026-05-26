@@ -6,7 +6,7 @@ import prettier from 'eslint-config-prettier';
 
 export default [
   {
-    // public/config.template.js holds envsubst placeholders (e.g. __USE_MOCK__)
+    // public/config.template.js holds envsubst placeholders (e.g. __API_BASE_URL__)
     // that are rewritten at container start — they are intentionally undefined
     // identifiers from JavaScript's perspective.
     ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'public/config.template.js'],

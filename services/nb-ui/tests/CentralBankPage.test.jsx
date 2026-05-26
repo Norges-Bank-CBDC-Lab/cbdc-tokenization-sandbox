@@ -2,14 +2,40 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-// Feature: CentralBankPage renders the CB summary, allowlist, and action
-// buttons. Each WNOK action button opens its modal. Full mock client live.
+// CentralBankPage renders the CB summary, allowlist, and action
+// buttons. Each WNOK action button opens its modal. We stub
+// CentralBankApi at the module boundary.
+
+const FIXTURE_CB = {
+  available: true,
+  address: '0xcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcb',
+  wnok: {
+    contractAddress: '0xwnokwnokwnokwnokwnokwnokwnokwnokwnokwnok',
+    balance: '10000000',
+    allowlistSize: 3,
+  },
+  md5: 'a',
+};
+
+const FIXTURE_ALLOWLIST = [
+  { address: '0x1111111111111111111111111111111111111111' },
+  { address: '0x2222222222222222222222222222222222222222' },
+];
+
+vi.mock('../src/api/centralBankApi.js', () => ({
+  CentralBankApi: {
+    getCentralBank: vi.fn().mockResolvedValue(FIXTURE_CB),
+    listAllowlist: vi.fn().mockResolvedValue(FIXTURE_ALLOWLIST),
+    addToAllowlist: vi.fn(),
+    removeFromAllowlist: vi.fn(),
+    mintWnok: vi.fn(),
+    burnWnok: vi.fn(),
+    transferWnok: vi.fn(),
+  },
+}));
 
 describe('CentralBankPage', () => {
   beforeEach(() => {
-    vi.resetModules();
-    window.__APP_CONFIG__.USE_MOCK = true;
-    window.__APP_CONFIG__.MOCK_LATENCY_MS = 0;
     window.location.hash = '#/central-bank';
   });
 
@@ -23,8 +49,6 @@ describe('CentralBankPage', () => {
       </ToastProvider>,
     );
 
-    // The page renders a loading card until the CB summary lands; everything
-    // (heading included) only mounts after the mock client resolves.
     expect(await screen.findByRole('heading', { name: 'Central Bank' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(/Sandbox only/i);
     await waitFor(() => {
@@ -47,7 +71,6 @@ describe('CentralBankPage', () => {
     const mintBtn = await screen.findByRole('button', { name: /^Mint$/ });
     await user.click(mintBtn);
     expect(await screen.findByRole('heading', { name: 'Mint WNOK' })).toBeInTheDocument();
-    // dismiss
     await user.click(screen.getByRole('button', { name: /Cancel/i }));
 
     const burnBtn = screen.getByRole('button', { name: /^Burn$/ });

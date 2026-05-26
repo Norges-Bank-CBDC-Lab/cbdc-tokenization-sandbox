@@ -11,7 +11,6 @@
  * during a unit test that doesn't set up the global).
  */
 const defaults = {
-  USE_MOCK: false,
   API_BASE_URL: 'http://bond-api.cbdc-sandbox.local',
   AUTH_MODE: 'none',
   AUTH_TENANT_ID: '',
@@ -19,7 +18,6 @@ const defaults = {
   AUTH_AUTHORITY: '',
   AUTH_SCOPES: '',
   AUTH_REDIRECT_URI: '',
-  MOCK_LATENCY_MS: 0,
 };
 
 function readWindowConfig() {

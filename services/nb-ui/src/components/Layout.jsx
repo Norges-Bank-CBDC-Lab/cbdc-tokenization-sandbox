@@ -1,9 +1,8 @@
 /**
  * Layout — top bar, nav, footer.
  *
- * Renders an environment pill (MOCK vs LIVE) so you can never deploy thinking
- * you're live when you're not. Also renders the auth chrome (sign-in /
- * user-badge) when AUTH_MODE !== 'none' — see services/nb-ui/src/auth/.
+ * Renders the auth chrome (sign-in / user-badge) when AUTH_MODE !== 'none'
+ * — see services/nb-ui/src/auth/.
  */
 import { useEffect, useState } from 'react';
 import { AppConfig } from '../config.js';
@@ -118,7 +117,6 @@ function AuthChrome() {
 }
 
 export function Layout({ route, navigate, children }) {
-  const isMock = AppConfig.USE_MOCK;
   const navItem = (key, label, href) => (
     <a
       href={href}
@@ -173,8 +171,7 @@ export function Layout({ route, navigate, children }) {
       </header>
       <main className="content">{children}</main>
       <footer className="app-footer">
-        NB Bond Auction Service · OpenAPI 1.0.0 ·{' '}
-        {isMock ? 'in-memory mock active' : AppConfig.API_BASE_URL}
+        NB Bond Auction Service · OpenAPI 1.0.0 · {AppConfig.API_BASE_URL}
       </footer>
     </div>
   );

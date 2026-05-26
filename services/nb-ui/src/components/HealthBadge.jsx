@@ -3,15 +3,11 @@
  * point to the NetworkHealthModal (Plan C).
  *
  * Renders a coloured pill — green for ok, yellow for degraded, red for
- * down, grey for mock mode — and a `title` tooltip with a concrete
- * reason for the colour. Click opens the modal; the modal owns the
- * Reconnect / Resync affordances and shares the same poll via
- * `useHealthPoll`.
- *
- * In mock mode the badge stays grey ("MOCK API") and skips polling.
+ * down — and a `title` tooltip with a concrete reason for the colour.
+ * Click opens the modal; the modal owns the Reconnect / Resync
+ * affordances and shares the same poll via `useHealthPoll`.
  */
 import { useState } from 'react';
-import { AppConfig } from '../config.js';
 import { useHealthPoll } from '../hooks/useHealthPoll.js';
 import { NetworkHealthModal } from '../pages/NetworkHealthModal.jsx';
 
@@ -19,7 +15,6 @@ const BORDER_COLOR = {
   ok: '#10b981',
   degraded: '#f59e0b',
   down: '#ef4444',
-  mock: '#d0d4dc',
   loading: '#d0d4dc',
 };
 
@@ -27,7 +22,6 @@ const LABEL = {
   ok: 'LIVE',
   degraded: 'LIVE',
   down: 'DOWN',
-  mock: 'MOCK API',
   loading: 'LIVE',
 };
 
@@ -60,19 +54,18 @@ export function summarise(health, now = Date.now()) {
 }
 
 export function HealthBadge() {
-  const isMock = AppConfig.USE_MOCK;
-  const { health, reload } = useHealthPoll({ enabled: !isMock });
+  const { health, reload } = useHealthPoll();
   const [modalOpen, setModalOpen] = useState(false);
 
-  const tone = isMock ? 'mock' : (health?.status ?? 'loading');
-  const tooltip = isMock ? 'Mock API — no real backend connected' : summarise(health);
+  const tone = health?.status ?? 'loading';
+  const tooltip = summarise(health);
   const label = LABEL[tone];
 
   return (
     <>
       <button
         type="button"
-        className={`env-pill ${isMock ? 'mock' : ''}`}
+        className="env-pill"
         onClick={() => setModalOpen(true)}
         title={tooltip}
         aria-label={`Network status: ${tooltip}`}

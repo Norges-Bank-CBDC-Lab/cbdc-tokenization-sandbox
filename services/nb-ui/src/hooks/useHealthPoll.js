@@ -5,9 +5,6 @@
  * same endpoint at the same cadence; centralising the fetch + cleanup
  * here keeps both surfaces in sync and avoids leaking timers.
  *
- *  - In mock mode the underlying mock client still drives the result
- *    so the badge / modal render sensible values; callers can choose
- *    not to render polling-dependent UI when AppConfig.USE_MOCK is on.
  *  - On fetch failure the state collapses to a synthetic `down` payload
  *    so the UI always has a consistent shape to render.
  *  - `reload()` re-fetches immediately without waiting for the next

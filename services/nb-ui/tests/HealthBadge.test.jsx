@@ -1,10 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Feature: HealthBadge polls /v1/health, recolours the pill, and opens
-// the NetworkHealthModal on click. Polling is paused entirely in mock
-// mode (the badge renders a static "MOCK API" pill).
+// the NetworkHealthModal on click.
 
 const okPayload = (overrides = {}) => ({
   status: 'ok',
@@ -57,7 +56,6 @@ const downPayload = () =>
 
 async function loadBadge(payload, { restartIngestionImpl } = {}) {
   vi.resetModules();
-  window.__APP_CONFIG__.USE_MOCK = false;
   const restartIngestion =
     restartIngestionImpl ??
     vi.fn().mockResolvedValue({ restarted: true, status: payload.ingestion });
@@ -83,10 +81,6 @@ function renderBadge(Badge, ToastProvider) {
 }
 
 describe('HealthBadge', () => {
-  beforeEach(() => {
-    window.__APP_CONFIG__.USE_MOCK = false;
-  });
-
   afterEach(() => {
     vi.useRealTimers();
     vi.doUnmock('../src/api/healthApi.js');
@@ -130,30 +124,6 @@ describe('HealthBadge', () => {
     expect(badge.getAttribute('title')).toBe("Backend can't reach chain");
   });
 
-  it('renders MOCK API in mock mode and skips polling', async () => {
-    vi.resetModules();
-    window.__APP_CONFIG__.USE_MOCK = true;
-    const getHealth = vi.fn();
-    vi.doMock('../src/api/healthApi.js', () => ({
-      HealthApi: { getHealth, restartIngestion: vi.fn() },
-    }));
-    const [{ HealthBadge }, { ToastProvider }] = await Promise.all([
-      import('../src/components/HealthBadge.jsx'),
-      import('../src/components/ui.jsx'),
-    ]);
-    render(
-      <ToastProvider>
-        <HealthBadge />
-      </ToastProvider>,
-    );
-    expect(screen.getByRole('button')).toHaveTextContent('MOCK API');
-    expect(screen.getByRole('button').getAttribute('title')).toBe(
-      'Mock API — no real backend connected',
-    );
-    // Polling is disabled (`enabled: !isMock`); getHealth never fires.
-    expect(getHealth).not.toHaveBeenCalled();
-  });
-
   it('opens the NetworkHealthModal on click and closes via the header ×', async () => {
     const { HealthBadge, ToastProvider } = await loadBadge(okPayload());
     const user = userEvent.setup();
@@ -174,7 +144,6 @@ describe('HealthBadge', () => {
   it('polls again after the configured interval', async () => {
     vi.useFakeTimers();
     vi.resetModules();
-    window.__APP_CONFIG__.USE_MOCK = false;
     const getHealth = vi.fn().mockResolvedValue(okPayload());
     vi.doMock('../src/api/healthApi.js', () => ({
       HealthApi: { getHealth, restartIngestion: vi.fn() },
@@ -201,7 +170,6 @@ describe('HealthBadge', () => {
   it('cleans up the polling timer on unmount', async () => {
     vi.useFakeTimers();
     vi.resetModules();
-    window.__APP_CONFIG__.USE_MOCK = false;
     const getHealth = vi.fn().mockResolvedValue(okPayload());
     vi.doMock('../src/api/healthApi.js', () => ({
       HealthApi: { getHealth, restartIngestion: vi.fn() },

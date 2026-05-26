@@ -21,24 +21,11 @@ npm run dev
 serves `public/config.js` verbatim — flip values there to change behaviour
 without rebuilding.
 
-By default the dev config talks to the real NB Bond API at
+The dev config talks to the real NB Bond API at
 `http://bond-api.cbdc-sandbox.local`. With the sandbox up (and the four
 `*.cbdc-sandbox.local` host entries in `/etc/hosts`), the dev server is
-fully functional end-to-end.
-
-To work without the sandbox running:
-
-```js
-// public/config.js
-window.__APP_CONFIG__ = {
-  USE_MOCK: true,
-  // ...
-};
-```
-
-The mock client in `src/api/mockClient.js` is shape-compatible with the
-real backend — it returns the exact response envelopes defined in
-`services/nb-bond-api/openapi.json`.
+fully functional end-to-end. Start the backend first with
+`./sandbox.sh start` from the repo root if it isn't already running.
 
 ## API surface and cache-first data flow
 
@@ -72,10 +59,6 @@ When adding a new page:
    via the hook's `reload()` or splice the returned DTO into local
    state directly.
 
-The mock client in `src/api/mockClient.js` returns shapes that match
-the OpenAPI document exactly, including `md5` fields. Mock-mode
-exercises the same selector paths as the real backend.
-
 ## Tests
 
 ```bash
@@ -83,11 +66,11 @@ npm test          # one-shot
 npm run test:watch
 ```
 
-Vitest + `@testing-library/react` + `jsdom`. Tests are intentionally
-**feature-level**: they exercise the real mock client and render whole
-pages rather than per-prop / per-call assertions. CI runs the same tests
-on any PR touching `services/nb-ui/**` via
-`.github/workflows/nb-ui.yml`.
+Vitest + `@testing-library/react` + `jsdom`. Page-level tests use
+`vi.mock('../src/api/<name>Api.js', …)` to inject deterministic
+fixtures at the API-module boundary, then render the whole page and
+assert against the rendered DOM. CI runs the same tests on any PR
+touching `services/nb-ui/**` via `.github/workflows/nb-ui.yml`.
 
 ## Pluggable auth
 
@@ -144,8 +127,8 @@ local sandbox renders that file from the chart's `runtimeConfig` block
 For a non-local nginx deployment the same image works unchanged — the
 deploying environment just supplies a different ConfigMap. If you need
 env-var-style placeholder substitution at container start instead,
-`public/config.template.js` ships placeholders (`__USE_MOCK__`,
-`__API_BASE_URL__`, etc.) that an `envsubst`-running init container can
+`public/config.template.js` ships placeholders (`__API_BASE_URL__`,
+`__AUTH_MODE__`, etc.) that an `envsubst`-running init container can
 consume.
 
 ## Hostname
@@ -204,4 +187,4 @@ _doesn't_ bust the cache.
 
 See `docs/KNOWN_ISSUES.md` for `reopenAuction` (no backend / on-chain
 support yet) and operator-selectable winners (backend currently ignores
-the `winners` field).
+operator selections; the UI's winners-selection workflow is informational).
