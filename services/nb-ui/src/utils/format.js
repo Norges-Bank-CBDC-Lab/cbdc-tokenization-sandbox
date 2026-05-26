@@ -82,6 +82,35 @@ export function durationToYears(seconds) {
   return months.toFixed(0) + ' mo';
 }
 
+// Bid `rate` is a 1e4-scaled integer whose meaning depends on auction
+// type: bps yield for RATE, price-per-100 nominal for PRICE/BUYBACK.
+// Render the numeric value with the right unit suffix for each.
+export function formatBidRate(rate, auctionType) {
+  if (rate == null || rate === '') return '—';
+  const n = Number(rate);
+  if (!isFinite(n)) return String(rate);
+  if (auctionType === 'RATE') return (n / 100).toFixed(2) + '%';
+  return (n / 100).toFixed(2);
+}
+
+export function rateColumnLabel(auctionType) {
+  if (auctionType === 'PRICE') return 'Price';
+  if (auctionType === 'BUYBACK') return 'Repurchase price';
+  return 'Yield';
+}
+
+export function bestRateLabel(auctionType) {
+  if (auctionType === 'PRICE') return 'Best (highest) price';
+  if (auctionType === 'BUYBACK') return 'Best (lowest) repurchase price';
+  return 'Best (lowest) yield';
+}
+
+export function clearingLabel(auctionType) {
+  if (auctionType === 'PRICE') return 'Clearing price';
+  if (auctionType === 'BUYBACK') return 'Clearing repurchase price';
+  return 'Clearing yield';
+}
+
 export const Fmt = {
   shortHex,
   bpsToPct,
@@ -90,4 +119,8 @@ export const Fmt = {
   formatUnixDate,
   formatRelative,
   durationToYears,
+  formatBidRate,
+  rateColumnLabel,
+  bestRateLabel,
+  clearingLabel,
 };
