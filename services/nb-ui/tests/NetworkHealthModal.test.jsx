@@ -26,7 +26,6 @@ const okHealth = (overrides = {}) => ({
 
 async function loadModal({ restartIngestion } = {}) {
   vi.resetModules();
-  window.__APP_CONFIG__.USE_MOCK = false;
   const restart = restartIngestion ?? vi.fn().mockResolvedValue({ restarted: true });
   vi.doMock('../src/api/healthApi.js', () => ({
     HealthApi: {

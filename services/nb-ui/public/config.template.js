@@ -3,7 +3,6 @@
 // result to /usr/share/nginx/html/config.js so the same built bundle works in
 // every environment without a rebuild. See services/nb-ui/DEVELOPMENT.md.
 window.__APP_CONFIG__ = {
-  USE_MOCK: __USE_MOCK__,
   API_BASE_URL: '__API_BASE_URL__',
   AUTH_MODE: '__AUTH_MODE__',
   AUTH_TENANT_ID: '__AUTH_TENANT_ID__',
@@ -11,5 +10,4 @@ window.__APP_CONFIG__ = {
   AUTH_AUTHORITY: '__AUTH_AUTHORITY__',
   AUTH_SCOPES: '__AUTH_SCOPES__',
   AUTH_REDIRECT_URI: '__AUTH_REDIRECT_URI__',
-  MOCK_LATENCY_MS: __MOCK_LATENCY_MS__,
 };

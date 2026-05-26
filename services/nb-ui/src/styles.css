@@ -176,12 +176,6 @@ button {
   border-radius: 2px;
   white-space: nowrap;
 }
-.env-pill.mock {
-  color: var(--accent);
-  border-color: rgba(200, 78, 46, 0.55);
-  background: rgba(200, 78, 46, 0.1);
-}
-
 main.content {
   flex: 1;
   max-width: 1320px;

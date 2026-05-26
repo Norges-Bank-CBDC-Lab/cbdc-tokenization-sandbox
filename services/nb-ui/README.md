@@ -29,15 +29,11 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for the full deploy shape.
 
 ## Talking to the backend
 
-By default the dev config (`public/config.js`) points at
+The dev config (`public/config.js`) points at
 `http://bond-api.cbdc-sandbox.local`. With the local sandbox running and your
 `/etc/hosts` populated, `npm run dev` works end-to-end against the real NB
-Bond API immediately.
-
-To work offline (e.g. on a plane), flip `USE_MOCK: true` in
-`public/config.js`. The mock client lives in `src/api/mockClient.js` and is
-shape-compatible with the OpenAPI envelopes in
-`services/nb-bond-api/openapi.json`.
+Bond API. Run `./sandbox.sh start` from the repo root first if the backend
+isn't already up.
 
 ## Auth
 
@@ -51,10 +47,9 @@ tenant / client IDs.**
 
 The single network seam is `src/api/bondsApi.js`, `src/api/auctionsApi.js`,
 `src/api/biddersApi.js`, and `src/api/centralBankApi.js`. Components and
-hooks call those modules; the modules dispatch to `MockClient` or
-`HttpClient` based on `USE_MOCK`. `HttpClient` injects
-`Authorization: Bearer …` per request using whichever `AuthProvider` was
-resolved at startup (`src/auth/index.js`).
+hooks call those modules; the modules call `HttpClient`. `HttpClient`
+injects `Authorization: Bearer …` per request using whichever
+`AuthProvider` was resolved at startup (`src/auth/index.js`).
 
 ## Pages
 

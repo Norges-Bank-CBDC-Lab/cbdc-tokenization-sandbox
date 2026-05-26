@@ -34,7 +34,6 @@ securityContext:
 # Override any of these at deploy time to point the same image at a different
 # backend, or to switch the auth plugin without rebuilding.
 runtimeConfig:
-  useMock: false
   apiBaseUrl: http://bond-api.cbdc-sandbox.local
   authMode: none
   authTenantId: ""
@@ -42,4 +41,3 @@ runtimeConfig:
   authAuthority: ""
   authScopes: ""
   authRedirectUri: ""
-  mockLatencyMs: 0

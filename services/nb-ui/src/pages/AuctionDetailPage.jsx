@@ -72,8 +72,8 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   const closeMut = useMutation(() => AuctionsApi.closeAuction(auctionId));
   const reopenMut = useMutation(() => AuctionsApi.reopenAuction(auctionId));
   const cancelMut = useMutation(() => AuctionsApi.cancelAuction(auctionId));
-  const finaliseMut = useMutation((approve, winners) =>
-    AuctionsApi.finaliseAuction(auctionId, auctionQ.data?.allocation?.hash, approve, winners),
+  const finaliseMut = useMutation((approve) =>
+    AuctionsApi.finaliseAuction(auctionId, auctionQ.data?.allocation?.hash, approve),
   );
 
   if (auctionQ.loading)
@@ -120,16 +120,12 @@ export function AuctionDetailPage({ auctionId, navigate }) {
       toast.push({ title: 'Cancel failed', body: e.message });
     }
   }
-  async function doFinalise(approve, winners) {
+  async function doFinalise(approve) {
     try {
-      await finaliseMut.run(approve, winners);
+      await finaliseMut.run(approve);
       toast.push({
         kind: 'ok',
         title: approve ? 'Allocation approved' : 'Allocation rejected',
-        body:
-          approve && winners
-            ? `${winners.length} winner${winners.length === 1 ? '' : 's'} finalised`
-            : undefined,
       });
       auctionQ.reload();
     } catch (e) {

@@ -3,7 +3,6 @@
 // public/config.template.js using envsubst before nginx starts (see
 // services/nb-ui/DEVELOPMENT.md "Runtime config injection").
 window.__APP_CONFIG__ = {
-  USE_MOCK: false,
   API_BASE_URL: 'http://bond-api.cbdc-sandbox.local',
   AUTH_MODE: 'none',
   AUTH_TENANT_ID: '',
@@ -11,5 +10,4 @@ window.__APP_CONFIG__ = {
   AUTH_AUTHORITY: '',
   AUTH_SCOPES: '',
   AUTH_REDIRECT_URI: '',
-  MOCK_LATENCY_MS: 0,
 };
