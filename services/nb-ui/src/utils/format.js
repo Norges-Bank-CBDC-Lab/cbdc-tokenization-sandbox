@@ -82,6 +82,23 @@ export function durationToYears(seconds) {
   return months.toFixed(0) + ' mo';
 }
 
+/**
+ * Format a chain-relative duration expressed in DURATION_SCALAR units.
+ * The API serves these alongside the raw-seconds fields (e.g.
+ * `maturity.durationYears`) precisely so the UI doesn't have to know
+ * the chain's seconds-per-year. On a real chain 1 unit = 1 calendar
+ * year; on the sandbox 1 unit = DURATION_SCALAR seconds (60 today).
+ * Display them as plain "N yr".
+ */
+export function formatYears(units) {
+  if (units == null || units === '') return '—';
+  const n = Number(units);
+  if (!isFinite(n)) return String(units);
+  if (n === 0) return '< 1 yr';
+  if (Number.isInteger(n)) return `${n} yr`;
+  return `${n.toFixed(1)} yr`;
+}
+
 // Bid `rate` is a 1e4-scaled integer whose meaning depends on auction
 // type: bps yield for RATE, price-per-100 nominal for PRICE/BUYBACK.
 // Render the numeric value with the right unit suffix for each.
@@ -119,6 +136,7 @@ export const Fmt = {
   formatUnixDate,
   formatRelative,
   durationToYears,
+  formatYears,
   formatBidRate,
   rateColumnLabel,
   bestRateLabel,

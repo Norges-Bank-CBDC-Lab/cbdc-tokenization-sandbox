@@ -260,13 +260,22 @@ const bondContractsSchema = z
 const maturitySchema = z
   .object({
     duration: bigIntStringSchema.nullable().meta({
-      description: 'Configured maturity duration in seconds',
+      description: 'Configured maturity duration in seconds (raw chain value)',
+    }),
+    durationYears: bigIntStringSchema.nullable().meta({
+      description:
+        'Maturity in DURATION_SCALAR units (= years on a real chain; sandbox compresses ' +
+        '1 unit to DURATION_SCALAR seconds). Derived as duration / DURATION_SCALAR — ' +
+        'use this for human-readable display; use `duration` for second-level arithmetic.',
     }),
     date: unixSecondsSchema.nullable().meta({
       description: 'Maturity date as unix timestamp',
     }),
     remaining: bigIntStringSchema.nullable().meta({
       description: 'Seconds until maturity; 0 once matured',
+    }),
+    remainingYears: bigIntStringSchema.nullable().meta({
+      description: 'Remaining time in DURATION_SCALAR units (see durationYears for semantics)',
     }),
   })
   .meta({
@@ -288,7 +297,12 @@ const couponPaymentsSchema = z
 const couponSchema = z
   .object({
     duration: bigIntStringSchema.nullable().meta({
-      description: 'Seconds between coupon payments',
+      description: 'Seconds between coupon payments (raw chain value)',
+    }),
+    durationYears: bigIntStringSchema.nullable().meta({
+      description:
+        'Coupon interval in DURATION_SCALAR units (= years on a real chain; see ' +
+        'BondMaturity.durationYears for the unit semantics).',
     }),
     rateBps: bpsSchema.nullable().meta({
       description:

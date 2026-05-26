@@ -2206,7 +2206,18 @@
                 "type": "null"
               }
             ],
-            "description": "Configured maturity duration in seconds"
+            "description": "Configured maturity duration in seconds (raw chain value)"
+          },
+          "durationYears": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maturity in DURATION_SCALAR units (= years on a real chain; sandbox compresses 1 unit to DURATION_SCALAR seconds). Derived as duration / DURATION_SCALAR — use this for human-readable display; use `duration` for second-level arithmetic."
           },
           "date": {
             "anyOf": [
@@ -2230,12 +2241,25 @@
               }
             ],
             "description": "Seconds until maturity; 0 once matured"
+          },
+          "remainingYears": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remaining time in DURATION_SCALAR units (see durationYears for semantics)"
           }
         },
         "required": [
           "duration",
+          "durationYears",
           "date",
-          "remaining"
+          "remaining",
+          "remainingYears"
         ],
         "additionalProperties": false,
         "description": "Maturity configuration and remaining time"
@@ -2252,7 +2276,18 @@
                 "type": "null"
               }
             ],
-            "description": "Seconds between coupon payments"
+            "description": "Seconds between coupon payments (raw chain value)"
+          },
+          "durationYears": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Coupon interval in DURATION_SCALAR units (= years on a real chain; see BondMaturity.durationYears for the unit semantics)."
           },
           "rateBps": {
             "anyOf": [
@@ -2271,6 +2306,7 @@
         },
         "required": [
           "duration",
+          "durationYears",
           "rateBps",
           "payments"
         ],

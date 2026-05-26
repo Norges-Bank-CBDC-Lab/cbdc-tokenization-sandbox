@@ -46,6 +46,14 @@ describe('format helpers', () => {
     expect(Fmt.formatBidRate('', 'PRICE')).toBe('—');
   });
 
+  it('formats DURATION_SCALAR-unit year counts as plain N yr', () => {
+    expect(Fmt.formatYears('4')).toBe('4 yr');
+    expect(Fmt.formatYears('1')).toBe('1 yr');
+    expect(Fmt.formatYears('0')).toBe('< 1 yr');
+    expect(Fmt.formatYears(null)).toBe('—');
+    expect(Fmt.formatYears('')).toBe('—');
+  });
+
   it('labels the clearing-rate KPI per auction type', () => {
     expect(Fmt.clearingLabel('RATE')).toBe('Clearing yield');
     expect(Fmt.clearingLabel('PRICE')).toBe('Clearing price');

@@ -161,7 +161,7 @@ export function BondDetailPage({ isin, navigate }) {
         </div>
         <div className="kpi">
           <div className="kpi-label">Time to maturity</div>
-          <div className="kpi-value">{Fmt.durationToYears(b.maturity?.remaining)}</div>
+          <div className="kpi-value">{Fmt.formatYears(b.maturity?.remainingYears)}</div>
           <div className="kpi-sub">{Fmt.formatRelative(b.maturity?.date)}</div>
         </div>
         <div className="kpi">
@@ -194,7 +194,7 @@ export function BondDetailPage({ isin, navigate }) {
               >
                 Maturity duration
               </dt>
-              <dd>{Fmt.durationToYears(b.maturity?.duration)}</dd>
+              <dd>{Fmt.formatYears(b.maturity?.durationYears)}</dd>
               <dt>Maturity date</dt>
               <dd>{Fmt.formatUnixDate(b.maturity?.date)}</dd>
               <dt
@@ -206,7 +206,7 @@ export function BondDetailPage({ isin, navigate }) {
               >
                 Coupon duration
               </dt>
-              <dd>{Fmt.durationToYears(b.coupon?.duration)}</dd>
+              <dd>{Fmt.formatYears(b.coupon?.durationYears)}</dd>
               <dt
                 title={
                   'Contractual annual rate paid per coupon — fixed at issuance. Distinct from ' +

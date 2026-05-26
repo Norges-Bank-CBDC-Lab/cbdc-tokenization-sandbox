@@ -16,7 +16,13 @@ import {
   computeBuybackAllocation,
   computeUniformAllocation,
 } from './allocation';
-import { getBondAuction, getBondAuctionAddress, getBondManager, getBondToken } from './chain';
+import {
+  getBondAuction,
+  getBondAuctionAddress,
+  getBondManager,
+  getBondToken,
+  getDurationScalar,
+} from './chain';
 import { withMd5 } from './http';
 import {
   type AuctionEventRow,
@@ -576,6 +582,16 @@ export async function composeBond(
 
   const holders = await composeHolders(db, isin);
 
+  // Cached chain-wide DURATION_SCALAR. Lets the API report durations in
+  // both raw seconds (legacy field, used for date arithmetic) and chain
+  // years (1 unit = one DURATION_SCALAR; matches what the operator typed
+  // in the create-bond modal).
+  const durationScalar = await getDurationScalar();
+  const toYears = (s: bigint | null): string | null => {
+    if (s === null || durationScalar === null || durationScalar === 0n) return null;
+    return (s / durationScalar).toString();
+  };
+
   return withMd5({
     isin,
     status,
@@ -590,14 +606,17 @@ export async function composeBond(
       maturityDuration !== null || maturityDate !== null || timeToMaturity !== null
         ? {
             duration: maturityDuration ? maturityDuration.toString() : null,
+            durationYears: toYears(maturityDuration),
             date: maturityDate ? maturityDate.toString() : null,
             remaining: timeToMaturity ? timeToMaturity.toString() : null,
+            remainingYears: toYears(timeToMaturity),
           }
         : null,
     coupon:
       couponDuration !== null || couponYield !== null || couponPaymentsTotal !== null
         ? {
             duration: couponDuration ? couponDuration.toString() : null,
+            durationYears: toYears(couponDuration),
             rateBps: couponYield ? couponYield.toString() : null,
             payments: {
               total: couponPaymentsTotal ? couponPaymentsTotal.toString() : null,
