@@ -97,6 +97,16 @@
               "default": false
             },
             "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+          },
+          {
+            "in": "query",
+            "name": "includeDisabled",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "When true, include soft-deleted bonds in the response. Disabled bonds are hidden by default to keep the operator working list focused. See DELETE /v1/bonds/{isin}."
           }
         ],
         "responses": {
@@ -132,6 +142,58 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "createBond",
+        "summary": "Create a bond partition without scheduling an auction. The first auction is scheduled separately via POST /v1/bonds/{isin}/auctions.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBondRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Newly created bond with no auctions yet",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -196,6 +258,43 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "bonds"
+        ],
+        "operationId": "disableBond",
+        "summary": "Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED auction in history. Idempotent — returns 204 even if the bond is already disabled.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "isin",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Isin"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Bond disabled (or was already disabled)"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -1425,6 +1524,39 @@
   },
   "components": {
     "schemas": {
+      "CreateBondRequest": {
+        "type": "object",
+        "properties": {
+          "isin": {
+            "$ref": "#/components/schemas/Isin"
+          },
+          "maturityDuration": {
+            "description": "Maturity duration. Unit follows the same convention as the create-auction body: years on real chains, durationScalar-units on the local sandbox (see common/helpers).",
+            "$ref": "#/components/schemas/BigIntString"
+          }
+        },
+        "required": [
+          "isin",
+          "maturityDuration"
+        ],
+        "description": "Request body for POST /v1/bonds"
+      },
+      "Isin": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ISIN identifying a bond",
+        "examples": [
+          "NO0012345678"
+        ]
+      },
+      "BigIntString": {
+        "type": "string",
+        "pattern": "^[0-9]+$",
+        "description": "Decimal string representation of a uint256",
+        "examples": [
+          "1000000000000000000"
+        ]
+      },
       "HoldersBody": {
         "type": "object",
         "properties": {
@@ -1503,14 +1635,6 @@
           "BUYBACK"
         ],
         "description": "Auction pricing model"
-      },
-      "BigIntString": {
-        "type": "string",
-        "pattern": "^[0-9]+$",
-        "description": "Decimal string representation of a uint256",
-        "examples": [
-          "1000000000000000000"
-        ]
       },
       "CloseAuctionBody": {
         "type": "object",
@@ -1963,6 +2087,10 @@
           "status": {
             "$ref": "#/components/schemas/BondStatus"
           },
+          "disabled": {
+            "type": "boolean",
+            "description": "True when the bond has been soft-deleted via DELETE /v1/bonds/{isin}. Disabled bonds are excluded from the default GET /v1/bonds response — pass ?includeDisabled=true to see them. Chain history (events) is preserved."
+          },
           "totalSupply": {
             "anyOf": [
               {
@@ -2019,6 +2147,7 @@
         "required": [
           "isin",
           "status",
+          "disabled",
           "totalSupply",
           "contracts",
           "maturity",
@@ -2029,14 +2158,6 @@
         ],
         "additionalProperties": false,
         "description": "Bond resource. Carries the full subtree of auctions, bids, allocations, and holders. A single GET /v1/bonds populates the entire UI cache."
-      },
-      "Isin": {
-        "type": "string",
-        "minLength": 1,
-        "description": "ISIN identifying a bond",
-        "examples": [
-          "NO0012345678"
-        ]
       },
       "BondStatus": {
         "type": "string",

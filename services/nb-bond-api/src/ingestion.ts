@@ -292,6 +292,12 @@ function getIsinForPartition(db: IngestionDatabase, partition: string): string |
   return row?.isin ?? null;
 }
 
+function setPartitionDisabled(db: IngestionDatabase, isin: string, disabled: boolean): void {
+  const partition = keccak256(toUtf8Bytes(isin));
+  const stmt = db.prepare(`UPDATE partitions SET disabled = ? WHERE partition = ?`);
+  stmt.run(disabled ? 1 : 0, partition.toLowerCase());
+}
+
 // Exported for direct unit-test coverage of idempotency behaviour.
 export function insertBondEvent(
   db: IngestionDatabase,
@@ -486,6 +492,9 @@ async function processBlockRange(
           args.bondAddress?.toString?.() ?? null,
           Number(log.blockNumber ?? 0),
         );
+        // Defensive: a disabled bond re-created via deployBondWithAuction
+        // should reappear in the default listing.
+        setPartitionDisabled(db, isin, false);
       } else if (name === 'BondAuctionClosed') {
         const auctionId = args.id as string;
         const isin = args.isin as string;
@@ -559,6 +568,43 @@ async function processBlockRange(
             value: args.value?.toString?.() ?? args.value,
             wnokAmount: args.wnokAmount?.toString?.() ?? args.wnokAmount,
           },
+        });
+      } else if (name === 'BondCreated') {
+        // Pre-staged bond (no auction yet). Upsert the partition row so the
+        // bond shows up in /v1/bonds before any auction is scheduled.
+        const isin = args.isin as string;
+        const partition = keccak256(toUtf8Bytes(isin));
+        upsertPartition(
+          db,
+          partition,
+          isin,
+          args.bondAddress?.toString?.() ?? null,
+          Number(log.blockNumber ?? 0),
+        );
+        // Re-create after a prior disable must clear the disabled flag so
+        // the bond reappears in the default GET /v1/bonds listing.
+        setPartitionDisabled(db, isin, false);
+        insertBondEvent(db, {
+          isin,
+          type: 'BOND_CREATED',
+          block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
+          txHash: log.transactionHash,
+          payload: {
+            bondAddress: args.bondAddress?.toString?.() ?? null,
+            maturityDurationSeconds: args.maturityDurationSeconds?.toString?.() ?? null,
+          },
+        });
+      } else if (name === 'BondDisabled') {
+        const isin = args.isin as string;
+        setPartitionDisabled(db, isin, true);
+        insertBondEvent(db, {
+          isin,
+          type: 'BOND_DISABLED',
+          block: Number(log.blockNumber ?? 0),
+          logIndex: Number(log.index ?? 0),
+          txHash: log.transactionHash,
+          payload: {},
         });
       }
     }

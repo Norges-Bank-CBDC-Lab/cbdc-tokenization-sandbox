@@ -23,6 +23,11 @@ import { logger } from './logger';
  *  - v2: added `log_index` + UNIQUE INDEX on `(tx_hash, log_index, …)`
  *        across the three event tables so re-processing the same
  *        chain log is a no-op.
+ *  - v3: added `partitions.disabled` for the bond soft-delete flow
+ *        (BondManager.disableBond / BondToken.disablePartition). Bumped
+ *        the version so the projection is rebuilt cleanly on first boot
+ *        after upgrade — CREATE TABLE IF NOT EXISTS would otherwise
+ *        keep the old shape.
  *
  * Note on the `bidders` table: unlike every other table in this file,
  * `bidders` is a *system of record*, not a chain projection. It is
@@ -32,7 +37,7 @@ import { logger } from './logger';
  * chain. Bidders are sandbox-impersonation keypairs and cannot be
  * recovered from chain state.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export interface IngestionDatabaseStatement<T = unknown> {
   all: (...args: unknown[]) => T[];
@@ -107,7 +112,8 @@ function createTables(db: IngestionDatabase) {
       partition TEXT PRIMARY KEY,
       isin TEXT,
       bond TEXT,
-      created_block INTEGER
+      created_block INTEGER,
+      disabled INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_partitions_isin ON partitions(isin);
 
@@ -413,16 +419,27 @@ export function countBidderRows(db: IngestionDatabase): number {
 
 // #endregion
 
-export function listAllBonds(db: IngestionDatabase): BondRow[] {
+export function listAllBonds(
+  db: IngestionDatabase,
+  opts: { includeDisabled?: boolean } = {},
+): BondRow[] {
   // One row per (isin, bond) tuple. Multiple partitions can share an ISIN
   // (different bond contracts), so we group and take the earliest creation
   // block as the bond's "born at".
+  // Disabled bonds are hidden by default — pass includeDisabled to surface them.
+  const filter = opts.includeDisabled ? '' : 'AND disabled = 0';
   const stmt = db.prepare(
     `SELECT isin, bond, MIN(created_block) AS created_block
      FROM partitions
-     WHERE isin IS NOT NULL
+     WHERE isin IS NOT NULL ${filter}
      GROUP BY isin, bond
      ORDER BY created_block, isin`,
   );
   return stmt.all() as BondRow[];
+}
+
+export function isBondDisabled(db: IngestionDatabase, isin: string): boolean {
+  const stmt = db.prepare(`SELECT MAX(disabled) AS disabled FROM partitions WHERE isin = ?`);
+  const row = stmt.get(isin) as { disabled: number | null } | undefined;
+  return Boolean(row?.disabled);
 }

@@ -242,7 +242,7 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
   it('drops event tables and clears checkpoint when opening at a lower user_version', () => {
     // Step 1: create a v0-shaped file directly with the OLD schema and
     // a row of stale data. This simulates a deployment that pre-dates
-    // SCHEMA_VERSION 2.
+    // the current SCHEMA_VERSION.
     {
       const raw = new DatabaseConstructor(dbPath);
       raw.exec(`
@@ -279,7 +279,7 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     const db = openDatabase({ dbPath }) as ClosableIngestionDatabase;
     try {
       const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(2);
+      expect(userVersion).toBe(3);
 
       // Tables exist (recreated by createTables after the drop).
       expect(rowCount(db, 'auction_events')).toBe(0);
@@ -336,7 +336,7 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     try {
       expect(rowCount(second, 'auction_events')).toBe(1);
       const userVersion = Number(second.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(2);
+      expect(userVersion).toBe(3);
     } finally {
       second.close();
     }

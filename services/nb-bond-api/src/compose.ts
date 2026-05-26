@@ -27,6 +27,7 @@ import {
   getAuctionRowById,
   getBalancesByIsin,
   getBondEventsByIsin,
+  isBondDisabled,
   listAllAuctions as listAuctionRows,
   listAllBonds as listBondRows,
   listAuctionRowsByIsin,
@@ -314,6 +315,12 @@ export interface ComposeOptions {
    * auctions always render unsealed regardless of this flag.
    */
   revealOpenBids?: boolean;
+
+  /**
+   * Include soft-deleted bonds in `composeAllBonds`. Default `false`.
+   * Drives the `?includeDisabled=true` query param on `GET /v1/bonds`.
+   */
+  includeDisabled?: boolean;
 }
 
 export async function composeAuction(
@@ -572,6 +579,7 @@ export async function composeBond(
   return withMd5({
     isin,
     status,
+    disabled: isBondDisabled(db, isin),
     totalSupply: resolvedSupply !== null ? resolvedSupply.toString() : null,
     contracts: {
       token: bondTokenAddress,
@@ -611,7 +619,7 @@ export async function composeAllBonds(
   db: IngestionDatabase,
   opts: ComposeOptions = {},
 ): Promise<Bond[]> {
-  const rows = listBondRows(db);
+  const rows = listBondRows(db, { includeDisabled: opts.includeDisabled });
   const bonds = await Promise.all(rows.map((r) => composeBond(db, r.isin, opts)));
   return bonds.filter((b): b is Bond => b !== null);
 }
