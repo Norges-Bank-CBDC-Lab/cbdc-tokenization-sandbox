@@ -22,6 +22,45 @@ export function Button({ variant = 'default', size, children, className = '', ..
   );
 }
 
+/**
+ * Renders a long hex string in full, wrappable + monospace, with a one-click
+ * Copy button. Falls back to triple-click select when the clipboard API is
+ * unavailable (e.g. a non-secure context).
+ */
+export function CopyableHex({ value }) {
+  const [copied, setCopied] = useState(false);
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — user can still triple-click to select */
+    }
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <code
+        className="mono"
+        style={{
+          flex: 1,
+          wordBreak: 'break-all',
+          background: 'var(--surface-2, #f5f6fa)',
+          padding: '4px 6px',
+          borderRadius: 4,
+          fontSize: 12,
+          userSelect: 'all',
+        }}
+      >
+        {value}
+      </code>
+      <Button size="sm" variant="ghost" onClick={onCopy} title="Copy to clipboard">
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
+}
+
 export function StatusBadge({ status }) {
   if (!status) return <span className="muted">—</span>;
   return <span className={`badge badge-${status}`}>{status}</span>;
