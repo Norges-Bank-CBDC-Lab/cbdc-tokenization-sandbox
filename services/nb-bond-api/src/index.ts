@@ -39,6 +39,7 @@ import {
   problemErrorMiddleware,
 } from './http';
 import {
+  decodeCustomError,
   getBondAuction,
   getBondAuctionAddress,
   getBondManager,
@@ -362,22 +363,8 @@ app.delete(
         // top-level message says "(unknown custom error)" — disable-path
         // reverts can originate in BondManager itself (BondHasFinalisedAuction)
         // or bubble up from BondToken (BondAlreadyDisabled / BondNotEmpty).
-        const data = (err as { data?: string }).data;
-        let errorName: string | null = null;
-        if (typeof data === 'string' && data.startsWith('0x')) {
-          const bondToken = await getBondToken();
-          for (const iface of [bondManager.interface, bondToken.interface]) {
-            try {
-              const parsed = iface.parseError(data);
-              if (parsed) {
-                errorName = parsed.name;
-                break;
-              }
-            } catch {
-              // try the next interface
-            }
-          }
-        }
+        const bondToken = await getBondToken();
+        const errorName = decodeCustomError(err, [bondManager.interface, bondToken.interface]);
 
         // Idempotent disable: the contract's BondAlreadyDisabled means
         // "no work to do" — return 204 instead of 409.
@@ -688,10 +675,43 @@ app.patch(
         );
       }
 
-      await sendWithManagedNonce(async (nonce) => {
-        const bondManager = await getBondManager();
-        return bondManager.closeAuction(isin, { nonce });
-      });
+      const sendClose = (extra: Record<string, unknown> = {}) =>
+        sendWithManagedNonce(async (nonce) => {
+          const manager = await getBondManager();
+          return manager.closeAuction(isin, { nonce, ...extra });
+        });
+      try {
+        await sendClose();
+      } catch (err) {
+        const manager = await getBondManager();
+        const errorName = decodeCustomError(err, [
+          bondAuctionContract.interface,
+          manager.interface,
+        ]);
+        if (errorName === 'InBidPhase' && !testMode) {
+          // Local Besu mints blocks only on transactions (genesis
+          // createemptyblocks=false), so the latest block's timestamp lags
+          // wall-clock and ethers' eth_estimateGas simulates the close against
+          // a stale block -> a false InBidPhase revert before broadcast. The
+          // precheck above already confirmed wall-clock > end, so retry once
+          // with an explicit gasLimit to skip estimation; the mined block is
+          // stamped at wall-clock > end and the contract accepts it. This stays
+          // correct after a future QBFT/Besu upgrade: if regular block
+          // production resumes, the first attempt's estimation succeeds and
+          // this fallback never runs.
+          await sendClose({ gasLimit: envVariables.NB_BOND_API_CLOSE_GAS_LIMIT });
+        } else if (errorName === 'InBidPhase') {
+          // testMode: a close was attempted before the on-chain end timestamp.
+          throw conflict(
+            'auction is still in its on-chain bidding window (block timestamp has not passed the' +
+              ' end timestamp). Note the local Besu clock only advances when a transaction is mined.',
+          );
+        } else if (errorName) {
+          throw conflict(`cannot close auction: ${errorName}`);
+        } else {
+          throw err;
+        }
+      }
 
       const auction = await composeAuction(historyDb, auctionId);
       if (!auction) throw notFound(`auction ${auctionId} not found after close`);
