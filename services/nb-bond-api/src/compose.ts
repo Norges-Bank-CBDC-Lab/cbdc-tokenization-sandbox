@@ -104,19 +104,31 @@ function numericAuctionType(value: AuctionType): 0 | 1 | 2 {
 
 // #region Bid composers ──────────────────────────────────────────────
 
-function composeSealedBid(raw: { bidder: string; ciphertext: string; plaintextHash: string }): Bid {
+function composeSealedBid(raw: {
+  bidder: string;
+  ciphertext: string;
+  plaintextHash: string;
+  bidIndex: number;
+}): Bid {
   return withMd5({
     bidder: raw.bidder,
     state: 'sealed' as const,
+    bidIndex: raw.bidIndex,
     ciphertext: raw.ciphertext,
     plaintextHash: raw.plaintextHash,
   });
 }
 
-function composeUnsealedBid(raw: { bidder: string; rate: bigint; units: bigint }): Bid {
+function composeUnsealedBid(raw: {
+  bidder: string;
+  rate: bigint;
+  units: bigint;
+  bidIndex: number;
+}): Bid {
   return withMd5({
     bidder: raw.bidder,
     state: 'unsealed' as const,
+    bidIndex: raw.bidIndex,
     rate: raw.rate.toString(),
     units: raw.units.toString(),
   });
@@ -353,13 +365,15 @@ export async function composeAuction(
             bidder: b.bidder,
             rate: parseBigInt(b.plaintext.rate, 'rate'),
             units: parseBigInt(b.plaintext.units, 'units'),
+            bidIndex: b.bidIndex,
           }),
         )
-      : sealedBids.map((b) =>
+      : sealedBids.map((b, i) =>
           composeSealedBid({
             bidder: b.bidder,
             ciphertext: b.ciphertext,
             plaintextHash: b.plaintextHash,
+            bidIndex: i,
           }),
         );
 

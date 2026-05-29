@@ -37,20 +37,10 @@
   ingestion cache + clears the allocation, or extend `BondAuction` with an
   on-chain reopen transition. The UI behaviour reverts to "just works" once
   the endpoint exists.
-
-## nb-ui: operator-selectable winners
-- The finalise modal in `services/nb-ui/` lets the operator pick a subset of
-  bids to include before approving. The selection is local — the API
-  call carries only `{ allocationHash, approve }`, and the backend
-  computes the allocation server-side.
-- The UI still shows the selection workflow so operators can preview the
-  proposed allocation before approving; the panel's clearing-rate and
-  coverage summary are informational only.
-- Planned follow-up: if operator-selectable winners are intended, update
-  the `finaliseRequestSchema` and the allocation pipeline to accept a winner
-  subset (with validation that the subset matches the previously-published
-  `allocationHash` to prevent inconsistent on-chain state), and have the UI
-  send the selected indices through `AuctionsApi.finaliseAuction`.
+- Related: a *finalised* auction is terminal on-chain (no un-finalise and no
+  closed→open transition). Correcting a bad outcome — e.g. a fat-finger bid
+  that set the wrong clearing rate — means running a fresh auction for the
+  bond, not mutating the finalised one.
 
 ## Auction `status: open` doesn't flip when end-time passes (chain semantic)
 - `BondAuction.AuctionStatus` only transitions from `BIDDING` to

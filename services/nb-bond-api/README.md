@@ -1,6 +1,6 @@
 # NB Bond API
 
-Express service that drives BondManager/BondAuction via a single signer holding `BOND_ADMIN_ROLE`. The service owns the sealing keypair, unseals bids, computes a uniform-price allocation, and submits `finaliseAuction` once approved.
+Express service that drives BondManager/BondAuction via a single signer holding `BOND_ADMIN_ROLE`. The service owns the sealing keypair, unseals bids, computes a uniform-price allocation over the operator-selected winning bids (cross-checking the operator's expected clearing rate), and submits `finaliseAuction` once approved.
 
 ## Endpoints & Usage
 

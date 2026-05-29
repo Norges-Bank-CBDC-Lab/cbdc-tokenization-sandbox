@@ -156,10 +156,22 @@ const allocationSchema = z
 
 // #region Bid (discriminated union) ──────────────────────────────────
 
+const bidIndexSchema = z
+  .number()
+  .int()
+  .nonnegative()
+  .meta({
+    id: 'BidIndex',
+    description:
+      'On-chain sealed-bid array index identifying this bid within its auction. Stable for the ' +
+      'life of the auction; used by the operator UI to address winners at finalisation.',
+  });
+
 const sealedBidSchema = z
   .object({
     bidder: addressSchema,
     state: z.literal('sealed'),
+    bidIndex: bidIndexSchema,
     ciphertext: hexStringSchema,
     plaintextHash: hexStringSchema,
     md5: md5Schema,
@@ -173,6 +185,7 @@ const unsealedBidSchema = z
   .object({
     bidder: addressSchema,
     state: z.literal('unsealed'),
+    bidIndex: bidIndexSchema,
     rate: bpsSchema,
     units: bigIntStringSchema,
     md5: md5Schema,
@@ -698,14 +711,27 @@ const closeAuctionBodySchema = z
 
 const finaliseBodySchema = z
   .object({
-    allocationHash: hexStringSchema,
     approve: z.boolean().meta({
       description: 'true → finalised; false → rejected (allocation discarded)',
     }),
+    winningBidIndexes: z
+      .array(bidIndexSchema)
+      .meta({
+        description:
+          'Sealed-bid indexes (each Bid.bidIndex) selected as winners. Required and non-empty ' +
+          'when approve=true: the server recomputes the allocation over exactly these bids and ' +
+          'ignores all unselected bids. Ignored when approve=false.',
+      })
+      .optional(),
+    expectedClearingRate: bpsSchema.optional(),
   })
   .meta({
     id: 'FinaliseBody',
-    description: 'PUT body for approving or rejecting a computed allocation',
+    description:
+      'PUT body for finalisation. Approve: approve=true with winningBidIndexes plus ' +
+      'expectedClearingRate (bps) — the server recomputes the clearing rate over the selected ' +
+      'bids and rejects on mismatch, so the minted coupon can never silently diverge from what ' +
+      'the operator saw. Reject: approve=false (allocation discarded; selection ignored).',
   });
 
 const holdersBodySchema = z

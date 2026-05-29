@@ -1747,27 +1747,31 @@
       "FinaliseBody": {
         "type": "object",
         "properties": {
-          "allocationHash": {
-            "$ref": "#/components/schemas/HexString"
-          },
           "approve": {
             "type": "boolean",
             "description": "true → finalised; false → rejected (allocation discarded)"
+          },
+          "winningBidIndexes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BidIndex"
+            },
+            "description": "Sealed-bid indexes (each Bid.bidIndex) selected as winners. Required and non-empty when approve=true: the server recomputes the allocation over exactly these bids and ignores all unselected bids. Ignored when approve=false."
+          },
+          "expectedClearingRate": {
+            "$ref": "#/components/schemas/Bps"
           }
         },
         "required": [
-          "allocationHash",
           "approve"
         ],
-        "description": "PUT body for approving or rejecting a computed allocation"
+        "description": "PUT body for finalisation. Approve: approve=true with winningBidIndexes plus expectedClearingRate (bps) — the server recomputes the clearing rate over the selected bids and rejects on mismatch, so the minted coupon can never silently diverge from what the operator saw. Reject: approve=false (allocation discarded; selection ignored)."
       },
-      "HexString": {
-        "type": "string",
-        "pattern": "^0x[a-fA-F0-9]+$",
-        "description": "Hex string",
-        "examples": [
-          "0xabc123"
-        ]
+      "BidIndex": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "On-chain sealed-bid array index identifying this bid within its auction. Stable for the life of the auction; used by the operator UI to address winners at finalisation."
       },
       "ProblemDetails": {
         "type": "object",
@@ -1920,6 +1924,14 @@
         ],
         "additionalProperties": false,
         "description": "Contract addresses the service is bound to"
+      },
+      "HexString": {
+        "type": "string",
+        "pattern": "^0x[a-fA-F0-9]+$",
+        "description": "Hex string",
+        "examples": [
+          "0xabc123"
+        ]
       },
       "HealthChain": {
         "type": "object",
@@ -2542,6 +2554,9 @@
             "type": "string",
             "const": "sealed"
           },
+          "bidIndex": {
+            "$ref": "#/components/schemas/BidIndex"
+          },
           "ciphertext": {
             "$ref": "#/components/schemas/HexString"
           },
@@ -2559,6 +2574,7 @@
         "required": [
           "bidder",
           "state",
+          "bidIndex",
           "ciphertext",
           "plaintextHash",
           "md5"
@@ -2575,6 +2591,9 @@
           "state": {
             "type": "string",
             "const": "unsealed"
+          },
+          "bidIndex": {
+            "$ref": "#/components/schemas/BidIndex"
           },
           "rate": {
             "$ref": "#/components/schemas/Bps"
@@ -2593,6 +2612,7 @@
         "required": [
           "bidder",
           "state",
+          "bidIndex",
           "rate",
           "units",
           "md5"

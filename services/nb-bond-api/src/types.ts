@@ -39,6 +39,10 @@ export interface Allocation {
   units: bigint;
   rate: bigint;
   auctionType: AuctionType;
+  // On-chain sealed-bid index of the bid this allocation fills. Carried
+  // through so finalisation can pair each allocation to its bidder proof
+  // unambiguously even when a bidder submitted multiple bids.
+  bidIndex: number;
 }
 
 export interface AllocationResult {

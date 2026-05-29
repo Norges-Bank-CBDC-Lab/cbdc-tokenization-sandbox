@@ -142,7 +142,8 @@ Simplified trust model:
   `BondManager` operations
 - dealers or bidders submit sealed bids directly to `BondAuction`
 - bid unsealing and uniform-price allocation computation happen off-chain in
-  the operator service
+  the operator service; the operator selects the winning bids and the service
+  recomputes the allocation over exactly that selection before finalising
 
 ## Off-Chain Architecture
 
@@ -153,8 +154,9 @@ The NB Bond API is the privileged operator service. It:
 - holds the issuer-side private key used to send privileged transactions to
   `BondManager`
 - owns or generates the auction sealing keypair used to unseal bids
-- computes auction allocations off-chain and finalises auctions on-chain using
-  bidder proofs
+- recomputes auction allocations off-chain over the operator-selected winning
+  bids (addressed by on-chain `bidIndex`), cross-checks the operator's expected
+  clearing rate, and finalises auctions on-chain using bidder proofs
 - maintains a local SQLite database for ingestion and operational views such as
   holders and history
 - exposes a v2 OpenAPI surface designed as a **bulky resource tree**: a single
@@ -276,10 +278,11 @@ At a high level:
 1. The issuer creates an auction through the NB Bond API.
 2. Dealers seal bids off-chain and submit them on-chain to `BondAuction`.
 3. The issuer closes the auction through the NB Bond API.
-4. The NB Bond API unseals bids, computes allocations off-chain, and returns
-   an allocation hash for approval.
-5. The issuer approves the result, and the NB Bond API finalises the auction
-   on-chain through `BondManager`, including DvP settlement.
+4. The NB Bond API unseals bids and returns the proposed allocation for review.
+5. The issuer selects the winning bids and approves; the NB Bond API recomputes
+   the allocation and clearing rate over exactly that selection, cross-checks the
+   issuer's expected clearing rate, and finalises the auction on-chain through
+   `BondManager`, including DvP settlement.
 
 For concrete sequences, see:
 

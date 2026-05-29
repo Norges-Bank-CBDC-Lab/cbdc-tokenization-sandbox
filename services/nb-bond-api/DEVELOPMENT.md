@@ -15,7 +15,7 @@ The API is defined by the OpenAPI 3.1 document in `services/nb-bond-api/openapi.
 
 - Sends issuer-side transactions to the on-chain `BondManager` contract (it holds `BOND_ADMIN_ROLE` off-chain via a private key).
 - Provides an operational interface to start and manage sealed-bid auctions (RATE, PRICE, BUYBACK).
-- Unseals encrypted bids off-chain (it owns the auction sealing keypair), computes allocations off-chain, and finalises auctions on-chain after explicit approval.
+- Unseals encrypted bids off-chain (it owns the auction sealing keypair), recomputes allocations off-chain over the operator-selected winning bids, and finalises auctions on-chain after explicit approval.
 - Provides read endpoints for bond state, auctions, holders, and an event history view backed by an ingestion database.
 
 ### 1.2 What it does not do
@@ -192,9 +192,9 @@ failures populate `errors[]` with `{ field, message }` entries.
   - Effects: sends `BondManager.cancelAuction(isin)`.
   - Returns the cancelled `Auction`.
 - `PUT /v1/auctions/{auctionId}/finalisation` (`operationId: finaliseAuction`)
-  - Body: `FinaliseBody` — `{ allocationHash, approve }`. `allocationHash` must match `auction.allocation.hash`.
-  - When `approve=true`: rebuilds per-allocation proofs from the unsealed plaintext, sends `BondManager.finaliseAuction(isin, allocations, proofs)`.
-  - When `approve=false`: marks the allocation rejected; no on-chain transaction.
+  - Body: `FinaliseBody` — `{ approve, winningBidIndexes?, expectedClearingRate? }`. When `approve=true`, `winningBidIndexes` (the on-chain `bidIndex` of each winning Bid) and `expectedClearingRate` (bps) are required.
+  - When `approve=true`: re-fetches the sealed bids from chain, recomputes the uniform-price allocation + clearing rate over **exactly the selected bids**, rejects (`400`) if the recomputed rate differs from `expectedClearingRate`, rebuilds per-allocation proofs (paired to bids by `bidIndex`), and sends `BondManager.finaliseAuction(isin, allocations, proofs)`. The server is the sole authority for the economic terms — unselected bids never reach the chain.
+  - When `approve=false`: marks the allocation rejected; no on-chain transaction (selection fields ignored).
   - Returns the updated `Auction`.
 
 ### 4.4 Admin
@@ -255,10 +255,10 @@ This section provides step-by-step "operator runbooks" that use only this OpenAP
 3. Dealers submit sealed bids on-chain using the CLIs (see §5).
 4. Close and compute:
    - `PATCH /v1/auctions/{auctionId}` body `{ "status": "closed" }`.
-   - Response is the updated `Auction`. Review `allocation.entries`, `allocation.clearingRate`, `allocation.hash`.
+   - Response is the updated `Auction`. Review `bids[]` (each carries its on-chain `bidIndex`), `allocation.entries`, and `allocation.clearingRate`.
 5. Finalise (or reject):
-   - `PUT /v1/auctions/{auctionId}/finalisation` body `{ "allocationHash", "approve": true }` to submit on-chain.
-   - If the operator does not approve the computed outcome, send `approve=false` to record rejection (no on-chain transaction).
+   - `PUT /v1/auctions/{auctionId}/finalisation` body `{ "approve": true, "winningBidIndexes": [0, 1, 3], "expectedClearingRate": "<bps>" }` to submit on-chain. Send the `bidIndex` of each winning bid plus the clearing rate you expect; the server recomputes over that selection and rejects (`400`) on mismatch.
+   - If the operator does not approve the computed outcome, send `{ "approve": false }` to record rejection (no on-chain transaction).
 6. Verify: subsequent `GET /v1/auctions/{auctionId}` (or `GET /v1/bonds/{isin}`) reflects the new status.
 
 ### 6.2 Issuance extension (PRICE auction)
@@ -310,15 +310,16 @@ The local sandbox fixture generator does this for the Helm-based sandbox flow.
 
 ### 7.2 Allocation approval safety
 
-Finalisation requires `allocationHash` to match the cached computed allocation. This is an intentional operator safety check.
+Finalisation recomputes the allocation server-side over the operator-selected `winningBidIndexes` and rejects if the recomputed clearing rate does not match the submitted `expectedClearingRate`. The server is the sole authority for the economic terms; the UI's figures are display-only. This cross-check guarantees the minted coupon cannot silently diverge from what the operator confirmed.
 
 Typical 4xx errors:
 
 - `400 end must be in the future`: the `end` timestamp is not valid.
 - `400 maturityDuration is required for RATE`: missing field for `RATE`.
 - `400 first auction for ISIN must be RATE`: you attempted `PRICE` or `BUYBACK` for an ISIN with no prior issuance.
-- `409 no allocation result available`: you called finalisation before closing and computing an allocation.
-- `400 allocationHash mismatch`: you attempted to finalise a different allocation than the one currently cached/computed.
+- `409 auction must be closed to finalise`: you called finalisation before closing the auction.
+- `400 clearing-rate mismatch`: the clearing rate the server recomputed over `winningBidIndexes` differs from the submitted `expectedClearingRate`; no allocation was submitted.
+- `400 unknown/duplicate winning bidIndex`: a `winningBidIndexes` entry does not exist on the auction or repeats.
 
 ### 7.3 Security posture
 

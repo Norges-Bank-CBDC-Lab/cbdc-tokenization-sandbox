@@ -34,9 +34,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   const closeMut = useMutation(() => AuctionsApi.closeAuction(auctionId));
   const reopenMut = useMutation(() => AuctionsApi.reopenAuction(auctionId));
   const cancelMut = useMutation(() => AuctionsApi.cancelAuction(auctionId));
-  const finaliseMut = useMutation((approve) =>
-    AuctionsApi.finaliseAuction(auctionId, auctionQ.data?.allocation?.hash, approve),
-  );
+  const finaliseMut = useMutation((args) => AuctionsApi.finaliseAuction(auctionId, args));
 
   if (auctionQ.loading)
     return (
@@ -82,9 +80,13 @@ export function AuctionDetailPage({ auctionId, navigate }) {
       toast.push({ title: 'Cancel failed', body: e.message });
     }
   }
-  async function doFinalise(approve) {
+  // `selection` is { winningBidIndexes, expectedClearingRate } from the
+  // finalise modal — only forwarded when approving. The backend recomputes
+  // the allocation over exactly the selected bids, so what is minted matches
+  // the operator's selection rather than the full close-time allocation.
+  async function doFinalise(approve, selection) {
     try {
-      await finaliseMut.run(approve);
+      await finaliseMut.run(approve ? { approve: true, ...selection } : { approve: false });
       toast.push({
         kind: 'ok',
         title: approve ? 'Allocation approved' : 'Allocation rejected',
