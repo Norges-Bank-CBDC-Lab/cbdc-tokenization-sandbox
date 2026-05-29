@@ -15,8 +15,6 @@ This file lists the documentation that is most likely to need updates when behav
 - `docs/AZURE_BOUNDARY.md`: What this repo's charts and scripts can vs cannot be reused from a non-local (ArgoCD / Azure) deployment.
 - `docs/post-mortems/README.md`: Incident reports and historical troubleshooting write-ups.
 - `docs/plans/jupyter-removal-plan.md`: Deferred decommission plan for the JupyterHub-based script runner and its replacement path.
-- `docs/plans/operator-ui-backlog.md`: Follow-up backlog for the operator UI — items from the post-PR-#115 feedback list that were not landed in #117/#118. Working list; items move out as PRs land.
-- `docs/plans/image-build-lifecycle-plan.md`: Plan to make the local image-build/registry lifecycle deterministic and offline-friendly — one shared hashed-image build helper, registry-reuse before upstream pull, a visible `FORCE_IMAGE_PULL`, and `image-report` / `cleanup-images` / `registry-reset` verbs with a CI-gated hash-input test.
 - `docs/plans/auction-web-fixes-plan.md`: Plan for four auction web fixes — clearing yield gated to closed/finalised (proposed→final), accurate allocation-hash tooltip + DTO, chain-time-robust auction close (gas-limit fallback + `InBidPhase` decode), and contract custom-error decoding.
 - `docs/plans/archive/`: Reference-only archive of plans whose implementation has shipped. Status lines inside each plan link to the merging PRs:
   - `docs/plans/archive/openapi-v2-plan.md`: NB Bond API v2 design — bulky resource tree, md5 / ETag caching protocol, RFC 7807 problem+json errors, and dual auth modes (`none` / `entra`).
@@ -24,6 +22,8 @@ This file lists the documentation that is most likely to need updates when behav
   - `docs/plans/archive/bidders-and-central-bank-plan.md`: Implementation plan for the `#/bidders` and `#/central-bank` NB UI pages plus their NB Bond API support (server-side impersonated bid submission, WNOK mint / burn / transfer / allowlist via the Norges Bank operator key).
   - `docs/plans/archive/health-indicator-and-self-healing-plan.md`: Plan B — `HealthBadge` + ingestion self-heal-at-boot. Shipped together with Plan C in PR #115.
   - `docs/plans/archive/network-health-modal-and-reconnect-plan.md`: Plan C — clickable `HealthBadge` opens the `NetworkHealthModal` with recent errors plus `Reconnect` / `Resync from block 0` affordances. Shipped together with Plan B in PR #115.
+  - `docs/plans/archive/image-build-lifecycle-plan.md`: Local image-build/registry lifecycle — shared hashed-image build helper, registry-reuse before upstream pull, visible `FORCE_IMAGE_PULL`, and `image-report` / `cleanup-images` / `registry-reset` verbs + CI hash-input test. Shipped via #128.
+  - `docs/plans/archive/operator-ui-backlog.md`: Post-#115 operator-UI follow-up backlog (shipped items landed via #115 / #117 / #118; retired from the active list).
 
 ## Infra and services
 - `infra/README.md`: Infra overview and command entrypoint.

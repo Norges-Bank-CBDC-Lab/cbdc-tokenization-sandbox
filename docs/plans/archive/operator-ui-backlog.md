@@ -1,6 +1,6 @@
 # Operator UI — Follow-up Backlog
 
-**Status:** Backlog, not started
+**Status:** Archived — retired from the active plan list (operator decision). The "What already shipped" items below landed via #115 / #117 / #118; any remaining backlog items are no longer tracked here.
 **Scope:** Continuation of the post-[#115](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/115) UI-feedback list. Items from that conversation that were not landed in [#117](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/117) / [#118](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/118) live here so the next session can resume without re-deriving context.
 
 Numbering follows the original feedback list to keep cross-references readable.
