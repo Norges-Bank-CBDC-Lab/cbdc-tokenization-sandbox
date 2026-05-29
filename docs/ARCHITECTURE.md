@@ -238,6 +238,16 @@ twist is a ConfigMap mount that overlays `/usr/share/nginx/html/config.js`
 from chart values, so the same image is re-pointable per deployment
 without rebuilding.
 
+The three repo-owned images (`nb-ui`, `nb-bond-api`, `bens-microservice`)
+share one content-hash build/check/push helper: a build is skipped when its
+hash tag is already in the local registry. Dockerfile bases are reused from
+the local registry instead of pulled from the internet when present, so
+builds stay offline while the `FROM` ref stays upstream (keeping image
+lineage portable). Old content-hash tags accumulate over time; inspect with
+`./sandbox.sh image-report` and reclaim with `./sandbox.sh cleanup-images`
+(host Docker cache) and `./sandbox.sh registry-reset` (the registry
+container). See `docs/KNOWN_ISSUES.md` for the disk-growth notes.
+
 ## Key Workflows
 
 ### 1. Start the sandbox

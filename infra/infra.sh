@@ -10,12 +10,15 @@ source ../common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop|delete|registry-start|registry-sync>"
+    echo "  $(basename "$0") <start|stop|delete|registry-start|registry-sync|registry-reset|cleanup-images|image-report> [--keep N] [--prune-build-cache]"
     echo
     echo "Notes:"
     echo "  stop keeps the kind cluster and its image cache; delete removes the cluster."
     echo "  registry-start starts the local registry container."
     echo "  registry-sync pushes configured images to the local registry."
+    echo "  registry-reset recreates the registry container and re-syncs base images (reclaims registry disk)."
+    echo "  cleanup-images prunes old nb-ui/nb-bond-api/bens-microservice tags (keep N newest, default 3)."
+    echo "  image-report prints a read-only view of pod/registry image state."
 }
 
 # parse command
@@ -28,6 +31,8 @@ else
 fi
 
 IS_SUBTASK="false"
+KEEP_IMAGES=3
+PRUNE_BUILD_CACHE="false"
 
 # parse flags and options
 while [[ $# -ge 1 ]] ; do
@@ -39,6 +44,13 @@ while [[ $# -ge 1 ]] ; do
             ;;
         --as-subtask )
             IS_SUBTASK="true"
+            ;;
+        --keep )
+            shift
+            KEEP_IMAGES="$1"
+            ;;
+        --prune-build-cache )
+            PRUNE_BUILD_CACHE="true"
             ;;
         * )
             echo "❌ Unknown flag: $key"
@@ -84,4 +96,10 @@ elif [ "$CMD" == "delete" ]; then
     checkPrereqs
     ensureLocalhostHostEntries
     kind delete cluster --name $CLUSTER_NAME
+elif [ "$CMD" == "registry-reset" ]; then
+    resetKindRegistry
+elif [ "$CMD" == "cleanup-images" ]; then
+    cleanupSandboxImages "$KEEP_IMAGES" "$PRUNE_BUILD_CACHE"
+elif [ "$CMD" == "image-report" ]; then
+    reportSandboxImages
 fi

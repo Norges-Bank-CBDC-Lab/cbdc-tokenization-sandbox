@@ -15,10 +15,12 @@ source ./common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop|delete|generate-config|registry-start|registry-sync|build-images> [Flags]"
+    echo "  $(basename "$0") <start|stop|delete|generate-config|registry-start|registry-sync|registry-reset|cleanup-images|image-report|build-images> [Flags]"
     echo
     echo "    Flags:"
     echo "      -h - Print this message"
+    echo "      --keep <N> - cleanup-images: keep the N newest tags per service (default 3 = current + 2)"
+    echo "      --prune-build-cache - cleanup-images: also run 'docker builder prune -f' (GLOBAL, all projects)"
     echo
     echo "    Description:"
     echo "      start: Start the cluster and components of the cbdc sandbox"
@@ -28,6 +30,9 @@ function printHelp() {
     echo "                       which components to deploy."
     echo "      registry-start: Start the local registry container"
     echo "      registry-sync: Push configured images to the local registry"
+    echo "      registry-reset: Recreate the local registry container and re-sync base images (reclaims registry disk)"
+    echo "      cleanup-images: Prune old content-hash images for nb-ui/nb-bond-api/bens-microservice (keeps current + 2)"
+    echo "      image-report: Read-only report of running pod images, registry tags, and current/deployed markers"
     echo "      build-images: Optional local override: build Blockscout backend/frontend from upstream source tags"
 }
 
@@ -115,6 +120,10 @@ else
     shift
 fi
 
+# image-lifecycle flags (used by cleanup-images)
+CLEANUP_KEEP=""
+CLEANUP_PRUNE_CACHE="false"
+
 # parse flags and options
 while [[ $# -ge 1 ]] ; do
     key="$1"
@@ -122,6 +131,13 @@ while [[ $# -ge 1 ]] ; do
         -h )
             printHelp
             exit 1
+            ;;
+        --keep )
+            shift
+            CLEANUP_KEEP="$1"
+            ;;
+        --prune-build-cache )
+            CLEANUP_PRUNE_CACHE="true"
             ;;
         * )
             echo "❌ Unknown flag: $key"
@@ -358,6 +374,22 @@ elif [ "$CMD" == "generate-config" ]; then
     else
         generateConfig
     fi
+elif [ "$CMD" == "image-report" ]; then
+    cd $SCRIPT_DIR/infra
+    ./infra.sh image-report --as-subtask
+elif [ "$CMD" == "cleanup-images" ]; then
+    cd $SCRIPT_DIR/infra
+    cleanup_args=(cleanup-images --as-subtask)
+    if [ -n "$CLEANUP_KEEP" ]; then
+        cleanup_args+=(--keep "$CLEANUP_KEEP")
+    fi
+    if [ "$CLEANUP_PRUNE_CACHE" == "true" ]; then
+        cleanup_args+=(--prune-build-cache)
+    fi
+    ./infra.sh "${cleanup_args[@]}"
+elif [ "$CMD" == "registry-reset" ]; then
+    cd $SCRIPT_DIR/infra
+    ./infra.sh registry-reset --as-subtask
 else
     echo "❌ Unknown command \"$CMD\". Aborting."
     exit 1

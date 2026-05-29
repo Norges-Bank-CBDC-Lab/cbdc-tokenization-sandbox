@@ -883,6 +883,11 @@ function loadImageToKind() {
 
     requireKindRegistry
 
+    if [ "${FORCE_IMAGE_PULL:-false}" == "true" ] && [ -z "${_FORCE_IMAGE_PULL_WARNED:-}" ]; then
+        echo "⚠️  FORCE_IMAGE_PULL=true — bypassing the registry/local cache for base & third-party images; these will be re-pulled from upstream (requires network). This does NOT rebuild the repo-owned images (nb-ui / nb-bond-api / bens-microservice); their content-hash skip ignores this flag." >&2
+        export _FORCE_IMAGE_PULL_WARNED=1
+    fi
+
     if [ "${FORCE_IMAGE_PULL:-false}" != "true" ]; then
         if [ "$(kindRegistryHasImage "$kind_image")" == "true" ]; then
             echo "✅ Using cached registry image $registry_image"
@@ -1017,18 +1022,36 @@ function getNBUIBuilderImage() {
 }
 
 # Make sure the given upstream image ref is present in the host's local
-# Docker image cache. `loadImageToKind` pushes a `:kind`-tagged variant to
-# the local Kind registry but it short-circuits when that tag is already
-# present, which means a fresh checkout can have the registry tag without
-# the original upstream ref cached locally. `docker build` then tries to
-# resolve the upstream ref over the network and fails offline. This helper
-# does an explicit `docker pull` only when the image is missing locally.
+# Docker image cache so `docker build` can resolve it as a FROM/ARG base.
+# `loadImageToKind` pushes a `:kind`-tagged variant to the local Kind
+# registry but short-circuits when that tag is already present, so a fresh
+# checkout can have the registry copy without the bare upstream ref cached
+# locally. Rather than pull from the internet, reuse the copy already in
+# the local registry (offline) and retag it back to the upstream ref — the
+# Dockerfile FROM stays an upstream ref, so the built image keeps its
+# portable lineage. Only fall back to an upstream pull when the local
+# registry doesn't have it either.
 function ensureLocalDockerImage() {
     local image_ref=$1
     if docker image inspect "$image_ref" >/dev/null 2>&1; then
         return 0
     fi
-    echo "🔄 Pulling $image_ref into local Docker cache for build use..."
+
+    # Digest-pinned refs can't be a `docker tag` target, so skip the reuse
+    # path for them. The repo-owned builds all use tag-based bases.
+    if [[ "$image_ref" != *@* ]]; then
+        local kind_ref
+        kind_ref="$(kindRegistryImageFor "$image_ref")"
+        if [ -n "$kind_ref" ] \
+            && { docker image inspect "$kind_ref" >/dev/null 2>&1 \
+                 || docker pull "$kind_ref" >/dev/null 2>&1; }; then
+            echo "🔁 Reusing local registry image $kind_ref as $image_ref (no upstream pull)."
+            docker tag "$kind_ref" "$image_ref"
+            return 0
+        fi
+    fi
+
+    echo "🔄 $image_ref not in host cache or local registry — pulling from upstream..."
     docker pull "$image_ref"
 }
 
@@ -1038,6 +1061,88 @@ function getLocalRegistryImage() {
     else
         echo "$KIND_REGISTRY_IMAGE"
     fi
+}
+
+# buildAndPushHashedImage REPO HASH CONTEXT DOCKERFILE PREP_FN [BUILD_ARG ...]
+#
+# Shared build/check/push for the repo-owned, content-hash-tagged images
+# (nb-ui, nb-bond-api, bens-microservice). Behaviour:
+#   - Skips the build when localhost:5001/<REPO>:<HASH> is already in the
+#     local registry (the content hash is the cache key).
+#   - On a miss, runs PREP_FN (a function name that ensures the Dockerfile
+#     stage bases are in the host Docker cache for an offline build), then
+#     docker build / tag / push.
+#   - DOCKERFILE is a path, or "-" to use CONTEXT/Dockerfile (no -f).
+#   - Each BUILD_ARG is passed verbatim as `--build-arg <BUILD_ARG>`.
+#   - All progress logs go to STDERR; the ONLY thing written to STDOUT is
+#     the localhost:5001/<REPO>:<HASH> pull tag, so callers can capture it
+#     (`tag="$(buildAndPushHashedImage ...)"` or `--set bensImage=$(...)`).
+function buildAndPushHashedImage() {
+    local repo="$1" hash="$2" context="$3" dockerfile="$4" prep_fn="$5"
+    shift 5
+    local build_args=("$@")
+
+    local local_tag="${repo}:${hash}"
+    local push_tag="localhost:${KIND_REGISTRY_PORT}/${repo}:${hash}"
+
+    # Skip rebuild if the image is already in the local registry. The
+    # registry serves OCI manifests so we list tags rather than negotiate
+    # media types.
+    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/${repo}/tags/list" 2>/dev/null \
+        | jq -e --arg t "$hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
+        echo "✅ ${repo} image ${push_tag} already in local registry — skipping build." >&2
+    else
+        # `docker build` resolves ARG/FROM defaults from the upstream
+        # registry unless those images are already in the host's Docker
+        # cache. PREP_FN guarantees they are before we build.
+        "$prep_fn" >&2 || {
+            echo "❌ Failed to prepare base images for ${repo}" >&2
+            return 1
+        }
+        echo "🐳 Building ${repo} image ${local_tag}..." >&2
+        local build_cmd=(docker build --tag "$local_tag")
+        local arg
+        for arg in "${build_args[@]}"; do
+            build_cmd+=(--build-arg "$arg")
+        done
+        if [ "$dockerfile" != "-" ]; then
+            build_cmd+=(-f "$dockerfile")
+        fi
+        build_cmd+=("$context")
+        "${build_cmd[@]}" >&2 || {
+            echo "❌ Failed to build ${repo} image" >&2
+            return 1
+        }
+        echo "📦 Pushing ${push_tag}..." >&2
+        docker tag "$local_tag" "$push_tag"
+        docker push "$push_tag" >&2 || {
+            echo "❌ Failed to push ${repo} image to local registry" >&2
+            return 1
+        }
+    fi
+
+    echo "$push_tag"
+}
+
+# Base-image prep callbacks for buildAndPushHashedImage. Each ensures the
+# Dockerfile stage bases for one service are present in the host Docker
+# cache. They read the *_RESOLVED globals set by the calling deploy
+# function and run only on a build miss (the deploy function has already
+# pushed the same bases to the kind registry via loadImageToKind).
+function prepBensBases() {
+    ensureLocalDockerImage "$BENS_BASE_RESOLVED"
+}
+
+function prepNBBondApiBases() {
+    ensureLocalDockerImage "$NB_BOND_API_BUILDER_RESOLVED"
+    if [ "$NB_BOND_API_RUNTIME_RESOLVED" != "$NB_BOND_API_BUILDER_RESOLVED" ]; then
+        ensureLocalDockerImage "$NB_BOND_API_RUNTIME_RESOLVED"
+    fi
+}
+
+function prepNBUIBases() {
+    ensureLocalDockerImage "$NB_UI_BUILDER_RESOLVED"
+    ensureLocalDockerImage "$NB_UI_NGINX_RESOLVED"
 }
 
 function syncImagesToRegistry() {
@@ -1063,6 +1168,141 @@ function syncImagesToRegistry() {
         fi
     done
 }
+
+# ── Local image lifecycle: report / cleanup / registry reset ──────────────
+# These operate ONLY on the repo-owned, content-hash-tagged images
+# (nb-ui, nb-bond-api, bens-microservice). Shared base / third-party images
+# (node, nginx, python, besu, blockscout, postgres, jupyter) are
+# deliberately never pruned — they are reused across services and removing
+# them would break offline builds.
+
+# Echo the content-hash tag currently deployed for REPO (read from any
+# running pod that pulls localhost:5001/<repo>:<tag>), or empty if none /
+# no cluster. Always succeeds.
+function currentDeployedTagFor() {
+    local repo="$1"
+    kubectl get pods --all-namespaces \
+        -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
+        | grep "/${repo}:" \
+        | sed "s#.*/${repo}:##" \
+        | head -1 || true
+}
+
+# Echo the content hash the current source tree WOULD build for REPO.
+function computeCurrentHashFor() {
+    case "$1" in
+        nb-ui) nbUIBundleHash ;;
+        nb-bond-api) nbBondApiBundleHash ;;
+        bens-microservice) bensImageHash ;;
+        *) echo "" ;;
+    esac
+}
+
+# Read-only report: running sandbox pod images, the registry tags per repo,
+# and which tag is the current build / currently deployed. Degrades
+# gracefully when the cluster or registry is down. Mutates nothing.
+function reportSandboxImages() {
+    local repos=(nb-ui nb-bond-api bens-microservice)
+    local repo tag current deployed tags
+
+    echo "=== Running sandbox pod images ==="
+    if [ "$(clusterExists)" == "true" ]; then
+        kubectl get pods --all-namespaces \
+            -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
+            | grep -E "localhost:${KIND_REGISTRY_PORT}/(nb-ui|nb-bond-api|bens-microservice):" \
+            | sort -u \
+            | sed 's/^/  /' \
+            || echo "  (no sandbox service pods found)"
+    else
+        echo "  (cluster not running — skipped)"
+    fi
+
+    echo
+    echo "=== Local registry tags (localhost:${KIND_REGISTRY_PORT}) ==="
+    for repo in "${repos[@]}"; do
+        current="$(computeCurrentHashFor "$repo")"
+        deployed="$(currentDeployedTagFor "$repo")"
+        echo "── ${repo}  (current build hash: ${current:-unknown}${deployed:+; deployed: ${deployed}}) ──"
+        tags="$(curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/${repo}/tags/list" 2>/dev/null | jq -r '.tags // [] | .[]' 2>/dev/null || true)"
+        if [ -z "$tags" ]; then
+            echo "   (no tags / registry unreachable)"
+            continue
+        fi
+        while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            local mark=""
+            [ "$tag" == "$current" ] && mark="${mark}  <- current build"
+            [ "$tag" == "$deployed" ] && mark="${mark}  <- deployed"
+            echo "   ${tag}${mark}"
+        done <<< "$tags"
+    done
+
+    echo
+    echo "ℹ️  '<repo>:<tag>' and 'localhost:${KIND_REGISTRY_PORT}/<repo>:<tag>' are aliases of one image id (negligible disk cost)."
+    echo "ℹ️  Reclaim host disk with: ./sandbox.sh cleanup-images   |   Wipe registry tags with: ./sandbox.sh registry-reset"
+    echo "ℹ️  Registry deletes are disabled, so individual registry tags cannot be removed via the API — use registry-reset."
+}
+
+# Host-side prune of the repo-owned content-hash images: keep the KEEP
+# newest tags per repo (default 3 = current + 2) plus the currently-deployed
+# tag; remove the rest (both the bare and localhost:5001/ aliases). Shared
+# base images are never touched. Optionally also prune the GLOBAL Docker
+# build cache (opt-in; affects all projects on the host).
+function cleanupSandboxImages() {
+    local keep="${1:-3}"
+    local prune_build_cache="${2:-false}"
+    local repos=(nb-ui nb-bond-api bens-microservice)
+    local repo deployed tag idx
+
+    for repo in "${repos[@]}"; do
+        deployed="$(currentDeployedTagFor "$repo")"
+        echo "── ${repo}  (keeping ${keep} newest${deployed:+ + deployed ${deployed}}) ──"
+        local tags=()
+        while IFS= read -r tag; do
+            [ -n "$tag" ] && [ "$tag" != "<none>" ] && tags+=("$tag")
+        done < <(docker images "$repo" --format '{{.Tag}}' 2>/dev/null)
+
+        if [ "${#tags[@]}" -eq 0 ]; then
+            echo "   (no local images)"
+            continue
+        fi
+
+        idx=0
+        for tag in "${tags[@]}"; do
+            idx=$((idx + 1))
+            if [ "$idx" -le "$keep" ] || [ "$tag" == "$deployed" ]; then
+                echo "   keep   ${repo}:${tag}"
+                continue
+            fi
+            echo "   remove ${repo}:${tag}"
+            docker rmi "${repo}:${tag}" >/dev/null 2>&1 || true
+            docker rmi "localhost:${KIND_REGISTRY_PORT}/${repo}:${tag}" >/dev/null 2>&1 || true
+        done
+    done
+
+    if [ "$prune_build_cache" == "true" ]; then
+        echo "⚠️  Pruning the GLOBAL Docker build cache (docker builder prune -f) — this affects ALL Docker projects on this host, not just the sandbox."
+        docker builder prune -f || true
+    fi
+
+    echo "✅ Cleanup complete. Shared base images and the deployed tags were left intact."
+    echo "ℹ️  The kind-registry container still holds its pushed tags (registry deletes are disabled). Use ./sandbox.sh registry-reset to reclaim that space."
+}
+
+# Recreate the local registry container from scratch — the safe, disposable
+# alternative to enabling registry delete + GC — and repopulate base images.
+# Repo-owned images rebuild on the next service start because their hash
+# tags will be absent. Requires network or a warm host cache to re-pull any
+# base image not already cached.
+function resetKindRegistry() {
+    echo "🧹 Removing the local registry container '${KIND_REGISTRY_NAME}' (all cached tags will be lost)..."
+    docker rm -f "${KIND_REGISTRY_NAME}" >/dev/null 2>&1 || true
+    ensureKindRegistry
+    echo "🔄 Repopulating base / third-party images into the fresh registry..."
+    syncImagesToRegistry
+    echo "✅ Registry reset complete. Repo-owned images (nb-ui / nb-bond-api / bens-microservice) will rebuild and re-push on the next service start."
+}
+
 function deployBesu() {
     requireContractsEnv
 
@@ -1168,9 +1408,8 @@ function prepareBensImage() {
         return 1
     fi
 
-    local bens_base
-    bens_base="$(getBensBaseImage)"
-    loadImageToKind "$bens_base" >&2
+    BENS_BASE_RESOLVED="$(getBensBaseImage)"
+    loadImageToKind "$BENS_BASE_RESOLVED" >&2
 
     local bundle_hash
     bundle_hash="$(bensImageHash)"
@@ -1179,32 +1418,13 @@ function prepareBensImage() {
         return 1
     fi
 
-    local local_tag="bens-microservice:${bundle_hash}"
-    local push_tag="localhost:${KIND_REGISTRY_PORT}/bens-microservice:${bundle_hash}"
-
-    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/bens-microservice/tags/list" 2>/dev/null \
-        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
-        echo "✅ BENS image ${push_tag} already in local registry — skipping build." >&2
-    else
-        ensureLocalDockerImage "$bens_base" >&2
-        echo "🐳 Building BENS image ${local_tag}..." >&2
-        docker build \
-            --tag "$local_tag" \
-            --build-arg "BENS_BUILDER_IMAGE=${bens_base}" \
-            --build-arg "BENS_RUNTIME_IMAGE=${bens_base}" \
-            "$BLOCKSCOUT_BENS_DIR" >&2 || {
-            echo "❌ Failed to build BENS image" >&2
-            return 1
-        }
-        echo "📦 Pushing ${push_tag}..." >&2
-        docker tag "$local_tag" "$push_tag"
-        docker push "$push_tag" >&2 || {
-            echo "❌ Failed to push BENS image to local registry" >&2
-            return 1
-        }
-    fi
-
-    echo "$push_tag"
+    # Build context is the BENS dir with its default Dockerfile (no -f).
+    # The helper echoes the localhost:5001 pull tag on stdout, preserving
+    # the `--set bensImage=$(prepareBensImage)` contract.
+    buildAndPushHashedImage \
+        "bens-microservice" "$bundle_hash" "$BLOCKSCOUT_BENS_DIR" "-" prepBensBases \
+        "BENS_BUILDER_IMAGE=${BENS_BASE_RESOLVED}" \
+        "BENS_RUNTIME_IMAGE=${BENS_BASE_RESOLVED}"
 }
 
 function deployScriptRunnerScriptsToConfigmap() {
@@ -1433,8 +1653,8 @@ function deployNBBondAPI() {
     requireNBBondApiHelmValues
     requireKindRegistry
 
-    # Pull both Dockerfile stage bases through docker first so the build
-    # works offline (matches the nb-ui pattern).
+    # Push both Dockerfile stage bases into the kind registry first so the
+    # build works offline (matches the nb-ui pattern).
     NB_BOND_API_BUILDER_RESOLVED="$(getNBBondApiBuilderImage)"
     NB_BOND_API_RUNTIME_RESOLVED="$(getNBBondApiRuntimeImage)"
     loadImageToKind "$NB_BOND_API_BUILDER_RESOLVED"
@@ -1448,48 +1668,18 @@ function deployNBBondAPI() {
         echo "❌ Could not compute nb-bond-api bundle hash."
         return 1
     fi
-    # Image refs follow the existing kind-registry convention: containerd
-    # inside the Kind node has hosts.toml mapping localhost:5001 → the kind
-    # registry, so the pod-side pull tag is the same "localhost:5001/..."
-    # the host pushes to. See infra/cluster/containerd-certs.d/.
-    local local_tag="nb-bond-api:${bundle_hash}"
-    local push_tag="localhost:${KIND_REGISTRY_PORT}/nb-bond-api:${bundle_hash}"
-    local pull_tag_in_kind="$push_tag"
 
-    # Skip rebuild if the image is already in the local registry — content
-    # hash is the cache key. The registry serves OCI manifests so we list
-    # tags rather than negotiate media types.
-    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/nb-bond-api/tags/list" 2>/dev/null \
-        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
-        echo "✅ nb-bond-api image ${push_tag} already in local registry — skipping build."
-    else
-        # `docker build` resolves ARG defaults from the upstream registry
-        # unless those images are already in the host's Docker image
-        # cache. Ensure they are before invoking build.
-        ensureLocalDockerImage "$NB_BOND_API_BUILDER_RESOLVED"
-        if [ "$NB_BOND_API_RUNTIME_RESOLVED" != "$NB_BOND_API_BUILDER_RESOLVED" ]; then
-            ensureLocalDockerImage "$NB_BOND_API_RUNTIME_RESOLVED"
-        fi
-        echo "🐳 Building nb-bond-api image ${local_tag}..."
-        # Build context is the repo root so the Dockerfile can COPY the
-        # workspace-level package.json + package-lock.json. The root
-        # .dockerignore controls what actually goes over to the daemon.
-        docker build \
-            --tag "$local_tag" \
-            --build-arg "NB_BOND_API_BUILDER_IMAGE=${NB_BOND_API_BUILDER_RESOLVED}" \
-            --build-arg "NB_BOND_API_RUNTIME_IMAGE=${NB_BOND_API_RUNTIME_RESOLVED}" \
-            -f "$NB_BOND_API_DIR/Dockerfile" \
-            "$REPO_ROOT" || {
-            echo "❌ Failed to build nb-bond-api image"
-            return 1
-        }
-        echo "📦 Pushing ${push_tag}..."
-        docker tag "$local_tag" "$push_tag"
-        docker push "$push_tag" || {
-            echo "❌ Failed to push nb-bond-api image to local registry"
-            return 1
-        }
-    fi
+    # Build/check/push via the shared helper. Image refs follow the kind
+    # registry convention: containerd in the Kind node maps localhost:5001
+    # → the kind registry, so the pod-side pull tag equals the host push
+    # tag. See infra/cluster/containerd-certs.d/. Build context is the repo
+    # root so the Dockerfile can COPY the workspace-level package.json +
+    # package-lock.json; the root .dockerignore controls the daemon upload.
+    local pull_tag_in_kind
+    pull_tag_in_kind="$(buildAndPushHashedImage \
+        "nb-bond-api" "$bundle_hash" "$REPO_ROOT" "$NB_BOND_API_DIR/Dockerfile" prepNBBondApiBases \
+        "NB_BOND_API_BUILDER_IMAGE=${NB_BOND_API_BUILDER_RESOLVED}" \
+        "NB_BOND_API_RUNTIME_IMAGE=${NB_BOND_API_RUNTIME_RESOLVED}")" || return 1
 
     registry_contract_address="$(getRegistryContractAddressFromConfigmap)"
     if [ -z "$registry_contract_address" ]; then
@@ -1534,8 +1724,8 @@ function nbUIBundleHash() {
 function deployNBUI() {
     requireKindRegistry
 
-    # Pull both Dockerfile stage bases through docker first so the build
-    # works offline (matches the pattern other services use).
+    # Push both Dockerfile stage bases into the kind registry first so the
+    # build works offline (matches the pattern other services use).
     NB_UI_BUILDER_RESOLVED="$(getNBUIBuilderImage)"
     NB_UI_NGINX_RESOLVED="$(getNBUINginxImage)"
     loadImageToKind "$NB_UI_BUILDER_RESOLVED"
@@ -1547,46 +1737,18 @@ function deployNBUI() {
         echo "❌ Could not compute nb-ui bundle hash."
         return 1
     fi
-    # Image refs follow the existing kind-registry convention: containerd
-    # inside the Kind node has hosts.toml mapping localhost:5001 → the kind
-    # registry, so the pod-side pull tag is the same "localhost:5001/..."
-    # the host pushes to. See infra/cluster/containerd-certs.d/.
-    local local_tag="nb-ui:${bundle_hash}"
-    local push_tag="localhost:${KIND_REGISTRY_PORT}/nb-ui:${bundle_hash}"
-    local pull_tag_in_kind="$push_tag"
 
-    # Skip rebuild if the image is already in the local registry — content
-    # hash is the cache key. The registry serves OCI manifests so we list
-    # tags rather than negotiate media types.
-    if curl -fsS "${KIND_REGISTRY_ENDPOINT}/v2/nb-ui/tags/list" 2>/dev/null \
-        | jq -e --arg t "$bundle_hash" '.tags // [] | index($t)' >/dev/null 2>&1; then
-        echo "✅ nb-ui image ${push_tag} already in local registry — skipping build."
-    else
-        # `docker build` resolves ARG defaults from the upstream registry
-        # unless those images are already in the host's Docker image
-        # cache. Ensure they are before invoking build.
-        ensureLocalDockerImage "$NB_UI_BUILDER_RESOLVED"
-        ensureLocalDockerImage "$NB_UI_NGINX_RESOLVED"
-        echo "🐳 Building nb-ui image ${local_tag}..."
-        # Build context is the repo root so the Dockerfile can COPY the
-        # workspace-level package.json + package-lock.json. The root
-        # .dockerignore controls what actually goes over to the daemon.
-        docker build \
-            --tag "$local_tag" \
-            --build-arg "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
-            --build-arg "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}" \
-            -f "$NB_UI_DIR/Dockerfile" \
-            "$REPO_ROOT" || {
-            echo "❌ Failed to build nb-ui image"
-            return 1
-        }
-        echo "📦 Pushing ${push_tag}..."
-        docker tag "$local_tag" "$push_tag"
-        docker push "$push_tag" || {
-            echo "❌ Failed to push nb-ui image to local registry"
-            return 1
-        }
-    fi
+    # Build/check/push via the shared helper. Image refs follow the kind
+    # registry convention: containerd in the Kind node maps localhost:5001
+    # → the kind registry, so the pod-side pull tag equals the host push
+    # tag. See infra/cluster/containerd-certs.d/. Build context is the repo
+    # root so the Dockerfile can COPY the workspace-level package.json +
+    # package-lock.json; the root .dockerignore controls the daemon upload.
+    local pull_tag_in_kind
+    pull_tag_in_kind="$(buildAndPushHashedImage \
+        "nb-ui" "$bundle_hash" "$REPO_ROOT" "$NB_UI_DIR/Dockerfile" prepNBUIBases \
+        "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
+        "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}")" || return 1
 
     helm upgrade nb-ui "$REPO_ROOT/services/nb-ui/helm" \
          --install \
