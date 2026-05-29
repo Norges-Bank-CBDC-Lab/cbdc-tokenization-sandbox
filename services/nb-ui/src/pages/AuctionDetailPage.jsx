@@ -199,16 +199,30 @@ export function AuctionDetailPage({ auctionId, navigate }) {
         <div className="kpi">
           <div className="kpi-label">{Fmt.clearingLabel(auction.type)}</div>
           <div className="kpi-value">
-            {auction.allocation?.clearingRate ? (
+            {auction.status !== 'open' && auction.allocation?.clearingRate ? (
               Fmt.formatBidRate(auction.allocation.clearingRate, auction.type)
             ) : (
               <span className="muted">—</span>
             )}
           </div>
-          <div className="kpi-sub">{auction.status === 'open' ? 'Awaiting close' : 'Computed'}</div>
+          <div className="kpi-sub">
+            {auction.status === 'open'
+              ? 'Awaiting close'
+              : auction.status === 'finalised'
+                ? 'Final'
+                : auction.allocation?.clearingRate
+                  ? 'Proposed'
+                  : '—'}
+          </div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Allocation hash</div>
+          <div
+            className="kpi-label"
+            title="Off-chain commitment to the computed allocation — the clearing rate plus every bidder's units. The operator confirms this exact digest when finalising; it is recomputed server-side to detect tampering. Not yet posted on-chain."
+            style={{ cursor: 'help' }}
+          >
+            Allocation hash
+          </div>
           <div className="kpi-value mono" style={{ fontSize: 14 }}>
             {Fmt.shortHex(auction.allocation?.hash, 10, 6)}
           </div>

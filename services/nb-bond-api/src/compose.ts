@@ -394,7 +394,7 @@ export async function composeAuction(
         rate: a.rate,
       })),
     });
-  } else if (unsealedBids && metadata.offering && metadata.offering > 0n) {
+  } else if (status === 'closed' && unsealedBids && metadata.offering && metadata.offering > 0n) {
     try {
       const result =
         metadata.auctionType === 'BUYBACK'
