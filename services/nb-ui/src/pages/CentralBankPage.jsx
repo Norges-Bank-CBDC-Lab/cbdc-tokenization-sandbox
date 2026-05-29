@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import { CentralBankApi } from '../api/centralBankApi.js';
+import { BiddersApi } from '../api/biddersApi.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
 import {
@@ -28,9 +29,49 @@ import { MintWnokModal } from './MintWnokModal.jsx';
 import { BurnWnokModal } from './BurnWnokModal.jsx';
 import { TransferWnokModal } from './TransferWnokModal.jsx';
 
+/**
+ * Renders a long hex string in full, wrappable + monospace, with a one-click
+ * Copy button. Mirrors the helper in AuctionDetailPage — dedupe both into
+ * components/ui.jsx in a follow-up.
+ */
+function CopyableHex({ value }) {
+  const [copied, setCopied] = useState(false);
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable — user can still triple-click to select */
+    }
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <code
+        className="mono"
+        style={{
+          flex: 1,
+          wordBreak: 'break-all',
+          background: 'var(--surface-2, #f5f6fa)',
+          padding: '4px 6px',
+          borderRadius: 4,
+          fontSize: 12,
+          userSelect: 'all',
+        }}
+      >
+        {value}
+      </code>
+      <Button size="sm" variant="ghost" onClick={onCopy} title="Copy to clipboard">
+        {copied ? 'Copied' : 'Copy'}
+      </Button>
+    </div>
+  );
+}
+
 export function CentralBankPage() {
   const cbQ = useApi(() => CentralBankApi.getCentralBank(), []);
   const listQ = useApi(() => CentralBankApi.listAllowlist(), []);
+  const biddersQ = useApi(() => BiddersApi.listBidders(), []);
   const [showAdd, setShowAdd] = useState(false);
   const [showMint, setShowMint] = useState(false);
   const [showBurn, setShowBurn] = useState(false);
@@ -84,6 +125,19 @@ export function CentralBankPage() {
   const onAllowlist = cb.available
     ? allowlist.some((e) => e.address.toLowerCase() === cb.address.toLowerCase())
     : false;
+  // The WNOK allowlist is address-only on-chain, so enrich each address with a
+  // name + type by matching the bidder roster (by lowercased address). The CB's
+  // own account is labelled separately; unknown addresses stay "—".
+  const biddersByAddress = new Map((biddersQ.data ?? []).map((b) => [b.address.toLowerCase(), b]));
+  function allowlistLabel(address) {
+    const lower = address.toLowerCase();
+    const bidder = biddersByAddress.get(lower);
+    if (bidder) return { name: bidder.name, type: 'Bidder' };
+    if (cb.available && lower === cb.address.toLowerCase()) {
+      return { name: '—', type: 'Central Bank' };
+    }
+    return { name: '—', type: '—' };
+  }
 
   return (
     <div>
@@ -151,6 +205,28 @@ export function CentralBankPage() {
 
           <div className="card">
             <div className="card-header">
+              <h3 className="card-title">Addresses</h3>
+            </div>
+            <div className="card-body">
+              <div style={{ display: 'grid', gap: 12 }}>
+                <div>
+                  <div className="kpi-label" style={{ marginBottom: 4 }}>
+                    CB account
+                  </div>
+                  <CopyableHex value={cb.address} />
+                </div>
+                <div>
+                  <div className="kpi-label" style={{ marginBottom: 4 }}>
+                    WNOK contract
+                  </div>
+                  <CopyableHex value={cb.wnok.contractAddress} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
               <h3 className="card-title">WNOK actions</h3>
             </div>
             <div className="card-body">
@@ -197,25 +273,32 @@ export function CentralBankPage() {
                   <thead>
                     <tr>
                       <th>Address</th>
+                      <th>Name</th>
+                      <th>Type</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {allowlist.map((e) => (
-                      <tr key={e.address}>
-                        <td className="mono">{e.address}</td>
-                        <td className="right">
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => onRemove(e.address)}
-                            disabled={removeMut.loading}
-                          >
-                            Remove
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {allowlist.map((e) => {
+                      const label = allowlistLabel(e.address);
+                      return (
+                        <tr key={e.address}>
+                          <td className="mono">{e.address}</td>
+                          <td>{label.name}</td>
+                          <td>{label.type}</td>
+                          <td className="right">
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => onRemove(e.address)}
+                              disabled={removeMut.loading}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
