@@ -1,0 +1,36 @@
+name: Image Hash Inputs
+
+on:
+  pull_request:
+    paths:
+      - "common/helpers.sh"
+      - "common/node-version.env"
+      - "services/nb-ui/src/**"
+      - "services/nb-ui/public/**"
+      - "services/nb-ui/Dockerfile"
+      - "services/nb-ui/package.json"
+      - "services/nb-ui/index.html"
+      - "services/nb-ui/vite.config.js"
+      - "services/nb-bond-api/src/**"
+      - "services/nb-bond-api/Dockerfile"
+      - "services/nb-bond-api/package.json"
+      - "services/nb-bond-api/tsconfig.json"
+      - "services/blockscout/bens-microservice/**"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/verification/check-image-hash-inputs.sh"
+      - ".github/workflows/image-hash-inputs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-image-hash-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate image content-hash inputs
+        run: bash scripts/verification/check-image-hash-inputs.sh

@@ -178,3 +178,24 @@ visible at a glance.
   per-service Docker build in one command (parallel `nb-ui.sh start
   --build-only`-style invocations). The right answer depends on how often
   developers want a "rebuild every image without deploying" path.
+
+## Local registry and Docker image cache grow unbounded
+- Each content-hash build of `nb-ui`, `nb-bond-api`, or `bens-microservice`
+  produces a new image id on the host and a new tag + blobs in the
+  `kind-registry` container. Nothing prunes them automatically.
+- `<repo>:<tag>` and `localhost:5001/<repo>:<tag>` are **aliases of the same
+  image id** — that pair is *not* the waste. The real growth is the
+  accumulation of old unique content-hash image ids on the host, plus
+  un-garbage-collected blobs in the registry container (registry deletes are
+  disabled by default and the container has no volume, so it also survives
+  `kind delete cluster`).
+- Inspect with `./sandbox.sh image-report` (read-only: running pod images,
+  registry tags per service, and which tag is the current build / deployed).
+- Reclaim host disk with `./sandbox.sh cleanup-images` — keeps the current +
+  2 newest tags per service and the deployed tag, and never removes shared
+  base images. Add `--keep N` to change the retention or `--prune-build-cache`
+  to also clear the global Docker build cache (affects all projects).
+- Reclaim registry space with `./sandbox.sh registry-reset` — recreates the
+  registry container and re-syncs base images; repo-owned images rebuild on
+  the next start. This is preferred over enabling registry delete + GC for a
+  disposable local registry.

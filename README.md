@@ -173,10 +173,13 @@ Use `/etc/hosts` on Linux/macOS or
 | --- | --- |
 | `./sandbox.sh start` | Create or update the local sandbox |
 | `./sandbox.sh stop` | Stop workloads while keeping the cluster and cached images |
-| `./sandbox.sh delete` | Tear down the Kind cluster. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, `docker rm -f kind-registry`. |
+| `./sandbox.sh delete` | Tear down the Kind cluster. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, run `./sandbox.sh registry-reset` (or `docker rm -f kind-registry`). |
 | `./sandbox.sh generate-config` | Create `.env.sandbox` with deploy toggles |
 | `./infra/infra.sh registry-start` | Start the local registry container (one-time setup; no-op if already running) |
 | `./infra/infra.sh registry-sync` | Optional pre-warm: push every pinned third-party image into the local registry up front so `sandbox.sh start` doesn't pull them on demand |
+| `./sandbox.sh image-report` | Read-only report: running pod images, local registry tags per service, and which tag is the current build / deployed |
+| `./sandbox.sh cleanup-images` | Prune old content-hash images for `nb-ui` / `nb-bond-api` / `bens-microservice` (keeps current + 2 newest and the deployed tag; never removes shared base images). `--keep N` changes retention; `--prune-build-cache` also clears the global Docker build cache |
+| `./sandbox.sh registry-reset` | Recreate the `kind-registry` container and re-sync base images, clearing accumulated registry tags. Repo-owned images rebuild on the next start |
 
 If startup fails with missing content digest errors, run `registry-sync`
 first. This avoids on-demand image pulls racing the deploy steps on slow

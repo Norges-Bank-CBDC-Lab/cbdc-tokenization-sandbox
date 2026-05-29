@@ -48,6 +48,20 @@ Mount behavior worth keeping explicit:
 If sandbox startup fails with missing digest or image-pull errors, run
 `registry-start` and `registry-sync` before retrying.
 
+Offline builds and `FORCE_IMAGE_PULL`:
+
+- When a locally-built service (nb-ui, nb-bond-api, bens-microservice) needs a
+  Dockerfile base image (e.g. `node:25.9.0`) that isn't in the host Docker
+  cache, the build reuses the copy already in the local registry and retags it
+  to the upstream ref — it does **not** pull from the internet. The Dockerfile
+  `FROM` stays an upstream ref, so built images keep a portable lineage.
+- `FORCE_IMAGE_PULL=true` forces base and third-party images to be re-pulled
+  from upstream (requires network), bypassing the registry/local cache; the run
+  prints a warning when it does so. This affects only the base/third-party
+  image load path — it does **not** rebuild the repo-owned content-hash images
+  (nb-ui, nb-bond-api, bens-microservice), which rebuild only when their source
+  changes.
+
 ## Validate Besu Connectivity
 
 To confirm that the local Besu JSON-RPC endpoint is reachable:
