@@ -53,6 +53,8 @@ import { getBalancesByIsin, openDatabase } from './ingestion-db';
 import { initSealingKeypair, type SealingKeypair } from './keys';
 import { logger } from './logger';
 import { parseBigInt } from './parsing';
+import { computeBuybackAllocation, computeUniformAllocation } from './allocation';
+import { AuctionType } from './types';
 import {
   type CloseAuctionBody,
   type CreateAuctionBody,
@@ -759,16 +761,12 @@ app.put(
   async (req, res, next) => {
     try {
       const { auctionId } = req.params as { auctionId: string };
-      const { allocationHash, approve } = req.body as FinaliseBody;
+      const { approve, winningBidIndexes, expectedClearingRate } = req.body as FinaliseBody;
 
       const auction = await composeAuction(historyDb, auctionId);
       if (!auction) throw notFound(`auction ${auctionId} not found`);
-      if (!auction.allocation) throw conflict('no allocation result available');
       if (auction.status === 'finalised') throw conflict('auction already finalised');
       if (auction.status === 'cancelled') throw conflict('auction cancelled');
-      if (auction.allocation.hash.toLowerCase() !== allocationHash.toLowerCase()) {
-        throw badRequest('allocationHash mismatch');
-      }
 
       const isin = auction.isin;
       if (!approve) {
@@ -782,22 +780,30 @@ app.put(
         return;
       }
 
-      // Approve path: rebuild allocation payload + proofs from the
-      // composed unsealed bids and submit to BondManager.finaliseAuction.
-      const allocPayload = auction.allocation.entries.map((entry) => ({
-        isin,
-        bidder: entry.bidder,
-        units: BigInt(entry.units),
-        rate: BigInt(entry.rate),
-        auctionType: auction.type === 'RATE' ? 0 : auction.type === 'PRICE' ? 1 : 2,
-      }));
-
-      const unsealedFromCompose = auction.bids.filter((b) => b.state === 'unsealed');
-      if (unsealedFromCompose.length === 0) {
-        throw conflict('unsealed bids required for finalisation');
+      // ---- Approve path (Design B) --------------------------------------
+      // The operator selects which sealed bids win, by on-chain bidIndex;
+      // the server is the sole authority for the economic terms. We re-fetch
+      // the sealed bids from chain, unseal them, recompute the uniform-price
+      // allocation over ONLY the selected subset, cross-check the clearing
+      // rate against what the operator confirmed, then submit. Unselected
+      // bids never reach the chain.
+      if (auction.status !== 'closed') {
+        throw conflict('auction must be closed to finalise');
       }
+      if (!winningBidIndexes || winningBidIndexes.length === 0) {
+        throw badRequest(
+          'winningBidIndexes is required and must be non-empty when approve is true',
+        );
+      }
+      if (expectedClearingRate === undefined) {
+        throw badRequest('expectedClearingRate is required when approve is true');
+      }
+      if (!auction.size) {
+        throw conflict('auction has no offering size');
+      }
+      const offering = BigInt(auction.size);
 
-      // Need the bidder signatures / bidderNonce — re-derive from chain.
+      // Re-derive bidder signatures / nonces from chain (authoritative).
       const { unsealBid, normalizeSealedBid } = await import('./bid');
       const bondManager = await getBondManager();
       const sealed = await bondManager.getSealedBids(isin);
@@ -808,20 +814,59 @@ app.put(
           plaintextHash: string;
         }>
       ).map(normalizeSealedBid);
-      const unsealedBids = sealedBids.map((b, i) => unsealBid(isin, b, i));
+      const unsealedByIndex = new Map<number, ReturnType<typeof unsealBid>>();
+      sealedBids.forEach((b, i) => unsealedByIndex.set(i, unsealBid(isin, b, i)));
 
-      const usedBidIndexes = new Set<number>();
-      const proofs = allocPayload.map((allocation) => {
-        const idx = unsealedBids.findIndex(
-          (b) =>
-            b.bidder.toLowerCase() === allocation.bidder.toLowerCase() &&
-            !usedBidIndexes.has(b.bidIndex),
-        );
-        if (idx < 0) {
-          throw conflict(`missing unsealed bid for allocation bidder ${allocation.bidder}`);
+      // Resolve the selection to unsealed bids; reject unknown / duplicate indexes.
+      const seenIndexes = new Set<number>();
+      const selectedBids = winningBidIndexes.map((idx) => {
+        const match = unsealedByIndex.get(idx);
+        if (!match) {
+          throw badRequest(`unknown winning bidIndex ${idx}`);
         }
-        const match = unsealedBids[idx];
-        usedBidIndexes.add(match.bidIndex);
+        if (seenIndexes.has(idx)) {
+          throw badRequest(`duplicate winning bidIndex ${idx}`);
+        }
+        seenIndexes.add(idx);
+        return match;
+      });
+
+      // Recompute the allocation over the selected subset only.
+      const auctionTypeEnum =
+        auction.type === 'RATE'
+          ? AuctionType.RATE
+          : auction.type === 'PRICE'
+            ? AuctionType.PRICE
+            : AuctionType.BUYBACK;
+      const result =
+        auctionTypeEnum === AuctionType.BUYBACK
+          ? computeBuybackAllocation(isin, selectedBids, offering)
+          : computeUniformAllocation(isin, auctionTypeEnum, selectedBids, offering);
+
+      // Cross-check: the server-recomputed clearing rate must equal what the
+      // operator confirmed, so the minted coupon can never silently diverge
+      // from what the operator saw in the UI.
+      if (result.clearingRate.toString() !== expectedClearingRate) {
+        throw badRequest(
+          `clearing-rate mismatch: server recomputed ${result.clearingRate.toString()} bps from the ` +
+            `selected bids but the request expected ${expectedClearingRate} bps. No allocation was submitted.`,
+        );
+      }
+
+      // Build the on-chain allocation payload + bidder proofs, pairing each
+      // allocation to its bid by bidIndex (unambiguous for duplicate bidders).
+      const allocPayload = result.allocations.map((a) => ({
+        isin,
+        bidder: a.bidder,
+        units: a.units,
+        rate: a.rate,
+        auctionType: a.auctionType,
+      }));
+      const proofs = result.allocations.map((a) => {
+        const match = unsealedByIndex.get(a.bidIndex);
+        if (!match) {
+          throw conflict(`missing unsealed bid for bidIndex ${a.bidIndex}`);
+        }
         if (!match.plaintext.bidderSig) {
           throw conflict(`missing bidderSig for ${match.bidder}`);
         }

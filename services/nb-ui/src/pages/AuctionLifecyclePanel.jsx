@@ -166,6 +166,35 @@ function CloseModal({ auction, onClose, onConfirm, busy }) {
   );
 }
 
+/**
+ * Uniform-price clearing rate over the selected bids — the rate of the
+ * marginal (last-filled) bid once the offering is exhausted. Mirrors the
+ * backend's computeUniformAllocation so the displayed rate equals the value
+ * sent as `expectedClearingRate` and, in turn, what is minted on-chain.
+ * RATE/BUYBACK fill lowest-rate-first; PRICE fills highest-first; ties prefer
+ * larger units.
+ */
+export function marginalClearingBps(picked, auctionType, offering) {
+  if (!picked || picked.length === 0) return 0;
+  const preferHigher = auctionType === 'PRICE';
+  const sorted = [...picked].sort((a, b) => {
+    const ra = Number(a.rate || 0);
+    const rb = Number(b.rate || 0);
+    if (ra !== rb) return preferHigher ? rb - ra : ra - rb;
+    return Number(b.units || 0) - Number(a.units || 0);
+  });
+  let remaining = offering > 0 ? offering : Infinity;
+  let clearing = 0;
+  for (const b of sorted) {
+    if (remaining <= 0) break;
+    const fill = Math.min(Number(b.units || 0), remaining);
+    if (fill <= 0) continue;
+    remaining -= fill;
+    clearing = Number(b.rate || 0);
+  }
+  return clearing;
+}
+
 function FinaliseModal({ auction, onClose, onConfirm, busy }) {
   // Bids come from the auction subtree — no separate fetch.
   const bids = useMemo(() => auction.bids.filter((b) => b.state === 'unsealed'), [auction.bids]);
@@ -183,7 +212,7 @@ function FinaliseModal({ auction, onClose, onConfirm, busy }) {
     if (!unsealed) return null;
     const picked = [...selected].map((i) => bids[i]).filter(Boolean);
     const totalUnits = picked.reduce((s, b) => s + Number(b.units || 0), 0);
-    const clearingBps = picked.reduce((max, b) => Math.max(max, Number(b.rate || 0)), 0);
+    const clearingBps = marginalClearingBps(picked, auction.type, offering);
     return {
       count: picked.length,
       totalUnits,
@@ -191,7 +220,7 @@ function FinaliseModal({ auction, onClose, onConfirm, busy }) {
       overAllocated: offering > 0 && totalUnits > offering,
       underFilled: offering > 0 && totalUnits < offering,
     };
-  }, [selected, bids, unsealed, offering]);
+  }, [selected, bids, unsealed, offering, auction.type]);
 
   function toggle(i) {
     setSelectionOverride((prev) => {
@@ -235,7 +264,15 @@ function FinaliseModal({ auction, onClose, onConfirm, busy }) {
           </Button>
           <Button
             variant={mode === 'approve' ? 'primary' : 'danger'}
-            onClick={() => onConfirm(mode === 'approve', [...(selected ?? [])])}
+            onClick={() => {
+              const winningBidIndexes = [...(selected ?? [])]
+                .map((i) => bids[i]?.bidIndex)
+                .filter((idx) => Number.isInteger(idx));
+              onConfirm(mode === 'approve', {
+                winningBidIndexes,
+                expectedClearingRate: String(summary?.clearingBps ?? 0),
+              });
+            }}
             disabled={disabled}
           >
             {busy
@@ -586,7 +623,7 @@ export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, 
           auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
-          onConfirm={(approve, winners) => handle(onFinalise, approve, winners)}
+          onConfirm={(approve, selection) => handle(onFinalise, approve, selection)}
         />
       )}
       {modal === 'reopen' && (

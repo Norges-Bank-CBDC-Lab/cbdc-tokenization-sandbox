@@ -53,7 +53,14 @@ export function computeUniformAllocation(
       continue;
     }
 
-    allocations.push({ isin, bidder: bid.bidder, units: fill, rate, auctionType });
+    allocations.push({
+      isin,
+      bidder: bid.bidder,
+      units: fill,
+      rate,
+      auctionType,
+      bidIndex: bid.bidIndex,
+    });
     totalAllocated += fill;
     remaining -= fill;
     clearingRate = rate;
@@ -111,6 +118,7 @@ export function computeBuybackAllocation(
       units: fill,
       rate,
       auctionType: AuctionType.BUYBACK,
+      bidIndex: bid.bidIndex,
     });
     totalAllocated += fill;
     remaining -= fill;
@@ -137,7 +145,9 @@ export function buildAllocationHash(
   isin: string,
   auctionType: AuctionType,
   clearingRate: bigint,
-  allocations: Allocation[],
+  // Only the hashed fields are required — callers that lack a bidIndex
+  // (e.g. on-chain allocations) can pass plain {bidder, units, rate}.
+  allocations: Array<{ bidder: string; units: bigint; rate: bigint }>,
 ): string {
   const encoded = coder.encode(
     [

@@ -57,8 +57,21 @@ async function reopenAuction(_auctionId) {
   );
 }
 
-async function finaliseAuction(auctionId, allocationHash, approve) {
-  const body = { allocationHash, approve };
+/**
+ * Finalise an auction.
+ *
+ * Approve: pass { approve: true, winningBidIndexes, expectedClearingRate }.
+ * Only the *selection* is sent — the backend re-fetches the sealed bids from
+ * chain, recomputes the allocation + clearing rate over exactly those bids,
+ * cross-checks `expectedClearingRate`, and submits. The operator's selection,
+ * not the full close-time allocation, determines what is minted.
+ *
+ * Reject: pass { approve: false }; selection fields are ignored.
+ */
+async function finaliseAuction(auctionId, { approve, winningBidIndexes, expectedClearingRate }) {
+  const body = approve
+    ? { approve: true, winningBidIndexes, expectedClearingRate }
+    : { approve: false };
   return HttpClient.put(`/v1/auctions/${encodeURIComponent(auctionId)}/finalisation`, body, {
     query: testModeQuery(),
   });
