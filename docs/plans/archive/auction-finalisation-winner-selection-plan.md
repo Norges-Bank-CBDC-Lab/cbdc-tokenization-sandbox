@@ -1,6 +1,6 @@
 # Auction Finalisation Winner-Selection — Implementation Plan
 
-**Status:** Implemented — verified live on the local sandbox; pending PR. (Move to `docs/plans/archive/` once the PR merges, with the PR link in this status line.)
+**Status:** ✅ Implemented and shipped via PR #133.
 **Branch suggestion:** `feature/auction-finalisation-winner-selection` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-bond-api/src/{schemas.ts,compose.ts,index.ts,allocation.ts,types.ts}`, `services/nb-bond-api/openapi.json`, `services/nb-bond-api/tests/`, `services/nb-ui/src/api/auctionsApi.js`, `services/nb-ui/src/pages/{AuctionDetailPage.jsx,AuctionLifecyclePanel.jsx}`, `docs/{ARCHITECTURE.md,KNOWN_ISSUES.md}`
 
