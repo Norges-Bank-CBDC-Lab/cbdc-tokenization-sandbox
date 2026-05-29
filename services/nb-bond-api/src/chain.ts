@@ -1,4 +1,11 @@
-import { Contract, JsonRpcProvider, TransactionReceipt, TransactionResponse, Wallet } from 'ethers';
+import {
+  Contract,
+  Interface,
+  JsonRpcProvider,
+  TransactionReceipt,
+  TransactionResponse,
+  Wallet,
+} from 'ethers';
 import { bondAuctionAbi, bondManagerAbi, bondTokenAbi, globalRegistryAbi, wnokAbi } from './abi';
 import { envVariables } from './env-vars';
 
@@ -80,6 +87,33 @@ export async function sendWithManagedNonce(
       throw err;
     }
   });
+}
+
+// Decode a Solidity custom-error revert into its error name by trying each
+// provided contract Interface. Ethers v6 surfaces the revert bytes in a few
+// places depending on whether the revert came from a call/staticCall,
+// eth_estimateGas, or a mined-tx wait — check the common shapes. Returns the
+// error name (e.g. "InBidPhase") or null if it can't be decoded.
+export function decodeCustomError(err: unknown, interfaces: Interface[]): string | null {
+  const e = err as {
+    data?: unknown;
+    info?: { error?: { data?: unknown } };
+    error?: { data?: unknown };
+  };
+  const candidates = [e?.data, e?.info?.error?.data, e?.error?.data];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.startsWith('0x') && candidate.length >= 10) {
+      for (const iface of interfaces) {
+        try {
+          const parsed = iface.parseError(candidate);
+          if (parsed) return parsed.name;
+        } catch {
+          // not this interface — try the next
+        }
+      }
+    }
+  }
+  return null;
 }
 
 async function assertProviderReady() {

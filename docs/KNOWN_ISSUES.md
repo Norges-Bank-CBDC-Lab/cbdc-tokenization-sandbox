@@ -121,6 +121,18 @@ visible at a glance.
   the sandbox but limits the testbed when bidders / auctioneer
   workflows need to be exercised end-to-end without waiting on
   wall-clock time.
+- Update (shipped): closing an auction *after* its scheduled end now
+  works reliably. The local Besu mints blocks only on transactions
+  (`createemptyblocks: false`), so its clock lags wall-clock and
+  `eth_estimateGas` would simulate the close against a stale block and
+  false-revert `InBidPhase()` before broadcast. The API now retries the
+  close once with an explicit gas-limit fallback
+  (`NB_BOND_API_CLOSE_GAS_LIMIT`) to skip that stale estimation; the mined
+  block is stamped at wall-clock > end and the contract accepts it. A
+  genuine before-end close (e.g. Test-mode) now returns a clear `409`
+  (the `InBidPhase` revert is decoded). This does **not** relax the chain
+  rule above — closing *before* `metadata.end` is still rejected on-chain;
+  that remains the asymmetric-timing follow-up below.
 - Planned follow-up — asymmetric timing model:
   - Keep the chain check on `submitBid` (`block.timestamp <=
     metadata.end`) so bidders retain a hard-enforced submit deadline.
