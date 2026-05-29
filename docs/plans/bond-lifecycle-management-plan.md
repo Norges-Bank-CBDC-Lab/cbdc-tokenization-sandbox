@@ -1,6 +1,6 @@
 # Bond Lifecycle Management — Implementation Plan
 
-**Status:** Draft, ready for operator review. Backlog items 11 + 12 from [`docs/plans/operator-ui-backlog.md`](operator-ui-backlog.md). Auction-deletion was scoped in by the operator and is addressed below as a no-op (the existing `cancelAuction` + UI filter is sufficient — see "Decisions" §D3).
+**Status:** Draft, ready for operator review. Backlog items 11 + 12 from [`docs/plans/archive/operator-ui-backlog.md`](archive/operator-ui-backlog.md). Auction-deletion was scoped in by the operator and is addressed below as a no-op (the existing `cancelAuction` + UI filter is sufficient — see "Decisions" §D3).
 **Branch suggestion:** `feature/bond-lifecycle-management`
 **Components touched:** `contracts/src/norges-bank/BondToken.sol` + `BondManager.sol` + their interfaces, `services/nb-bond-api/` (ingestion, schemas, routes), `services/nb-ui/` (BondsPage + BondDetailPage + new modal), docs.
 
@@ -31,7 +31,7 @@ What was inspected and what was actually verified in this session (2026-05-26).
   - `docs/ARCHITECTURE.md` — referenced for the component diagram and trust-boundary notes (will need a small refresh to reflect the new lifecycle).
   - `docs/KNOWN_ISSUES.md` — confirms there is no existing partition-disable plan and no auction-delete plan; this plan does not invalidate any current entry.
   - `docs/DOCUMENTATION_INDEX.md` — points new plan doc into `docs/plans/`.
-  - `docs/plans/operator-ui-backlog.md` — items 11 + 12 verbatim.
+  - `docs/plans/archive/operator-ui-backlog.md` — items 11 + 12 verbatim.
   - `docs/plans/archive/bidders-and-central-bank-plan.md`, `docs/plans/archive/health-indicator-and-self-healing-plan.md` — house style for this kind of multi-layer plan.
   - `contracts/AGENTS.md` — Solidity style and Foundry expectations (named struct init, custom errors over revert strings, events for state-changing actions, early-revert validation, `./slither.sh` advisory).
   - `services/nb-bond-api/README.md`, `services/nb-bond-api/DEVELOPMENT.md`, `services/nb-ui/README.md`, `services/nb-ui/DEVELOPMENT.md` — area conventions.
@@ -107,7 +107,7 @@ What was inspected and what was actually verified in this session (2026-05-26).
   - `docs/ARCHITECTURE.md` — short paragraph on the bond inventory being independent of the auction calendar.
   - `docs/KNOWN_ISSUES.md` — entry retired (or simplified) for the historical "bond cannot be undone" gap.
   - `docs/DOCUMENTATION_INDEX.md` — pointer added to the archived form of this plan once shipped.
-  - `docs/plans/operator-ui-backlog.md` — item 11 + 12 moved to the "What already shipped" list on merge.
+  - `docs/plans/archive/operator-ui-backlog.md` — item 11 + 12 moved to the "What already shipped" list on merge.
 
 ### Out Of Scope
 
@@ -183,7 +183,7 @@ Choices below are local-first and acceptable for this sandbox. None of them bloc
 | `+ New bond` modal collects only ISIN + maturity; submitting lands on `BondDetailPage` with a "Schedule first auction" CTA | Operator UX (per §D2) | vitest page-level test | Pass |
 | `npm test` in `services/nb-bond-api` and `services/nb-ui` clean | CI gate | Workflows green | Pass |
 | `python3 scripts/verification/check-public-repo-hygiene.py` + `check-markdown-links.py` clean | Public-repo hygiene | Script output captured in PR | Clean |
-| `docs/plans/operator-ui-backlog.md` items 11 + 12 moved to the "shipped" list | Plan-doc maintenance | Git diff | Updated |
+| `docs/plans/archive/operator-ui-backlog.md` items 11 + 12 moved to the "shipped" list | Plan-doc maintenance | Git diff | Updated |
 | `docs/KNOWN_ISSUES.md` updated to reflect what (if anything) is still open after this lands | Doc consistency | Git diff | Updated |
 
 ## Assumptions
@@ -412,7 +412,7 @@ Leave the docs accurate, the index current, and the public-repo posture clean.
 - Update `contracts/docs/contracts-reference.md` and `contracts/docs/bond-lifecycle-walkthrough.md` (new entrypoints, the "pre-stage then schedule" path).
 - Update `docs/ARCHITECTURE.md` (one-paragraph note that bond inventory is independent of auction calendar).
 - Update `docs/KNOWN_ISSUES.md` (retire any historical "bond cannot be undone" mention; the entry for `reopenAuction` is unaffected).
-- Update `docs/plans/operator-ui-backlog.md` — move items 11 + 12 into the "shipped" list, delete the per-item sections. The doc shrinks accordingly.
+- Update `docs/plans/archive/operator-ui-backlog.md` — move items 11 + 12 into the "shipped" list, delete the per-item sections. The doc shrinks accordingly.
 - Move this plan doc to `docs/plans/archive/bond-lifecycle-management-plan.md` and update the status line + PR link. Update `docs/DOCUMENTATION_INDEX.md` accordingly.
 
 ### Verification Stop
@@ -443,7 +443,7 @@ Evidence to include in the PR body:
 - Output of `forge test` and `./slither.sh` from Phase 1.
 - Output of `npm test` for nb-bond-api and nb-ui.
 - A `curl` transcript covering the four happy paths and one rejection (Phase 2 verification stop).
-- A note that items 11 + 12 are moved from `docs/plans/operator-ui-backlog.md` to the "shipped" list.
+- A note that items 11 + 12 are moved from `docs/plans/archive/operator-ui-backlog.md` to the "shipped" list.
 
 Per repo policy: no AI attribution in the commit messages or the PR body. Branch targets `development`, not `main`.
 
@@ -460,6 +460,6 @@ Per repo policy: no AI attribution in the commit messages or the PR body. Branch
 - All acceptance-criteria rows show `Pass` or equivalent.
 - Phase 4 walkthrough signed off by the operator.
 - PR(s) merged into `development`.
-- `docs/plans/operator-ui-backlog.md` items 11 + 12 moved to "shipped".
+- `docs/plans/archive/operator-ui-backlog.md` items 11 + 12 moved to "shipped".
 - Plan doc archived under `docs/plans/archive/` with a status line + PR link.
 - `docs/KNOWN_ISSUES.md` no longer has the "bond cannot be undone" gap (or its historical phrasing).
