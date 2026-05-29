@@ -1,6 +1,6 @@
 # Local Image Build & Cleanup Lifecycle — Implementation Plan
 
-**Status:** Implemented on `feature/local-image-lifecycle` (Phases 1–6 done, verified locally); pending commit / PR + operator review
+**Status:** ✅ Shipped via [#128](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/128). Archived.
 **Branch suggestion:** `feature/local-image-lifecycle` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `common/helpers.sh`, `infra/infra.sh`, `sandbox.sh`, `scripts/verification/`, `.github/workflows/`, `README.md`, `infra/README.md`, `docs/ARCHITECTURE.md`, `docs/KNOWN_ISSUES.md`, `docs/DOCUMENTATION_INDEX.md`
 

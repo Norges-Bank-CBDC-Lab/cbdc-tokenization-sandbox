@@ -139,7 +139,8 @@ const allocationSchema = z
     clearingRate: bpsSchema,
     totalAllocated: bigIntStringSchema,
     hash: hexStringSchema.meta({
-      description: 'Hash committing to the allocation result; matches on-chain',
+      description:
+        'Off-chain commitment to the computed allocation (clearing rate + each bidder share); recomputed server-side and confirmed by the operator at finalisation.',
     }),
     auctionType: auctionTypeSchema,
     computedAt: unixMillisSchema,
