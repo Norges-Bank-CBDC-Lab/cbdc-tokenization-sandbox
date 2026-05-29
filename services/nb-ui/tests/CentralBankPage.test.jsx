@@ -18,6 +18,7 @@ const FIXTURE_CB = {
 };
 
 const FIXTURE_ALLOWLIST = [
+  { address: '0xcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcb' },
   { address: '0x1111111111111111111111111111111111111111' },
   { address: '0x2222222222222222222222222222222222222222' },
 ];
@@ -31,6 +32,16 @@ vi.mock('../src/api/centralBankApi.js', () => ({
     mintWnok: vi.fn(),
     burnWnok: vi.fn(),
     transferWnok: vi.fn(),
+  },
+}));
+
+vi.mock('../src/api/biddersApi.js', () => ({
+  BiddersApi: {
+    listBidders: vi
+      .fn()
+      .mockResolvedValue([
+        { address: '0x1111111111111111111111111111111111111111', name: 'Nordea' },
+      ]),
   },
 }));
 
@@ -101,5 +112,22 @@ describe('CentralBankPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Add to WNOK allowlist' }),
     ).toBeInTheDocument();
+  });
+
+  it('labels allowlist entries with bidder name and type', async () => {
+    const { CentralBankPage } = await import('../src/pages/CentralBankPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+
+    render(
+      <ToastProvider>
+        <CentralBankPage />
+      </ToastProvider>,
+    );
+
+    // Bidder match → roster name + "Bidder" type.
+    expect(await screen.findByText('Nordea')).toBeInTheDocument();
+    expect(screen.getByText('Bidder')).toBeInTheDocument();
+    // The CB's own allowlisted address → "Central Bank" (also the page h1, so ≥ 2).
+    expect(screen.getAllByText('Central Bank').length).toBeGreaterThanOrEqual(2);
   });
 });
