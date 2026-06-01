@@ -59,7 +59,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.16.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `express-rate-limit` | `8.5.2` | MIT |
-| `helmet` | `8.1.0` | MIT |
+| `helmet` | `8.2.0` | MIT |
 | `jose` | `6.2.3` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
@@ -78,7 +78,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.6.0` | MIT |
 | `jest` | `30.4.2` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `ts-jest` | `29.4.10` | MIT |
+| `ts-jest` | `29.4.11` | MIT |
 | `tsx` | `4.22.3` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 | `typescript-eslint` | `8.59.4` | MIT |
@@ -121,7 +121,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `vite` | `8.0.13` | MIT |
+| `vite` | `8.0.14` | MIT |
 | `vitest` | `4.1.7` | MIT |
 
 ### `services/blockscout/bens-microservice`
@@ -148,7 +148,7 @@ output and does not declare third-party npm dependencies.
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
 | `web3` | `7.16.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
-| `ipython` | `9.13.0` | BSD-3-Clause |
+| `ipython` | `9.14.0` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
 | `plotly` | `6.5.2` | MIT |
 | `pandas` | `2.3.0` | BSD-3-Clause |
