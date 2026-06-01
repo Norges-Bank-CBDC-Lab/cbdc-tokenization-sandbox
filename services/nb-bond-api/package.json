@@ -23,7 +23,7 @@
     "ethers": "6.16.0",
     "express": "5.2.1",
     "express-rate-limit": "8.5.2",
-    "helmet": "8.1.0",
+    "helmet": "8.2.0",
     "jose": "6.2.3",
     "winston": "3.19.0",
     "zod": "4.4.3",
@@ -44,7 +44,7 @@
     "globals": "17.6.0",
     "jest": "30.4.2",
     "prettier": "3.8.3",
-    "ts-jest": "29.4.10",
+    "ts-jest": "29.4.11",
     "tsx": "4.22.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.59.4"
