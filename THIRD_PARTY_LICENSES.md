@@ -180,4 +180,5 @@ this source repository.
 | Jupyter Docker Stacks / `base-notebook` image | BSD-3-Clause | External image dependency |
 | Blockscout Helm charts | GPL-3.0 | Pulled at deploy time |
 | Blockscout application | GPL-3.0 | Pulled at deploy time |
+| Blockscout smart-contract-verifier | GPL-3.0 | Contract-verification microservice; pulled at deploy time (pinned in `common/images.yaml` under `blockscout.smart_contract_verifier`) |
 | BusyBox image | GPL-2.0 | Referenced in `services/blockscout/templates/blockscout-migration-job.yaml` |
