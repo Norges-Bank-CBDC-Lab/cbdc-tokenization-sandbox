@@ -71,3 +71,36 @@ If this fails but curl works, the issue is in Blockscout client config.
 2) Mount the CA bundle into Blockscout and set a standard CA env var (e.g., `SSL_CERT_FILE`).  
 3) Avoid `ETHEREUM_JSONRPC_HTTP_INSECURE=true` unless the adapter explicitly supports it.
 
+## Contract verification
+
+Modern Blockscout (the v10 backend used here) does **not** verify contracts
+in-process — it delegates source compilation and bytecode matching to a
+standalone **smart-contract-verifier** microservice (`sc-verifier-deployment` /
+`sc-verifier-service`, pinned in `common/images.yaml` under
+`blockscout.smart_contract_verifier`). The backend is wired to it via
+`MICROSERVICE_SC_VERIFIER_{ENABLED,URL,TYPE}` in
+`services/blockscout/values.backend.env.yaml`.
+
+- **Verify the deployed contracts:** `make verify-contracts` (→
+  `contracts/contracts.sh verify-latest`). It defaults to `forge … --watch`, so
+  it polls for the *real* result and exits non-zero on failure. `--no-watch`
+  restores fire-and-forget.
+- **Check a contract's status:**
+  `curl -s http://blockscout.cbdc-sandbox.local/api/v2/smart-contracts/<addr>` —
+  a verified contract returns `is_verified: true` plus `name`/`source_code`; an
+  unverified one returns only bytecode keys.
+
+### "Verification submitted OK but the contract never shows verified"
+
+This is the classic symptom of a **missing/unhealthy sc-verifier**. The backend
+accepts submissions (`Response: OK, GUID: …`) even when it has nowhere to route
+them, so without `--watch` it looks successful. Check:
+
+```bash
+kubectl get pods -n blockscout | grep sc-verifier      # Running 1/1 ?
+kubectl -n blockscout logs deploy/sc-verifier-deployment --tail=50
+```
+
+The sc-verifier fetches solc compilers on first use (egress to
+`binaries.soliditylang.org`); a network/compiler error shows up in those logs.
+

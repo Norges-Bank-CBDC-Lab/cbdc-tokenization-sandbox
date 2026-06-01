@@ -958,6 +958,15 @@ function getBlockscoutDbImage() {
     getImageValue "blockscout.db" "$default_image"
 }
 
+function getBlockscoutScVerifierImage() {
+    # Blockscout's standalone smart-contract-verifier microservice. The v10
+    # backend delegates Solidity source compilation / bytecode matching to
+    # this service (it does not verify in-process). Pinned in
+    # common/images.yaml, pre-pulled by `./infra/infra.sh registry-sync`, and
+    # mirrored to the kind registry at deploy time (deployBlockscout).
+    getImageValue "blockscout.smart_contract_verifier" ""
+}
+
 function getBensBaseImage() {
     # The python base used as both builder and runtime stages of the BENS
     # Dockerfile. Pinned in common/images.yaml under blockscout.bens and
@@ -1526,9 +1535,13 @@ function deployBlockscout() {
     POSTGRES_IMAGE=$(getBlockscoutDbImage)
     echo "🔍 Using postgres image: $POSTGRES_IMAGE"
 
+    SC_VERIFIER_IMAGE=$(getBlockscoutScVerifierImage)
+    echo "🔍 Using smart-contract-verifier image: $SC_VERIFIER_IMAGE"
+
     loadImageToKind $BLOCKSCOUT_FRONTEND_IMAGE
     loadImageToKind $BLOCKSCOUT_BACKEND_IMAGE
     loadImageToKind $POSTGRES_IMAGE
+    loadImageToKind $SC_VERIFIER_IMAGE
 
     # BENS is a repo-owned service: build the image locally with a
     # content-hash tag, push to the kind registry, and pass that ref to
@@ -1539,9 +1552,11 @@ function deployBlockscout() {
     BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
     BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
     POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
+    SC_VERIFIER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SC_VERIFIER_IMAGE")
     echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
     echo "🔁 Using local registry image for blockscout backend: $BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE"
     echo "🔁 Using local registry image for postgres: $POSTGRES_IMAGE_OVERRIDE"
+    echo "🔁 Using local registry image for smart-contract-verifier: $SC_VERIFIER_IMAGE_OVERRIDE"
 
     BLOCKSCOUT_FRONTEND_REPOSITORY_OVERRIDE=$(imageRepo "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
     BLOCKSCOUT_FRONTEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE")
@@ -1564,7 +1579,8 @@ function deployBlockscout() {
          ${BLOCKSCOUT_BACKEND_REPOSITORY_OVERRIDE:+--set blockscout.image.repository=$BLOCKSCOUT_BACKEND_REPOSITORY_OVERRIDE} \
          ${BLOCKSCOUT_BACKEND_TAG_OVERRIDE:+--set blockscout.image.tag=$BLOCKSCOUT_BACKEND_TAG_OVERRIDE} \
          ${POSTGRES_IMAGE_OVERRIDE:+--set dbImage=$POSTGRES_IMAGE_OVERRIDE} \
-         ${BENS_IMAGE_OVERRIDE:+--set bensImage=$BENS_IMAGE_OVERRIDE}
+         ${BENS_IMAGE_OVERRIDE:+--set bensImage=$BENS_IMAGE_OVERRIDE} \
+         ${SC_VERIFIER_IMAGE_OVERRIDE:+--set scVerifierImage=$SC_VERIFIER_IMAGE_OVERRIDE}
 
 }
 

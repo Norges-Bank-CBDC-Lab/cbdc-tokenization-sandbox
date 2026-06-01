@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sc-verifier-deployment
+  namespace: blockscout
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sc-verifier
+  template:
+    metadata:
+      labels:
+        app: sc-verifier
+    spec:
+      securityContext:
+        # fsGroup keeps the writable /tmp emptyDir (compiler cache) group-
+        # writable by the runtime uid, whether the image runs as root or a
+        # built-in non-root user.
+        fsGroup: 1000
+      containers:
+        - name: sc-verifier
+          # Blockscout smart-contract-verifier microservice (GPL-3.0, same as
+          # the rest of the Blockscout stack). Pinned in common/images.yaml;
+          # mirrored to the kind registry and supplied via
+          # --set scVerifierImage=... by deployBlockscout (common/helpers.sh).
+          # The v10 backend delegates Solidity verification to this service.
+          image: {{ required "scVerifierImage is required (pinned in common/images.yaml; set by deployBlockscout)" .Values.scVerifierImage }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+            # Root fs is read-only; the only writable path is the /tmp emptyDir
+            # below, where solc compilers are cached.
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8050
+              protocol: TCP
+          env:
+            - name: SMART_CONTRACT_VERIFIER__SERVER__HTTP__ENABLED
+              value: "true"
+            - name: SMART_CONTRACT_VERIFIER__SERVER__HTTP__ADDR
+              value: "0.0.0.0:8050"
+            - name: SMART_CONTRACT_VERIFIER__SERVER__GRPC__ENABLED
+              value: "false"
+            - name: SMART_CONTRACT_VERIFIER__SOLIDITY__ENABLED
+              value: "true"
+            - name: SMART_CONTRACT_VERIFIER__SOLIDITY__COMPILERS_DIR
+              value: "/tmp/solidity-compilers"
+            - name: SMART_CONTRACT_VERIFIER__SOLIDITY__FETCHER__LIST__LIST_URL
+              value: "https://binaries.soliditylang.org/linux-amd64/list.json"
+            # Solidity-only sandbox (Foundry). Vyper and Sourcify are unused and
+            # would add startup egress; disable them.
+            - name: SMART_CONTRACT_VERIFIER__VYPER__ENABLED
+              value: "false"
+            - name: SMART_CONTRACT_VERIFIER__SOURCIFY__ENABLED
+              value: "false"
+            - name: SMART_CONTRACT_VERIFIER__METRICS__ENABLED
+              value: "false"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            tcpSocket:
+              port: 8050
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8050
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        # Writable scratch for the solc compiler cache (COMPILERS_DIR). Ephemeral
+        # by design — compilers are re-fetched on pod restart.
+        - name: tmp
+          emptyDir: {}
