@@ -7,6 +7,15 @@
  *
  * Tenant / client / scope values come from runtime config — never committed.
  *
+ * MSAL Browser v5 note: against Entra ID (which has Cross-Origin-Opener-Policy
+ * enabled by default), MSAL routes silent-iframe and popup flows through its
+ * redirect-bridge. A real deployment that relies on silent token refresh
+ * (`acquireTokenSilent`) must serve a redirect-bridge page (a Vite multi-page
+ * entry) and point `AUTH_REDIRECT_URI` at it; without it, silent acquisition
+ * can fail and the UI falls back to interactive login. This whole module is
+ * dormant locally (`AUTH_MODE=none`) and is unverified at runtime until a real
+ * Entra deployment exists — see docs/KNOWN_ISSUES.md.
+ *
  * @param {Object} cfg - subset of AppConfig
  * @param {string} cfg.AUTH_TENANT_ID
  * @param {string} cfg.AUTH_CLIENT_ID
@@ -30,8 +39,10 @@ export function createEntraAuth(cfg) {
             redirectUri: cfg.AUTH_REDIRECT_URI || window.location.origin,
           },
           cache: {
+            // `storeAuthStateInCookie` was removed from CacheOptions in MSAL
+            // Browser v5 (auth state is no longer cookie-backed). sessionStorage
+            // already scopes the cache to the tab, which is what we want.
             cacheLocation: 'sessionStorage',
-            storeAuthStateInCookie: false,
           },
         });
         await app.initialize();

@@ -27,6 +27,18 @@
 - This does not affect compilation results; ensure the cache directory is
   writable if you want a clean warning-free build.
 
+## nb-ui: MSAL v5 needs a redirect-bridge for Entra silent token refresh
+- `@azure/msal-browser` was upgraded to v5. v5 routes silent-iframe and popup
+  flows through a redirect-bridge when the authority sets Cross-Origin-Opener-
+  Policy (COOP) headers, and Microsoft Entra ID has COOP enabled by default.
+- The Entra auth path (`services/nb-ui/src/auth/entraAuth.js`) is dormant in the
+  local sandbox (`AUTH_MODE=none`) and cannot be exercised here. A real Entra
+  deployment that relies on `acquireTokenSilent` must serve a redirect-bridge
+  page (a Vite multi-page entry), point `AUTH_REDIRECT_URI` at it, and register
+  that URI in the Entra app registration.
+- Until then the v5 bump is build/lint/test-verified but runtime-unverified. The
+  redirect (login) flow itself is unaffected. Owned by the cloud deployment work.
+
 ## nb-ui: reopenAuction needs backend / on-chain support
 - The `services/nb-ui/` operator UI exposes a "Reopen…" action on closed
   auctions (see `AuctionLifecyclePanel`), but there is no matching backend
