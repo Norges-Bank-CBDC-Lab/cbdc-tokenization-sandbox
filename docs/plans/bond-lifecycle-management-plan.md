@@ -1,6 +1,6 @@
 # Bond Lifecycle Management — Implementation Plan
 
-**Status:** Draft, ready for operator review. Backlog items 11 + 12 from [`docs/plans/archive/operator-ui-backlog.md`](archive/operator-ui-backlog.md). Auction-deletion was scoped in by the operator and is addressed below as a no-op (the existing `cancelAuction` + UI filter is sufficient — see "Decisions" §D3).
+**Status:** Functional code shipped via [#127](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/127) (contracts + ingestion + API + UI, with tests). **Phase 5 documentation + archival are still outstanding — see [`outstanding-plan-items.md`](outstanding-plan-items.md).** Kept active until those land. Backlog items 11 + 12 from [`docs/plans/archive/operator-ui-backlog.md`](archive/operator-ui-backlog.md). Auction-deletion was delivered as a no-op (the existing `cancelAuction` + UI filter is sufficient — see "Decisions" §D3).
 **Branch suggestion:** `feature/bond-lifecycle-management`
 **Components touched:** `contracts/src/norges-bank/BondToken.sol` + `BondManager.sol` + their interfaces, `services/nb-bond-api/` (ingestion, schemas, routes), `services/nb-ui/` (BondsPage + BondDetailPage + new modal), docs.
 

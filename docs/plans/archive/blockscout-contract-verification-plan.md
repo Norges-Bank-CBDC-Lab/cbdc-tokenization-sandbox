@@ -1,6 +1,6 @@
 # Blockscout Contract Verification — Implementation Plan
 
-**Status:** Implemented — verified live on the local sandbox (13/13 contracts `is_verified: true`); pending PR. Move to `docs/plans/archive/` with the PR link once merged.
+**Status:** Shipped via [#141](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/141) (commit `097b99f`). Implemented and verified live on the local sandbox (13/13 contracts `is_verified: true`). Archived 2026-06-05.
 **Branch suggestion:** `feature/blockscout-sc-verifier` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `common/images.yaml`, `services/blockscout/templates/` (2 new), `services/blockscout/values.backend.env.yaml`, `common/helpers.sh` (`deployBlockscout` image wiring), `contracts/contracts.sh` (`verify-latest` hardening), docs (`THIRD_PARTY_*`, `services/blockscout/debugging.md`, `docs/KNOWN_ISSUES.md`, `docs/DOCUMENTATION_INDEX.md`)
 
