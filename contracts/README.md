@@ -107,7 +107,7 @@ Prerequisites (local developer tools, installed once):
 ```console
 pipx install slither-analyzer   # Slither
 brew install graphviz           # dot (renders the Slither graphs)
-npm install -g sol2uml          # optional; falls back to `npx sol2uml`
+npm install -g sol2uml          # sol2uml (UML class diagram)
 ```
 
 The command resolves these tools and prints install hints if any are missing.
