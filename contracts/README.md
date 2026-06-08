@@ -82,6 +82,36 @@ Recent coverage additions include:
   `test/norges-bank/BondAuction.t.sol` and
   `test/norges-bank/BondManager.t.sol`
 
+## Diagrams
+
+Generate contract relationship diagrams for local review with one command from
+the repository root:
+
+```console
+make diagrams
+```
+
+This writes the following into git-ignored `generated/` folders under both
+`contracts/diagrams/` and `docs/diagrams/`:
+
+- **Slither** — per-contract call graphs and a whole-project inheritance graph
+- **sol2uml** — a cleaned UML class diagram
+
+The output is never committed (the `generated/` folders are git-ignored); re-run
+the command whenever the contracts change. For accurate storage layouts (e.g.
+for upgrade-safety review of the upgradeable CSD tokens) use the solc-based
+`forge inspect <Contract> storageLayout` instead.
+
+Prerequisites (local developer tools, installed once):
+
+```console
+pipx install slither-analyzer   # Slither
+brew install graphviz           # dot (renders the Slither graphs)
+npm install -g sol2uml          # optional; falls back to `npx sol2uml`
+```
+
+The command resolves these tools and prints install hints if any are missing.
+
 ## Deploy And Verify
 
 The sandbox uses `contracts.sh` to deploy and verify the contract set against
