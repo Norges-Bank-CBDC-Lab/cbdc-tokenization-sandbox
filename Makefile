@@ -1,4 +1,4 @@
-.PHONY: help build-contracts test-contracts verify-contracts fmt-contracts slither \
+.PHONY: help build-contracts test-contracts verify-contracts fmt-contracts slither diagrams \
 	sandbox-fresh-start sandbox-start sandbox-stop sandbox-delete sandbox-generate-config \
 	infra-start infra-stop infra-delete infra-registry-start infra-registry-sync \
 	api-lint api-format-check bens-openapi-regen \
@@ -26,6 +26,7 @@ help:
 	@echo "  verify-contracts   Run verification on blockscout for previously deployed contracts (uses contract broadcast directory)"
 	@echo "  fmt-contracts      Format Solidity (forge fmt)"
 	@echo "  slither            Run slither.sh (if configured)"
+	@echo "  diagrams           Generate contract diagrams (Slither + sol2uml), git-ignored output"
 	@echo "  sandbox-fresh-start Run complete startup scripts for sandbox. (Will initiate local containers first, then sandbox)"
 	@echo "  sandbox-start      Start sandbox (infra/services/contracts via sandbox.sh, make sure to have local containers running)"
 	@echo "  sandbox-stop       Stop sandbox releases (keeps cluster/cache)"
@@ -246,3 +247,6 @@ bid-submit-basic: sandbox-local-fixtures require-basic-bid-vars
 bid-place: bid-encrypt bid-submit
 
 bid-place-basic: bid-encrypt-basic bid-submit-basic
+
+diagrams:
+	@./scripts/generate-contract-diagrams.sh
