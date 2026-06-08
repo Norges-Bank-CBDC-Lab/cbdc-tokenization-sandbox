@@ -20,5 +20,8 @@
 # local AI handoff notes
 Handoff-AI-*.md
 
+# local code-graph / knowledge-graph tool output (e.g. graphify)
+graphify-out/
+
 # npm workspaces — hoisted node_modules lives at the repo root
 /node_modules/
