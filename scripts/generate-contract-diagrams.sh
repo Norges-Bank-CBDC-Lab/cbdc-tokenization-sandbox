@@ -11,7 +11,7 @@
 # Local developer tool. Prereqs (install once):
 #   pipx install slither-analyzer     # slither
 #   brew install graphviz             # dot (renders Slither .dot files)
-#   npm install -g sol2uml            # optional; falls back to `npx sol2uml`
+#   npm install -g sol2uml            # sol2uml (UML class diagram)
 #
 set -euo pipefail
 
@@ -25,21 +25,25 @@ OUT_DOCS="$REPO_ROOT/docs/diagrams/generated"
 # to it (the repo root). Always clean those strays, even on failure.
 trap 'rm -f "$REPO_ROOT"/contracts.*.dot' EXIT
 
-# --- resolve tools (pipx/brew put these off the default PATH on some setups) ---
+# --- preflight: all three tools are REQUIRED; report everything missing at once ---
+# (pipx/brew/npm install off the default PATH on some setups, so fall back to
+# their well-known locations before deciding a tool is missing.)
 SLITHER="$(command -v slither || true)"; [ -n "$SLITHER" ] || SLITHER="$HOME/.local/bin/slither"
 DOT="$(command -v dot || true)"; [ -n "$DOT" ] || DOT="/opt/homebrew/bin/dot"
+SOL2UML="$(command -v sol2uml || true)"
+if [ -z "$SOL2UML" ] && [ -n "$(npm prefix -g 2>/dev/null)" ]; then
+  _sol2uml_global="$(npm prefix -g)/bin/sol2uml"
+  [ -x "$_sol2uml_global" ] && SOL2UML="$_sol2uml_global"
+fi
 
-[ -x "$SLITHER" ] || { echo "ERROR: slither not found. Install: pipx install slither-analyzer" >&2; exit 1; }
-[ -x "$DOT" ] || { echo "ERROR: graphviz 'dot' not found. Install: brew install graphviz" >&2; exit 1; }
-
-if command -v sol2uml >/dev/null 2>&1; then
-  SOL2UML=(sol2uml)
-elif [ -n "$(npm prefix -g 2>/dev/null)" ] && [ -x "$(npm prefix -g)/bin/sol2uml" ]; then
-  SOL2UML=("$(npm prefix -g)/bin/sol2uml")
-elif command -v npx >/dev/null 2>&1; then
-  SOL2UML=(npx --yes sol2uml)
-else
-  SOL2UML=()
+missing=0
+[ -x "$SLITHER" ] || { echo "ERROR: slither not found.  Install: pipx install slither-analyzer" >&2; missing=1; }
+[ -x "$DOT" ]     || { echo "ERROR: graphviz 'dot' not found.  Install: brew install graphviz" >&2; missing=1; }
+[ -x "$SOL2UML" ] || { echo "ERROR: sol2uml not found.  Install: npm install -g sol2uml" >&2; missing=1; }
+if [ "$missing" -ne 0 ]; then
+  echo "" >&2
+  echo "Install the tool(s) listed above, then re-run: make diagrams" >&2
+  exit 1
 fi
 
 echo "==> Generating contract diagrams"
@@ -72,17 +76,14 @@ shopt -u nullglob
 echo "    rendered $count Slither graph(s) (per-contract call graphs + inheritance)"
 
 # --- sol2uml: cleaned UML class diagram ---
-if [ "${#SOL2UML[@]}" -gt 0 ]; then
-  echo "==> sol2uml: UML class diagram (cleaned)"
-  if "${SOL2UML[@]}" class "$CONTRACTS_DIR/src" \
-      --hidePrivates --hideEnums --hideStructs --hideLibraries \
-      -f svg -o "$OUT_PRIMARY/sol2uml/class.svg" >/dev/null 2>&1; then
-    echo "    wrote class.svg"
-  else
-    echo "    (sol2uml failed; skipped — install: npm install -g sol2uml)"
-  fi
+echo "==> sol2uml: UML class diagram (cleaned)"
+if "$SOL2UML" class "$CONTRACTS_DIR/src" \
+    --hidePrivates --hideEnums --hideStructs --hideLibraries \
+    -f svg -o "$OUT_PRIMARY/sol2uml/class.svg" >"$OUT_PRIMARY/sol2uml/sol2uml.log" 2>&1; then
+  echo "    wrote class.svg"
 else
-  echo "==> sol2uml not found (npm install -g sol2uml) — skipping class diagram"
+  echo "ERROR: sol2uml failed; see $OUT_PRIMARY/sol2uml/sol2uml.log" >&2
+  exit 1
 fi
 
 # --- publish a copy next to the docs ---
