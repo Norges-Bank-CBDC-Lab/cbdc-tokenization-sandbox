@@ -22,3 +22,7 @@ Handoff-AI-*.md
 
 # npm workspaces — hoisted node_modules lives at the repo root
 /node_modules/
+
+# generated contract diagrams (run `make diagrams`)
+contracts/diagrams/generated/
+docs/diagrams/generated/
