@@ -1,6 +1,6 @@
 # Operator UI — Follow-up Backlog
 
-**Status:** Archived — retired from the active plan list (operator decision). The "What already shipped" items below landed via #115 / #117 / #118; any remaining backlog items are no longer tracked here.
+**Status:** Archived — retired from the active plan list (operator decision). The "What already shipped" items below landed via #115 / #117 / #118 / #127; the only remaining open item (BENS, item 5) is deferred.
 **Scope:** Continuation of the post-[#115](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/115) UI-feedback list. Items from that conversation that were not landed in [#117](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/117) / [#118](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/118) live here so the next session can resume without re-deriving context.
 
 Numbering follows the original feedback list to keep cross-references readable.
@@ -40,7 +40,7 @@ The operator UI does not display name-resolved addresses via the Blockscout BENS
 
 ### 11 + 12 — Delete unminted bond + decouple bond creation from auction creation
 
-**Status:** Needs a planning pass via the `sandbox-implementation-planner` skill before any code change.
+**Status:** ✅ Shipped via #127 — delivered in the bond-lifecycle-management plan (`deployBond` / `deployAuctionForBond` / `disableBond` + `BondToken.disablePartition`, plus ingestion, API, and UI; the soft-delete model anticipated below was used). The original scoping below is retained for historical context.
 
 Two closely related contract-level gaps that are worth designing together so the contract changes don't fight each other:
 

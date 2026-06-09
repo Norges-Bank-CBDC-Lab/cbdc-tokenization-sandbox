@@ -1,6 +1,6 @@
 # Outstanding Plan Items
 
-**Status:** Triage list — for operator review. Created during the `docs/plans/` cleanup on 2026-06-05.
+**Status:** Archived 2026-06-09 — triage complete. The stale `operator-ui-backlog.md` items (11 + 12) were corrected; the remaining bond-lifecycle Phase-5 documentation updates were accepted as low-priority debt; the optional code-cleanup and auction-test items were declined. Archived alongside `bond-lifecycle-management-plan.md`; retained for historical reference.
 
 These are leftover, deferred, or lower-priority pointers extracted from plans that are otherwise shipped or only partially complete. This file is intentionally **not** a plan — it is a holding area so nothing is silently lost when a plan is archived or left partly done. For each item, decide: **do it**, **fold into another plan**, or **drop**.
 
