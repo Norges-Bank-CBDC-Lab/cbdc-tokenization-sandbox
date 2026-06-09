@@ -15,7 +15,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@azure/msal-browser": "5.11.0",
+    "@azure/msal-browser": "5.12.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
@@ -31,7 +31,7 @@
     "globals": "17.6.0",
     "jsdom": "29.1.1",
     "prettier": "3.8.3",
-    "vite": "8.0.14",
-    "vitest": "4.1.7"
+    "vite": "8.0.16",
+    "vitest": "4.1.8"
   }
 }
