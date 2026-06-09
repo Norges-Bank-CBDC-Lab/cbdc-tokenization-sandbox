@@ -1,6 +1,6 @@
 # Auction Web Fixes — Implementation Plan
 
-**Status:** Shipped via [#129](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/129) (commit `6528093`). All four fixes implemented and tested. Archived 2026-06-05. One optional, plan-flagged best-effort UI test was not added — tracked in [`outstanding-plan-items.md`](../outstanding-plan-items.md).
+**Status:** Shipped via [#129](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/pull/129) (commit `6528093`). All four fixes implemented and tested. Archived 2026-06-05. One optional, plan-flagged best-effort UI test was not added — tracked in [`outstanding-plan-items.md`](outstanding-plan-items.md).
 **Branch suggestion:** `feature/auction-web-fixes` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-bond-api/src/{compose.ts,index.ts,schemas.ts,chain.ts}`, `services/nb-bond-api/openapi.json` (regen), `services/nb-bond-api/tests/`, `services/nb-ui/src/pages/AuctionDetailPage.jsx`, `services/nb-ui/tests/`, `docs/KNOWN_ISSUES.md`, `docs/DOCUMENTATION_INDEX.md`
 
