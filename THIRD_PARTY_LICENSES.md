@@ -64,7 +64,7 @@ License labels and deployment-time notes remain curated review items.
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
 | `zod-openapi` | `5.4.6` | MIT |
-| `@babel/core` | `7.29.0` | MIT |
+| `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
 | `@types/better-sqlite3` | `7.6.13` | MIT |
@@ -79,7 +79,7 @@ License labels and deployment-time notes remain curated review items.
 | `jest` | `30.4.2` | MIT |
 | `prettier` | `3.8.3` | MIT |
 | `ts-jest` | `29.4.11` | MIT |
-| `tsx` | `4.22.3` | MIT |
+| `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 | `typescript-eslint` | `8.59.4` | MIT |
 
@@ -90,7 +90,7 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.9.1` | MIT |
-| `tsx` | `4.22.3` | MIT |
+| `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
@@ -100,14 +100,14 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.16.0` | MIT |
 | `@types/node` | `25.9.1` | MIT |
-| `tsx` | `4.22.3` | MIT |
+| `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `services/nb-ui`
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@azure/msal-browser` | `5.11.0` | MIT |
+| `@azure/msal-browser` | `5.12.0` | MIT |
 | `react` | `19.2.6` | MIT |
 | `react-dom` | `19.2.6` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |
@@ -121,8 +121,8 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
 | `prettier` | `3.8.3` | MIT |
-| `vite` | `8.0.14` | MIT |
-| `vitest` | `4.1.7` | MIT |
+| `vite` | `8.0.16` | MIT |
+| `vitest` | `4.1.8` | MIT |
 
 ### `services/blockscout/bens-microservice`
 
