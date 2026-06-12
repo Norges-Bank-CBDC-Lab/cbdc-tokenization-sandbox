@@ -68,6 +68,16 @@ describe('entraAuth session model', () => {
     expect(msalState.lastApp.config.cache.cacheLocation).toBe('localStorage');
   });
 
+  it('pins postLogoutRedirectUri to the redirect URI so sign-out lands on the login page', async () => {
+    // MSAL's fallback is the CURRENT page URL, which fails Entra's
+    // exact-match validation against the registered redirect URIs (e.g. a
+    // /#/route suffix) and strands sign-out on the Entra interstitial.
+    const auth = createEntraAuth({ ...CFG, AUTH_REDIRECT_URI: 'https://app.example.test' });
+    await auth.init();
+    expect(msalState.lastApp.config.auth.redirectUri).toBe('https://app.example.test');
+    expect(msalState.lastApp.config.auth.postLogoutRedirectUri).toBe('https://app.example.test');
+  });
+
   it('restores a cached account on init and serves a Bearer header silently', async () => {
     msalState.accounts = [ACCOUNT];
     const auth = createEntraAuth(CFG);

@@ -47,6 +47,14 @@ export function createEntraAuth(cfg) {
             clientId: cfg.AUTH_CLIENT_ID,
             authority,
             redirectUri: cfg.AUTH_REDIRECT_URI || window.location.origin,
+            // Without this, MSAL falls back to the CURRENT page URL as the
+            // post_logout_redirect_uri. Entra exact-matches that value
+            // against the registered redirect URIs, so a route like
+            // /#/bonds fails validation and sign-out strands the user on
+            // the Entra interstitial instead of this app's login page.
+            // There is no separate post-logout registration in Entra —
+            // reusing the registered redirect URI is the contract.
+            postLogoutRedirectUri: cfg.AUTH_REDIRECT_URI || window.location.origin,
           },
           cache: {
             // localStorage so the session survives new tabs and browser
