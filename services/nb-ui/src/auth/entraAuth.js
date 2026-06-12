@@ -7,14 +7,21 @@
  *
  * Tenant / client / scope values come from runtime config — never committed.
  *
- * MSAL Browser v5 note: against Entra ID (which has Cross-Origin-Opener-Policy
- * enabled by default), MSAL routes silent-iframe and popup flows through its
- * redirect-bridge. A real deployment that relies on silent token refresh
- * (`acquireTokenSilent`) must serve a redirect-bridge page (a Vite multi-page
- * entry) and point `AUTH_REDIRECT_URI` at it; without it, silent acquisition
- * can fail and the UI falls back to interactive login. This whole module is
- * dormant locally (`AUTH_MODE=none`) and is unverified at runtime until a real
- * Entra deployment exists — see docs/KNOWN_ISSUES.md.
+ * Session model (MSAL Browser v5):
+ * - The token cache lives in localStorage, so a signed-in session survives
+ *   new tabs and browser restarts. The hard bounds are the refresh token
+ *   Entra issues to SPAs (fixed lifetime of roughly a day, not configurable)
+ *   and manual sign-out.
+ * - `acquireTokenSilent` renews access tokens with the cached refresh token —
+ *   a plain network call, no hidden iframes — so no COOP redirect-bridge page
+ *   is needed. (The previously-documented bridge approach was dropped:
+ *   iframe-based silent auth is unreliable under third-party-cookie blocking,
+ *   and refresh-token renewal covers the silent path while a session is
+ *   valid.)
+ * - When silent renewal requires interaction (refresh token expired or
+ *   revoked), the provider flips to "session expired": listeners are
+ *   notified and isSessionExpired() returns true, so the auth gate can swap
+ *   to the login page instead of letting API calls 401 silently.
  *
  * @param {Object} cfg - subset of AppConfig
  * @param {string} cfg.AUTH_TENANT_ID
@@ -25,24 +32,31 @@
  */
 export function createEntraAuth(cfg) {
   // Lazy-load MSAL. Kept inside the factory so the no-auth code path never
-  // pulls the chunk down.
+  // pulls the chunk down. The module reference is retained so error-type
+  // checks (InteractionRequiredAuthError) work without a second import.
+  let msal = null;
   let pcaPromise = null;
   async function pca() {
     if (!pcaPromise) {
-      pcaPromise = import('@azure/msal-browser').then(async ({ PublicClientApplication }) => {
+      pcaPromise = import('@azure/msal-browser').then(async (mod) => {
+        msal = mod;
         const authority =
           cfg.AUTH_AUTHORITY || `https://login.microsoftonline.com/${cfg.AUTH_TENANT_ID}`;
-        const app = new PublicClientApplication({
+        const app = new mod.PublicClientApplication({
           auth: {
             clientId: cfg.AUTH_CLIENT_ID,
             authority,
             redirectUri: cfg.AUTH_REDIRECT_URI || window.location.origin,
           },
           cache: {
-            // `storeAuthStateInCookie` was removed from CacheOptions in MSAL
-            // Browser v5 (auth state is no longer cookie-backed). sessionStorage
-            // already scopes the cache to the tab, which is what we want.
-            cacheLocation: 'sessionStorage',
+            // localStorage so the session survives new tabs and browser
+            // restarts. The effective bound is the SPA refresh-token
+            // lifetime (~a day, fixed by Entra) or manual sign-out.
+            // Trade-off (accepted for this sandbox): localStorage is
+            // readable by any script in the origin, so an XSS could lift
+            // cached tokens — sessionStorage would only shrink, not close,
+            // that window.
+            cacheLocation: 'localStorage',
           },
         });
         await app.initialize();
@@ -69,13 +83,24 @@ export function createEntraAuth(cfg) {
   }
 
   let cachedAccount = null;
+  let sessionExpired = false;
 
   function setActiveAccount(app, account) {
     if (account) {
       app.setActiveAccount(account);
     }
+    // Any explicit account-state change (sign-in, restore, sign-out)
+    // supersedes a prior expiry signal.
+    sessionExpired = false;
     cachedAccount = account ? { username: account.username, name: account.name } : null;
     notify();
+  }
+
+  function markSessionExpired() {
+    if (!sessionExpired) {
+      sessionExpired = true;
+      notify();
+    }
   }
 
   return {
@@ -104,16 +129,32 @@ export function createEntraAuth(cfg) {
     getAccount() {
       return cachedAccount;
     },
+    isSessionExpired() {
+      return sessionExpired;
+    },
     async getAuthHeader() {
       const app = await pca();
       const account = app.getActiveAccount();
       if (!account) return null;
       try {
         const result = await app.acquireTokenSilent({ scopes, account });
+        if (sessionExpired) {
+          // Renewal works again (e.g. a transient outage was misread as
+          // expiry by an intermediate state) — clear the signal.
+          sessionExpired = false;
+          notify();
+        }
         return `Bearer ${result.accessToken}`;
-      } catch {
-        // Silent acquisition failed (token expired, no interaction).
-        // The caller's request will go out unauth'd; the UI can prompt re-login.
+      } catch (e) {
+        if (msal && e instanceof msal.InteractionRequiredAuthError) {
+          // The refresh token is spent (expired/revoked) — only an
+          // interactive sign-in can continue. Flip the gate to the login
+          // page instead of letting requests 401 silently.
+          markSessionExpired();
+        }
+        // Transient failures (network, throttling) keep today's behavior:
+        // the request goes out unauthenticated and the caller surfaces the
+        // API error.
         return null;
       }
     },
