@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-// Feature: the auth gate in App.jsx. In entra mode a signed-out user sees
-// ONLY the login page (no nav, no pages, no API calls); a signed-in user
-// gets the full app (with the existing user badge + Sign out chrome); the
-// none mode is never gated (the local sandbox must keep working); and a
-// silent-renewal expiry mid-session swaps the app for the login page with
-// the "session expired" notice.
+// Feature: the auth gate in App.jsx. In entra mode a signed-out user sees ONLY
+// the login page; a signed-in user with a recognised role gets the app
+// (operators also see the Central Bank tab; testers do not, and the route is
+// guarded); a signed-in user with no recognised role sees the access-denied
+// page; none mode is never gated; and a silent-renewal expiry mid-session
+// swaps the app for the login page with the "session expired" notice. Roles
+// come from the account's ID-token claims — see src/auth/entraAuth.js and
+// src/auth/capabilities.js.
 
 vi.mock('@azure/msal-browser', () => {
   class InteractionRequiredAuthError extends Error {}
@@ -45,12 +47,29 @@ vi.mock('@azure/msal-browser', () => {
   return { PublicClientApplication, InteractionRequiredAuthError, __msalMockState: state };
 });
 
-const ACCOUNT = { username: 'operator@example.test', name: 'Operator' };
+// Accounts carry their App Roles in idTokenClaims.roles — the source the
+// provider reads first (resolveRoles in src/auth/entraAuth.js).
+const operatorAccount = {
+  username: 'operator@example.test',
+  name: 'Operator',
+  idTokenClaims: { roles: ['Sandbox.Operator'] },
+};
+const testerAccount = {
+  username: 'tester@example.test',
+  name: 'Tester',
+  idTokenClaims: { roles: ['Sandbox.Tester'] },
+};
+const noRoleAccount = {
+  username: 'stranger@example.test',
+  name: 'Stranger',
+  idTokenClaims: { roles: [] },
+};
 
-// Reset the module graph, point runtime config at the requested auth mode,
-// prime the MSAL mock, and import a fresh App against all of it.
+// Reset the module graph, point runtime config at the requested auth mode +
+// role lists, prime the MSAL mock, and import a fresh App against all of it.
 async function loadApp({ authMode = 'entra', accounts = [], silentImpl } = {}) {
   vi.resetModules();
+  window.location.hash = '';
   window.__APP_CONFIG__ = {
     API_BASE_URL: 'http://test.local',
     AUTH_MODE: authMode,
@@ -59,11 +78,14 @@ async function loadApp({ authMode = 'entra', accounts = [], silentImpl } = {}) {
     AUTH_AUTHORITY: '',
     AUTH_SCOPES: authMode === 'entra' ? 'api://33333333-3333-3333-3333-333333333333/op' : '',
     AUTH_REDIRECT_URI: '',
+    AUTH_OPERATOR_ROLES: 'Sandbox.Operator',
+    AUTH_TESTER_ROLES: 'Sandbox.Tester',
   };
   const msal = await import('@azure/msal-browser');
   msal.__msalMockState.accounts = accounts;
   msal.__msalMockState.redirectResult = null;
-  if (silentImpl) msal.__msalMockState.acquireTokenSilentImpl = silentImpl;
+  msal.__msalMockState.acquireTokenSilentImpl =
+    silentImpl || (async () => ({ accessToken: 'test-token' }));
   const { App } = await import('../src/App.jsx');
   return { App, msal };
 }
@@ -71,9 +93,8 @@ async function loadApp({ authMode = 'entra', accounts = [], silentImpl } = {}) {
 let fetchMock;
 
 beforeEach(() => {
-  // No test in this file should depend on API data; pages render their
-  // error/loading states when fetch rejects, which is enough to assert the
-  // shell is (or is not) mounted.
+  // No test here depends on API data; pages render error/loading states when
+  // fetch rejects, which is enough to assert the shell is (or isn't) mounted.
   fetchMock = vi.fn(async () => {
     throw new TypeError('network disabled in this test');
   });
@@ -82,6 +103,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.location.hash = '';
 });
 
 describe('auth gate (entra mode)', () => {
@@ -91,10 +113,7 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByText('You are signed out.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    // None of the app shell is mounted...
-    expect(screen.queryByText('Auctions')).not.toBeInTheDocument();
-    expect(screen.queryByText('Central Bank')).not.toBeInTheDocument();
-    // ...and nothing has talked to the API.
+    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -106,30 +125,56 @@ describe('auth gate (entra mode)', () => {
     expect(msal.__msalMockState.lastApp.loginRedirect).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the full app (with user badge and Sign out) when signed in', async () => {
-    const { App } = await loadApp({ accounts: [ACCOUNT] });
+  it('renders the full app incl. the Central Bank tab for an operator', async () => {
+    const { App } = await loadApp({ accounts: [operatorAccount] });
     render(<App />);
 
     expect(await screen.findByText('Operator')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
-    expect(screen.getByText('Auctions')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Auctions' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Central Bank' })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
   });
 
+  it('hides the Central Bank tab for a tester and guards the route', async () => {
+    const { App } = await loadApp({ accounts: [testerAccount] });
+    window.location.hash = '#/central-bank';
+    render(<App />);
+
+    expect(await screen.findByRole('link', { name: 'Auctions' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Central Bank' })).not.toBeInTheDocument();
+    // Manually hitting the route shows the not-authorised panel, not the CB surface.
+    expect(await screen.findByText('Not authorised')).toBeInTheDocument();
+    expect(screen.queryByText('WNOK actions')).not.toBeInTheDocument();
+  });
+
+  it('shows the access-denied page for a signed-in user with no recognised role', async () => {
+    const { App } = await loadApp({ accounts: [noRoleAccount] });
+    render(<App />);
+
+    expect(
+      await screen.findByText('Stranger is not authorised for this application.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
+  });
+
   it('swaps the app for the login page with an expired notice when silent renewal needs interaction', async () => {
-    const { App, msal } = await loadApp({ accounts: [ACCOUNT] });
+    const { App, msal } = await loadApp({ accounts: [operatorAccount] });
     msal.__msalMockState.acquireTokenSilentImpl = async () => {
       throw new msal.InteractionRequiredAuthError('refresh token expired');
     };
 
     render(<App />);
 
-    // Mounting pages triggers API calls -> getAuthHeader -> expiry signal.
+    // Roles resolve from the ID token (no token call), so the operator app
+    // mounts; mounting pages then calls getAuthHeader -> acquireTokenSilent
+    // -> the expiry signal.
     expect(
       await screen.findByText('Your session has expired — please sign in again.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.queryByText('Auctions')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
   });
 });
 
@@ -138,7 +183,7 @@ describe('auth gate (none mode)', () => {
     const { App } = await loadApp({ authMode: 'none' });
     render(<App />);
 
-    expect(await screen.findByText('Auctions')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Auctions' })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
   });

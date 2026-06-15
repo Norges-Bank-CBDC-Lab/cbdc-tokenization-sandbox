@@ -53,6 +53,7 @@ Important optional settings:
 - `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
 - `NB_BOND_API_AUTH_MODE`: `none` (default) or `entra`. See §7.7.
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE`: required when `NB_BOND_API_AUTH_MODE=entra`.
+- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES`: comma-separated Entra App Role values for role-based access (operator gates `/v1/central-bank/*`; recognised = operator ∪ tester). Operator roles required in `entra` mode. See §7.7.
 
 ### 2.3 Start commands
 
@@ -200,7 +201,7 @@ failures populate `errors[]` with `{ field, message }` entries.
 ### 4.4 Admin
 
 - `POST /v1/admin/restart-ingestion` (`operationId: restartIngestion`)
-  - Sits under the standard auth gate (no-op in `none` mode, JWT-validated in `entra` mode). Today there is no additional role check — see [§7.9](#79-admin-restart-ingestion) for the portability flag before promoting outside the sandbox.
+  - Operator-only: sits under the standard auth gate (no-op in `none` mode, JWT-validated in `entra` mode) plus an operator-role check in `entra` mode (`403` otherwise). See [§7.9](#79-admin-restart-ingestion).
   - `POST /v1/admin/restart-ingestion` — plain restart. Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. Projection survives.
   - `POST /v1/admin/restart-ingestion?fromBlock=0` — destructive reset. Drops every projection table (`auctions`, `auction_events`, `bond_events`, `balance_events`, `balances`, `partitions`, `ingestion_state`) and restarts the loop, which will rebuild from `START_BLOCK`. The `bidders` table is **preserved** because it holds sandbox impersonation keypairs that cannot be recovered from chain.
   - Returns `RestartOutcome` — `{ restarted: boolean, status: HealthIngestion }`. `200` when the loop confirmed `loopRunning=true` within the 5s timeout, `202` when it's still coming up (e.g. Besu still unreachable). The operator UI polls `/v1/health` to track the rest of the rebuild either way.
@@ -442,9 +443,25 @@ secured operation; the runtime decides whether to enforce.
 - `entra` — bearer tokens are validated as JWTs issued by Microsoft
   Entra ID. The middleware (`src/auth.ts`) verifies signature against
   the tenant's JWKS, plus `iss` and `aud` claims. Required env:
-  `NB_BOND_API_AUTH_ENTRA_TENANT_ID`, `NB_BOND_API_AUTH_ENTRA_AUDIENCE`.
-  Misconfiguration (e.g. `entra` mode without a tenant id) fails fast
-  at startup — there is no silent fallback.
+  `NB_BOND_API_AUTH_ENTRA_TENANT_ID`, `NB_BOND_API_AUTH_ENTRA_AUDIENCE`,
+  and `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` (see below).
+  Misconfiguration (e.g. `entra` mode without a tenant id, or without any
+  operator role) fails fast at startup — there is no silent fallback.
+
+**Role-based authorization (entra mode only).** Beyond authenticating the
+token, `entra` mode authorizes it against the `roles` claim (Entra App Roles):
+
+- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` — comma-separated App Role values
+  granting operator access. These gate `/v1/central-bank/*` (mint, burn,
+  allowlist, transfer). Required in `entra` mode.
+- `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` — comma-separated App Role values
+  granting baseline access without Central Bank. Optional.
+- Every authenticated endpoint requires at least one _recognised_ role
+  (operator ∪ tester); a valid token carrying none is rejected with `403`.
+  `/v1/central-bank/*` additionally requires an operator role (`403`
+  otherwise). `none` mode performs no role checks. The values must match the
+  nb-ui `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values
+  defined in Entra.
 
 `/v1/health`, `/docs`, and `/v1/openapi.json` are mounted before the
 auth gate and stay public in both modes. Every other endpoint goes
@@ -527,11 +544,11 @@ table?** Append its name to that constant — both paths pick it up.
 constant; document it next to the `bidders` exception.
 
 Auth: the endpoint sits under the standard `authMiddleware` (no-op in
-`none` mode, JWT-validated in `entra` mode). There is **no extra
-role check** in entra mode today — sandbox-acceptable, but **before
-promoting to a non-local deployment** the destructive `?fromBlock=0`
-variant should be gated behind a tenant-admin role and emit an
-audit-log entry on every fire. Tracked in Plan C's portability flags.
+`none` mode, JWT-validated in `entra` mode) and is **operator-only** in
+`entra` mode — `/v1/admin/*` requires an operator App Role
+(`NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES`) and returns `403` otherwise.
+An audit-log entry on every destructive `?fromBlock=0` fire is still a
+recommended follow-up before a non-local deployment.
 
 ### 7.10 Data persistence (/app/data PVC)
 

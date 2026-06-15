@@ -20,7 +20,7 @@ import helmet from 'helmet';
 import { keccak256, toUtf8Bytes } from 'ethers';
 
 import { resetProjectionAndRestart, restartIngestionLoop } from './admin';
-import { authMiddleware } from './auth';
+import { authMiddleware, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
 import {
   composeAllAuctions,
   composeAllBonds,
@@ -242,9 +242,20 @@ app.get('/v1/health', async (req, res, next) => {
 // in `none` mode, JWT validation in `entra` mode).
 app.use(authMiddleware);
 
+// Baseline authorization: in `entra` mode every authenticated route requires
+// at least one recognised role (operator or tester). A valid token carrying
+// no recognised role is rejected — the server mirror of the nb-ui access gate.
+// No-op in `none` mode.
+app.use(requireAnyRole(recognizedRoles));
+
 // #endregion
 
 // #region Admin ──────────────────────────────────────────────────────
+
+// Admin operations are operator-only. This prefix guard covers every
+// /v1/admin route below. No-op in `none` mode; 403 for non-operator tokens
+// in `entra` mode.
+app.use('/v1/admin', requireAnyRole(operatorRoles));
 
 /**
  * Restart the in-process ingestion loop. With `?fromBlock=0`, also
@@ -1074,6 +1085,11 @@ function mapCentralBankError(err: unknown): never {
 function toAllowlistEntry(address: string) {
   return withMd5({ address });
 }
+
+// Central Bank is operator-only. This single prefix guard covers every
+// /v1/central-bank route below. No-op in `none` mode; 403 for non-operator
+// tokens in `entra` mode.
+app.use('/v1/central-bank', requireAnyRole(operatorRoles));
 
 app.get('/v1/central-bank', async (req, res, next) => {
   try {

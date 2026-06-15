@@ -82,7 +82,7 @@ describe('entraAuth session model', () => {
     msalState.accounts = [ACCOUNT];
     const auth = createEntraAuth(CFG);
     await auth.init();
-    expect(auth.getAccount()).toEqual(ACCOUNT);
+    expect(auth.getAccount()).toEqual({ ...ACCOUNT, roles: [] });
     expect(auth.isSessionExpired()).toBe(false);
     expect(await auth.getAuthHeader()).toBe('Bearer test-token');
   });
@@ -134,7 +134,7 @@ describe('entraAuth session model', () => {
     msalState.redirectResult = { account: ACCOUNT };
     await auth.init();
     expect(auth.isSessionExpired()).toBe(false);
-    expect(auth.getAccount()).toEqual(ACCOUNT);
+    expect(auth.getAccount()).toEqual({ ...ACCOUNT, roles: [] });
   });
 
   it('returns no header (without calling acquireTokenSilent) when signed out', async () => {
@@ -144,5 +144,22 @@ describe('entraAuth session model', () => {
     msalState.acquireTokenSilentImpl = silent;
     expect(await auth.getAuthHeader()).toBeNull();
     expect(silent).not.toHaveBeenCalled();
+  });
+
+  it('exposes App Roles from the ID-token claims after init', async () => {
+    msalState.accounts = [{ ...ACCOUNT, idTokenClaims: { roles: ['Sandbox.Operator'] } }];
+    const auth = createEntraAuth(CFG);
+    await auth.init();
+    expect(auth.getAccount().roles).toEqual(['Sandbox.Operator']);
+  });
+
+  it('falls back to the access-token roles when the ID token carries none', async () => {
+    msalState.accounts = [ACCOUNT];
+    msalState.acquireTokenSilentImpl = async () => ({
+      accessToken: `h.${btoa(JSON.stringify({ roles: ['Sandbox.Tester'] }))}.s`,
+    });
+    const auth = createEntraAuth(CFG);
+    await auth.init();
+    expect(auth.getAccount().roles).toEqual(['Sandbox.Tester']);
   });
 });
