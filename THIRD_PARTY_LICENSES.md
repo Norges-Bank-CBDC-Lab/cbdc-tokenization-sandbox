@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of May 20, 2026.
+deployment-time components used by this repository as of June 15, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -53,7 +53,7 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
-| `better-sqlite3` | `12.10.0` | MIT |
+| `better-sqlite3` | `12.10.1` | MIT |
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
@@ -77,7 +77,7 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.6.0` | MIT |
 | `jest` | `30.4.2` | MIT |
-| `prettier` | `3.8.3` | MIT |
+| `prettier` | `3.8.4` | MIT |
 | `ts-jest` | `29.4.11` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
@@ -107,20 +107,20 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@azure/msal-browser` | `5.12.0` | MIT |
-| `react` | `19.2.6` | MIT |
-| `react-dom` | `19.2.6` | MIT |
+| `@azure/msal-browser` | `5.13.0` | MIT |
+| `react` | `19.2.7` | MIT |
+| `react-dom` | `19.2.7` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
 | `@vitejs/plugin-react` | `6.0.2` | MIT |
-| `eslint` | `9.18.0` | MIT |
+| `eslint` | `9.39.4` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
-| `prettier` | `3.8.3` | MIT |
+| `prettier` | `3.8.4` | MIT |
 | `vite` | `8.0.16` | MIT |
 | `vitest` | `4.1.8` | MIT |
 
@@ -148,9 +148,9 @@ output and does not declare third-party npm dependencies.
 | `ipywidgets` | `8.1.8` | BSD-3-Clause |
 | `web3` | `7.16.0` | MIT |
 | `eth-account` | `0.13.7` | MIT |
-| `ipython` | `9.14.0` | BSD-3-Clause |
+| `ipython` | `9.14.1` | BSD-3-Clause |
 | `pytz` | `2025.2` | MIT |
-| `plotly` | `6.5.2` | MIT |
+| `plotly` | `6.8.0` | MIT |
 | `pandas` | `2.3.0` | BSD-3-Clause |
 | `psycopg2-binary` | `2.9.12` | LGPL with exceptions |
 
