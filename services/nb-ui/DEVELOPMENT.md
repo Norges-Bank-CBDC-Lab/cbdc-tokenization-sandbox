@@ -85,6 +85,27 @@ The auth seam is `src/auth/index.js`. It resolves one of:
   are never committed to this repo** — they come from the runtime
   `config.js` rendered by whatever deploys the bundle.
 
+### Role-based access (entra mode)
+
+When `AUTH_MODE=entra`, the UI gates pages on the signed-in account's Entra
+**App Roles** (the `roles` claim), resolved by `src/auth/entraAuth.js` (ID-token
+claims first, access-token decode as a fallback) and mapped to capabilities by
+`src/auth/capabilities.js`:
+
+- `AUTH_OPERATOR_ROLES` — comma-separated App Role values granting full access
+  including the Central Bank page.
+- `AUTH_TESTER_ROLES` — comma-separated App Role values granting the UI without
+  Central Bank.
+- A signed-in user with **no** recognised role sees a full-page "access denied"
+  screen (`src/components/AccessDeniedPage.jsx`) instead of the app.
+- The Central Bank nav item is hidden for non-operators and the
+  `#/central-bank` route is guarded, so the page never mounts for them.
+
+This is UX only — the NB Bond API independently enforces the same roles and is
+the real boundary. `none` mode is never gated (the local sandbox is fully open).
+The values must match the API's `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` /
+`..._TESTER_ROLES` and the App Role values defined in Entra.
+
 To try the Entra plugin locally (no real tenant needed — just enough to
 prove the seam is reachable):
 
@@ -182,6 +203,22 @@ _doesn't_ bust the cache.
   permissive enough to load the React bundle in a sandbox context. A
   non-local deployment should tighten CSP via a custom nginx config —
   flagged in `docs/plans/archive/nb-ui-frontend-plan.md` Portability Flags.
+
+## Portability Flags
+
+Local-acceptable defaults a non-local deployment must set explicitly:
+
+- **Auth role values are runtime config, not constants.** `AUTH_OPERATOR_ROLES`
+  / `AUTH_TESTER_ROLES` (and the matching nb-bond-api role env) must be set to
+  the deployment's Entra App Role values. The chart defaults (`Sandbox.Operator`
+  / `Sandbox.Tester`) are only consulted in `entra` mode.
+- **Roles are read from the ID token first.** This assumes the App Roles are
+  assigned on the app the ID token is issued for (a single SPA+API app
+  registration — the simplest setup). With a separate API app registration the
+  provider falls back to decoding the access token; if neither carries the
+  roles, sign-in lands on the access-denied screen.
+- **CSP** — see "Known gotchas"; a non-local deployment should tighten the nginx
+  CSP (also flagged in `docs/plans/archive/nb-ui-frontend-plan.md`).
 
 ## Follow-ups
 

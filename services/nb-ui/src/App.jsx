@@ -5,10 +5,12 @@
  */
 import { useEffect, useState } from 'react';
 import { auth, authMode } from './auth/index.js';
+import { capabilitiesForAccount } from './auth/capabilities.js';
 import { useRoute } from './hooks/useRoute.js';
-import { ToastProvider } from './components/ui.jsx';
+import { ToastProvider, EmptyState } from './components/ui.jsx';
 import { Layout } from './components/Layout.jsx';
 import { LoginPage } from './components/LoginPage.jsx';
+import { AccessDeniedPage } from './components/AccessDeniedPage.jsx';
 import { BondsPage } from './pages/BondsPage.jsx';
 import { BondDetailPage } from './pages/BondDetailPage.jsx';
 import { AuctionsPage } from './pages/AuctionsPage.jsx';
@@ -58,7 +60,12 @@ export function App() {
     if (!authState.account || authState.expired) {
       return <LoginPage expired={authState.expired} />;
     }
+    if (!capabilitiesForAccount(authState.account).canUseApp) {
+      return <AccessDeniedPage account={authState.account} />;
+    }
   }
+
+  const caps = capabilitiesForAccount(authState.account);
 
   let page;
   if (route.name === 'bonds') page = <BondsPage navigate={navigate} />;
@@ -70,12 +77,22 @@ export function App() {
       <AuctionDetailPage key={route.auctionId} auctionId={route.auctionId} navigate={navigate} />
     );
   else if (route.name === 'bidders') page = <BiddersPage navigate={navigate} />;
-  else if (route.name === 'central-bank') page = <CentralBankPage navigate={navigate} />;
+  else if (route.name === 'central-bank')
+    page = caps.canAccessCentralBank ? (
+      <CentralBankPage navigate={navigate} />
+    ) : (
+      <div className="card">
+        <EmptyState
+          title="Not authorised"
+          message="The Central Bank surface is operator-only. Ask an operator if you need access."
+        />
+      </div>
+    );
   else page = <BondsPage navigate={navigate} />;
 
   return (
     <ToastProvider>
-      <Layout route={route} navigate={navigate}>
+      <Layout route={route} navigate={navigate} canAccessCentralBank={caps.canAccessCentralBank}>
         {page}
       </Layout>
     </ToastProvider>

@@ -49,7 +49,12 @@ its own values:
   local frontend origin and ships unauthenticated. ArgoCD supplies the
   real origin list, the real OIDC/Entra config (via nb-ui's runtime
   `config.js`), and whatever validating proxy fronts nb-bond-api. The
-  charts do not embed any of this.
+  charts do not embed any of this. Role-based access (entra mode) adds
+  `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` (nb-ui) and
+  `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `..._TESTER_ROLES`
+  (nb-bond-api), which must match the Entra App Role values. Defining the
+  App Roles and assigning groups to them is a deployment-repo / Entra-portal
+  responsibility, not this repo's.
 
 ## Charts that are local-shape and need new wrappers for cloud
 

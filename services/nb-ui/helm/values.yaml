@@ -41,3 +41,10 @@ runtimeConfig:
   authAuthority: ""
   authScopes: ""
   authRedirectUri: ""
+  # Comma-separated Entra App Role values. Only consulted when authMode=entra
+  # (ignored locally, where authMode=none means the UI is fully open).
+  # Operators get full access including Central Bank; testers get the UI
+  # without it. Must match the App Role values defined in Entra and the
+  # nb-bond-api NB_BOND_API_AUTH_ENTRA_*_ROLES env.
+  authOperatorRoles: "Sandbox.Operator"
+  authTesterRoles: "Sandbox.Tester"

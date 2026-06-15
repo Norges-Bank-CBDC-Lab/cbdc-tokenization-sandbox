@@ -116,7 +116,7 @@ function AuthChrome() {
   );
 }
 
-export function Layout({ route, navigate, children }) {
+export function Layout({ route, navigate, children, canAccessCentralBank = true }) {
   const navItem = (key, label, href) => (
     <a
       href={href}
@@ -159,7 +159,7 @@ export function Layout({ route, navigate, children }) {
             {navItem('bonds', 'Bonds', '#/bonds')}
             {navItem('auctions', 'Auctions', '#/auctions')}
             {navItem('bidders', 'Bidders', '#/bidders')}
-            {navItem('central-bank', 'Central Bank', '#/central-bank')}
+            {canAccessCentralBank && navItem('central-bank', 'Central Bank', '#/central-bank')}
           </nav>
           <div className="top-bar-right">
             <AuthChrome />

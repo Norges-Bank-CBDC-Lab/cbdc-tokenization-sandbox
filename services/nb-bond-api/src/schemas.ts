@@ -798,12 +798,14 @@ const errorRefs = {
     304: notModified,
     400: { $ref: '#/components/responses/BadRequest' },
     401: { $ref: '#/components/responses/Unauthorized' },
+    403: { $ref: '#/components/responses/Forbidden' },
     404: { $ref: '#/components/responses/NotFound' },
     500: { $ref: '#/components/responses/InternalError' },
   },
   mutate: {
     400: { $ref: '#/components/responses/BadRequest' },
     401: { $ref: '#/components/responses/Unauthorized' },
+    403: { $ref: '#/components/responses/Forbidden' },
     404: { $ref: '#/components/responses/NotFound' },
     409: { $ref: '#/components/responses/Conflict' },
     500: { $ref: '#/components/responses/InternalError' },
@@ -1318,14 +1320,15 @@ export const openApiDocument = createDocument({
       name: 'central-bank',
       description:
         'Central Bank (Norges Bank) operator surface against the WNOK contract: mint, burn, ' +
-        'transfer, allowlist add/remove. Sandbox-only.',
+        'transfer, allowlist add/remove. Operator-only — entra mode requires an operator App ' +
+        'Role and returns 403 otherwise. Sandbox-only.',
     },
     {
       name: 'admin',
       description:
         'Operator-only ingestion lifecycle (restart loop, drop-and-rebuild projection). ' +
-        'Sits under the standard auth gate; no extra RBAC today — see the Plan-C ' +
-        'portability flag before promoting to a non-local deployment.',
+        'Requires an operator App Role in entra mode (403 otherwise); auth is a no-op in ' +
+        'none mode.',
     },
   ],
   security: [{ bearerAuth: [] }],
@@ -1338,7 +1341,9 @@ export const openApiDocument = createDocument({
         bearerFormat: 'JWT',
         description:
           'Microsoft Entra ID access token. In deployments where NB_BOND_API_AUTH_MODE=none ' +
-          '(local sandbox default), the header is accepted but not validated.',
+          '(local sandbox default), the header is accepted but not validated. In entra mode the ' +
+          'token must carry a recognised App Role in its `roles` claim (see the 403 response); ' +
+          'Central Bank endpoints require an operator role.',
       },
     },
     responses: {
@@ -1348,6 +1353,13 @@ export const openApiDocument = createDocument({
       },
       Unauthorized: {
         description: 'Authentication required or token invalid.',
+        content: { 'application/json': { schema: problemDetailsSchema } },
+      },
+      Forbidden: {
+        description:
+          'Authenticated, but the token lacks a role required for this resource (entra mode ' +
+          'only). Central Bank endpoints require an operator App Role; every other endpoint ' +
+          'requires at least one recognised role.',
         content: { 'application/json': { schema: problemDetailsSchema } },
       },
       NotFound: {

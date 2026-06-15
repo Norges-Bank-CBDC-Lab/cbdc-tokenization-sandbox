@@ -30,6 +30,27 @@
  * @param {string} cfg.AUTH_SCOPES   - comma-separated scope list (e.g. "api://.../.default")
  * @param {string} cfg.AUTH_REDIRECT_URI
  */
+function base64UrlDecode(segment) {
+  const padded = segment + '='.repeat((4 - (segment.length % 4)) % 4);
+  return atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+}
+
+/** Best-effort extraction of the App Roles (`roles`) claim from a JWT. */
+function decodeJwtRoles(token) {
+  try {
+    const claims = JSON.parse(base64UrlDecode(token.split('.')[1]));
+    return Array.isArray(claims.roles) ? claims.roles : [];
+  } catch {
+    return [];
+  }
+}
+
+/** App Roles from the cached account's ID-token claims (may be empty). */
+function rolesFromIdToken(account) {
+  const roles = account?.idTokenClaims?.roles;
+  return Array.isArray(roles) ? roles : [];
+}
+
 export function createEntraAuth(cfg) {
   // Lazy-load MSAL. Kept inside the factory so the no-auth code path never
   // pulls the chunk down. The module reference is retained so error-type
@@ -100,7 +121,9 @@ export function createEntraAuth(cfg) {
     // Any explicit account-state change (sign-in, restore, sign-out)
     // supersedes a prior expiry signal.
     sessionExpired = false;
-    cachedAccount = account ? { username: account.username, name: account.name } : null;
+    cachedAccount = account
+      ? { username: account.username, name: account.name, roles: rolesFromIdToken(account) }
+      : null;
     notify();
   }
 
@@ -111,17 +134,44 @@ export function createEntraAuth(cfg) {
     }
   }
 
+  // Resolve the account's App Roles. Prefer the ID-token claims (present
+  // whenever the App Roles are assigned on the app the ID token is issued for
+  // — the common single-registration setup), and fall back to decoding the
+  // access token (audience = the API) when the ID token carries none, e.g. a
+  // separate API app registration. The backend independently re-checks the
+  // access token's roles, so this only governs what the UI shows.
+  async function resolveRoles(app, account) {
+    const fromId = rolesFromIdToken(account);
+    if (fromId.length) return fromId;
+    try {
+      const result = await app.acquireTokenSilent({ scopes, account });
+      return decodeJwtRoles(result.accessToken);
+    } catch {
+      return [];
+    }
+  }
+
+  async function hydrateRoles(app, account) {
+    const roles = await resolveRoles(app, account);
+    if (cachedAccount) {
+      cachedAccount = { ...cachedAccount, roles };
+      notify();
+    }
+  }
+
   return {
     async init() {
       const app = await pca();
       const result = await app.handleRedirectPromise();
       if (result?.account) {
         setActiveAccount(app, result.account);
+        await hydrateRoles(app, result.account);
         return;
       }
       const accounts = app.getAllAccounts();
       if (accounts.length > 0) {
         setActiveAccount(app, accounts[0]);
+        await hydrateRoles(app, accounts[0]);
       }
     },
     async login() {

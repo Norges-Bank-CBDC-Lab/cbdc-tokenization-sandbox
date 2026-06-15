@@ -4,6 +4,7 @@
  * @typedef {Object} AuthAccount
  * @property {string} username
  * @property {string=} name
+ * @property {string[]=} roles - Entra App Role values from the token (entra mode); [] when none
  *
  * @typedef {Object} AuthProvider
  * @property {() => Promise<void>} init           - one-shot setup (token refresh, redirect handling)

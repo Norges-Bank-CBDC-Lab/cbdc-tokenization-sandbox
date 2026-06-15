@@ -77,6 +77,12 @@ env:
   # Required only when NB_BOND_API_AUTH_MODE=entra:
   # NB_BOND_API_AUTH_ENTRA_TENANT_ID: "<tenant-guid>"
   # NB_BOND_API_AUTH_ENTRA_AUDIENCE: "<bond-api-app-registration-client-id>"
+  # Comma-separated Entra App Role values. Operator roles gate /v1/central-bank/*
+  # (required in entra mode); any recognised role (operator or tester) is needed
+  # for every other authenticated endpoint. Must match the App Role values in
+  # Entra and the nb-ui AUTH_OPERATOR_ROLES / AUTH_TESTER_ROLES.
+  # NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES: "Sandbox.Operator"
+  # NB_BOND_API_AUTH_ENTRA_TESTER_ROLES: "Sandbox.Tester"
 secret:
   BOND_ADMIN_PK: "<base64-encoded-local-sandbox-private-key>"
   AUCTION_OWNER_SEAL_PK: "<base64-encoded-local-seal-private-key>"

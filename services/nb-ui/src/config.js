@@ -18,6 +18,8 @@ const defaults = {
   AUTH_AUTHORITY: '',
   AUTH_SCOPES: '',
   AUTH_REDIRECT_URI: '',
+  AUTH_OPERATOR_ROLES: '',
+  AUTH_TESTER_ROLES: '',
 };
 
 function readWindowConfig() {
