@@ -15,4 +15,6 @@ data:
       AUTH_AUTHORITY: {{ .Values.runtimeConfig.authAuthority | default "" | quote }},
       AUTH_SCOPES: {{ .Values.runtimeConfig.authScopes | default "" | quote }},
       AUTH_REDIRECT_URI: {{ .Values.runtimeConfig.authRedirectUri | default "" | quote }},
+      AUTH_OPERATOR_ROLES: {{ .Values.runtimeConfig.authOperatorRoles | default "" | quote }},
+      AUTH_TESTER_ROLES: {{ .Values.runtimeConfig.authTesterRoles | default "" | quote }},
     };

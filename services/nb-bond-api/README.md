@@ -94,6 +94,12 @@ host source mount is required and the chart no longer runs `npm ci` /
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE` –
   required when `NB_BOND_API_AUTH_MODE=entra`. ArgoCD must keep these in
   sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
+- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` –
+  comma-separated Entra App Role values for role-based access in `entra` mode.
+  Operator roles gate the Central Bank endpoints (`/v1/central-bank/*`) and are
+  required; any recognised role (operator or tester) is needed for other
+  authenticated endpoints. Must match the nb-ui `AUTH_OPERATOR_ROLES` /
+  `AUTH_TESTER_ROLES`.
 
 ## Scripts
 

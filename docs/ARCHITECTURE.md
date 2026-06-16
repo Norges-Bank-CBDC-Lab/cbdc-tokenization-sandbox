@@ -229,6 +229,10 @@ The UI is a thin client over the NB Bond API:
   OIDC tenant / client config at runtime
 - tenant / client / scope values for the Entra plugin are never committed —
   they are read from `window.__APP_CONFIG__` at startup
+- in `entra` mode the UI also enforces role-based access from Entra App Roles:
+  operators get full access including the Central Bank page, testers get the UI
+  without it, and an unrecognised account sees an access-denied screen. The NB
+  Bond API enforces the same roles server-side; `none` mode is ungated
 
 Deployment shape in the local sandbox: a multi-stage Dockerfile in
 `services/nb-ui/` builds the React bundle inside the Node builder image
@@ -318,7 +322,10 @@ credentials, or example values outside local development.
 The NB UI ships a pluggable auth layer (`services/nb-ui/src/auth/`) that
 defaults to no-auth locally and can be switched to OIDC (Entra / MSAL) per
 deployment via runtime config without rebuilding the bundle. Tenant- and
-client-specific values are intentionally **not** committed in this repo.
+client-specific values are intentionally **not** committed in this repo. In
+`entra` mode both tiers additionally enforce role-based access from Entra App
+Roles (operator vs tester; the Central Bank surface is operator-only), with the
+NB Bond API as the authoritative boundary.
 
 ## Read Next
 

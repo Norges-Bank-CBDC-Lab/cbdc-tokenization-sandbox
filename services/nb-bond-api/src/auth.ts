@@ -38,6 +38,21 @@ const entraConfig: EntraConfig | null =
 
 logger.info(`auth mode: ${envVariables.NB_BOND_API_AUTH_MODE}`);
 
+function parseRoleList(value: string): string[] {
+  return value
+    .split(',')
+    .map((r) => r.trim())
+    .filter((r) => r.length > 0);
+}
+
+// App Role values that grant operator (Central Bank) access, and the union of
+// all recognised roles (operator ∪ tester). Empty in `none` mode (the gates
+// short-circuit there); non-empty in `entra` mode (env-vars fail-fast
+// guarantees at least one operator role).
+export const operatorRoles = parseRoleList(envVariables.NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES);
+const testerRoles = parseRoleList(envVariables.NB_BOND_API_AUTH_ENTRA_TESTER_ROLES);
+export const recognizedRoles = Array.from(new Set([...operatorRoles, ...testerRoles]));
+
 /**
  * Extracts the bearer token from the Authorization header, or null.
  *
@@ -82,10 +97,13 @@ export async function authMiddleware(
   }
 
   try {
-    await jwtVerify(token, entraConfig.jwks, {
+    const { payload } = await jwtVerify(token, entraConfig.jwks, {
       issuer: entraConfig.issuer,
       audience: entraConfig.audience,
     });
+    // App Roles arrive as the `roles` claim. Stash for the authorization
+    // middlewares (requireAnyRole) mounted after this gate.
+    res.locals.authRoles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
     next();
   } catch (err) {
     res.status(401).json(
@@ -94,4 +112,29 @@ export async function authMiddleware(
       }),
     );
   }
+}
+
+/**
+ * Authorization middleware factory. No-op in `none` mode (the sandbox is
+ * unauthenticated). In `entra` mode it requires the validated token's `roles`
+ * claim (captured by authMiddleware into res.locals.authRoles) to intersect
+ * `allowed`, else responds 403 Forbidden.
+ */
+export function requireAnyRole(allowed: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!entraConfig) {
+      next();
+      return;
+    }
+    const roles: string[] = Array.isArray(res.locals.authRoles) ? res.locals.authRoles : [];
+    if (roles.some((role) => allowed.includes(role))) {
+      next();
+      return;
+    }
+    res.status(403).json(
+      buildProblem(req, 403, 'Forbidden', {
+        detail: 'Your account is not authorised for this resource.',
+      }),
+    );
+  };
 }

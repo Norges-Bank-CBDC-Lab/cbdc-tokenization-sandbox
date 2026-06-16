@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sc-verifier-service
+  namespace: blockscout
+spec:
+  selector:
+    app: sc-verifier
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8050
+  type: ClusterIP

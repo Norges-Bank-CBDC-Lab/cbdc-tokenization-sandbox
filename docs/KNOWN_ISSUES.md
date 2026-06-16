@@ -27,17 +27,23 @@
 - This does not affect compilation results; ensure the cache directory is
   writable if you want a clean warning-free build.
 
-## nb-ui: MSAL v5 needs a redirect-bridge for Entra silent token refresh
-- `@azure/msal-browser` was upgraded to v5. v5 routes silent-iframe and popup
-  flows through a redirect-bridge when the authority sets Cross-Origin-Opener-
-  Policy (COOP) headers, and Microsoft Entra ID has COOP enabled by default.
-- The Entra auth path (`services/nb-ui/src/auth/entraAuth.js`) is dormant in the
-  local sandbox (`AUTH_MODE=none`) and cannot be exercised here. A real Entra
-  deployment that relies on `acquireTokenSilent` must serve a redirect-bridge
-  page (a Vite multi-page entry), point `AUTH_REDIRECT_URI` at it, and register
-  that URI in the Entra app registration.
-- Until then the v5 bump is build/lint/test-verified but runtime-unverified. The
-  redirect (login) flow itself is unaffected. Owned by the cloud deployment work.
+## nb-ui: Entra silent renewal is refresh-token-based (no redirect-bridge); runtime-unverified locally
+- Superseded design (was: "MSAL v5 needs a redirect-bridge for silent token
+  refresh"). `acquireTokenSilent` renews access tokens with the refresh token
+  MSAL caches for SPAs — a plain network call, no hidden iframes — so no COOP
+  redirect-bridge page is needed while a session is valid. Iframe-based silent
+  auth was additionally ruled out because third-party-cookie blocking breaks it
+  in modern browsers.
+- When the refresh token is spent (Entra issues SPAs a fixed ~24 h refresh
+  token), `acquireTokenSilent` fails with an interaction-required error; the
+  auth layer then flips to a "session expired" state and the auth gate renders
+  the login page (`services/nb-ui/src/components/LoginPage.jsx`) instead of
+  letting API calls 401 silently.
+- The Entra auth path (`services/nb-ui/src/auth/entraAuth.js`) remains dormant
+  in the local sandbox (`AUTH_MODE=none`) and cannot be exercised here, so
+  silent renewal is build/lint/test-verified but runtime-unverified until a
+  real Entra deployment runs the timed renewal check. Owned by the cloud
+  deployment work.
 
 ## nb-ui: reopenAuction needs backend / on-chain support
 - The `services/nb-ui/` operator UI exposes a "Reopen…" action on closed

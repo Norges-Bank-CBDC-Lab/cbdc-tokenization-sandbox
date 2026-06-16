@@ -173,7 +173,11 @@ elif [ "$CMD" == "verify" ]; then
     CONSTRUCTOR_ARGS_PATH=""
     VERIFIER="blockscout"
     VERIFIER_URL="${BLOCKSCOUT_LOCAL_URL:-}"
-    WATCH_FLAG="false"
+    # Default to --watch so forge polls Blockscout for the *real* verification
+    # result and exits non-zero on failure. Without this a missing/broken
+    # verifier microservice looks like success (it only submits). --no-watch
+    # restores fire-and-forget.
+    WATCH_FLAG="true"
     GUESS_ARGS="true"
 
     while [[ $# -ge 1 ]] ; do
@@ -225,6 +229,10 @@ elif [ "$CMD" == "verify" ]; then
                 WATCH_FLAG="true"
                 shift
                 ;;
+            --no-watch )
+                WATCH_FLAG="false"
+                shift
+                ;;
             * )
                 echo "❌ Unknown flag: $key"
                 exit 1
@@ -265,7 +273,11 @@ elif [ "$CMD" == "verify-latest" ]; then
     BROADCAST_DIR="broadcast"
     VERIFIER="blockscout"
     VERIFIER_URL="${BLOCKSCOUT_LOCAL_URL:-}"
-    WATCH_FLAG="false"
+    # Default to --watch so forge polls Blockscout for the *real* verification
+    # result and exits non-zero on failure. Without this a missing/broken
+    # verifier microservice looks like success (it only submits). --no-watch
+    # restores fire-and-forget.
+    WATCH_FLAG="true"
     GUESS_ARGS="true"
 
     while [[ $# -ge 1 ]] ; do
@@ -305,6 +317,10 @@ elif [ "$CMD" == "verify-latest" ]; then
                 ;;
             --watch )
                 WATCH_FLAG="true"
+                shift
+                ;;
+            --no-watch )
+                WATCH_FLAG="false"
                 shift
                 ;;
             * )

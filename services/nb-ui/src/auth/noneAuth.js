@@ -14,6 +14,9 @@ export function createNoneAuth() {
     getAccount() {
       return null;
     },
+    isSessionExpired() {
+      return false;
+    },
     async getAuthHeader() {
       return null;
     },

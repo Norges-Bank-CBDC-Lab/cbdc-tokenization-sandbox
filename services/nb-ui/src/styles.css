@@ -1215,3 +1215,44 @@ footer.app-footer {
     opacity: 1;
   }
 }
+
+/* ============================================================
+   login page (auth gate) — the only surface a signed-out user
+   sees when an interactive auth mode is active
+   ============================================================ */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: var(--sp-5);
+}
+.login-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 400px;
+  padding: var(--sp-7) var(--sp-6);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  text-align: center;
+  color: var(--navy);
+}
+.login-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.login-status {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.login-status-expired {
+  color: var(--accent);
+}

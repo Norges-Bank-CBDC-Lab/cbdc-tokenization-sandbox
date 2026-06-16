@@ -50,6 +50,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v && v.trim().length > 0 ? v : undefined)),
+  // Comma-separated Entra App Role values granting operator (Central Bank)
+  // access. Required when NB_BOND_API_AUTH_MODE=entra — without it the
+  // /v1/central-bank/* endpoints would be unreachable. Must match the nb-ui
+  // AUTH_OPERATOR_ROLES values and the App Role values defined in Entra.
+  NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES: z.string().default(''),
+  // Comma-separated Entra App Role values granting baseline access without
+  // Central Bank (e.g. Sandbox.Tester). Optional; operators are always
+  // recognised. In entra mode a token carrying none of the operator or
+  // tester roles is rejected with 403.
+  NB_BOND_API_AUTH_ENTRA_TESTER_ROLES: z.string().default(''),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -67,6 +77,13 @@ if (parsedEnv.data.NB_BOND_API_AUTH_MODE === 'entra') {
   }
   if (!parsedEnv.data.NB_BOND_API_AUTH_ENTRA_AUDIENCE) {
     missing.push('NB_BOND_API_AUTH_ENTRA_AUDIENCE');
+  }
+  // Operator roles must be present, else /v1/central-bank/* is unreachable.
+  const operatorRoleCount = parsedEnv.data.NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES.split(',')
+    .map((r) => r.trim())
+    .filter((r) => r.length > 0).length;
+  if (operatorRoleCount === 0) {
+    missing.push('NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES');
   }
   if (missing.length) {
     throw new Error(
