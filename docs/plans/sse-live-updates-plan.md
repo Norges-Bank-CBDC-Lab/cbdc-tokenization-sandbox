@@ -5,6 +5,7 @@
 **Owner / operator:** sandbox operator (this repo). Cloud/GitOps portability items are flagged for the separate deployment repo, not executed here.
 **Branch suggestion:** `feature/sse-live-updates` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`.
 **Components touched:** `services/nb-bond-api/` (new `GET /v1/events` SSE endpoint fed by the existing ingestion loop; optional request-path-read fold-in; schemas/env-vars), `services/nb-ui/` (native `EventSource` client; invalidate-and-refetch on push; collapse the health poll into the stream heartbeat with the Phase-0 poll kept as fallback), `docs/` (ARCHITECTURE, KNOWN_ISSUES, per-service DEVELOPMENT, AZURE_BOUNDARY, DOCUMENTATION_INDEX).
+**Related:** the client reconcile layer is specced separately in `docs/plans/cursor-reconcile-sync-plan.md` — it ships first on the existing health poll and replaces the crude `window.location.reload()` reconnect; this stream is a later transport for the same event cursor.
 
 > Mirrors the header block and phased structure of `docs/plans/role-based-access-control-plan.md` and `docs/plans/archive/nb-ui-frontend-plan.md`. Update `Status:` as the plan progresses (`Planned` → `Approved` → `✅ Implemented and shipped`); when shipped, move this file to `docs/plans/archive/`.
 
