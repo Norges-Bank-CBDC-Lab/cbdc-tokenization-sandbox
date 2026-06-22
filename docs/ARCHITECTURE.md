@@ -136,6 +136,13 @@ Foundry. Key components include:
   - `Wnok` (`contracts/src/norges-bank/Wnok.sol`): mock cash token used for
     local settlement flows
 
+> **Planned — decided, not yet implemented:** this ERC-1410-based security-token
+> design is slated to migrate to canonical **ERC-3643 (T-REX)** — a shared on-chain
+> identity registry plus modular compliance for both bonds and equities, retiring the
+> partitioned `BondToken` and the ERC-20 `StockToken`; cash (`Wnok`) keeps its own
+> allowlist. See `docs/decisions/0002-adopt-erc-3643-for-tokenized-securities.md` (ADR 0002).
+> The description above remains the current state until that work lands.
+
 Simplified trust model:
 
 - the issuer or operator role (Norges Bank in the sandbox) controls
