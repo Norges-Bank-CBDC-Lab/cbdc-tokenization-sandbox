@@ -17,6 +17,7 @@ import { AuctionsPage } from './pages/AuctionsPage.jsx';
 import { AuctionDetailPage } from './pages/AuctionDetailPage.jsx';
 import { BiddersPage } from './pages/BiddersPage.jsx';
 import { CentralBankPage } from './pages/CentralBankPage.jsx';
+import { BankingPage } from './pages/BankingPage.jsx';
 
 /**
  * ComingSoon — placeholder for nav destinations that exist in the category
@@ -118,7 +119,7 @@ export function App() {
   else if (route.name === 'stocks') page = <ComingSoon title="Stocks" />;
   else if (route.name === 'tbd')
     page = caps.canAccessBanking ? (
-      <ComingSoon title="Banking · TBD" />
+      <BankingPage navigate={navigate} />
     ) : (
       <div className="card">
         <EmptyState
