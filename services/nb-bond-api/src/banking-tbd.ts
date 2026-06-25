@@ -13,9 +13,16 @@
  *
  * Sandbox-only.
  */
-import { Contract, getAddress } from 'ethers';
+import {
+  Contract,
+  type ContractTransactionReceipt,
+  type ContractTransactionResponse,
+  Wallet,
+  getAddress,
+} from 'ethers';
 
 import { tbdAbi } from './abi';
+import { deriveBidderAddress, deriveFixturePrivateKey } from './bidders';
 import { getWnok, provider, resolveRegisteredAddress } from './chain';
 import { envVariables } from './env-vars';
 import { withMd5 } from './http';
@@ -91,14 +98,18 @@ async function composeToken(bankName: string, address: string) {
 }
 
 /** Resolve each configured bank's TBD address; skips any not registered. */
-async function resolveConfiguredTbds(): Promise<{ bankName: string; address: string }[]> {
+async function resolveConfiguredTbds(): Promise<
+  { bankName: string; role: string; address: string }[]
+> {
   const resolved = await Promise.all(
     TBD_BANKS.map(async (b) => {
       const address = await resolveRegisteredAddress(b.contractName);
-      return address ? { bankName: b.bankName, address: getAddress(address) } : null;
+      return address ? { bankName: b.bankName, role: b.role, address: getAddress(address) } : null;
     }),
   );
-  return resolved.filter((r): r is { bankName: string; address: string } => r !== null);
+  return resolved.filter(
+    (r): r is { bankName: string; role: string; address: string } => r !== null,
+  );
 }
 
 /** Read every configured TBD token. */
@@ -118,4 +129,91 @@ export async function getTbdToken(address: string) {
   const present = await resolveConfiguredTbds();
   const match = present.find((r) => r.address === target);
   return match ? composeToken(match.bankName, match.address) : null;
+}
+
+// ── Mutations ───────────────────────────────────────────────────────
+// Signed by the TBD's OWNING bank — the only key holding MINTER / BURNER /
+// ALLOWLIST_ADMIN on that token — derived the same way as the bidder roster.
+// Each write returns null when the address isn't a configured TBD (route 404s).
+// Sandbox-only.
+
+export interface TbdTransactionRef {
+  hash: string;
+  block: number | null;
+}
+
+async function tbdWriteContract(address: string): Promise<Contract | null> {
+  let target: string;
+  try {
+    target = getAddress(address);
+  } catch {
+    return null;
+  }
+  const match = (await resolveConfiguredTbds()).find((r) => r.address === target);
+  if (!match) return null;
+  const wallet = new Wallet(deriveFixturePrivateKey(match.role), provider);
+  return new Contract(match.address, tbdAbi, wallet);
+}
+
+async function sendTbdTx(
+  address: string,
+  invoke: (tbd: Contract) => Promise<ContractTransactionResponse>,
+): Promise<TbdTransactionRef | null> {
+  const tbd = await tbdWriteContract(address);
+  if (!tbd) return null;
+  const tx = await invoke(tbd);
+  const receipt = (await tx.wait()) as ContractTransactionReceipt | null;
+  return { hash: tx.hash, block: receipt?.blockNumber ?? null };
+}
+
+export function addTbdAllowlist(address: string, holder: string) {
+  return sendTbdTx(address, (tbd) => {
+    const fn = tbd.add as unknown as (a: string) => Promise<ContractTransactionResponse>;
+    return fn(getAddress(holder));
+  });
+}
+
+export function removeTbdAllowlist(address: string, holder: string) {
+  return sendTbdTx(address, (tbd) => {
+    const fn = tbd.remove as unknown as (a: string) => Promise<ContractTransactionResponse>;
+    return fn(getAddress(holder));
+  });
+}
+
+export function mintTbd(address: string, to: string, amount: bigint) {
+  return sendTbdTx(address, (tbd) => {
+    const fn = tbd.mint as unknown as (
+      a: string,
+      b: bigint,
+    ) => Promise<ContractTransactionResponse>;
+    return fn(getAddress(to), amount);
+  });
+}
+
+export function burnTbd(address: string, from: string, amount: bigint) {
+  return sendTbdTx(address, (tbd) => {
+    const fn = tbd.burn as unknown as (
+      a: string,
+      b: bigint,
+    ) => Promise<ContractTransactionResponse>;
+    return fn(getAddress(from), amount);
+  });
+}
+
+export function transferTbd(address: string, to: string, amount: bigint) {
+  return sendTbdTx(address, (tbd) => {
+    const fn = tbd.transfer as unknown as (
+      a: string,
+      b: bigint,
+    ) => Promise<ContractTransactionResponse>;
+    return fn(getAddress(to), amount);
+  });
+}
+
+/** The configured banks the operator can act as. Addresses only — keys stay server-side. */
+export function listConfiguredBanks(): { name: string; address: string }[] {
+  return TBD_BANKS.map((b) => ({
+    name: b.bankName,
+    address: deriveBidderAddress(deriveFixturePrivateKey(b.role)),
+  }));
 }

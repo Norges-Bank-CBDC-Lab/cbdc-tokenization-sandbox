@@ -1453,6 +1453,56 @@
         }
       }
     },
+    "/v1/banking/banks": {
+      "get": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "listBanks",
+        "summary": "List the configured banks the operator can act as (signer selector)",
+        "responses": {
+          "200": {
+            "description": "Configured banks",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BankInfo"
+                  }
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/v1/banking/tbd": {
       "get": {
         "tags": [
@@ -1553,6 +1603,335 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/banking/tbd/{address}/allowlist/{holder}": {
+      "put": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "addToTbdAllowlist",
+        "summary": "Add an address to a TBD's allowlist (signed by the owning bank; idempotent)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "in": "path",
+            "name": "holder",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the on-chain add",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "removeFromTbdAllowlist",
+        "summary": "Remove an address from a TBD's allowlist (signed by the owning bank; idempotent)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "in": "path",
+            "name": "holder",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the on-chain remove",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/banking/tbd/{address}/mint": {
+      "post": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "mintTbd",
+        "summary": "Mint TBD to an allowlisted address (signed by the owning bank)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TbdMintBurnBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the mint",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/banking/tbd/{address}/burn": {
+      "post": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "burnTbd",
+        "summary": "Burn TBD from an allowlisted address (signed by the owning bank)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TbdMintBurnBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the burn",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/banking/tbd/{address}/transfer": {
+      "post": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "transferTbd",
+        "summary": "Transfer TBD from the owning bank's account to an allowlisted recipient",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TbdTransferBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transaction reference for the transfer",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransactionRef"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -1929,6 +2308,40 @@
           "amount"
         ],
         "description": "Body for a transfer from the CB account"
+      },
+      "TbdMintBurnBody": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "description": "Target address (must be on the TBD allowlist)",
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "description": "Amount in whole TBD units (decimals = 0)",
+            "$ref": "#/components/schemas/BigIntString"
+          }
+        },
+        "required": [
+          "address",
+          "amount"
+        ],
+        "description": "Body for TBD mint / burn operations"
+      },
+      "TbdTransferBody": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/BigIntString"
+          }
+        },
+        "required": [
+          "to",
+          "amount"
+        ],
+        "description": "Body for a transfer from the owning bank's account"
       },
       "FinaliseBody": {
         "type": "object",
@@ -3151,6 +3564,33 @@
         ],
         "additionalProperties": false,
         "description": "On-chain transaction reference (hash + block)"
+      },
+      "BankInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Bank label, e.g. \"Nordea Bank\""
+          },
+          "address": {
+            "description": "The bank's EVM address — the signer for its own TBD operations",
+            "$ref": "#/components/schemas/Address"
+          },
+          "md5": {
+            "type": "string",
+            "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
+            "examples": [
+              "9e107d9d372bb6826bd81d3542a419d6"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "address",
+          "md5"
+        ],
+        "additionalProperties": false,
+        "description": "A configured bank the operator can act as. The server holds the signing key; only the address is exposed. Feeds the UI bank selector."
       },
       "TbdToken": {
         "type": "object",

@@ -599,6 +599,41 @@ const tbdTokenSchema = z
       'WNOK-reserve-backed. The same DTO is returned by the list and the single-token GET.',
   });
 
+const tbdMintBurnBodySchema = z
+  .object({
+    address: addressSchema.meta({ description: 'Target address (must be on the TBD allowlist)' }),
+    amount: bigIntStringSchema.meta({ description: 'Amount in whole TBD units (decimals = 0)' }),
+  })
+  .meta({
+    id: 'TbdMintBurnBody',
+    description: 'Body for TBD mint / burn operations',
+  });
+
+const tbdTransferBodySchema = z
+  .object({
+    to: addressSchema,
+    amount: bigIntStringSchema,
+  })
+  .meta({
+    id: 'TbdTransferBody',
+    description: "Body for a transfer from the owning bank's account",
+  });
+
+const bankInfoSchema = z
+  .object({
+    name: z.string().meta({ description: 'Bank label, e.g. "Nordea Bank"' }),
+    address: addressSchema.meta({
+      description: "The bank's EVM address — the signer for its own TBD operations",
+    }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'BankInfo',
+    description:
+      'A configured bank the operator can act as. The server holds the signing key; only the ' +
+      'address is exposed. Feeds the UI bank selector.',
+  });
+
 // #endregion
 
 // #region Health ─────────────────────────────────────────────────────
@@ -924,6 +959,13 @@ const bidderAddressPathParam = {
 const tbdAddressPathParam = {
   in: 'path' as const,
   name: 'address',
+  required: true,
+  schema: { $ref: '#/components/schemas/Address' },
+};
+
+const tbdHolderPathParam = {
+  in: 'path' as const,
+  name: 'holder',
   required: true,
   schema: { $ref: '#/components/schemas/Address' },
 };
@@ -1307,6 +1349,17 @@ const paths: ZodOpenApiPathsObject = {
   },
 
   // banking ────────────────────────────────────────
+  '/v1/banking/banks': {
+    get: {
+      tags: ['banking'],
+      operationId: 'listBanks',
+      summary: 'List the configured banks the operator can act as (signer selector)',
+      responses: {
+        200: successJson('Configured banks', z.array(bankInfoSchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
   '/v1/banking/tbd': {
     get: {
       tags: ['banking'],
@@ -1327,6 +1380,76 @@ const paths: ZodOpenApiPathsObject = {
       responses: {
         200: successJson('TBD token', tbdTokenSchema),
         ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/allowlist/{holder}': {
+    put: {
+      tags: ['banking'],
+      operationId: 'addToTbdAllowlist',
+      summary: "Add an address to a TBD's allowlist (signed by the owning bank; idempotent)",
+      parameters: [tbdAddressPathParam, tbdHolderPathParam],
+      responses: {
+        200: successJson('Transaction reference for the on-chain add', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+    delete: {
+      tags: ['banking'],
+      operationId: 'removeFromTbdAllowlist',
+      summary: "Remove an address from a TBD's allowlist (signed by the owning bank; idempotent)",
+      parameters: [tbdAddressPathParam, tbdHolderPathParam],
+      responses: {
+        200: successJson('Transaction reference for the on-chain remove', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/mint': {
+    post: {
+      tags: ['banking'],
+      operationId: 'mintTbd',
+      summary: 'Mint TBD to an allowlisted address (signed by the owning bank)',
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the mint', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/burn': {
+    post: {
+      tags: ['banking'],
+      operationId: 'burnTbd',
+      summary: 'Burn TBD from an allowlisted address (signed by the owning bank)',
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the burn', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/transfer': {
+    post: {
+      tags: ['banking'],
+      operationId: 'transferTbd',
+      summary: "Transfer TBD from the owning bank's account to an allowlisted recipient",
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdTransferBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the transfer', transactionRefSchema),
+        ...errorRefs.mutate,
       },
     },
   },
@@ -1529,6 +1652,8 @@ export {
   transactionRefSchema,
   wnokMintBurnBodySchema,
   wnokTransferBodySchema,
+  tbdMintBurnBodySchema,
+  tbdTransferBodySchema,
 };
 
 export type Address = z.infer<typeof addressSchema>;
@@ -1570,5 +1695,7 @@ export type AllowlistEntry = z.infer<typeof allowlistEntrySchema>;
 export type TransactionRefDto = z.infer<typeof transactionRefSchema>;
 export type WnokMintBurnBody = z.infer<typeof wnokMintBurnBodySchema>;
 export type WnokTransferBody = z.infer<typeof wnokTransferBodySchema>;
+export type TbdMintBurnBody = z.infer<typeof tbdMintBurnBodySchema>;
+export type TbdTransferBody = z.infer<typeof tbdTransferBodySchema>;
 
 // #endregion
