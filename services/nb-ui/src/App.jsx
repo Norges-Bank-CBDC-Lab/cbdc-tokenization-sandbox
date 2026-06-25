@@ -17,6 +17,23 @@ import { AuctionsPage } from './pages/AuctionsPage.jsx';
 import { AuctionDetailPage } from './pages/AuctionDetailPage.jsx';
 import { BiddersPage } from './pages/BiddersPage.jsx';
 import { CentralBankPage } from './pages/CentralBankPage.jsx';
+import { BankingPage } from './pages/BankingPage.jsx';
+
+/**
+ * ComingSoon — placeholder for nav destinations that exist in the category
+ * structure but aren't built yet (Stocks, Coupon payout, and TBD until its
+ * page lands). Keeps dropdown links live instead of dead-ending.
+ */
+function ComingSoon({ title }) {
+  return (
+    <div className="card">
+      <EmptyState
+        title={`${title} — coming soon`}
+        message="This page is part of the planned navigation and isn't built yet."
+      />
+    </div>
+  );
+}
 
 export function App() {
   const { route, navigate } = useRoute();
@@ -88,11 +105,39 @@ export function App() {
         />
       </div>
     );
+  else if (route.name === 'coupon-payout')
+    page = caps.canAccessCentralBank ? (
+      <ComingSoon title="Coupon payout" />
+    ) : (
+      <div className="card">
+        <EmptyState
+          title="Not authorised"
+          message="The Central Bank surface is operator-only. Ask an operator if you need access."
+        />
+      </div>
+    );
+  else if (route.name === 'stocks') page = <ComingSoon title="Stocks" />;
+  else if (route.name === 'tbd')
+    page = caps.canAccessBanking ? (
+      <BankingPage navigate={navigate} />
+    ) : (
+      <div className="card">
+        <EmptyState
+          title="Not authorised"
+          message="The Banking surface is operator-only. Ask an operator if you need access."
+        />
+      </div>
+    );
   else page = <BondsPage navigate={navigate} />;
 
   return (
     <ToastProvider>
-      <Layout route={route} navigate={navigate} canAccessCentralBank={caps.canAccessCentralBank}>
+      <Layout
+        route={route}
+        navigate={navigate}
+        canAccessCentralBank={caps.canAccessCentralBank}
+        canAccessBanking={caps.canAccessBanking}
+      >
         {page}
       </Layout>
     </ToastProvider>

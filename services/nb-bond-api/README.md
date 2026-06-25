@@ -39,6 +39,13 @@ Two sandbox-only resource families sit alongside the bond tree:
   operations from the CB account. All `central-bank` endpoints respond
   `503 Service Unavailable` when `CENTRAL_BANK_PK` is unset or WNOK
   isn't registered in `GlobalRegistry`.
+- **`banking`** — operator surface over the per-bank TBD (tokenized bank
+  deposit) tokens. `GET /v1/banking/banks` lists the configured banks (the
+  signer selector); `GET /v1/banking/tbd[/{address}]` returns each TBD with its
+  owning bank, supply, WNOK reserve backing, government-nomination, and holders;
+  `PUT/DELETE /v1/banking/tbd/{address}/allowlist/{holder}` and
+  `POST /v1/banking/tbd/{address}/{mint,burn,transfer}` mutate it, signed by the
+  token's owning bank. Operator-only.
 
 ## Sandbox Helm Config
 

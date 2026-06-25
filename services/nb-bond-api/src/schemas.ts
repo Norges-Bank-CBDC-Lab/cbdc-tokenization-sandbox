@@ -528,6 +528,119 @@ const wnokTransferBodySchema = z
 
 // #endregion
 
+// #region Banking ────────────────────────────────────────────────────
+
+const tbdHolderSchema = z
+  .object({
+    address: addressSchema,
+    balance: bigIntStringSchema.meta({
+      description: 'TBD balance in whole units (the contract uses decimals = 0)',
+    }),
+  })
+  .meta({
+    id: 'TbdHolder',
+    description: 'An allowlisted TBD holder and its balance. Always read with its parent token.',
+  });
+
+const tbdTokenSchema = z
+  .object({
+    address: addressSchema.meta({ description: 'TBD contract address — the resource id' }),
+    name: z.string().meta({ description: 'Token name, e.g. "TBD Nordea"' }),
+    symbol: z.string().meta({ description: 'Token symbol, e.g. "TBDnordea"' }),
+    decimals: z
+      .number()
+      .int()
+      .meta({ description: 'Always 0 — TBD is denominated in whole units' }),
+    totalSupply: bigIntStringSchema.meta({ description: 'Total TBD issued, whole units' }),
+    bank: z
+      .object({
+        name: z.string().meta({ description: 'Owning bank label, e.g. "Nordea Bank"' }),
+        address: addressSchema.meta({
+          description: "Owning bank's EVM address — holds admin / minter / burner on this token",
+        }),
+      })
+      .meta({ id: 'TbdBank', description: 'The commercial bank that owns this TBD token' }),
+    reserve: z
+      .object({
+        wnokBalance: bigIntStringSchema.meta({
+          description: "Owning bank's WNOK balance — the central-bank-money reserve",
+        }),
+        backed: z.boolean().meta({
+          description:
+            'True when the bank WNOK reserve covers the TBD supply (reserve >= totalSupply). ' +
+            'Informational only — 1:1 backing is not enforced on-chain.',
+        }),
+        bankAllowlisted: z.boolean().meta({
+          description:
+            "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the " +
+            'WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination.',
+        }),
+      })
+      .nullable()
+      .meta({
+        id: 'TbdReserve',
+        description: 'WNOK reserve backing (informational). Null when WNOK is unreachable.',
+      }),
+    government: z
+      .object({
+        nominated: z.boolean().meta({
+          description:
+            'True when a government reserve account is set (enables the gov-reserve mint path)',
+        }),
+        reserveAddress: addressSchema.nullable().meta({
+          description: 'The government reserve account, or null when not nominated',
+        }),
+      })
+      .meta({ id: 'TbdGovernment', description: 'Government-nomination state for this token' }),
+    holders: z
+      .array(tbdHolderSchema)
+      .meta({ description: 'Allowlisted addresses with their TBD balances (sandbox-scale)' }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'TbdToken',
+    description:
+      'A tokenized bank deposit (TBD) — one ERC-20 per commercial bank, allowlist-gated and ' +
+      'WNOK-reserve-backed. The same DTO is returned by the list and the single-token GET.',
+  });
+
+const tbdMintBurnBodySchema = z
+  .object({
+    address: addressSchema.meta({ description: 'Target address (must be on the TBD allowlist)' }),
+    amount: bigIntStringSchema.meta({ description: 'Amount in whole TBD units (decimals = 0)' }),
+  })
+  .meta({
+    id: 'TbdMintBurnBody',
+    description: 'Body for TBD mint / burn operations',
+  });
+
+const tbdTransferBodySchema = z
+  .object({
+    to: addressSchema,
+    amount: bigIntStringSchema,
+  })
+  .meta({
+    id: 'TbdTransferBody',
+    description: "Body for a transfer from the owning bank's account",
+  });
+
+const bankInfoSchema = z
+  .object({
+    name: z.string().meta({ description: 'Bank label, e.g. "Nordea Bank"' }),
+    address: addressSchema.meta({
+      description: "The bank's EVM address — the signer for its own TBD operations",
+    }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'BankInfo',
+    description:
+      'A configured bank the operator can act as. The server holds the signing key; only the ' +
+      'address is exposed. Feeds the UI bank selector.',
+  });
+
+// #endregion
+
 // #region Health ─────────────────────────────────────────────────────
 
 const healthContractsSchema = z
@@ -844,6 +957,20 @@ const testModeQueryParam = {
 const bidderAddressPathParam = {
   in: 'path' as const,
   name: 'address',
+  required: true,
+  schema: { $ref: '#/components/schemas/Address' },
+};
+
+const tbdAddressPathParam = {
+  in: 'path' as const,
+  name: 'address',
+  required: true,
+  schema: { $ref: '#/components/schemas/Address' },
+};
+
+const tbdHolderPathParam = {
+  in: 'path' as const,
+  name: 'holder',
   required: true,
   schema: { $ref: '#/components/schemas/Address' },
 };
@@ -1226,6 +1353,112 @@ const paths: ZodOpenApiPathsObject = {
     },
   },
 
+  // banking ────────────────────────────────────────
+  '/v1/banking/banks': {
+    get: {
+      tags: ['banking'],
+      operationId: 'listBanks',
+      summary: 'List the configured banks the operator can act as (signer selector)',
+      responses: {
+        200: successJson('Configured banks', z.array(bankInfoSchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/banking/tbd': {
+    get: {
+      tags: ['banking'],
+      operationId: 'listTbd',
+      summary: 'List all deployed TBD tokens (one per bank) with supply, reserve, and holders',
+      responses: {
+        200: successJson('TBD tokens', z.array(tbdTokenSchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}': {
+    get: {
+      tags: ['banking'],
+      operationId: 'getTbd',
+      summary: 'Get one TBD token by its contract address',
+      parameters: [tbdAddressPathParam],
+      responses: {
+        200: successJson('TBD token', tbdTokenSchema),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/allowlist/{holder}': {
+    put: {
+      tags: ['banking'],
+      operationId: 'addToTbdAllowlist',
+      summary: "Add an address to a TBD's allowlist (signed by the owning bank; idempotent)",
+      parameters: [tbdAddressPathParam, tbdHolderPathParam],
+      responses: {
+        200: successJson('Transaction reference for the on-chain add', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+    delete: {
+      tags: ['banking'],
+      operationId: 'removeFromTbdAllowlist',
+      summary: "Remove an address from a TBD's allowlist (signed by the owning bank; idempotent)",
+      parameters: [tbdAddressPathParam, tbdHolderPathParam],
+      responses: {
+        200: successJson('Transaction reference for the on-chain remove', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/mint': {
+    post: {
+      tags: ['banking'],
+      operationId: 'mintTbd',
+      summary: 'Mint TBD to an allowlisted address (signed by the owning bank)',
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the mint', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/burn': {
+    post: {
+      tags: ['banking'],
+      operationId: 'burnTbd',
+      summary: 'Burn TBD from an allowlisted address (signed by the owning bank)',
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdMintBurnBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the burn', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}/transfer': {
+    post: {
+      tags: ['banking'],
+      operationId: 'transferTbd',
+      summary: "Transfer TBD from the owning bank's account to an allowlisted recipient",
+      parameters: [tbdAddressPathParam],
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: tbdTransferBodySchema } },
+      },
+      responses: {
+        200: successJson('Transaction reference for the transfer', transactionRefSchema),
+        ...errorRefs.mutate,
+      },
+    },
+  },
+
   // admin ──────────────────────────────────────────
   '/v1/admin/restart-ingestion': {
     post: {
@@ -1324,6 +1557,13 @@ export const openApiDocument = createDocument({
         'Role and returns 403 otherwise. Sandbox-only.',
     },
     {
+      name: 'banking',
+      description:
+        'Commercial-bank tokenized deposits (TBD): one ERC-20 per bank, with supply, WNOK ' +
+        'reserve backing, holders, and (mutations) allowlist / mint / burn / transfer. ' +
+        'Operator-only — entra mode requires an operator App Role (403 otherwise). Sandbox-only.',
+    },
+    {
       name: 'admin',
       description:
         'Operator-only ingestion lifecycle (restart loop, drop-and-rebuild projection). ' +
@@ -1417,6 +1657,8 @@ export {
   transactionRefSchema,
   wnokMintBurnBodySchema,
   wnokTransferBodySchema,
+  tbdMintBurnBodySchema,
+  tbdTransferBodySchema,
 };
 
 export type Address = z.infer<typeof addressSchema>;
@@ -1458,5 +1700,7 @@ export type AllowlistEntry = z.infer<typeof allowlistEntrySchema>;
 export type TransactionRefDto = z.infer<typeof transactionRefSchema>;
 export type WnokMintBurnBody = z.infer<typeof wnokMintBurnBodySchema>;
 export type WnokTransferBody = z.infer<typeof wnokTransferBodySchema>;
+export type TbdMintBurnBody = z.infer<typeof tbdMintBurnBodySchema>;
+export type TbdTransferBody = z.infer<typeof tbdTransferBodySchema>;
 
 // #endregion

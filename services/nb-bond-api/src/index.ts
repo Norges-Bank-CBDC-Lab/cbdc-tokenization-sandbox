@@ -63,6 +63,8 @@ import {
   type FinaliseBody,
   type HoldersBody,
   type SubmitBidBody,
+  type TbdMintBurnBody,
+  type TbdTransferBody,
   type WnokMintBurnBody,
   type WnokTransferBody,
   auctionIdParamSchema,
@@ -76,6 +78,8 @@ import {
   isinParamSchema,
   openApiDocument,
   submitBidBodySchema,
+  tbdMintBurnBodySchema,
+  tbdTransferBodySchema,
   wnokMintBurnBodySchema,
   wnokTransferBodySchema,
 } from './schemas';
@@ -105,6 +109,16 @@ import {
 } from './central-bank';
 import { withMd5 } from './http';
 import { provider } from './chain';
+import {
+  addTbdAllowlist,
+  burnTbd,
+  getTbdToken,
+  listConfiguredBanks,
+  listTbdTokens,
+  mintTbd,
+  removeTbdAllowlist,
+  transferTbd,
+} from './banking-tbd';
 
 const sealingKeys: SealingKeypair = initSealingKeypair(envVariables.AUCTION_OWNER_SEAL_PK);
 
@@ -1268,6 +1282,154 @@ app.post(
         mapCentralBankError(err);
         return;
       }
+      okResponse(req, res, ref);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// #endregion
+
+// #region Banking (TBD) ──────────────────────────────────────────────
+
+// Banking (TBD) is operator-only — same prefix-guard model as Central Bank.
+// No-op in `none` mode; 403 for non-operator tokens in `entra` mode.
+app.use('/v1/banking', requireAnyRole(operatorRoles));
+
+app.get('/v1/banking/tbd', async (req, res, next) => {
+  try {
+    okResponse(req, res, await listTbdTokens());
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/v1/banking/tbd/:address', async (req, res, next) => {
+  try {
+    const { address } = req.params as { address: string };
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      throw badRequest('address must be a valid EVM address');
+    }
+    const token = await getTbdToken(address);
+    if (!token) throw notFound(`no TBD token registered at ${address}`);
+    okResponse(req, res, token);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.get('/v1/banking/banks', async (req, res, next) => {
+  try {
+    okResponse(
+      req,
+      res,
+      listConfiguredBanks().map((b) => withMd5(b)),
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.put('/v1/banking/tbd/:address/allowlist/:holder', async (req, res, next) => {
+  try {
+    const { address, holder } = req.params as { address: string; holder: string };
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address) || !/^0x[a-fA-F0-9]{40}$/.test(holder)) {
+      throw badRequest('address and holder must be valid EVM addresses');
+    }
+    const ref = await addTbdAllowlist(address, holder);
+    if (!ref) throw notFound(`no TBD token registered at ${address}`);
+    okResponse(req, res, ref);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete('/v1/banking/tbd/:address/allowlist/:holder', async (req, res, next) => {
+  try {
+    const { address, holder } = req.params as { address: string; holder: string };
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address) || !/^0x[a-fA-F0-9]{40}$/.test(holder)) {
+      throw badRequest('address and holder must be valid EVM addresses');
+    }
+    const ref = await removeTbdAllowlist(address, holder);
+    if (!ref) throw notFound(`no TBD token registered at ${address}`);
+    okResponse(req, res, ref);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post(
+  '/v1/banking/tbd/:address/mint',
+  validateRequest(tbdMintBurnBodySchema),
+  async (req, res, next) => {
+    try {
+      const { address } = req.params as { address: string };
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        throw badRequest('address must be a valid EVM address');
+      }
+      const body = req.body as TbdMintBurnBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      const ref = await mintTbd(address, body.address, amount);
+      if (!ref) throw notFound(`no TBD token registered at ${address}`);
+      okResponse(req, res, ref);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+app.post(
+  '/v1/banking/tbd/:address/burn',
+  validateRequest(tbdMintBurnBodySchema),
+  async (req, res, next) => {
+    try {
+      const { address } = req.params as { address: string };
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        throw badRequest('address must be a valid EVM address');
+      }
+      const body = req.body as TbdMintBurnBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      const ref = await burnTbd(address, body.address, amount);
+      if (!ref) throw notFound(`no TBD token registered at ${address}`);
+      okResponse(req, res, ref);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+app.post(
+  '/v1/banking/tbd/:address/transfer',
+  validateRequest(tbdTransferBodySchema),
+  async (req, res, next) => {
+    try {
+      const { address } = req.params as { address: string };
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        throw badRequest('address must be a valid EVM address');
+      }
+      const body = req.body as TbdTransferBody;
+      let amount: bigint;
+      try {
+        amount = BigInt(body.amount);
+      } catch {
+        throw badRequest('amount must be a decimal uint256 string');
+      }
+      if (amount <= 0n) throw badRequest('amount must be positive');
+      const ref = await transferTbd(address, body.to, amount);
+      if (!ref) throw notFound(`no TBD token registered at ${address}`);
       okResponse(req, res, ref);
     } catch (err) {
       next(err);

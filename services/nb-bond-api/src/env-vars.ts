@@ -22,6 +22,10 @@ const envSchema = z.object({
   // Registry name for the WNOK contract. Matches WNOK_CONTRACT_NAME in
   // contracts/.env. Default matches the local sandbox deploy.
   WNOK_CONTRACT_NAME: z.string().min(1).default('Wholesale NOK'),
+  // Registry names for the per-bank TBD (tokenized bank deposit) contracts.
+  // Match TBD_*_CONTRACT_NAME in contracts/.env; defaults match the local deploy.
+  TBD_NORDEA_CONTRACT_NAME: z.string().min(1).default('TBD Nordea'),
+  TBD_DNB_CONTRACT_NAME: z.string().min(1).default('TBD DNB'),
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),

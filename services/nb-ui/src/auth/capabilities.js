@@ -22,14 +22,14 @@ function parseRoleList(value) {
 const operatorRoles = parseRoleList(AppConfig.AUTH_OPERATOR_ROLES);
 const testerRoles = parseRoleList(AppConfig.AUTH_TESTER_ROLES);
 
-const FULL_ACCESS = { canUseApp: true, canAccessCentralBank: true };
-const NO_ACCESS = { canUseApp: false, canAccessCentralBank: false };
+const FULL_ACCESS = { canUseApp: true, canAccessCentralBank: true, canAccessBanking: true };
+const NO_ACCESS = { canUseApp: false, canAccessCentralBank: false, canAccessBanking: false };
 
 /**
  * Derive capability flags for an account.
  *
  * @param {{ roles?: string[] } | null} account
- * @returns {{ canUseApp: boolean, canAccessCentralBank: boolean }}
+ * @returns {{ canUseApp: boolean, canAccessCentralBank: boolean, canAccessBanking: boolean }}
  */
 export function capabilitiesForAccount(account) {
   // Non-interactive auth (local sandbox) is fully open.
@@ -41,5 +41,6 @@ export function capabilitiesForAccount(account) {
   return {
     canUseApp: isOperator || isTester,
     canAccessCentralBank: isOperator,
+    canAccessBanking: isOperator,
   };
 }
