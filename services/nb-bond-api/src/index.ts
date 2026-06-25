@@ -121,6 +121,7 @@ import {
   removeTbdAllowlist,
   transferTbd,
 } from './banking-tbd';
+import { listRegisteredContracts } from './registry';
 
 const sealingKeys: SealingKeypair = initSealingKeypair(envVariables.AUCTION_OWNER_SEAL_PK);
 
@@ -1105,6 +1106,15 @@ function toAllowlistEntry(address: string) {
 // Central Bank is operator-only. This single prefix guard covers every
 // /v1/central-bank route below. No-op in `none` mode; 403 for non-operator
 // tokens in `entra` mode.
+app.get('/v1/registry', async (req, res, next) => {
+  try {
+    const contracts = await listRegisteredContracts();
+    okResponse(req, res, contracts);
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use('/v1/central-bank', requireAnyRole(operatorRoles));
 
 app.get('/v1/central-bank', async (req, res, next) => {

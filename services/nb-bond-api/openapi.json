@@ -859,6 +859,38 @@
         }
       }
     },
+    "/v1/registry": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "listRegistry",
+        "summary": "List contracts registered in the GlobalRegistry",
+        "responses": {
+          "200": {
+            "description": "Registered contracts (name -> address); the GlobalRegistry itself is first.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegisteredContract"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/bidders": {
       "get": {
         "tags": [
@@ -3404,6 +3436,24 @@
         ],
         "additionalProperties": false,
         "description": "Auction or bond event observed on-chain"
+      },
+      "RegisteredContract": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name the contract is registered under in GlobalRegistry"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": [
+          "name",
+          "address"
+        ],
+        "additionalProperties": false,
+        "description": "A contract registered in the GlobalRegistry (name -> address)"
       },
       "Bidder": {
         "type": "object",

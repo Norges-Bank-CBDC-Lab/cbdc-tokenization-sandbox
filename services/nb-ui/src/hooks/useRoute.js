@@ -41,6 +41,9 @@ export function parseHash(hash) {
   if (section === 'tbd') {
     return { name: 'tbd' };
   }
+  if (section === 'registry') {
+    return { name: 'registry' };
+  }
   return { name: 'bonds' };
 }
 

@@ -517,6 +517,18 @@ const centralBankSchema = z
     description: 'Central Bank operator summary',
   });
 
+const registeredContractSchema = z
+  .object({
+    name: z
+      .string()
+      .meta({ description: 'Name the contract is registered under in GlobalRegistry' }),
+    address: addressSchema,
+  })
+  .meta({
+    id: 'RegisteredContract',
+    description: 'A contract registered in the GlobalRegistry (name -> address)',
+  });
+
 const wnokMintBurnBodySchema = z
   .object({
     address: addressSchema.meta({
@@ -1207,6 +1219,19 @@ const paths: ZodOpenApiPathsObject = {
     },
   },
   // bidders ────────────────────────────────────────
+  '/v1/registry': {
+    get: {
+      tags: ['system'],
+      operationId: 'listRegistry',
+      summary: 'List contracts registered in the GlobalRegistry',
+      responses: {
+        200: successJson(
+          'Registered contracts (name -> address); the GlobalRegistry itself is first.',
+          z.array(registeredContractSchema),
+        ),
+      },
+    },
+  },
   '/v1/bidders': {
     get: {
       tags: ['bidders'],
