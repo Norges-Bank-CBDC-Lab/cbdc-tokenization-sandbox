@@ -38,7 +38,7 @@ Give the sandbox operator a **Banking → TBD** page that surfaces every deploye
 - **Deploy a new bank's TBD from the UI** (operator-chosen: manage existing first). Tracked as a fast follow-up — needs a new deploy endpoint + form.
 - **Coupon payout page** and **Stocks page** (nav placeholders only here).
 - **Cross-bank `cct` transfer test action** and a **roles editor** per TBD (phase-2 candidates).
-- **Contract hardening of `cctSetToAddr`** (no access control — in-code `//TODO`). Flag for a separate contracts PR; see Residual Risks.
+- **Contract hardening of `cctSetToAddr`** (no access control — in-code `//TODO`). To be folded into the ERC-3643 contract refactor (ADR 0002) — the planned window to revisit all contracts, TBD included; see Residual Risks.
 
 ## Folder And File Placement
 
@@ -62,8 +62,8 @@ Give the sandbox operator a **Banking → TBD** page that surfaces every deploye
 | **D5 Banking RBAC gate** *(resolved)* | — | Add `canAccessBanking`, operator-gated parallel to central bank; `none` mode open | ✅ yes |
 | **D6 Signer selection** *(resolved, refined)* | — | UI **bank-selector dropdown** lists the configured banks (name/address — **never private keys**); the operator chooses which bank signs and the API maps the choice to a server-side key. Enabled in **both** `none` (sandbox) and `entra` (azure). Key-custody model revisited later. | ✅ refined |
 | **D7 TBD discovery** *(resolved)* | — | v1: config list (`TBD_*_CONTRACT_NAME`) resolved via `GlobalRegistry`. **Future:** add a `GlobalRegistry` view returning all TBDs (enumeration) for dynamic discovery — also supports deploy-new-bank. | ✅ yes |
-| **D8 v1 read depth** *(explained; pending)* | minimal (supply + bank) vs enriched | Enriched: also reserve backing (bank WNOK vs TBD supply), per-holder balances, gov-nominated flag; defer cross-bank `cct` history + roles editor | Operator deciding |
-| **D9 `cctSetToAddr` hardening** *(explained; pending)* | this plan / separate contracts PR / accept | Separate contracts PR — Solidity change, and cross-bank UI is not in v1 | Operator deciding |
+| **D8 v1 read depth** *(resolved)* | — | Enriched: reserve backing (bank WNOK vs TBD supply), per-holder balances, gov-nominated flag; defer cross-bank `cct` history + roles editor | ✅ enriched |
+| **D9 `cctSetToAddr` hardening** *(resolved)* | — | **Not a separate PR.** Folded into the ERC-3643 contract refactor (ADR 0002), which is the window to revisit all contracts (TBD included). Out of scope for this UI work. | ✅ defer to ERC-3643 refactor |
 
 ## Portability Flags
 
@@ -235,7 +235,7 @@ Branch / commit / PR / CI gates owned by `sandbox-pr-workflow`.
 ## Residual Risks
 
 - **Per-bank key custody (D6)** is a sandbox-only convenience and must not leak into a non-local deployment design.
-- **`cctSetToAddr` has no access control** (in-code `//TODO`). Out of scope here; recommend a separate contracts PR to add a role guard before any cross-bank `cct` test action is built (a phase-2 feature would otherwise expose it through the UI).
+- **`cctSetToAddr` has no access control** (in-code `//TODO`). Out of scope here; to be addressed during the **ERC-3643 contract refactor (ADR 0002)** — the planned window to revisit all contracts, TBD included — before any cross-bank `cct` test action is built (a later feature would otherwise expose it through the UI).
 - **TBD discovery via config list (D7)** won't see a bank deployed after startup until the config/registry-enumeration follow-up lands — acceptable while deploy-from-UI is deferred.
 
 ## Done Criteria
