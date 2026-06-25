@@ -23,7 +23,7 @@ import {
 
 import { tbdAbi } from './abi';
 import { deriveBidderAddress, deriveFixturePrivateKey } from './bidders';
-import { getWnok, provider, resolveRegisteredAddress } from './chain';
+import { getBondManager, getWnok, provider, resolveRegisteredAddress } from './chain';
 import { envVariables } from './env-vars';
 import { withMd5 } from './http';
 
@@ -223,4 +223,17 @@ export function listConfiguredBanks(): { name: string; address: string }[] {
     name: b.bankName,
     address: deriveBidderAddress(deriveFixturePrivateKey(b.role)),
   }));
+}
+
+/**
+ * The bank whose tokenized deposit (TBD) settles government bond payments —
+ * `BondManager.GOV_TBD` resolved against the configured roster. Name is
+ * `'Unknown'` when GOV_TBD points at a TBD that is not in the roster.
+ */
+export async function getGovSettlementBank(): Promise<{ name: string; address: string }> {
+  const manager = await getBondManager();
+  const govTbd = getAddress((await manager.GOV_TBD()) as string);
+  const tbds = await resolveConfiguredTbds();
+  const match = tbds.find((t) => t.address === govTbd);
+  return { name: match?.bankName ?? 'Unknown', address: govTbd };
 }

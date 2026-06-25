@@ -3481,6 +3481,10 @@
                     "description": "CB account balance in 1-NOK units",
                     "$ref": "#/components/schemas/BigIntString"
                   },
+                  "totalSupply": {
+                    "description": "Total WNOK in existence (minted minus burned), in 1-NOK units",
+                    "$ref": "#/components/schemas/BigIntString"
+                  },
                   "allowlistSize": {
                     "type": "integer",
                     "minimum": 0,
@@ -3490,6 +3494,7 @@
                 "required": [
                   "contractAddress",
                   "balance",
+                  "totalSupply",
                   "allowlistSize"
                 ],
                 "additionalProperties": false
@@ -3499,6 +3504,31 @@
               }
             ],
             "description": "WNOK binding state. Null when WNOK is unreachable."
+          },
+          "govSettlementBank": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Bank whose TBD settles government bond payments"
+                  },
+                  "address": {
+                    "$ref": "#/components/schemas/Address"
+                  }
+                },
+                "required": [
+                  "name",
+                  "address"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "BondManager.GOV_TBD resolved to a configured bank — the government's bond-payment settlement bank. Null when BondManager is unavailable."
           },
           "md5": {
             "type": "string",
@@ -3512,6 +3542,7 @@
           "address",
           "available",
           "wnok",
+          "govSettlementBank",
           "md5"
         ],
         "additionalProperties": false,

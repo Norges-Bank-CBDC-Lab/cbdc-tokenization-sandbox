@@ -2,10 +2,10 @@
  * CentralBankPage — Norges Bank operator surface against WNOK.
  *
  * Surfaces:
- *  - CB account address, WNOK contract address, CB balance, allowlist size
- *  - Allowlist editor (add/remove)
- *  - Mint / Burn / Transfer modals (all transactions originate from the
- *    CB account, gated by MINTER/BURNER roles + the WNOK allowlist)
+ *  - KPIs: WNOK balance (at CB), supply, in-circulation, government settlement bank
+ *  - Addresses (CB account + WNOK contract) and the allowlist editor (add/remove)
+ *  - Mint / Burn / Transfer actions in the header (all transactions originate
+ *    from the CB account, gated by MINTER/BURNER roles + the WNOK allowlist)
  *
  * The API returns `available: false` when CENTRAL_BANK_PK is unset
  * or the WNOK contract isn't registered — we render an empty state
@@ -113,6 +113,19 @@ export function CentralBankPage() {
           </div>
         </div>
         <div className="actions">
+          {cb.available && (
+            <>
+              <Button variant="ghost" onClick={() => setShowMint(true)}>
+                Mint
+              </Button>
+              <Button variant="ghost" onClick={() => setShowBurn(true)}>
+                Burn
+              </Button>
+              <Button variant="ghost" onClick={() => setShowTransfer(true)}>
+                Transfer
+              </Button>
+            </>
+          )}
           <Button onClick={reloadAll} variant="ghost">
             Refresh
           </Button>
@@ -138,32 +151,37 @@ export function CentralBankPage() {
         <>
           <div className="kpi-grid">
             <div className="kpi">
-              <div className="kpi-label">CB account</div>
-              <div className="kpi-value mono" style={{ fontSize: 14 }}>
-                {Fmt.shortHex(cb.address, 10, 8)}
-              </div>
-              <div className="kpi-sub">
-                {onAllowlist ? 'On allowlist — can transfer' : 'Not allowlisted'}
-              </div>
-            </div>
-            <div className="kpi">
               <div className="kpi-label">WNOK balance</div>
               <div className="kpi-value mono">{Fmt.formatUnits(cb.wnok.balance)}</div>
               <div className="kpi-sub">Held by the CB account</div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">Allowlist size</div>
-              <div className="kpi-value">{cb.wnok.allowlistSize}</div>
-              <div className="kpi-sub">Addresses permitted to send / receive</div>
+              <div className="kpi-label">WNOK supply</div>
+              <div className="kpi-value mono">{Fmt.formatUnits(cb.wnok.totalSupply ?? '0')}</div>
+              <div className="kpi-sub">Total minted minus burned</div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">WNOK contract</div>
-              <div className="kpi-value mono" style={{ fontSize: 14 }}>
-                {Fmt.shortHex(cb.wnok.contractAddress, 10, 8)}
+              <div className="kpi-label">In circulation</div>
+              <div className="kpi-value mono">
+                {Fmt.formatUnits(
+                  (BigInt(cb.wnok.totalSupply ?? '0') - BigInt(cb.wnok.balance ?? '0')).toString(),
+                )}
               </div>
-              <div className="kpi-sub">From GlobalRegistry</div>
+              <div className="kpi-sub">WNOK held outside the CB</div>
+            </div>
+            <div className="kpi">
+              <div className="kpi-label">Government bank</div>
+              <div className="kpi-value">{cb.govSettlementBank?.name ?? '—'}</div>
+              <div className="kpi-sub">Settles bond coupon / redemption</div>
             </div>
           </div>
+
+          {!onAllowlist && (
+            <div className="hint" style={{ marginBottom: 16 }}>
+              Heads-up: the CB account is not on its own WNOK allowlist. Transfers from CB will
+              revert until the operator adds it to the allowlist below.
+            </div>
+          )}
 
           <div className="card">
             <div className="card-header">
@@ -184,31 +202,6 @@ export function CentralBankPage() {
                   <CopyableHex value={cb.wnok.contractAddress} />
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">WNOK actions</h3>
-            </div>
-            <div className="card-body">
-              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                <Button variant="primary" onClick={() => setShowMint(true)}>
-                  Mint
-                </Button>
-                <Button variant="danger" onClick={() => setShowBurn(true)}>
-                  Burn
-                </Button>
-                <Button variant="ghost" onClick={() => setShowTransfer(true)}>
-                  Transfer from CB
-                </Button>
-              </div>
-              {!onAllowlist && (
-                <div className="hint" style={{ marginTop: 8 }}>
-                  Heads-up: the CB account is not on its own WNOK allowlist. Transfers from CB will
-                  revert until the operator adds it here.
-                </div>
-              )}
             </div>
           </div>
 

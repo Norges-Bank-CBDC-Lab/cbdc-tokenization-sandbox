@@ -491,11 +491,24 @@ const centralBankSchema = z
       .object({
         contractAddress: addressSchema,
         balance: bigIntStringSchema.meta({ description: 'CB account balance in 1-NOK units' }),
+        totalSupply: bigIntStringSchema.meta({
+          description: 'Total WNOK in existence (minted minus burned), in 1-NOK units',
+        }),
         allowlistSize: z.number().int().nonnegative(),
       })
       .nullable()
       .meta({
         description: 'WNOK binding state. Null when WNOK is unreachable.',
+      }),
+    govSettlementBank: z
+      .object({
+        name: z.string().meta({ description: 'Bank whose TBD settles government bond payments' }),
+        address: addressSchema,
+      })
+      .nullable()
+      .meta({
+        description:
+          "BondManager.GOV_TBD resolved to a configured bank — the government's bond-payment settlement bank. Null when BondManager is unavailable.",
       }),
     md5: md5Schema,
   })
