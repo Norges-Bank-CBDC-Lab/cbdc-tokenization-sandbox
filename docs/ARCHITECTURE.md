@@ -240,6 +240,9 @@ The UI is a thin client over the NB Bond API:
   operators get full access including the Central Bank page, testers get the UI
   without it, and an unrecognised account sees an access-denied screen. The NB
   Bond API enforces the same roles server-side; `none` mode is ungated
+- the operator pages include **Banking** (`#/tbd`) — per-bank tokenized bank
+  deposits managed against the `/v1/banking/*` surface — alongside the Central
+  Bank (WNOK) page; the top nav is grouped into dropdown categories
 
 Deployment shape in the local sandbox: a multi-stage Dockerfile in
 `services/nb-ui/` builds the React bundle inside the Node builder image
