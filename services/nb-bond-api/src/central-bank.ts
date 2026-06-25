@@ -96,6 +96,12 @@ export async function getCbWnokBalance(): Promise<bigint> {
   return bal;
 }
 
+/** Read total WNOK supply (minted minus burned) via the bound contract. */
+export async function getWnokTotalSupply(): Promise<bigint> {
+  const wnok = await getWnokContract();
+  return (await wnok.totalSupply()) as bigint;
+}
+
 /** Read the full WNOK allowlist (sandbox-scale; contract returns one array). */
 export async function listAllowlist(): Promise<string[]> {
   const wnok = await getWnokContract();

@@ -101,6 +101,7 @@ import {
   burnWnok,
   getCbAddress,
   getCbWnokBalance,
+  getWnokTotalSupply,
   isCentralBankReady,
   listAllowlist,
   mintWnok,
@@ -112,6 +113,7 @@ import { provider } from './chain';
 import {
   addTbdAllowlist,
   burnTbd,
+  getGovSettlementBank,
   getTbdToken,
   listConfiguredBanks,
   listTbdTokens,
@@ -1118,6 +1120,7 @@ app.get('/v1/central-bank', async (req, res, next) => {
             : '0x0000000000000000000000000000000000000000',
           available: false,
           wnok: null,
+          govSettlementBank: null,
         }),
       );
       return;
@@ -1131,13 +1134,16 @@ app.get('/v1/central-bank', async (req, res, next) => {
           address: getCbAddress(),
           available: false,
           wnok: null,
+          govSettlementBank: null,
         }),
       );
       return;
     }
-    const [balance, allowlist] = await Promise.all([
+    const [balance, allowlist, totalSupply, govSettlementBank] = await Promise.all([
       getCbWnokBalance().catch(() => 0n),
       listAllowlist().catch(() => [] as string[]),
+      getWnokTotalSupply().catch(() => 0n),
+      getGovSettlementBank().catch(() => null),
     ]);
     okResponse(
       req,
@@ -1148,8 +1154,10 @@ app.get('/v1/central-bank', async (req, res, next) => {
         wnok: {
           contractAddress: wnokAddr,
           balance: balance.toString(),
+          totalSupply: totalSupply.toString(),
           allowlistSize: allowlist.length,
         },
+        govSettlementBank,
       }),
     );
   } catch (err) {

@@ -30,7 +30,7 @@ Make the existing WNOK allowlist on the Central Bank page legible: each allowlis
 
 | Decision | Options | Recommendation | Needed from operator |
 |---|---|---|---|
-| Labels only vs labels + balances | labels / labels + balances | Labels first (the legibility win); balances as a fast follow if wanted | Confirm |
+| Labels only vs labels + balances | labels / labels + balances | Labels first (the legibility win). If balances are added, keep them off the ETag-cached labelled list — they're volatile (see Residual Risks) | Confirm |
 | Where labelling lives | backend-enriched DTO / frontend-resolved | Backend-enriched — keeps the client thin and lets the WNOK surface own its shape | Confirm |
 | Recognise TBD *contracts* on the allowlist | yes / no | Yes — that's the missing piece; resolve via the banking roster + GlobalRegistry | Confirm |
 
@@ -68,7 +68,9 @@ Phase 4  Docs + public-repo hygiene
 ## Residual Risks
 
 - Address→entity resolution must stay cheap (sandbox-scale allowlist) — cache the roster/registry lookups per request.
-- Keep the central-bank DTO independent of `TbdToken` so the WNOK page can diverge over time.
+- Keep the central-bank DTO independent of `TbdToken` so the WNOK page can diverge over time — **but** put the address→entity resolver itself in one shared backend module used by both the WNOK and (future) TBD enrichment, so "what counts as a bank / TBD / gov-reserve" can't drift between the two surfaces. Separate UI components, shared resolution logic.
+- **Balances are volatile and fight the ETag cache.** The allowlist response carries an `md5` for the 304 protocol the operator UI relies on. Labels are stable, but a WNOK `balance` changes on every mint / burn / transfer, so folding it into the labelled list would churn the md5 and defeat caching. If balances are added, keep them off the cacheable labelled list — a separate read or an opt-in `?include=balance` flag — and treat them as best-effort.
+- **Balances add a chain-read dependency.** Labels resolve from in-memory rosters (cheap); per-entry `balanceOf` is N on-chain reads that pull this endpoint into the "request-path chain reads bubble up as opaque 500s" failure mode (`docs/KNOWN_ISSUES.md`) when Besu is briefly unreachable. Another reason to ship labels first.
 
 ## Done Criteria
 

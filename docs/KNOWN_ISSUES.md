@@ -246,3 +246,24 @@ visible at a glance.
   `@babel/core` + `@babel/preset-env` rows in `THIRD_PARTY_LICENSES.md`, and
   verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
   (not merged) with this rationale.
+
+## BondManager hard-codes the government settlement bank (`GOV_TBD`)
+- `BondManager` stores the government's cash-leg settlement bank as an `immutable`
+  — `GOV_TBD`, with `_GOV_RESERVE` derived from `ITbd(GOV_TBD).govReserve()`
+  (`contracts/src/norges-bank/BondManager.sol:46-94`). It is the TBD (tokenized
+  bank deposit) whose tokens settle bond coupon and redemption payments
+  (`payCoupon`, `redeem`); in the local sandbox it is wired to Nordea
+  (`TBD_NORDEA_CONTRACT_NAME`, resolved from GlobalRegistry at deploy —
+  `contracts/script/norges-bank/10_Bond.s.sol:26`, `11_BondSetup.s.sol:32`).
+- Because it is `immutable`, switching the government's agent bank requires
+  redeploying `BondManager` and re-wiring the bond stack. The source of truth is
+  also split: the deploy resolves the bank from a GlobalRegistry name, then freezes
+  it on `BondManager`. This is fine for the single-bank sandbox but is the wrong
+  long-term home — "who settles government cash" is a settlement / governance
+  concern, not a bond-contract detail.
+- Planned follow-up: move the designation to mutable, well-modelled state — either a
+  stable, resolvable GlobalRegistry entry (e.g. a `Gov TBD` name) or the settlement
+  layer / `PrimaryDealerRegistry` introduced by
+  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md),
+  so the agent bank can change without a redeploy. The operator Central Bank page
+  surfaces the current value by reading `BondManager.GOV_TBD()`.
