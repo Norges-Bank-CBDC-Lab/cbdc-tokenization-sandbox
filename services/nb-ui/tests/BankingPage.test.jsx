@@ -26,7 +26,7 @@ const nordea = {
   decimals: 0,
   totalSupply: '10000',
   bank: { name: 'Nordea Bank', address: `0x${'a'.repeat(40)}` },
-  reserve: { wnokBalance: '1100000', backed: true },
+  reserve: { wnokBalance: '1100000', backed: true, bankAllowlisted: true },
   government: { nominated: true, reserveAddress: `0x${'b'.repeat(40)}` },
   holders: [{ address: `0x${'c'.repeat(40)}`, balance: '10000' }],
   md5: 'x',
@@ -37,7 +37,7 @@ const dnb = {
   name: 'TBD DNB',
   symbol: 'TBDdnb',
   bank: { name: 'DNB Bank', address: `0x${'d'.repeat(40)}` },
-  reserve: { wnokBalance: '1200000', backed: true },
+  reserve: { wnokBalance: '1200000', backed: true, bankAllowlisted: true },
   government: { nominated: false, reserveAddress: null },
 };
 
@@ -68,6 +68,8 @@ describe('BankingPage', () => {
     expect(screen.getByRole('button', { name: 'Mint' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Burn' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Transfer' })).toBeInTheDocument();
+    // The WNOK-settlement indicator reflects the bank's WNOK allowlist status.
+    expect(screen.getByText('Allowlisted')).toBeInTheDocument();
   });
 
   it('renders an empty state when no TBDs are registered', async () => {

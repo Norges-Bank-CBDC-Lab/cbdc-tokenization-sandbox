@@ -9,7 +9,7 @@
  *
  * Sandbox-only — per-bank signing keys are local fixtures.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BankingApi } from '../api/bankingApi.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Fmt } from '../utils/format.js';
@@ -27,16 +27,37 @@ import { AddTbdAllowlistModal } from './AddTbdAllowlistModal.jsx';
 import { TbdMintBurnModal } from './TbdMintBurnModal.jsx';
 import { TransferTbdModal } from './TransferTbdModal.jsx';
 
+const PAGE_SIZE = 5;
+
 export function BankingPage() {
   const tbdQ = useApi(() => BankingApi.listTbd(), []);
   const banksQ = useApi(() => BankingApi.listBanks(), []);
   const [selectedBank, setSelectedBank] = useState('');
   const [modal, setModal] = useState(null);
+  const [page, setPage] = useState(0);
   const toast = useToast();
 
   const removeMut = useMutation(({ tbdAddress, holder }) =>
     BankingApi.removeFromAllowlist(tbdAddress, holder),
   );
+
+  // Keep the overview showing the selected ("acting as") bank's page. Manual
+  // Next/Prev still browse freely — this only re-syncs when the selection or
+  // the underlying data changes.
+  useEffect(() => {
+    const list = tbdQ.data ?? [];
+    const active = (
+      selectedBank ||
+      banksQ.data?.[0]?.address ||
+      list[0]?.bank.address ||
+      ''
+    ).toLowerCase();
+    const idx = list.findIndex((t) => t.bank.address.toLowerCase() === active);
+    if (idx >= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPage(Math.floor(idx / PAGE_SIZE));
+    }
+  }, [selectedBank, tbdQ.data, banksQ.data]);
 
   function reload() {
     tbdQ.reload();
@@ -65,6 +86,9 @@ export function BankingPage() {
   const options = banks.length ? banks : tokens.map((t) => t.bank);
   const activeBank = (selectedBank || options[0]?.address || '').toLowerCase();
   const token = tokens.find((t) => t.bank.address.toLowerCase() === activeBank) ?? null;
+  const pageCount = Math.max(1, Math.ceil(tokens.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedTokens = tokens.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
 
   function onMutated(kind, ref) {
     setModal(null);
@@ -139,7 +163,7 @@ export function BankingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tokens.map((t) => (
+                  {pagedTokens.map((t) => (
                     <tr
                       key={t.address}
                       onClick={() => setSelectedBank(t.bank.address)}
@@ -160,10 +184,41 @@ export function BankingPage() {
                   ))}
                 </tbody>
               </table>
+              {pageCount > 1 && (
+                <div
+                  className="row"
+                  style={{
+                    gap: 8,
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    marginTop: 12,
+                  }}
+                >
+                  <span className="muted">
+                    Page {safePage + 1} of {pageCount}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={safePage === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={safePage >= pageCount - 1}
+                    onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="card">
+          <div className="card" style={{ marginTop: 'var(--sp-6)' }}>
             <div className="card-header">
               <h3 className="card-title">Manage TBD</h3>
               <div className="row" style={{ gap: 8, alignItems: 'center' }}>
@@ -212,13 +267,34 @@ export function BankingPage() {
                       <div className="kpi-sub">Allowlisted addresses</div>
                     </div>
                     <div className="kpi">
-                      <div className="kpi-label">Government-nominated</div>
+                      <div
+                        className="kpi-label"
+                        title="The TBD has a designated government reserve account that can mint TBD by depositing WNOK 1:1 (sovereign-money issuance). This is NOT WNOK-allowlist membership."
+                      >
+                        Government-nominated ⓘ
+                      </div>
                       <div className="kpi-value">{token.government.nominated ? 'Yes' : 'No'}</div>
                       <div className="kpi-sub">
                         {token.government.nominated
                           ? Fmt.shortHex(token.government.reserveAddress, 8, 6)
                           : 'No gov-reserve mint path'}
                       </div>
+                    </div>
+                    <div className="kpi">
+                      <div
+                        className="kpi-label"
+                        title="Whether the owning bank's address is on the WNOK allowlist — required to hold the WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination."
+                      >
+                        WNOK settlement ⓘ
+                      </div>
+                      <div className="kpi-value">
+                        {token.reserve
+                          ? token.reserve.bankAllowlisted
+                            ? 'Allowlisted'
+                            : 'Not allowlisted'
+                          : '—'}
+                      </div>
+                      <div className="kpi-sub">Owning bank on the WNOK allowlist</div>
                     </div>
                   </div>
 

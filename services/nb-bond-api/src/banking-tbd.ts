@@ -74,11 +74,18 @@ async function composeToken(bankName: string, address: string) {
 
   // Reserve backing: the owning bank's WNOK balance vs the TBD supply.
   // Informational only — 1:1 backing is not enforced on-chain.
-  let reserve: { wnokBalance: string; backed: boolean } | null = null;
+  let reserve: { wnokBalance: string; backed: boolean; bankAllowlisted: boolean } | null = null;
   const wnok = await getWnok(provider).catch(() => null);
   if (wnok) {
-    const wnokBalance = await (wnok.balanceOf(bankAddress) as Promise<bigint>).catch(() => 0n);
-    reserve = { wnokBalance: wnokBalance.toString(), backed: wnokBalance >= totalSupplyRaw };
+    const [wnokBalance, bankAllowlisted] = await Promise.all([
+      (wnok.balanceOf(bankAddress) as Promise<bigint>).catch(() => 0n),
+      (wnok.allowlistQuery(bankAddress) as Promise<boolean>).catch(() => false),
+    ]);
+    reserve = {
+      wnokBalance: wnokBalance.toString(),
+      backed: wnokBalance >= totalSupplyRaw,
+      bankAllowlisted,
+    };
   }
 
   const govReserve = getAddress(govReserveRaw);

@@ -570,6 +570,11 @@ const tbdTokenSchema = z
             'True when the bank WNOK reserve covers the TBD supply (reserve >= totalSupply). ' +
             'Informational only — 1:1 backing is not enforced on-chain.',
         }),
+        bankAllowlisted: z.boolean().meta({
+          description:
+            "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the " +
+            'WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination.',
+        }),
       })
       .nullable()
       .meta({
