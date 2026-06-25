@@ -147,6 +147,11 @@ const NAV_CATEGORIES = [
     gate: 'canAccessBanking',
     items: [{ label: 'TBD', href: '#/tbd', match: ['tbd'] }],
   },
+  {
+    key: 'system',
+    label: 'System',
+    items: [{ label: 'Global Registry', href: '#/registry', match: ['registry'] }],
+  },
 ];
 
 /**
