@@ -4,7 +4,7 @@
  * Renders the auth chrome (sign-in / user-badge) when AUTH_MODE !== 'none'
  * — see services/nb-ui/src/auth/.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppConfig } from '../config.js';
 import { auth, authMode } from '../auth/index.js';
 import { getTestMode, setTestMode, subscribeTestMode } from '../utils/debugSettings.js';
@@ -116,29 +116,128 @@ function AuthChrome() {
   );
 }
 
-export function Layout({ route, navigate, children, canAccessCentralBank = true }) {
-  const navItem = (key, label, href) => (
-    <a
-      href={href}
-      className={
-        route.name === key ||
-        (key === 'bonds' && route.name === 'bond') ||
-        (key === 'auctions' && route.name === 'auction')
-          ? 'active'
-          : ''
-      }
-      onClick={(e) => {
-        e.preventDefault();
-        navigate(href);
-      }}
-    >
-      {label}
-    </a>
+// Category model for the top nav. Each item's `match` lists the route names
+// that should light the item (and its category) as active — detail routes
+// collapse into their parent (bond->bonds, auction->auctions). A category with
+// a `gate` is only rendered when that capability flag is true, mirroring the
+// per-page guards in App.jsx.
+const NAV_CATEGORIES = [
+  {
+    key: 'central-bank',
+    label: 'Central Bank',
+    gate: 'canAccessCentralBank',
+    items: [
+      { label: 'wNOK', href: '#/central-bank', match: ['central-bank'] },
+      { label: 'Coupon payout', href: '#/coupon-payout', match: ['coupon-payout'] },
+    ],
+  },
+  {
+    key: 'securities',
+    label: 'Securities',
+    items: [
+      { label: 'Bonds', href: '#/bonds', match: ['bonds', 'bond'] },
+      { label: 'Stocks', href: '#/stocks', match: ['stocks'] },
+      { label: 'Auctions', href: '#/auctions', match: ['auctions', 'auction'] },
+      { label: 'Bidders', href: '#/bidders', match: ['bidders'] },
+    ],
+  },
+  {
+    key: 'banking',
+    label: 'Banking',
+    gate: 'canAccessBanking',
+    items: [{ label: 'TBD', href: '#/tbd', match: ['tbd'] }],
+  },
+  {
+    key: 'system',
+    label: 'System',
+    items: [{ label: 'Global Registry', href: '#/registry', match: ['registry'] }],
+  },
+];
+
+/**
+ * CategoryNav — top-bar nav grouped into dropdown categories. One menu is open
+ * at a time; it closes on outside click, Escape, or after navigating. A gated
+ * category is hidden when its capability flag is false, so a non-operator in
+ * entra mode never sees Central Bank or Banking.
+ */
+function CategoryNav({ route, navigate, canAccessCentralBank = true, canAccessBanking = true }) {
+  const gates = { canAccessCentralBank, canAccessBanking };
+  const categories = NAV_CATEGORIES.filter((c) => !c.gate || gates[c.gate]);
+  const [openKey, setOpenKey] = useState(null);
+  const navRef = useRef(null);
+
+  useEffect(() => {
+    if (!openKey) return undefined;
+    const onDocClick = (e) => {
+      if (navRef.current && !navRef.current.contains(e.target)) setOpenKey(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpenKey(null);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openKey]);
+
+  const go = (href) => {
+    setOpenKey(null);
+    navigate(href);
+  };
+
+  return (
+    <nav className="top-nav" ref={navRef}>
+      {categories.map((cat) => {
+        const active = cat.items.some((it) => it.match.includes(route.name));
+        const open = openKey === cat.key;
+        return (
+          <div key={cat.key} className="nav-category">
+            <button
+              type="button"
+              className={`nav-cat-trigger${active ? ' active' : ''}`}
+              aria-haspopup="true"
+              aria-expanded={open}
+              onClick={() => setOpenKey(open ? null : cat.key)}
+            >
+              {cat.label}
+              <span className="nav-cat-caret" aria-hidden="true">
+                ▾
+              </span>
+            </button>
+            {open && (
+              <div className="nav-dropdown" role="menu">
+                {cat.items.map((it) => (
+                  <a
+                    key={it.href}
+                    href={it.href}
+                    role="menuitem"
+                    className={it.match.includes(route.name) ? 'active' : ''}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      go(it.href);
+                    }}
+                  >
+                    {it.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </nav>
   );
+}
 
-  // Route-name-to-nav-key collapses detail pages into their parent tab so
-  // the active style stays sticky as the operator drills in.
-
+export function Layout({
+  route,
+  navigate,
+  children,
+  canAccessCentralBank = true,
+  canAccessBanking = true,
+}) {
   return (
     <div className="app">
       <header className="top-bar">
@@ -155,12 +254,12 @@ export function Layout({ route, navigate, children, canAccessCentralBank = true 
             <NorgesBankLogo height={26} />
             <div className="brand-sub">Bond Auction Service</div>
           </a>
-          <nav className="top-nav">
-            {navItem('bonds', 'Bonds', '#/bonds')}
-            {navItem('auctions', 'Auctions', '#/auctions')}
-            {navItem('bidders', 'Bidders', '#/bidders')}
-            {canAccessCentralBank && navItem('central-bank', 'Central Bank', '#/central-bank')}
-          </nav>
+          <CategoryNav
+            route={route}
+            navigate={navigate}
+            canAccessCentralBank={canAccessCentralBank}
+            canAccessBanking={canAccessBanking}
+          />
           <div className="top-bar-right">
             <AuthChrome />
             <TestModeToggle />

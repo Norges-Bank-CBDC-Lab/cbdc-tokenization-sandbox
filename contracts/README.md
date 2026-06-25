@@ -193,6 +193,14 @@ directly after loading `.env`.
 | `BondDvP` and `csd/DvP` | DvP as a financial settlement concept | Settlement payloads, failure mapping, and contract-to-contract coupling are specific to this repo's runtime stack. |
 | `BaseSecurityToken` | OpenZeppelin upgradeable ERC20 and AccessControl foundations | `custodialTransfer`, role conventions, and allowlist-driven transfer constraints are project-specific. |
 
+> **Planned — decided, not yet implemented:** the security tokens above — the
+> ERC1410-inspired partitioned `BondToken` and the upgradeable ERC-20
+> `BaseSecurityToken` / `StockToken` — are slated to be retired in favour of canonical
+> **ERC-3643 (T-REX)** tokens on a shared identity registry plus modular compliance. Cash
+> (`Wnok`) keeps its own allowlist. See
+> [ADR 0002](../docs/decisions/0002-adopt-erc-3643-for-tokenized-securities.md). The tables
+> above describe the current contract set until that migration lands.
+
 ## Read Next
 
 - [AGENTS.md](AGENTS.md) for repo-specific contract guidance used by AI coding

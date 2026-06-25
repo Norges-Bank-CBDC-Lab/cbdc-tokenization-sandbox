@@ -136,6 +136,13 @@ Foundry. Key components include:
   - `Wnok` (`contracts/src/norges-bank/Wnok.sol`): mock cash token used for
     local settlement flows
 
+> **Planned — decided, not yet implemented:** this ERC-1410-based security-token
+> design is slated to migrate to canonical **ERC-3643 (T-REX)** — a shared on-chain
+> identity registry plus modular compliance for both bonds and equities, retiring the
+> partitioned `BondToken` and the ERC-20 `StockToken`; cash (`Wnok`) keeps its own
+> allowlist. See `docs/decisions/0002-adopt-erc-3643-for-tokenized-securities.md` (ADR 0002).
+> The description above remains the current state until that work lands.
+
 Simplified trust model:
 
 - the issuer or operator role (Norges Bank in the sandbox) controls
@@ -233,6 +240,9 @@ The UI is a thin client over the NB Bond API:
   operators get full access including the Central Bank page, testers get the UI
   without it, and an unrecognised account sees an access-denied screen. The NB
   Bond API enforces the same roles server-side; `none` mode is ungated
+- the operator pages include **Banking** (`#/tbd`) — per-bank tokenized bank
+  deposits managed against the `/v1/banking/*` surface — alongside the Central
+  Bank (WNOK) page; the top nav is grouped into dropdown categories
 
 Deployment shape in the local sandbox: a multi-stage Dockerfile in
 `services/nb-ui/` builds the React bundle inside the Node builder image

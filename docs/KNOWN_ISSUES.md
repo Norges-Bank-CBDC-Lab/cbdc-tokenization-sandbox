@@ -219,3 +219,51 @@ visible at a glance.
   registry container and re-syncs base images; repo-owned images rebuild on
   the next start. This is preferred over enabling registry delete + GC for a
   disposable local registry.
+
+## Babel 8 (`@babel/core`, `@babel/preset-env`) upgrade deferred
+- Dependabot proposed bumping `@babel/core` 7.29.7 → 8.0.1 and
+  `@babel/preset-env` 7.29.5 → 8.0.2 — `nb-bond-api` dev dependencies used only
+  by `babel-jest` to transform `.js` / `.mjs` test inputs (including the ESM
+  `@noble/secp256k1`). The bump is **functionally fine** (under Babel 8 the
+  `nb-bond-api` suite stays green: jest, lint, build), but it was held.
+- Why deferred — a correct upgrade is more than a version bump:
+  - Babel 8 requires Node `^22.18.0 || >=24.11.0`. That is satisfied (the repo
+    pins Node 25 via `common/node-version.env`), but `@babel/core` 8 hoisted to
+    the workspace root breaks `nb-ui`'s `@vitejs/plugin-react`, which
+    peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
+    keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
+    8 peer-requires core 8, so the two bumps are coupled and must land together.
+  - The raw Dependabot PRs also fail the `validate-inventory` check because they
+    do not update `THIRD_PARTY_LICENSES.md`.
+  - With the dual tree in place, a full `npm install` re-serialises
+    `package-lock.json` by ~18k lines (only ~18 entries are genuinely new; the
+    rest is npm reordering identical entries) — an unreviewable diff for a
+    dev-only transform dependency.
+- Planned follow-up: revisit deliberately if there is a concrete reason (a
+  security advisory on Babel 7, or `@vitejs/plugin-react` moving to Babel 8 so
+  the dual tree collapses). The work is: bump both in
+  `services/nb-bond-api/package.json`, let npm build the dual tree, update the
+  `@babel/core` + `@babel/preset-env` rows in `THIRD_PARTY_LICENSES.md`, and
+  verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
+  (not merged) with this rationale.
+
+## BondManager hard-codes the government settlement bank (`GOV_TBD`)
+- `BondManager` stores the government's cash-leg settlement bank as an `immutable`
+  — `GOV_TBD`, with `_GOV_RESERVE` derived from `ITbd(GOV_TBD).govReserve()`
+  (`contracts/src/norges-bank/BondManager.sol:46-94`). It is the TBD (tokenized
+  bank deposit) whose tokens settle bond coupon and redemption payments
+  (`payCoupon`, `redeem`); in the local sandbox it is wired to Nordea
+  (`TBD_NORDEA_CONTRACT_NAME`, resolved from GlobalRegistry at deploy —
+  `contracts/script/norges-bank/10_Bond.s.sol:26`, `11_BondSetup.s.sol:32`).
+- Because it is `immutable`, switching the government's agent bank requires
+  redeploying `BondManager` and re-wiring the bond stack. The source of truth is
+  also split: the deploy resolves the bank from a GlobalRegistry name, then freezes
+  it on `BondManager`. This is fine for the single-bank sandbox but is the wrong
+  long-term home — "who settles government cash" is a settlement / governance
+  concern, not a bond-contract detail.
+- Planned follow-up: move the designation to mutable, well-modelled state — either a
+  stable, resolvable GlobalRegistry entry (e.g. a `Gov TBD` name) or the settlement
+  layer / `PrimaryDealerRegistry` introduced by
+  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md),
+  so the agent bank can change without a redeploy. The operator Central Bank page
+  surfaces the current value by reading `BondManager.GOV_TBD()`.

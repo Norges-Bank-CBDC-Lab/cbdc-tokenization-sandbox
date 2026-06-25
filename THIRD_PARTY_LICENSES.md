@@ -53,7 +53,7 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
-| `better-sqlite3` | `12.10.1` | MIT |
+| `better-sqlite3` | `12.11.1` | MIT |
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.16.0` | MIT |
@@ -81,7 +81,7 @@ License labels and deployment-time notes remain curated review items.
 | `ts-jest` | `29.4.11` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
-| `typescript-eslint` | `8.59.4` | MIT |
+| `typescript-eslint` | `8.61.1` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -107,7 +107,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@azure/msal-browser` | `5.13.0` | MIT |
+| `@azure/msal-browser` | `5.14.0` | MIT |
 | `react` | `19.2.7` | MIT |
 | `react-dom` | `19.2.7` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |

@@ -12,8 +12,10 @@ const FIXTURE_CB = {
   wnok: {
     contractAddress: '0xwnokwnokwnokwnokwnokwnokwnokwnokwnokwnok',
     balance: '10000000',
+    totalSupply: '25000000',
     allowlistSize: 3,
   },
+  govSettlementBank: { name: 'DNB', address: '0x3333333333333333333333333333333333333333' },
   md5: 'a',
 };
 
@@ -65,7 +67,10 @@ describe('CentralBankPage', () => {
     await waitFor(() => {
       expect(screen.getByText('WNOK balance')).toBeInTheDocument();
     });
-    expect(screen.getByText('Allowlist size')).toBeInTheDocument();
+    expect(screen.getByText('WNOK supply')).toBeInTheDocument();
+    expect(screen.getByText('In circulation')).toBeInTheDocument();
+    expect(screen.getByText('Government bank')).toBeInTheDocument();
+    expect(screen.getByText('DNB')).toBeInTheDocument();
   });
 
   it('opens the Mint, Burn, and Transfer modals', async () => {
@@ -89,7 +94,7 @@ describe('CentralBankPage', () => {
     expect(await screen.findByRole('heading', { name: 'Burn WNOK' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Cancel/i }));
 
-    const transferBtn = screen.getByRole('button', { name: /Transfer from CB/i });
+    const transferBtn = screen.getByRole('button', { name: /^Transfer$/ });
     await user.click(transferBtn);
     expect(
       await screen.findByRole('heading', { name: 'Transfer WNOK from CB' }),

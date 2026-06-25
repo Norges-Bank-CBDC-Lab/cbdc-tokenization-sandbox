@@ -1,6 +1,9 @@
 # emacs
 *~
 
+# Obsidian vault
+/.obsidian/
+
 # vscode
 /.vscode/
 **/.vscode/
@@ -16,6 +19,7 @@
 /.tmp/
 /.codex/
 /.claude/
+/outputs/
 
 # local AI handoff notes
 Handoff-AI-*.md

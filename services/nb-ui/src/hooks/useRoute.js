@@ -7,6 +7,9 @@
  *   #/auctions/0xabc...              -> { name: "auction", auctionId: "0xabc..." }
  *   #/bidders                        -> { name: "bidders" }
  *   #/central-bank                   -> { name: "central-bank" }
+ *   #/coupon-payout                  -> { name: "coupon-payout" }
+ *   #/stocks                         -> { name: "stocks" }
+ *   #/tbd                            -> { name: "tbd" }
  */
 import { useState, useEffect, useCallback } from 'react';
 
@@ -28,6 +31,18 @@ export function parseHash(hash) {
   }
   if (section === 'central-bank') {
     return { name: 'central-bank' };
+  }
+  if (section === 'coupon-payout') {
+    return { name: 'coupon-payout' };
+  }
+  if (section === 'stocks') {
+    return { name: 'stocks' };
+  }
+  if (section === 'tbd') {
+    return { name: 'tbd' };
+  }
+  if (section === 'registry') {
+    return { name: 'registry' };
   }
   return { name: 'bonds' };
 }
