@@ -528,6 +528,79 @@ const wnokTransferBodySchema = z
 
 // #endregion
 
+// #region Banking ────────────────────────────────────────────────────
+
+const tbdHolderSchema = z
+  .object({
+    address: addressSchema,
+    balance: bigIntStringSchema.meta({
+      description: 'TBD balance in whole units (the contract uses decimals = 0)',
+    }),
+  })
+  .meta({
+    id: 'TbdHolder',
+    description: 'An allowlisted TBD holder and its balance. Always read with its parent token.',
+  });
+
+const tbdTokenSchema = z
+  .object({
+    address: addressSchema.meta({ description: 'TBD contract address — the resource id' }),
+    name: z.string().meta({ description: 'Token name, e.g. "TBD Nordea"' }),
+    symbol: z.string().meta({ description: 'Token symbol, e.g. "TBDnordea"' }),
+    decimals: z
+      .number()
+      .int()
+      .meta({ description: 'Always 0 — TBD is denominated in whole units' }),
+    totalSupply: bigIntStringSchema.meta({ description: 'Total TBD issued, whole units' }),
+    bank: z
+      .object({
+        name: z.string().meta({ description: 'Owning bank label, e.g. "Nordea Bank"' }),
+        address: addressSchema.meta({
+          description: "Owning bank's EVM address — holds admin / minter / burner on this token",
+        }),
+      })
+      .meta({ id: 'TbdBank', description: 'The commercial bank that owns this TBD token' }),
+    reserve: z
+      .object({
+        wnokBalance: bigIntStringSchema.meta({
+          description: "Owning bank's WNOK balance — the central-bank-money reserve",
+        }),
+        backed: z.boolean().meta({
+          description:
+            'True when the bank WNOK reserve covers the TBD supply (reserve >= totalSupply). ' +
+            'Informational only — 1:1 backing is not enforced on-chain.',
+        }),
+      })
+      .nullable()
+      .meta({
+        id: 'TbdReserve',
+        description: 'WNOK reserve backing (informational). Null when WNOK is unreachable.',
+      }),
+    government: z
+      .object({
+        nominated: z.boolean().meta({
+          description:
+            'True when a government reserve account is set (enables the gov-reserve mint path)',
+        }),
+        reserveAddress: addressSchema.nullable().meta({
+          description: 'The government reserve account, or null when not nominated',
+        }),
+      })
+      .meta({ id: 'TbdGovernment', description: 'Government-nomination state for this token' }),
+    holders: z
+      .array(tbdHolderSchema)
+      .meta({ description: 'Allowlisted addresses with their TBD balances (sandbox-scale)' }),
+    md5: md5Schema,
+  })
+  .meta({
+    id: 'TbdToken',
+    description:
+      'A tokenized bank deposit (TBD) — one ERC-20 per commercial bank, allowlist-gated and ' +
+      'WNOK-reserve-backed. The same DTO is returned by the list and the single-token GET.',
+  });
+
+// #endregion
+
 // #region Health ─────────────────────────────────────────────────────
 
 const healthContractsSchema = z
@@ -842,6 +915,13 @@ const testModeQueryParam = {
 };
 
 const bidderAddressPathParam = {
+  in: 'path' as const,
+  name: 'address',
+  required: true,
+  schema: { $ref: '#/components/schemas/Address' },
+};
+
+const tbdAddressPathParam = {
   in: 'path' as const,
   name: 'address',
   required: true,
@@ -1226,6 +1306,31 @@ const paths: ZodOpenApiPathsObject = {
     },
   },
 
+  // banking ────────────────────────────────────────
+  '/v1/banking/tbd': {
+    get: {
+      tags: ['banking'],
+      operationId: 'listTbd',
+      summary: 'List all deployed TBD tokens (one per bank) with supply, reserve, and holders',
+      responses: {
+        200: successJson('TBD tokens', z.array(tbdTokenSchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
+  '/v1/banking/tbd/{address}': {
+    get: {
+      tags: ['banking'],
+      operationId: 'getTbd',
+      summary: 'Get one TBD token by its contract address',
+      parameters: [tbdAddressPathParam],
+      responses: {
+        200: successJson('TBD token', tbdTokenSchema),
+        ...errorRefs.read,
+      },
+    },
+  },
+
   // admin ──────────────────────────────────────────
   '/v1/admin/restart-ingestion': {
     post: {
@@ -1322,6 +1427,13 @@ export const openApiDocument = createDocument({
         'Central Bank (Norges Bank) operator surface against the WNOK contract: mint, burn, ' +
         'transfer, allowlist add/remove. Operator-only — entra mode requires an operator App ' +
         'Role and returns 403 otherwise. Sandbox-only.',
+    },
+    {
+      name: 'banking',
+      description:
+        'Commercial-bank tokenized deposits (TBD): one ERC-20 per bank, with supply, WNOK ' +
+        'reserve backing, holders, and (mutations) allowlist / mint / burn / transfer. ' +
+        'Operator-only — entra mode requires an operator App Role (403 otherwise). Sandbox-only.',
     },
     {
       name: 'admin',

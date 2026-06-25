@@ -225,3 +225,14 @@ export async function getWnok(
   if (!address) return null;
   return new Contract(address, wnokAbi, wallet);
 }
+
+/**
+ * Resolve any contract address from GlobalRegistry by its registered name.
+ * Returns null when the name isn't registered. Used by the banking/TBD
+ * surface, which resolves several per-bank tokens by name.
+ */
+export async function resolveRegisteredAddress(name: string): Promise<string | null> {
+  await assertProviderReady();
+  const [found, address] = await registry.tryGetContract(name);
+  return found ? address : null;
+}
