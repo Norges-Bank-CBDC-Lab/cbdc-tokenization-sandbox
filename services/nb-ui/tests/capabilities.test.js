@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // Feature: the role -> capability policy in src/auth/capabilities.js. Role
 // lists come from runtime config (AUTH_OPERATOR_ROLES / AUTH_TESTER_ROLES),
 // read at module load — so each case re-imports against a fresh config.
+// Central Bank and Banking are both operator-only surfaces.
 
 async function loadCapabilities(config) {
   vi.resetModules();
@@ -25,8 +26,16 @@ afterEach(() => {
 describe('capabilitiesForAccount', () => {
   it('grants full access in none mode regardless of roles', async () => {
     const cap = await loadCapabilities({ AUTH_MODE: 'none' });
-    expect(cap(null)).toEqual({ canUseApp: true, canAccessCentralBank: true });
-    expect(cap({ roles: [] })).toEqual({ canUseApp: true, canAccessCentralBank: true });
+    expect(cap(null)).toEqual({
+      canUseApp: true,
+      canAccessCentralBank: true,
+      canAccessBanking: true,
+    });
+    expect(cap({ roles: [] })).toEqual({
+      canUseApp: true,
+      canAccessCentralBank: true,
+      canAccessBanking: true,
+    });
   });
 
   it('grants full access to an operator', async () => {
@@ -34,14 +43,16 @@ describe('capabilitiesForAccount', () => {
     expect(cap({ roles: ['Sandbox.Operator'] })).toEqual({
       canUseApp: true,
       canAccessCentralBank: true,
+      canAccessBanking: true,
     });
   });
 
-  it('grants the UI without Central Bank to a tester', async () => {
+  it('grants the UI without the operator surfaces to a tester', async () => {
     const cap = await loadCapabilities(entra);
     expect(cap({ roles: ['Sandbox.Tester'] })).toEqual({
       canUseApp: true,
       canAccessCentralBank: false,
+      canAccessBanking: false,
     });
   });
 
@@ -50,8 +61,13 @@ describe('capabilitiesForAccount', () => {
     expect(cap({ roles: ['Some.Other.Role'] })).toEqual({
       canUseApp: false,
       canAccessCentralBank: false,
+      canAccessBanking: false,
     });
-    expect(cap(null)).toEqual({ canUseApp: false, canAccessCentralBank: false });
+    expect(cap(null)).toEqual({
+      canUseApp: false,
+      canAccessCentralBank: false,
+      canAccessBanking: false,
+    });
   });
 
   it('lets operator capabilities win when an account holds both roles', async () => {
@@ -59,6 +75,7 @@ describe('capabilitiesForAccount', () => {
     expect(cap({ roles: ['Sandbox.Tester', 'Sandbox.Operator'] })).toEqual({
       canUseApp: true,
       canAccessCentralBank: true,
+      canAccessBanking: true,
     });
   });
 });

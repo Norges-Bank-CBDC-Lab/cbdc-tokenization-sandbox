@@ -113,7 +113,7 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByText('You are signed out.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Securities/ })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -131,8 +131,8 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByText('Operator')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Auctions' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Central Bank' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Securities/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Central Bank/ })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
   });
 
@@ -141,8 +141,8 @@ describe('auth gate (entra mode)', () => {
     window.location.hash = '#/central-bank';
     render(<App />);
 
-    expect(await screen.findByRole('link', { name: 'Auctions' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Central Bank' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Central Bank/ })).not.toBeInTheDocument();
     // Manually hitting the route shows the not-authorised panel, not the CB surface.
     expect(await screen.findByText('Not authorised')).toBeInTheDocument();
     expect(screen.queryByText('WNOK actions')).not.toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('auth gate (entra mode)', () => {
       await screen.findByText('Stranger is not authorised for this application.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Securities/ })).not.toBeInTheDocument();
   });
 
   it('swaps the app for the login page with an expired notice when silent renewal needs interaction', async () => {
@@ -174,7 +174,7 @@ describe('auth gate (entra mode)', () => {
       await screen.findByText('Your session has expired — please sign in again.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Auctions' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Securities/ })).not.toBeInTheDocument();
   });
 });
 
@@ -183,8 +183,22 @@ describe('auth gate (none mode)', () => {
     const { App } = await loadApp({ authMode: 'none' });
     render(<App />);
 
-    expect(await screen.findByRole('link', { name: 'Auctions' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+  });
+
+  it('groups nav into dropdown categories; opening Securities reveals its pages', async () => {
+    const { App } = await loadApp({ authMode: 'none' });
+    render(<App />);
+    // Category triggers are visible; the sub-page links live inside a closed menu.
+    expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Central Bank/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Banking/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Auctions' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Securities/ }));
+    expect(screen.getByRole('menuitem', { name: 'Bonds' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Auctions' })).toBeInTheDocument();
   });
 });
