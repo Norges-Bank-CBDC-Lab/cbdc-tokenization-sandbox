@@ -71,17 +71,17 @@ License labels and deployment-time notes remain curated review items.
 | `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `25.9.1` | MIT |
+| `@types/node` | `26.0.1` | MIT |
 | `babel-jest` | `30.4.1` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.6.0` | MIT |
 | `jest` | `30.4.2` | MIT |
-| `prettier` | `3.9.1` | MIT |
+| `prettier` | `3.9.4` | MIT |
 | `ts-jest` | `29.4.11` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
-| `typescript-eslint` | `8.62.0` | MIT |
+| `typescript-eslint` | `8.62.1` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -89,7 +89,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `25.9.1` | MIT |
+| `@types/node` | `26.0.1` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
@@ -99,7 +99,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `25.9.1` | MIT |
+| `@types/node` | `26.0.1` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
@@ -120,7 +120,7 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
 | `globals` | `17.6.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
-| `prettier` | `3.9.1` | MIT |
+| `prettier` | `3.9.4` | MIT |
 | `vite` | `8.0.16` | MIT |
 | `vitest` | `4.1.9` | MIT |
 
