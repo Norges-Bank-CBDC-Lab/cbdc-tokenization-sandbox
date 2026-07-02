@@ -19,10 +19,27 @@ spec:
       labels:
         app: besu
     spec:
+      # Run as the image's non-root 'besu' user (uid 1000). The image's config
+      # defaults to root and this chart bypasses besu-entry.sh, so the uid must
+      # be forced here; fsGroup + OnRootMismatch chowns the data PVC on mount
+      # (a one-time migration for pre-existing local volumes).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: besu
           image: {{ .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           ports:
             - name: json-rpc
               containerPort: 8545
