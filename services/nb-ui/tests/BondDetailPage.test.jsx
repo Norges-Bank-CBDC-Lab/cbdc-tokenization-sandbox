@@ -130,8 +130,8 @@ describe('BondDetailPage disable affordance', () => {
 
     expect(await screen.findByText('DISABLED')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Disable bond/i })).toBeNull();
-    // Also hides the "+ New auction" affordance — disabled bonds aren't
-    // candidates for new auctions.
+    // No "+ New auction" affordance on the bond page — auction creation
+    // lives on the Auctions page only.
     expect(screen.queryByRole('button', { name: /\+ New auction/i })).toBeNull();
   });
 

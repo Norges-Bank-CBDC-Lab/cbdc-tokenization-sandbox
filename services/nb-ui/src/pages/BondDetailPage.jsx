@@ -18,12 +18,10 @@ import {
   TypeBadge,
   useToast,
 } from '../components/ui.jsx';
-import { CreateAuctionModal } from './CreateAuctionModal.jsx';
 import { ConfirmDisableBondModal } from './ConfirmDisableBondModal.jsx';
 
 export function BondDetailPage({ isin, navigate }) {
   const bondQ = useApi(() => BondsApi.getBond(isin), [isin]);
-  const [showCreate, setShowCreate] = useState(false);
   const [showDisable, setShowDisable] = useState(false);
   const disableMut = useMutation(() => BondsApi.disableBond(isin));
   const toast = useToast();
@@ -77,21 +75,6 @@ export function BondDetailPage({ isin, navigate }) {
     }
   }
 
-  function handleCreated(updatedBond) {
-    setShowCreate(false);
-    const newAuction = updatedBond?.auctions?.[0];
-    toast.push({
-      kind: 'ok',
-      title: 'Auction created',
-      body: `${newAuction ? Fmt.shortHex(newAuction.id) : ''} on ${updatedBond.isin}`,
-    });
-    // First reload races the backend ingestion loop (default 3s tick); the
-    // delayed second reload covers the worst case where the immediate one
-    // just missed a tick.
-    bondQ.reload();
-    setTimeout(bondQ.reload, 4000);
-  }
-
   return (
     <div>
       <div className="page-header">
@@ -123,11 +106,6 @@ export function BondDetailPage({ isin, navigate }) {
           <Button variant="ghost" onClick={bondQ.reload}>
             Refresh
           </Button>
-          {!b.disabled && (
-            <Button variant="primary" onClick={() => setShowCreate(true)}>
-              + New auction
-            </Button>
-          )}
           {canDisable && (
             <Button
               variant="danger"
@@ -230,17 +208,12 @@ export function BondDetailPage({ isin, navigate }) {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Auctions for {b.isin}</h3>
-            {!b.disabled && (
-              <Button size="sm" variant="primary" onClick={() => setShowCreate(true)}>
-                + New auction
-              </Button>
-            )}
           </div>
           <div className="card-body flush">
             {auctions.length === 0 ? (
               <EmptyState
                 title="No auctions yet"
-                message="Create the first auction for this bond."
+                message="Create auctions from the Auctions page."
               />
             ) : (
               <table className="tbl">
@@ -322,15 +295,6 @@ export function BondDetailPage({ isin, navigate }) {
           </div>
         </div>
       </div>
-
-      {showCreate && (
-        <CreateAuctionModal
-          defaultIsin={b.isin}
-          lockIsin
-          onClose={() => setShowCreate(false)}
-          onCreated={handleCreated}
-        />
-      )}
 
       {showDisable && (
         <ConfirmDisableBondModal

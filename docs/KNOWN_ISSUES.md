@@ -205,9 +205,9 @@ visible at a glance.
   `./sandbox.sh build-images` once before `./sandbox.sh start`. The
   smart-contract-verifier image is still published upstream
   (`ghcr.io/blockscout/smart-contract-verifier`) and pulls normally.
-- Consequence for any non-local (e.g. Azure) deployment: it must build and
-  host its own Blockscout images (amd64) in its own registry — see
-  `docs/AZURE_BOUNDARY.md`.
+- Consequence for any non-local reuse of this stack: that deployment must
+  build the two Blockscout images itself (for its own target CPU platform)
+  and host them in its own registry.
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
 
