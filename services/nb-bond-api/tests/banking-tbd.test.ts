@@ -7,7 +7,7 @@
  * Round-trip reads against a real chain are covered by the live curl
  * verification, not here — jest boots the module against a no-op provider.
  */
-import { TBD_BANKS, getTbdToken, listConfiguredBanks } from '../src/banking-tbd';
+import { TBD_BANKS, getTbdToken, listBanks } from '../src/banking-tbd';
 
 describe('banking-tbd config', () => {
   it('configures the two local-sandbox banks with their fixture roles and registry names', () => {
@@ -25,9 +25,10 @@ describe('getTbdToken', () => {
   });
 });
 
-describe('listConfiguredBanks', () => {
+describe('listBanks', () => {
   it('lists the configured banks with derived addresses and no key material', () => {
-    const banks = listConfiguredBanks();
+    // No created-banks DB injected in this suite → configured roster only.
+    const banks = listBanks();
     expect(banks.map((b) => b.name)).toEqual(['Nordea Bank', 'DNB Bank']);
     for (const bank of banks) {
       expect(bank.address).toMatch(/^0x[a-fA-F0-9]{40}$/);

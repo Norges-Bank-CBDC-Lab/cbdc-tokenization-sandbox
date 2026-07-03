@@ -58,6 +58,7 @@ import { AuctionType } from './types';
 import {
   type CloseAuctionBody,
   type CreateAuctionBody,
+  type CreateBankBody,
   type CreateBidderBody,
   type CreateBondBody,
   type FinaliseBody,
@@ -71,6 +72,7 @@ import {
   bidderAddressParamSchema,
   closeAuctionBodySchema,
   createAuctionBodySchema,
+  createBankBodySchema,
   createBidderBodySchema,
   createBondBodySchema,
   finaliseBodySchema,
@@ -115,12 +117,14 @@ import {
   burnTbd,
   getGovSettlementBank,
   getTbdToken,
-  listConfiguredBanks,
+  listBanks,
   listTbdTokens,
   mintTbd,
   removeTbdAllowlist,
+  setCreatedBanksDb,
   transferTbd,
 } from './banking-tbd';
+import { BankConflictError, BankValidationError, DvpUnavailableError, createBank } from './banks';
 import { listRegisteredContracts } from './registry';
 
 const sealingKeys: SealingKeypair = initSealingKeypair(envVariables.AUCTION_OWNER_SEAL_PK);
@@ -169,6 +173,11 @@ try {
 } catch (err) {
   logger.warn(`bidders seed failed: ${(err as Error).message}`);
 }
+
+// The `banks` system-of-record table shares the same writable handle.
+// Injecting it here lets the banking roster (banking-tbd.ts) merge the
+// created banks into listings, the bank selector, and mutation signing.
+setCreatedBanksDb(biddersDb);
 
 // #region Unauthenticated routes (mounted before authMiddleware) ─────
 
@@ -1347,8 +1356,39 @@ app.get('/v1/banking/banks', async (req, res, next) => {
     okResponse(
       req,
       res,
-      listConfiguredBanks().map((b) => withMd5(b)),
+      listBanks().map((b) => withMd5(b)),
     );
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/v1/banking/banks', validateRequest(createBankBodySchema), async (req, res, next) => {
+  try {
+    const body = req.body as CreateBankBody;
+    let record;
+    try {
+      record = await createBank(biddersDb, {
+        name: body.name,
+        privateKey: body.privateKey,
+        enableWnokSettlement: body.enableWnokSettlement,
+      });
+    } catch (err) {
+      if (err instanceof BankValidationError) {
+        throw badRequest(err.message);
+      }
+      if (err instanceof BankConflictError) {
+        throw conflict(err.message);
+      }
+      if (err instanceof DvpUnavailableError) {
+        throw new HttpError(503, 'Service Unavailable', { detail: err.message });
+      }
+      // CentralBankNotConfiguredError / WnokUnavailableError → 503,
+      // same availability signalling as the /v1/central-bank routes.
+      mapCentralBankError(err);
+      return;
+    }
+    okResponse(req, res, withMd5({ name: record.name, address: record.address }));
   } catch (err) {
     next(err);
   }

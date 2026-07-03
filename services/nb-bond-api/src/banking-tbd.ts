@@ -3,13 +3,16 @@
  * tokens. Each commercial bank owns one allowlist-gated, WNOK-reserve-backed
  * ERC-20 (decimals = 0), registered in GlobalRegistry by name.
  *
- * Discovery is a config list for now (the local-sandbox banks). When
- * deploy-from-UI lands this moves to GlobalRegistry enumeration — see
- * docs/plans/nav-categories-and-tbd-page-plan.md (D7).
+ * The roster is the configured local-sandbox banks (TBD_BANKS) merged with
+ * the banks created from the Banking page (`banks` system-of-record table,
+ * see banks.ts). Both resolve their TBD address from GlobalRegistry by
+ * contract name, so a bank whose TBD is not (yet / any longer) registered
+ * simply drops out of the listing.
  *
  * Reads are live chain calls (no projection), mirroring central-bank.ts.
- * Mutations (a later increment) sign with the owning bank's key, derived
- * deterministically the same way as the bidder roster (bidders.ts).
+ * Mutations sign with the owning bank's key — derived deterministically the
+ * same way as the bidder roster (bidders.ts) for configured banks, stored
+ * in SQLite for created banks.
  *
  * Sandbox-only.
  */
@@ -26,6 +29,7 @@ import { deriveBidderAddress, deriveFixturePrivateKey } from './bidders';
 import { getBondManager, getWnok, provider, resolveRegisteredAddress } from './chain';
 import { envVariables } from './env-vars';
 import { withMd5 } from './http';
+import { type IngestionDatabase, listBankRows } from './ingestion-db';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -43,6 +47,39 @@ export const TBD_BANKS: ReadonlyArray<{ bankName: string; role: string; contract
   },
   { bankName: 'DNB Bank', role: 'PK_DNB', contractName: envVariables.TBD_DNB_CONTRACT_NAME },
 ];
+
+// Handle onto the `banks` system-of-record table, injected once at boot
+// (index.ts). Modules under test that never call setCreatedBanksDb see the
+// configured roster only.
+let createdBanksDb: IngestionDatabase | null = null;
+
+export function setCreatedBanksDb(db: IngestionDatabase): void {
+  createdBanksDb = db;
+}
+
+/** One bank the operator can act as: label, registry key, and signing key. */
+interface BankRosterEntry {
+  bankName: string;
+  contractName: string;
+  privateKey: string;
+}
+
+/** The full roster: configured fixture banks + banks created from the UI. */
+function bankRoster(): BankRosterEntry[] {
+  const configured = TBD_BANKS.map((b) => ({
+    bankName: b.bankName,
+    contractName: b.contractName,
+    privateKey: deriveFixturePrivateKey(b.role),
+  }));
+  const created = createdBanksDb
+    ? listBankRows(createdBanksDb).map((r) => ({
+        bankName: r.name,
+        contractName: r.contract_name,
+        privateKey: r.private_key,
+      }))
+    : [];
+  return [...configured, ...created];
+}
 
 export interface TbdHolderData {
   address: string;
@@ -104,28 +141,30 @@ async function composeToken(bankName: string, address: string) {
   });
 }
 
-/** Resolve each configured bank's TBD address; skips any not registered. */
-async function resolveConfiguredTbds(): Promise<
-  { bankName: string; role: string; address: string }[]
+/** Resolve each roster bank's TBD address; skips any not registered. */
+async function resolveRosterTbds(): Promise<
+  { bankName: string; privateKey: string; address: string }[]
 > {
   const resolved = await Promise.all(
-    TBD_BANKS.map(async (b) => {
+    bankRoster().map(async (b) => {
       const address = await resolveRegisteredAddress(b.contractName);
-      return address ? { bankName: b.bankName, role: b.role, address: getAddress(address) } : null;
+      return address
+        ? { bankName: b.bankName, privateKey: b.privateKey, address: getAddress(address) }
+        : null;
     }),
   );
   return resolved.filter(
-    (r): r is { bankName: string; role: string; address: string } => r !== null,
+    (r): r is { bankName: string; privateKey: string; address: string } => r !== null,
   );
 }
 
-/** Read every configured TBD token. */
+/** Read every roster TBD token (configured + created). */
 export async function listTbdTokens() {
-  const present = await resolveConfiguredTbds();
+  const present = await resolveRosterTbds();
   return Promise.all(present.map((r) => composeToken(r.bankName, r.address)));
 }
 
-/** Read one TBD by contract address. Returns null when it isn't a configured TBD. */
+/** Read one TBD by contract address. Returns null when it isn't a roster TBD. */
 export async function getTbdToken(address: string) {
   let target: string;
   try {
@@ -133,15 +172,16 @@ export async function getTbdToken(address: string) {
   } catch {
     return null;
   }
-  const present = await resolveConfiguredTbds();
+  const present = await resolveRosterTbds();
   const match = present.find((r) => r.address === target);
   return match ? composeToken(match.bankName, match.address) : null;
 }
 
 // ── Mutations ───────────────────────────────────────────────────────
 // Signed by the TBD's OWNING bank — the only key holding MINTER / BURNER /
-// ALLOWLIST_ADMIN on that token — derived the same way as the bidder roster.
-// Each write returns null when the address isn't a configured TBD (route 404s).
+// ALLOWLIST_ADMIN on that token. Configured banks derive their key the same
+// way as the bidder roster; created banks read theirs from SQLite.
+// Each write returns null when the address isn't a roster TBD (route 404s).
 // Sandbox-only.
 
 export interface TbdTransactionRef {
@@ -156,9 +196,9 @@ async function tbdWriteContract(address: string): Promise<Contract | null> {
   } catch {
     return null;
   }
-  const match = (await resolveConfiguredTbds()).find((r) => r.address === target);
+  const match = (await resolveRosterTbds()).find((r) => r.address === target);
   if (!match) return null;
-  const wallet = new Wallet(deriveFixturePrivateKey(match.role), provider);
+  const wallet = new Wallet(match.privateKey, provider);
   return new Contract(match.address, tbdAbi, wallet);
 }
 
@@ -217,23 +257,26 @@ export function transferTbd(address: string, to: string, amount: bigint) {
   });
 }
 
-/** The configured banks the operator can act as. Addresses only — keys stay server-side. */
-export function listConfiguredBanks(): { name: string; address: string }[] {
-  return TBD_BANKS.map((b) => ({
+/**
+ * The banks the operator can act as (configured + created). Addresses
+ * only — keys stay server-side.
+ */
+export function listBanks(): { name: string; address: string }[] {
+  return bankRoster().map((b) => ({
     name: b.bankName,
-    address: deriveBidderAddress(deriveFixturePrivateKey(b.role)),
+    address: deriveBidderAddress(b.privateKey),
   }));
 }
 
 /**
  * The bank whose tokenized deposit (TBD) settles government bond payments —
- * `BondManager.GOV_TBD` resolved against the configured roster. Name is
- * `'Unknown'` when GOV_TBD points at a TBD that is not in the roster.
+ * `BondManager.GOV_TBD` resolved against the roster. Name is `'Unknown'`
+ * when GOV_TBD points at a TBD that is not in the roster.
  */
 export async function getGovSettlementBank(): Promise<{ name: string; address: string }> {
   const manager = await getBondManager();
   const govTbd = getAddress((await manager.GOV_TBD()) as string);
-  const tbds = await resolveConfiguredTbds();
+  const tbds = await resolveRosterTbds();
   const match = tbds.find((t) => t.address === govTbd);
   return { name: match?.bankName ?? 'Unknown', address: govTbd };
 }
