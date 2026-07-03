@@ -1,6 +1,6 @@
 # WNOK (Central Bank) Page Enhancement — Implementation Plan
 
-**Status:** Draft, ready for operator review
+**Status:** Draft — the optional WNOK-balance half shipped separately (`AllowlistEntry.wnokBalance` + the "WNOK holding" column); the labelling half (bank / TBD / gov-reserve types) remains open
 **Branch suggestion:** `feature/wnok-allowlist-enrichment` — defer the branch / commit / PR / CI workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-bond-api/` (enrich the central-bank allowlist read), `services/nb-ui/` (CentralBankPage allowlist rendering), docs.
 
