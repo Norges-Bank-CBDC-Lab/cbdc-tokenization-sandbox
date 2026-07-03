@@ -106,8 +106,7 @@ the Kind cluster `cluster-cbdc-monoledger`.
 - Source-building the backend/frontend images at the new tags via
   `./sandbox.sh build-images` (upstream stopped publishing release images),
   and documenting that reality (`docs/KNOWN_ISSUES.md`, `sandbox.sh`
-  build-images help text, `common/images.yaml` comments,
-  `docs/AZURE_BOUNDARY.md`).
+  build-images help text, `common/images.yaml` comments).
 - Documentation updates listed in Phase 6.
 
 ### Out Of Scope
@@ -116,8 +115,8 @@ the Kind cluster `cluster-cbdc-monoledger`.
   and `docs/KNOWN_ISSUES.md` is untouched).
 - Postgres / python / busybox base-image bumps (separate dependency-pin lane).
 - Enabling additional Blockscout microservices (stats, user-ops-indexer, etc.).
-- The non-local (Azure/GitOps) Blockscout upgrade — planned in the other
-  repo; see Portability Flags for the constraint it inherits.
+- The non-local Blockscout upgrade — owned by the separate deployment
+  repository; see Portability Flags for the constraints it inherits.
 
 ## Decisions And Open Questions
 
@@ -134,10 +133,10 @@ front of Phase 3.
 - **The v10 → v11 stepping-stone rule matters wherever the Blockscout
   database is persistent.** Locally the DB is wiped on every
   `blockscout.sh stop` (namespace + PVC delete), so v11 installs greenfield.
-  A deployment with a persistent DB (the Azure/GitOps one) must either step
+  A deployment with a persistent database must either step
   `v10.0.8 → v10.1.1 → v11.2.1` with migrations at each hop, or accept a
-  full re-index. Do **not** promote these pins to the other repo as a plain
-  image bump.
+  full re-index. Do **not** promote these pins to a non-local deployment as
+  a plain image bump.
 - `DISABLE_CATCHUP_INDEXER: "true"` means any *explorer-only* restart on a
   surviving chain loses pre-restart history. Pre-existing behaviour, not new
   to v11 — flagged here because it shapes D1 and any future non-local restart
@@ -146,8 +145,9 @@ front of Phase 3.
   `common/images.yaml` name the intended upstream refs, but they resolve only
   because `./sandbox.sh build-images` builds them from source into the local
   registry. A non-local deployment must build the backend + frontend images
-  itself (amd64 for AKS) and host them in its own registry — it cannot pull
-  them from ghcr or Docker Hub.
+  itself (for its own target CPU platform — the local build produces the
+  host architecture only) and host them in its own registry — it cannot
+  pull them from ghcr or Docker Hub.
 
 ## Acceptance Criteria
 
