@@ -481,11 +481,14 @@ const submitBidBodySchema = z
 const allowlistEntrySchema = z
   .object({
     address: addressSchema,
+    wnokBalance: bigIntStringSchema.nullable().meta({
+      description: "The address's current WNOK balance; null when the chain read failed.",
+    }),
     md5: md5Schema,
   })
   .meta({
     id: 'AllowlistEntry',
-    description: 'A single allowlisted address',
+    description: 'A single allowlisted address with its live WNOK holding',
   });
 
 const transactionRefSchema = z

@@ -230,6 +230,7 @@ export function CentralBankPage() {
                       <th>Address</th>
                       <th>Name</th>
                       <th>Type</th>
+                      <th className="num">WNOK holding</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -241,6 +242,9 @@ export function CentralBankPage() {
                           <td className="mono">{e.address}</td>
                           <td>{label.name}</td>
                           <td>{label.type}</td>
+                          <td className="num mono">
+                            {e.wnokBalance != null ? Fmt.formatUnits(e.wnokBalance) : '—'}
+                          </td>
                           <td className="right">
                             <Button
                               size="sm"

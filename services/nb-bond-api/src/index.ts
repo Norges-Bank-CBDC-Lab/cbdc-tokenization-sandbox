@@ -107,6 +107,7 @@ import {
   getWnokTotalSupply,
   isCentralBankReady,
   listAllowlist,
+  listAllowlistWithBalances,
   mintWnok,
   removeFromAllowlist,
   transferWnokFromCb,
@@ -1140,8 +1141,8 @@ function mapCentralBankError(err: unknown): never {
   throw err;
 }
 
-function toAllowlistEntry(address: string) {
-  return withMd5({ address });
+function toAllowlistEntry(entry: { address: string; wnokBalance: string | null }) {
+  return withMd5(entry);
 }
 
 // Central Bank is operator-only. This single prefix guard covers every
@@ -1218,8 +1219,8 @@ app.get('/v1/central-bank', async (req, res, next) => {
 
 app.get('/v1/central-bank/allowlist', async (req, res, next) => {
   try {
-    const addresses = await listAllowlist();
-    okResponse(req, res, addresses.map(toAllowlistEntry));
+    const entries = await listAllowlistWithBalances();
+    okResponse(req, res, entries.map(toAllowlistEntry));
   } catch (err) {
     try {
       mapCentralBankError(err);
