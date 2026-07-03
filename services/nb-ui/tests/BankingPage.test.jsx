@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ToastProvider } from '../src/components/ui.jsx';
 
 // The page reads the banking API; mock it so the test exercises the
@@ -8,6 +9,7 @@ vi.mock('../src/api/bankingApi.js', () => ({
   BankingApi: {
     listTbd: vi.fn(),
     listBanks: vi.fn(),
+    createBank: vi.fn(),
     addToAllowlist: vi.fn(),
     removeFromAllowlist: vi.fn(),
     mint: vi.fn(),
@@ -77,5 +79,54 @@ describe('BankingPage', () => {
     BankingApi.listBanks.mockResolvedValue([]);
     renderPage();
     expect(await screen.findByText('No TBD tokens found')).toBeInTheDocument();
+  });
+
+  describe('Add bank', () => {
+    it('opens the AddBank modal with name, keypair radio, and a default-checked WNOK checkbox', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const addBtn = await screen.findByRole('button', { name: /\+ Add bank/i });
+      await user.click(addBtn);
+
+      expect(await screen.findByRole('heading', { name: 'Add bank' })).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Sparebanken Norge')).toBeInTheDocument();
+      expect(screen.getByLabelText(/Generate new keypair/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Import existing private key/i)).toBeInTheDocument();
+      // WNOK settlement is opt-out: the checkbox is present and checked.
+      const checkbox = screen.getByRole('checkbox', { name: /Enable WNOK settlement/i });
+      expect(checkbox).toBeChecked();
+    });
+
+    it('creates a bank and reloads the banks + tokens queries', async () => {
+      BankingApi.createBank.mockResolvedValue({
+        name: 'Testbanken',
+        address: `0x${'e'.repeat(40)}`,
+        md5: 'x',
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: /\+ Add bank/i }));
+      await user.type(screen.getByPlaceholderText('Sparebanken Norge'), 'Testbanken');
+
+      const banksCallsBefore = BankingApi.listBanks.mock.calls.length;
+      const tbdCallsBefore = BankingApi.listTbd.mock.calls.length;
+
+      await user.click(screen.getByRole('button', { name: 'Add bank' }));
+
+      expect(BankingApi.createBank).toHaveBeenCalledWith({
+        name: 'Testbanken',
+        privateKey: undefined,
+        enableWnokSettlement: true,
+      });
+      // Success toast + both queries reloaded so the new bank appears in
+      // the dropdown and its TBD in the listing.
+      expect(await screen.findByText('Bank added')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(BankingApi.listBanks.mock.calls.length).toBeGreaterThan(banksCallsBefore);
+        expect(BankingApi.listTbd.mock.calls.length).toBeGreaterThan(tbdCallsBefore);
+      });
+    });
   });
 });

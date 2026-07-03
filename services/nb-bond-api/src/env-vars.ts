@@ -26,6 +26,9 @@ const envSchema = z.object({
   // Match TBD_*_CONTRACT_NAME in contracts/.env; defaults match the local deploy.
   TBD_NORDEA_CONTRACT_NAME: z.string().min(1).default('TBD Nordea'),
   TBD_DNB_CONTRACT_NAME: z.string().min(1).default('TBD DNB'),
+  // Registry name for the DvP contract (every TBD constructor takes its
+  // address). Matches DVP_CONTRACT_NAME in contracts/.env.
+  DVP_CONTRACT_NAME: z.string().min(1).default('Delivery vs Payment'),
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),

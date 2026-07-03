@@ -660,8 +660,40 @@ const bankInfoSchema = z
   .meta({
     id: 'BankInfo',
     description:
-      'A configured bank the operator can act as. The server holds the signing key; only the ' +
-      'address is exposed. Feeds the UI bank selector.',
+      'A bank the operator can act as — configured fixture or created from the Banking page. ' +
+      'The server holds the signing key; only the address is exposed. Feeds the UI bank selector.',
+  });
+
+const createBankBodySchema = z
+  .object({
+    name: z
+      .string()
+      .min(1)
+      .max(64)
+      .meta({
+        description:
+          'Human-readable bank label. Also derives the GlobalRegistry key ("TBD <name>") ' +
+          'and the token symbol.',
+      }),
+    privateKey: z
+      .string()
+      .regex(/^0x[a-fA-F0-9]{64}$/)
+      .optional()
+      .meta({
+        description: 'Optional import of an existing 32-byte hex key. Generated if omitted.',
+      }),
+    enableWnokSettlement: z
+      .boolean()
+      .default(true)
+      .meta({
+        description:
+          'Add the bank address to the WNOK allowlist so it can hold the WNOK reserve and ' +
+          'settle cross-bank. Default true.',
+      }),
+  })
+  .meta({
+    id: 'CreateBankBody',
+    description: 'Request body for creating a bank (deploys a fresh TBD contract)',
   });
 
 // #endregion
@@ -1396,10 +1428,26 @@ const paths: ZodOpenApiPathsObject = {
     get: {
       tags: ['banking'],
       operationId: 'listBanks',
-      summary: 'List the configured banks the operator can act as (signer selector)',
+      summary: 'List the banks the operator can act as (configured + created; signer selector)',
       responses: {
-        200: successJson('Configured banks', z.array(bankInfoSchema)),
+        200: successJson('Banks (configured + created)', z.array(bankInfoSchema)),
         ...errorRefs.read,
+      },
+    },
+    post: {
+      tags: ['banking'],
+      operationId: 'createBank',
+      summary:
+        'Create a bank: deploy a fresh TBD signed by the bank key (generated when privateKey ' +
+        'is omitted), register "TBD <name>" in GlobalRegistry, and optionally add the bank to ' +
+        'the WNOK allowlist',
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: createBankBodySchema } },
+      },
+      responses: {
+        200: successJson('Newly created bank', bankInfoSchema),
+        ...errorRefs.mutate,
       },
     },
   },
@@ -1697,6 +1745,7 @@ export {
   wnokTransferBodySchema,
   tbdMintBurnBodySchema,
   tbdTransferBodySchema,
+  createBankBodySchema,
 };
 
 export type Address = z.infer<typeof addressSchema>;
@@ -1740,5 +1789,6 @@ export type WnokMintBurnBody = z.infer<typeof wnokMintBurnBodySchema>;
 export type WnokTransferBody = z.infer<typeof wnokTransferBodySchema>;
 export type TbdMintBurnBody = z.infer<typeof tbdMintBurnBodySchema>;
 export type TbdTransferBody = z.infer<typeof tbdTransferBodySchema>;
+export type CreateBankBody = z.infer<typeof createBankBodySchema>;
 
 // #endregion
