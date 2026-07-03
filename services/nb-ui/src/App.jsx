@@ -17,13 +17,14 @@ import { AuctionsPage } from './pages/AuctionsPage.jsx';
 import { AuctionDetailPage } from './pages/AuctionDetailPage.jsx';
 import { BiddersPage } from './pages/BiddersPage.jsx';
 import { CentralBankPage } from './pages/CentralBankPage.jsx';
+import { CouponPayoutPage } from './pages/CouponPayoutPage.jsx';
 import { BankingPage } from './pages/BankingPage.jsx';
 import { GlobalRegistryPage } from './pages/GlobalRegistryPage.jsx';
 
 /**
  * ComingSoon — placeholder for nav destinations that exist in the category
- * structure but aren't built yet (Stocks, Coupon payout, and TBD until its
- * page lands). Keeps dropdown links live instead of dead-ending.
+ * structure but aren't built yet (Stocks). Keeps dropdown links live
+ * instead of dead-ending.
  */
 function ComingSoon({ title }) {
   return (
@@ -108,7 +109,7 @@ export function App() {
     );
   else if (route.name === 'coupon-payout')
     page = caps.canAccessCentralBank ? (
-      <ComingSoon title="Coupon payout" />
+      <CouponPayoutPage navigate={navigate} />
     ) : (
       <div className="card">
         <EmptyState
