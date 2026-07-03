@@ -324,7 +324,7 @@
           "bonds"
         ],
         "operationId": "payCoupon",
-        "summary": "Pay coupon to bond holders",
+        "summary": "Pay coupon to bond holders. Operator-only — the cash leg is paid from the government reserve (entra mode requires an operator App Role; 403 otherwise).",
         "parameters": [
           {
             "in": "path",
@@ -3023,6 +3023,34 @@
             ],
             "description": "Contractual annualised coupon rate in bps, fixed at bond issuance. Not the same as yield-to-maturity, which depends on the secondary-market price the holder paid; the sandbox has no secondary market so they coincide at par issuance."
           },
+          "lastPaymentAt": {
+            "anyOf": [
+              {
+                "description": "Unix timestamp in seconds (decimal string).",
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Raw lastCouponPayment chain value (unix seconds). NOTE: the contract initialises this to the finalise/issuance timestamp, so until the first payout (payments.made === 0) it equals the issuance date, not an actual payout."
+          },
+          "nextPaymentDue": {
+            "anyOf": [
+              {
+                "description": "Unix timestamp in seconds (decimal string).",
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the next coupon becomes payable: lastPaymentAt + duration (unix seconds). Null when the bond has no coupon schedule or all coupons are paid."
+          },
+          "payable": {
+            "type": "boolean",
+            "description": "True when a coupon can be paid now: payments.remaining > 0 and the LATEST BLOCK timestamp has reached nextPaymentDue. Computed server-side against the chain clock — the sandbox chain only mints blocks on transactions, so it lags wall clock. Clients must not recompute this from local time."
+          },
           "payments": {
             "$ref": "#/components/schemas/CouponPayments"
           }
@@ -3031,6 +3059,9 @@
           "duration",
           "durationYears",
           "rateBps",
+          "lastPaymentAt",
+          "nextPaymentDue",
+          "payable",
           "payments"
         ],
         "additionalProperties": false,

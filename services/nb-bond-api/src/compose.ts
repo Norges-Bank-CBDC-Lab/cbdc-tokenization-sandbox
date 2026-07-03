@@ -22,6 +22,7 @@ import {
   getBondManager,
   getBondToken,
   getDurationScalar,
+  getLatestBlockTimestamp,
 } from './chain';
 import { withMd5 } from './http';
 import {
@@ -339,6 +340,16 @@ export interface ComposeOptions {
    * Drives the `?includeDisabled=true` query param on `GET /v1/bonds`.
    */
   includeDisabled?: boolean;
+
+  /**
+   * Latest block timestamp (unix seconds), used for the coupon
+   * `payable` flag. Multi-bond composers fetch it ONCE per compose
+   * pass and fan it out here so N bonds don't trigger N identical
+   * `getBlock('latest')` calls. When undefined, `composeBond` fetches
+   * it itself (single-bond routes). `null` means the chain read
+   * failed — payability is then reported as false.
+   */
+  latestBlockTimestamp?: bigint | null;
 }
 
 export async function composeAuction(
@@ -540,9 +551,13 @@ export async function composeBond(
   const couponDuration = couponDurationRaw ? BigInt(couponDurationRaw.toString()) : null;
   const couponYield = couponYieldRaw ? BigInt(couponYieldRaw.toString()) : null;
   const lastCouponPayment = lastCouponPaymentRaw ? BigInt(lastCouponPaymentRaw.toString()) : null;
-  const couponPaymentCount = couponPaymentCountRaw
-    ? BigInt(couponPaymentCountRaw.toString())
-    : null;
+  // 0 is meaningful for the payment count (freshly issued bond, no
+  // coupons paid yet) — a falsy check would collapse it to null, which
+  // both mis-derives the status ('unknown' instead of 'minting') and
+  // makes payments.remaining null so the FIRST coupon could never show
+  // as payable. Only a failed chain read (null) maps to null.
+  const couponPaymentCount =
+    couponPaymentCountRaw !== null ? BigInt(couponPaymentCountRaw.toString()) : null;
   const maturityDate = maturityDateRaw ? BigInt(maturityDateRaw.toString()) : null;
   const totalSupply = totalSupplyRaw ? BigInt(totalSupplyRaw.toString()) : null;
   const isMatured = Boolean(isMaturedRaw);
@@ -568,6 +583,31 @@ export async function composeBond(
       const remaining = couponPaymentsTotal - couponPaymentCount;
       couponPaymentsRemaining = remaining >= 0n ? remaining : 0n;
     }
+  }
+
+  // Coupon payability. Mirrors BondManager.payCoupon's on-chain gate:
+  // paymentCount < expectedPayments AND block.timestamp >= lastPayment
+  // + couponDuration. `lastCouponPayment` is initialised to the
+  // finalise (issuance) timestamp, so before the first payout the due
+  // time is issuance + one interval. CRITICAL: the comparison uses the
+  // LATEST BLOCK timestamp — the sandbox chain only mints blocks on
+  // transactions, so the chain clock lags wall clock and Date.now()
+  // would mark bonds payable that the contract still rejects.
+  const latestBlockTimestamp =
+    opts.latestBlockTimestamp !== undefined
+      ? opts.latestBlockTimestamp
+      : await getLatestBlockTimestamp();
+  let couponNextPaymentDue: bigint | null = null;
+  let couponPayable = false;
+  if (
+    lastCouponPayment !== null &&
+    couponDuration &&
+    couponDuration > 0n &&
+    couponPaymentsRemaining !== null &&
+    couponPaymentsRemaining > 0n
+  ) {
+    couponNextPaymentDue = lastCouponPayment + couponDuration;
+    couponPayable = latestBlockTimestamp !== null && latestBlockTimestamp >= couponNextPaymentDue;
   }
 
   const nowSec = BigInt(Math.floor(Date.now() / 1000));
@@ -632,10 +672,17 @@ export async function composeBond(
             duration: couponDuration ? couponDuration.toString() : null,
             durationYears: toYears(couponDuration),
             rateBps: couponYield ? couponYield.toString() : null,
+            // Equals the issuance timestamp until the first payout
+            // (payments.made === 0) — see the schema description.
+            lastPaymentAt: lastCouponPayment !== null ? lastCouponPayment.toString() : null,
+            nextPaymentDue: couponNextPaymentDue !== null ? couponNextPaymentDue.toString() : null,
+            payable: couponPayable,
             payments: {
               total: couponPaymentsTotal ? couponPaymentsTotal.toString() : null,
               made: couponPaymentCount !== null ? couponPaymentCount.toString() : null,
-              remaining: couponPaymentsRemaining ? couponPaymentsRemaining.toString() : null,
+              // '0' (not null) once all coupons are paid.
+              remaining:
+                couponPaymentsRemaining !== null ? couponPaymentsRemaining.toString() : null,
             },
           }
         : null,
@@ -653,7 +700,15 @@ export async function composeAllBonds(
   opts: ComposeOptions = {},
 ): Promise<Bond[]> {
   const rows = listBondRows(db, { includeDisabled: opts.includeDisabled });
-  const bonds = await Promise.all(rows.map((r) => composeBond(db, r.isin, opts)));
+  // One latest-block read per compose pass, fanned out to every bond's
+  // coupon-payability check (see ComposeOptions.latestBlockTimestamp).
+  const latestBlockTimestamp =
+    opts.latestBlockTimestamp !== undefined
+      ? opts.latestBlockTimestamp
+      : await getLatestBlockTimestamp();
+  const bonds = await Promise.all(
+    rows.map((r) => composeBond(db, r.isin, { ...opts, latestBlockTimestamp })),
+  );
   return bonds.filter((b): b is Bond => b !== null);
 }
 

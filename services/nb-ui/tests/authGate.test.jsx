@@ -143,9 +143,26 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Central Bank/ })).not.toBeInTheDocument();
+    // Banking is tester-accessible — Central Bank is the only
+    // operator-locked surface.
+    expect(screen.getByRole('button', { name: /Banking/ })).toBeInTheDocument();
     // Manually hitting the route shows the not-authorised panel, not the CB surface.
     expect(await screen.findByText('Not authorised')).toBeInTheDocument();
     expect(screen.queryByText('WNOK actions')).not.toBeInTheDocument();
+  });
+
+  it('guards the coupon-payout route for a tester with the not-authorised panel', async () => {
+    const { App } = await loadApp({ accounts: [testerAccount] });
+    window.location.hash = '#/coupon-payout';
+    render(<App />);
+
+    // The app shell mounts (tester has a recognised role), but the
+    // operator-only Coupon payout page — nested under the hidden
+    // Central Bank category — is replaced by the not-authorised panel.
+    expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Central Bank/ })).not.toBeInTheDocument();
+    expect(await screen.findByText('Not authorised')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Coupon payout' })).not.toBeInTheDocument();
   });
 
   it('shows the access-denied page for a signed-in user with no recognised role', async () => {

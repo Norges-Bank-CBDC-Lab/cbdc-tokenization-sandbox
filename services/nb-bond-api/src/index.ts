@@ -463,6 +463,10 @@ app.get('/v1/bonds/:isin/history', validateRequest(isinParamSchema, 'params'), (
 
 app.post(
   '/v1/bonds/:isin/coupon-payments',
+  // Operator-only — pays the coupon cash leg from the government
+  // reserve. The rest of /v1/bonds stays tester-accessible; no-op in
+  // `none` mode, 403 for non-operator roles in entra mode.
+  requireAnyRole(operatorRoles),
   validateRequest(isinParamSchema, 'params'),
   validateRequest(holdersBodySchema),
   async (req, res, next) => {
@@ -1320,9 +1324,10 @@ app.post(
 
 // #region Banking (TBD) ──────────────────────────────────────────────
 
-// Banking (TBD) is operator-only — same prefix-guard model as Central Bank.
-// No-op in `none` mode; 403 for non-operator tokens in `entra` mode.
-app.use('/v1/banking', requireAnyRole(operatorRoles));
+// Banking (TBD) is open to both operator and tester roles so testers can
+// exercise bank-money flows; Central Bank stays the only operator-locked
+// surface. No-op in `none` mode; 403 for unrecognised tokens in `entra`.
+app.use('/v1/banking', requireAnyRole(recognizedRoles));
 
 app.get('/v1/banking/tbd', async (req, res, next) => {
   try {

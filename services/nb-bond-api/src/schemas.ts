@@ -325,6 +325,24 @@ const couponSchema = z
         'price the holder paid; the sandbox has no secondary market so they coincide ' +
         'at par issuance.',
     }),
+    lastPaymentAt: unixSecondsSchema.nullable().meta({
+      description:
+        'Raw lastCouponPayment chain value (unix seconds). NOTE: the contract initialises ' +
+        'this to the finalise/issuance timestamp, so until the first payout ' +
+        '(payments.made === 0) it equals the issuance date, not an actual payout.',
+    }),
+    nextPaymentDue: unixSecondsSchema.nullable().meta({
+      description:
+        'When the next coupon becomes payable: lastPaymentAt + duration (unix seconds). ' +
+        'Null when the bond has no coupon schedule or all coupons are paid.',
+    }),
+    payable: z.boolean().meta({
+      description:
+        'True when a coupon can be paid now: payments.remaining > 0 and the LATEST BLOCK ' +
+        'timestamp has reached nextPaymentDue. Computed server-side against the chain clock — ' +
+        'the sandbox chain only mints blocks on transactions, so it lags wall clock. Clients ' +
+        'must not recompute this from local time.',
+    }),
     payments: couponPaymentsSchema,
   })
   .meta({
@@ -1129,7 +1147,9 @@ const paths: ZodOpenApiPathsObject = {
     post: {
       tags: ['bonds'],
       operationId: 'payCoupon',
-      summary: 'Pay coupon to bond holders',
+      summary:
+        'Pay coupon to bond holders. Operator-only — the cash leg is paid from the government ' +
+        'reserve (entra mode requires an operator App Role; 403 otherwise).',
       parameters: [isinPathParam],
       requestBody: {
         required: true,

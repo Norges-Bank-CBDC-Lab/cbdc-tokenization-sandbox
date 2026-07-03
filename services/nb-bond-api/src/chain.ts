@@ -125,6 +125,25 @@ async function assertProviderReady() {
   }
 }
 
+/**
+ * Timestamp of the latest mined block, in unix seconds.
+ *
+ * The sandbox chain only mints blocks when transactions land, so the
+ * chain clock LAGS wall clock — sometimes by a lot. Any time-based
+ * eligibility the contracts enforce via `block.timestamp` (e.g. coupon
+ * payability, auction close) must be derived from THIS value, never
+ * from `Date.now()`, or the API will report actions as ready that the
+ * chain still rejects.
+ */
+export async function getLatestBlockTimestamp(): Promise<bigint | null> {
+  try {
+    const block = await provider.getBlock('latest');
+    return block ? BigInt(block.timestamp) : null;
+  } catch {
+    return null;
+  }
+}
+
 // DURATION_SCALAR is an immutable constant on the deployed BondManager
 // (seconds-per-year on real chains; small value like 60 on the sandbox
 // for fast testing). Cache it once after the first successful read so
