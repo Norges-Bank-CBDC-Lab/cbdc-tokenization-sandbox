@@ -47,12 +47,12 @@ describe('capabilitiesForAccount', () => {
     });
   });
 
-  it('grants the UI without the operator surfaces to a tester', async () => {
+  it('grants the UI incl. Banking, but not Central Bank, to a tester', async () => {
     const cap = await loadCapabilities(entra);
     expect(cap({ roles: ['Sandbox.Tester'] })).toEqual({
       canUseApp: true,
       canAccessCentralBank: false,
-      canAccessBanking: false,
+      canAccessBanking: true,
     });
   });
 
