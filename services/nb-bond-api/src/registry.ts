@@ -33,7 +33,7 @@ export const REGISTRY_CONTRACT_NAMES: readonly string[] = [
   'Bond Delivery vs Payment',
   envVariables.TBD_NORDEA_CONTRACT_NAME,
   envVariables.TBD_DNB_CONTRACT_NAME,
-  'Delivery vs Payment',
+  envVariables.DVP_CONTRACT_NAME,
   'Order Book',
   'StockToken Factory',
   'Pareto Broker',

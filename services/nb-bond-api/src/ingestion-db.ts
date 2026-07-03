@@ -29,13 +29,13 @@ import { logger } from './logger';
  *        after upgrade — CREATE TABLE IF NOT EXISTS would otherwise
  *        keep the old shape.
  *
- * Note on the `bidders` table: unlike every other table in this file,
- * `bidders` is a *system of record*, not a chain projection. It is
- * created additively via `CREATE TABLE IF NOT EXISTS` and must NEVER
- * be added to the drop list in `migrateToCurrentVersion` — that
- * function only drops projection tables that can be rebuilt from
- * chain. Bidders are sandbox-impersonation keypairs and cannot be
- * recovered from chain state.
+ * Note on the `bidders` and `banks` tables: unlike every other table
+ * in this file, they are *systems of record*, not chain projections.
+ * They are created additively via `CREATE TABLE IF NOT EXISTS` and
+ * must NEVER be added to the drop list in `migrateToCurrentVersion` —
+ * that function only drops projection tables that can be rebuilt from
+ * chain. Bidder and bank keypairs are sandbox-impersonation keys and
+ * cannot be recovered from chain state.
  */
 const SCHEMA_VERSION = 3;
 
@@ -167,6 +167,20 @@ function createTables(db: IngestionDatabase) {
       private_key TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
+
+    -- System-of-record table: banks created from the Banking page. Each
+    -- row holds the bank keypair plus the TBD contract deployed for it
+    -- (registered in GlobalRegistry under contract_name). NEVER add this
+    -- to the drop list in migrateToCurrentVersion — see the
+    -- SCHEMA_VERSION doc comment.
+    CREATE TABLE IF NOT EXISTS banks (
+      address TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      private_key TEXT NOT NULL,
+      contract_name TEXT NOT NULL UNIQUE,
+      tbd_address TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -195,10 +209,11 @@ function createTables(db: IngestionDatabase) {
  */
 /**
  * Names of every projection table the ingestion loop owns. **Excludes
- * `bidders`** — that table is a sandbox system-of-record (impersonation
- * keypairs that can't be recovered from chain) and must never be added
- * here. Adding a new projection table? Add its name here AND it will
- * be picked up by both the schema migration and the admin reset path.
+ * `bidders` and `banks`** — those tables are sandbox systems-of-record
+ * (impersonation keypairs that can't be recovered from chain) and must
+ * never be added here. Adding a new projection table? Add its name here
+ * AND it will be picked up by both the schema migration and the admin
+ * reset path.
  */
 export const PROJECTION_TABLE_NAMES = [
   'ingestion_state',
@@ -415,6 +430,60 @@ export function deleteBidderRow(db: IngestionDatabase, address: string): number 
 export function countBidderRows(db: IngestionDatabase): number {
   const row = db.prepare(`SELECT COUNT(*) AS n FROM bidders`).get() as { n: number };
   return row.n;
+}
+
+// #endregion
+
+// #region Banks (system-of-record) ──────────────────────────────────
+
+export interface BankRow {
+  address: string;
+  name: string;
+  private_key: string;
+  contract_name: string;
+  tbd_address: string;
+  created_at: number;
+}
+
+const BANK_ROW_COLUMNS = 'address, name, private_key, contract_name, tbd_address, created_at';
+
+export function listBankRows(db: IngestionDatabase): BankRow[] {
+  return db
+    .prepare(
+      `SELECT ${BANK_ROW_COLUMNS}
+       FROM banks
+       ORDER BY created_at, address`,
+    )
+    .all() as BankRow[];
+}
+
+export function getBankRowByAddress(db: IngestionDatabase, address: string): BankRow | null {
+  const row = db
+    .prepare(
+      `SELECT ${BANK_ROW_COLUMNS}
+       FROM banks
+       WHERE LOWER(address) = LOWER(?)`,
+    )
+    .get(address);
+  return (row as BankRow | undefined) ?? null;
+}
+
+export function getBankRowByName(db: IngestionDatabase, name: string): BankRow | null {
+  const row = db
+    .prepare(
+      `SELECT ${BANK_ROW_COLUMNS}
+       FROM banks
+       WHERE LOWER(name) = LOWER(?)`,
+    )
+    .get(name);
+  return (row as BankRow | undefined) ?? null;
+}
+
+export function insertBankRow(db: IngestionDatabase, row: BankRow): void {
+  db.prepare(
+    `INSERT INTO banks(${BANK_ROW_COLUMNS})
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(row.address, row.name, row.private_key, row.contract_name, row.tbd_address, row.created_at);
 }
 
 // #endregion

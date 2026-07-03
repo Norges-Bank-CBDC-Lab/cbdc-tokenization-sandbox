@@ -1491,10 +1491,10 @@
           "banking"
         ],
         "operationId": "listBanks",
-        "summary": "List the configured banks the operator can act as (signer selector)",
+        "summary": "List the banks the operator can act as (configured + created; signer selector)",
         "responses": {
           "200": {
-            "description": "Configured banks",
+            "description": "Banks (configured + created)",
             "headers": {
               "ETag": {
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
@@ -1528,6 +1528,61 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "banking"
+        ],
+        "operationId": "createBank",
+        "summary": "Create a bank: deploy a fresh TBD signed by the bank key (generated when privateKey is omitted), register \"TBD <name>\" in GlobalRegistry, and optionally add the bank to the WNOK allowlist",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBankBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Newly created bank",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BankInfo"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2340,6 +2395,31 @@
           "amount"
         ],
         "description": "Body for a transfer from the CB account"
+      },
+      "CreateBankBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Human-readable bank label. Also derives the GlobalRegistry key (\"TBD <name>\") and the token symbol."
+          },
+          "privateKey": {
+            "description": "Optional import of an existing 32-byte hex key. Generated if omitted.",
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{64}$"
+          },
+          "enableWnokSettlement": {
+            "default": true,
+            "description": "Add the bank address to the WNOK allowlist so it can hold the WNOK reserve and settle cross-bank. Default true.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "description": "Request body for creating a bank (deploys a fresh TBD contract)"
       },
       "TbdMintBurnBody": {
         "type": "object",
@@ -3702,7 +3782,7 @@
           "md5"
         ],
         "additionalProperties": false,
-        "description": "A configured bank the operator can act as. The server holds the signing key; only the address is exposed. Feeds the UI bank selector."
+        "description": "A bank the operator can act as — configured fixture or created from the Banking page. The server holds the signing key; only the address is exposed. Feeds the UI bank selector."
       },
       "TbdToken": {
         "type": "object",

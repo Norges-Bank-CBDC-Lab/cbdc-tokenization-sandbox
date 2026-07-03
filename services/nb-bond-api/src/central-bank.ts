@@ -43,7 +43,13 @@ export class WnokUnavailableError extends Error {
 let cachedWallet: Wallet | null = null;
 let cachedContract: Contract | null = null;
 
-function getWallet(): Wallet {
+/**
+ * The Central Bank signer. Exported for flows outside this module that
+ * must sign as the CB — e.g. GlobalRegistry.setContract during bank
+ * creation (banks.ts): the registry owner IS the CB account. Throws
+ * `CentralBankNotConfiguredError` when CENTRAL_BANK_PK is unset.
+ */
+export function getCbWallet(): Wallet {
   if (!envVariables.CENTRAL_BANK_PK) {
     throw new CentralBankNotConfiguredError();
   }
@@ -57,7 +63,7 @@ async function getWnokContract(): Promise<Contract> {
   if (cachedContract) return cachedContract;
   // Fail fast on missing key BEFORE the chain lookup — avoids leaking
   // a JsonRpcProvider retry loop in tests that don't supply a CB key.
-  const wallet = getWallet();
+  const wallet = getCbWallet();
   const address = await getWnokAddress();
   if (!address) {
     throw new WnokUnavailableError(envVariables.WNOK_CONTRACT_NAME);
@@ -86,7 +92,7 @@ export async function isCentralBankReady(): Promise<boolean> {
 }
 
 export function getCbAddress(): string {
-  return getWallet().address;
+  return getCbWallet().address;
 }
 
 /** Read CB's own WNOK balance via the bound contract. */

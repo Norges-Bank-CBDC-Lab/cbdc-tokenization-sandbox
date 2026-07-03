@@ -16,6 +16,10 @@ async function listBanks() {
   return HttpClient.get('/v1/banking/banks');
 }
 
+async function createBank(body) {
+  return HttpClient.post('/v1/banking/banks', body);
+}
+
 async function listTbd() {
   return HttpClient.get('/v1/banking/tbd');
 }
@@ -46,6 +50,7 @@ async function transfer(address, { to, amount }) {
 
 export const BankingApi = {
   listBanks,
+  createBank,
   listTbd,
   getTbd,
   addToAllowlist,

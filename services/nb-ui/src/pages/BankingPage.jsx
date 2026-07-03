@@ -23,6 +23,7 @@ import {
   Select,
   useToast,
 } from '../components/ui.jsx';
+import { AddBankModal } from './AddBankModal.jsx';
 import { AddTbdAllowlistModal } from './AddTbdAllowlistModal.jsx';
 import { TbdMintBurnModal } from './TbdMintBurnModal.jsx';
 import { TransferTbdModal } from './TransferTbdModal.jsx';
@@ -128,6 +129,9 @@ export function BankingPage() {
         <div className="actions">
           <Button onClick={reload} variant="ghost">
             Refresh
+          </Button>
+          <Button onClick={() => setModal('addBank')} variant="primary">
+            + Add bank
           </Button>
         </div>
       </div>
@@ -403,6 +407,24 @@ export function BankingPage() {
           existingAddresses={token.holders.map((h) => h.address)}
           onClose={() => setModal(null)}
           onAdded={(ref) => onMutated('Allowlist add', ref)}
+        />
+      )}
+      {modal === 'addBank' && (
+        <AddBankModal
+          existingNames={options.map((b) => b.name)}
+          onClose={() => setModal(null)}
+          onCreated={(bank) => {
+            setModal(null);
+            toast.push({
+              kind: 'ok',
+              title: 'Bank added',
+              body: `${bank.name} — TBD deployed and registered`,
+            });
+            // Act as the new bank right away, and refresh both the bank
+            // selector and the TBD listing so its token shows up.
+            setSelectedBank(bank.address);
+            reload();
+          }}
         />
       )}
     </div>
