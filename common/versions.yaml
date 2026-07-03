@@ -11,7 +11,7 @@
 #
 # Example (upgrade Blockscout chart):
 #   charts:
-#     blockscout_stack: 4.4.0
+#     blockscout_stack: 4.6.0
 #
 # Notes:
 # - Chart upgrades can introduce breaking changes; review upstream chart notes.
@@ -22,6 +22,6 @@
 #   - NGINX Gateway Fabric chart: https://github.com/nginx/nginx-gateway-fabric/releases
 #
 charts:
-  blockscout_stack: 4.4.3
+  blockscout_stack: 4.5.1
   script_runner: 4.3.2
   nginx_gateway_fabric: 2.6.0

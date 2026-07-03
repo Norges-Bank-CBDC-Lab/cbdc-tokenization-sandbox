@@ -361,8 +361,8 @@ elif [ "$CMD" == "registry-sync" ]; then
     ./infra.sh registry-sync --as-subtask
 elif [ "$CMD" == "build-images" ]; then
     checkPrereqs
-    echo "ℹ️ Default sandbox deploys use published Blockscout images pinned in services/blockscout/values.yaml."
-    echo "ℹ️ build-images is an optional local override for testing upstream Blockscout source changes."
+    echo "ℹ️ Blockscout backend/frontend images are built from source at the tags pinned in common/images.yaml."
+    echo "ℹ️ Upstream stopped publishing release images (see docs/KNOWN_ISSUES.md); run this once before start on a fresh machine or after registry-reset."
     cd $SCRIPT_DIR/services/blockscout
     ./build-images.sh
 elif [ "$CMD" == "generate-config" ]; then

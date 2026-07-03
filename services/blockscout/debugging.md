@@ -73,9 +73,9 @@ If this fails but curl works, the issue is in Blockscout client config.
 
 ## Contract verification
 
-Modern Blockscout (the v10 backend used here) does **not** verify contracts
-in-process — it delegates source compilation and bytecode matching to a
-standalone **smart-contract-verifier** microservice (`sc-verifier-deployment` /
+Modern Blockscout (v10 and later; this sandbox runs a v11 backend) does
+**not** verify contracts in-process — it delegates source compilation and
+bytecode matching to a standalone **smart-contract-verifier** microservice (`sc-verifier-deployment` /
 `sc-verifier-service`, pinned in `common/images.yaml` under
 `blockscout.smart_contract_verifier`). The backend is wired to it via
 `MICROSERVICE_SC_VERIFIER_{ENABLED,URL,TYPE}` in

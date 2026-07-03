@@ -6,7 +6,7 @@
 dbImage: postgres:18.4
 bensImage: python:3.14.5
 
-# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/398795a6fb05b95fd39a9da8c3e24bdf5122e4e3/charts/blockscout-stack/values.yaml
+# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/blockscout-stack-4.5.1/charts/blockscout-stack/values.yaml
 config:
   network:
     id: 2018
@@ -44,7 +44,7 @@ blockscout:
     pullPolicy: IfNotPresent
     # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/blockscout
-    tag: "v10.0.8"
+    tag: "v11.2.1"
   ## Init container configuration (used to run DB migrations)
   ##
   init:
@@ -109,7 +109,7 @@ frontend:
     pullPolicy: IfNotPresent
     # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/frontend
-    tag: "v2.7.3"
+    tag: "v2.9.0"
 
   replicaCount: 1
 
