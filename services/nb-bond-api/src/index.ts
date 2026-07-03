@@ -454,6 +454,10 @@ app.get('/v1/bonds/:isin/history', validateRequest(isinParamSchema, 'params'), (
 
 app.post(
   '/v1/bonds/:isin/coupon-payments',
+  // Operator-only — pays the coupon cash leg from the government
+  // reserve. The rest of /v1/bonds stays tester-accessible; no-op in
+  // `none` mode, 403 for non-operator roles in entra mode.
+  requireAnyRole(operatorRoles),
   validateRequest(isinParamSchema, 'params'),
   validateRequest(holdersBodySchema),
   async (req, res, next) => {
