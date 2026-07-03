@@ -229,4 +229,35 @@ describe('CouponPayoutPage', () => {
     expect(await within(modal).findByText('CouponNotReady')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Pay coupon on NO0000000001' })).toBeInTheDocument();
   });
+
+  it('flags treasury-held units (the bond manager) in the payment preview', async () => {
+    // A partial allocation leaves unsold units on the BondManager itself.
+    // The contract requires covering EVERY holder, so the preview keeps
+    // the manager row (labelled) and warns that the payout will fail on
+    // the government TBD allowlist. Mixed casing proves the address
+    // match is case-insensitive.
+    const MANAGER = '0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc';
+    const bond = {
+      ...PAYABLE_BOND,
+      contracts: { ...PAYABLE_BOND.contracts, manager: MANAGER },
+      holders: [
+        { holder: HOLDER_A, balance: '600', md5: 'h1' },
+        { holder: MANAGER.toLowerCase(), balance: '400', md5: 'hm' },
+      ],
+    };
+    const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
+    render(<PayCouponModal bond={bond} onClose={() => {}} onPaid={() => {}} />);
+
+    // Both rows render (header + 2 holders + total), the manager row is
+    // labelled, and the warning is shown before any transaction fires.
+    expect(screen.getAllByRole('row')).toHaveLength(4);
+    expect(screen.getByText('(treasury)')).toBeInTheDocument();
+    expect(screen.getByText(/treasury-held units/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/will fail unless the manager is explicitly allowlisted/),
+    ).toBeInTheDocument();
+    // Total covers ALL holders — the full cash leg the contract demands:
+    // (600 + 400) units × 4.25% of face = 42.50 K NOK.
+    expect(screen.getByText('42.50 K NOK')).toBeInTheDocument();
+  });
 });
