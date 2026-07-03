@@ -1,5 +1,6 @@
 import {
   Contract,
+  EventLog,
   Interface,
   JsonRpcProvider,
   TransactionReceipt,
@@ -8,6 +9,7 @@ import {
 } from 'ethers';
 import { bondAuctionAbi, bondManagerAbi, bondTokenAbi, globalRegistryAbi, wnokAbi } from './abi';
 import { envVariables } from './env-vars';
+import { logger } from './logger';
 
 export const provider = new JsonRpcProvider(envVariables.RPC_URL);
 
@@ -254,4 +256,34 @@ export async function resolveRegisteredAddress(name: string): Promise<string | n
   await assertProviderReady();
   const [found, address] = await registry.tryGetContract(name);
   return found ? address : null;
+}
+
+/**
+ * Every name ever registered in the GlobalRegistry, recovered from its
+ * ContractAdded / ContractUpdated events — the mapping itself is keyed by
+ * hashed names and cannot be enumerated on-chain. The event `name` params
+ * are not indexed, so the full strings sit in the log data. The local
+ * chain is small (blocks mint only on transactions), so a from-genesis
+ * scan per request is cheap. Failures degrade to an empty list so the
+ * registry inventory can fall back to its canonical name set.
+ */
+export async function listRegistryEventNames(): Promise<string[]> {
+  try {
+    await assertProviderReady();
+    const [added, updated] = await Promise.all([
+      registry.queryFilter(registry.filters.ContractAdded(), 0, 'latest'),
+      registry.queryFilter(registry.filters.ContractUpdated(), 0, 'latest'),
+    ]);
+    const names: string[] = [];
+    for (const ev of [...added, ...updated]) {
+      const name = ev instanceof EventLog ? ev.args?.[0] : undefined;
+      if (typeof name === 'string' && name.length > 0 && !names.includes(name)) {
+        names.push(name);
+      }
+    }
+    return names;
+  } catch (err) {
+    logger.warn(`GlobalRegistry event scan failed: ${(err as Error).message}`);
+    return [];
+  }
 }
