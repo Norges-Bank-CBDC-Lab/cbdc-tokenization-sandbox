@@ -1315,9 +1315,10 @@ app.post(
 
 // #region Banking (TBD) ──────────────────────────────────────────────
 
-// Banking (TBD) is operator-only — same prefix-guard model as Central Bank.
-// No-op in `none` mode; 403 for non-operator tokens in `entra` mode.
-app.use('/v1/banking', requireAnyRole(operatorRoles));
+// Banking (TBD) is open to both operator and tester roles so testers can
+// exercise bank-money flows; Central Bank stays the only operator-locked
+// surface. No-op in `none` mode; 403 for unrecognised tokens in `entra`.
+app.use('/v1/banking', requireAnyRole(recognizedRoles));
 
 app.get('/v1/banking/tbd', async (req, res, next) => {
   try {

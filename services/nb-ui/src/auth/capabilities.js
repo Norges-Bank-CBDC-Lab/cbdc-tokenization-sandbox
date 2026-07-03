@@ -40,7 +40,9 @@ export function capabilitiesForAccount(account) {
   const isTester = roles.some((r) => testerRoles.includes(r));
   return {
     canUseApp: isOperator || isTester,
+    // Central Bank is the only operator-locked surface; Banking (TBD) is
+    // open to testers so they can exercise bank-money flows end-to-end.
     canAccessCentralBank: isOperator,
-    canAccessBanking: isOperator,
+    canAccessBanking: isOperator || isTester,
   };
 }
