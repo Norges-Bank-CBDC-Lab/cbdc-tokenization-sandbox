@@ -1,10 +1,8 @@
 /**
  * CreateAuctionModal — schedule an auction for an existing bond.
  *
- * - When invoked without `lockIsin` (e.g. from AuctionsPage), the operator
- *   picks a bond from a dropdown of non-disabled bonds.
- * - When invoked with `lockIsin` (e.g. from BondDetailPage), the bond is
- *   fixed.
+ * - Invoked from AuctionsPage; the operator picks a bond from a dropdown
+ *   of non-disabled bonds.
  * - The auction-type radio gates RATE / PRICE / BUYBACK against the
  *   selected bond's prior auction history: the contract requires the
  *   first auction for an ISIN to be RATE, and every subsequent auction to
@@ -16,8 +14,8 @@ import { BondsApi } from '../api/bondsApi.js';
 import { useApi, useMutation } from '../hooks/useApi.js';
 import { Button, Field, Input, Modal, RadioGroup, Select } from '../components/ui.jsx';
 
-export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose, onCreated }) {
-  const [isin, setIsin] = useState(defaultIsin);
+export function CreateAuctionModal({ onClose, onCreated }) {
+  const [isin, setIsin] = useState('');
   const [auctionType, setAuctionType] = useState('RATE');
   const [size, setSize] = useState('1000000');
   const [endDays, setEndDays] = useState('3');
@@ -97,28 +95,20 @@ export function CreateAuctionModal({ defaultIsin = '', lockIsin = false, onClose
     <Modal title="New auction" onClose={onClose} footer={footer}>
       <Field
         label="Bond"
-        hint={
-          lockIsin
-            ? 'Auction will be created for this bond.'
-            : 'Pick the bond this auction issues against. Disabled bonds are hidden.'
-        }
+        hint="Pick the bond this auction issues against. Disabled bonds are hidden."
         error={isinError}
       >
-        {lockIsin ? (
-          <Input mono disabled value={isin} />
-        ) : (
-          <Select value={isin} onChange={(e) => pickIsin(e.target.value)}>
-            <option value="">— select bond —</option>
-            {bonds.map((b) => {
-              const auctions = b.auctions?.length ?? 0;
-              return (
-                <option key={b.isin} value={b.isin}>
-                  {b.isin} ({auctions === 0 ? 'no auctions yet' : `${auctions} prior`})
-                </option>
-              );
-            })}
-          </Select>
-        )}
+        <Select value={isin} onChange={(e) => pickIsin(e.target.value)}>
+          <option value="">— select bond —</option>
+          {bonds.map((b) => {
+            const auctions = b.auctions?.length ?? 0;
+            return (
+              <option key={b.isin} value={b.isin}>
+                {b.isin} ({auctions === 0 ? 'no auctions yet' : `${auctions} prior`})
+              </option>
+            );
+          })}
+        </Select>
       </Field>
 
       <Field
