@@ -77,6 +77,51 @@ For an ArgoCD-deployed Blockscout, prefer one of:
 Either way, the deployment repo owns the choice. This repo's
 `composeBlockscoutChart` is not a stable input contract.
 
+#### Version-upgrade guardrails (from the local v10 → v11 upgrade)
+
+Findings from moving the local sandbox to backend `v11.2.1` / frontend
+`v2.9.0` / chart `4.5.1` that a non-local Blockscout deployment inherits:
+
+- **No public upstream images exist for Blockscout v10+.** Upstream stopped
+  publishing release-tagged images (`ghcr.io/blockscout/blockscout` ends at
+  the v9.0.2 era, `ghcr.io/blockscout/frontend` at v2.3.5, Docker Hub in
+  April 2025), and previously pullable tags were removed. The deployment
+  repo must build the backend + frontend images from the upstream release
+  tags itself (amd64 for AKS — the local build produces arm64) and host
+  them in its own registry. `services/blockscout/build-images.sh` shows the
+  exact clone + `docker build` recipe, including the build args each image
+  needs. Re-check upstream before doing this; if a release channel is
+  restored, pulling is preferable.
+- **The v11 migration stepping stone applies to persistent databases.** The
+  local sandbox installs Blockscout greenfield on every restart, so
+  upstream's rule "v11.0.0 must be installed on top of v10.1" never bites
+  here. A deployment with a persistent Blockscout database must either step
+  `v10.0.8 → v10.1.1 → v11.2.x` (migrations complete at each hop) or drop
+  the database and re-index from the chain.
+- **Re-indexing needs the catchup indexer.** The local env sets
+  `DISABLE_CATCHUP_INDEXER: "true"` (realtime-only). If the deployment
+  reuses these env values and ever starts from an empty database against a
+  chain with history, nothing backfills old blocks. Enable catchup for any
+  re-index and budget for the extra RPC load on the node.
+- **v11 defaults database SSL to `require`.** `ECTO_USE_SSL` is deprecated
+  in favour of `ECTO_SSL_MODE` (v11.1.0+; values `disable`/`allow`/`prefer`/
+  `require`/`verify-ca`/`verify-full`; resolution: `ECTO_SSL_MODE` →
+  `sslmode` in `DATABASE_URL` → default `require`). The local sandbox must
+  set `disable` for its plain-TCP Postgres — omitting it crash-loops
+  migrations with `Postgrex.Error: ssl not available`. A deployment on TLS'd
+  managed Postgres should set the mode explicitly (`require` at minimum,
+  `verify-full` where the CA chain is provisioned) rather than inheriting
+  defaults through an env-file copied from this repo.
+- **Frontend and backend versions are coupled.** Frontend v2.9.0 requires
+  backend API ≥ v11.2.0 and BENS ≥ v1.7.1. Roll backend and frontend
+  together; frontend-first (or backend-only) rollouts have an unsupported
+  intermediate state.
+- **BENS expectations moved.** If the deployment runs the real BENS
+  microservice, frontend v2.9.0's minimum is v1.7.1. If it mirrors this
+  repo's local BENS stub, revalidate the stub (and the chain-id URL-rewrite
+  in `services/blockscout/templates/httproute.yaml`) against the new
+  frontend before promoting.
+
 ### Gateway and routes
 
 `infra/gateway/` is shaped around `*.cbdc-sandbox.local` hostnames and

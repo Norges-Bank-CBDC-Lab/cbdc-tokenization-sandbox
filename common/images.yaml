@@ -12,10 +12,10 @@
 #
 # Example (upgrade Blockscout + Postgres + BENS):
 #   blockscout:
-#     backend: ghcr.io/blockscout/blockscout:v10.0.8
-#     frontend: ghcr.io/blockscout/frontend:v2.7.3
-#     db: postgres:18.4
-#     bens: python:3.14.5
+#     backend: ghcr.io/blockscout/blockscout:v11.3.0
+#     frontend: ghcr.io/blockscout/frontend:v2.10.0
+#     db: postgres:18.5
+#     bens: python:3.15.0
 #
 # Notes:
 # - Tags should be explicit (avoid ":latest") to keep builds reproducible.
@@ -32,14 +32,20 @@
 besu: hyperledger/besu:26.1.0
 
 blockscout:
-  backend: ghcr.io/blockscout/blockscout:v10.0.8
-  frontend: ghcr.io/blockscout/frontend:v2.7.3
+  # Backend + frontend refs name the upstream release tags, but upstream no
+  # longer publishes release images to any public registry (ghcr stops at the
+  # v9.0.2 / v2.3.5 era). These two images are built from source at the pinned
+  # tag by ./sandbox.sh build-images and served from the local kind registry —
+  # run build-images once on a fresh machine or after registry-reset.
+  # See docs/KNOWN_ISSUES.md.
+  backend: ghcr.io/blockscout/blockscout:v11.2.1
+  frontend: ghcr.io/blockscout/frontend:v2.9.0
   db: postgres:18.4
   bens: python:3.14.5
   # Smart-contract verification microservice. Modern Blockscout delegates
   # source compilation / bytecode matching to this standalone service; the
-  # backend (v10) does not verify in-process. GPL-3.0, same as the rest of
-  # the Blockscout stack.
+  # backend (v10 and later) does not verify in-process. GPL-3.0, same as the
+  # rest of the Blockscout stack.
   smart_contract_verifier: ghcr.io/blockscout/smart-contract-verifier:v1.10.3
 
 script_runner:

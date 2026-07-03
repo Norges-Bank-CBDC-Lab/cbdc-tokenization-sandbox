@@ -186,11 +186,38 @@ visible at a glance.
   retained because it mirrors the "CB normally only mints, doesn't
   hold" pattern.
 
+## Blockscout backend/frontend images must be source-built — upstream stopped publishing release images
+- Upstream Blockscout no longer publishes release-tagged container images to
+  any public registry. `ghcr.io/blockscout/blockscout` effectively stops at
+  the v9.0.2 era (its `latest` was built 2025-08-14),
+  `ghcr.io/blockscout/frontend` stops at v2.3.5 (`latest` built 2025-10-14),
+  and Docker Hub publication ended in April 2025. Release tags that were
+  pullable earlier (including the previously pinned `v10.0.8` / `v2.7.3`)
+  have since been removed from ghcr; only rolling `master` / `main` /
+  `prerelease-*` tags are still updated there.
+- The backend/frontend pins in `common/images.yaml` therefore name upstream
+  refs that cannot be pulled. They are satisfied locally by
+  `./sandbox.sh build-images`, which clones the pinned release tags, builds
+  both images from source, and pushes them to the local kind registry;
+  `./sandbox.sh start` reuses registry images before attempting an upstream
+  pull, so subsequent starts need no rebuild.
+- On a fresh machine (or after `./sandbox.sh registry-reset`), run
+  `./sandbox.sh build-images` once before `./sandbox.sh start`. The
+  smart-contract-verifier image is still published upstream
+  (`ghcr.io/blockscout/smart-contract-verifier`) and pulls normally.
+- Consequence for any non-local (e.g. Azure) deployment: it must build and
+  host its own Blockscout images (amd64) in its own registry — see
+  `docs/AZURE_BOUNDARY.md`.
+- Follow-up: watch upstream for a restored publication channel and switch
+  back to pulled images when release tags reappear.
+
 ## sandbox.sh build-images is Blockscout-only today
 - `./sandbox.sh build-images` only wraps
   `services/blockscout/build-images.sh`, which clones upstream Blockscout
-  and builds the backend + frontend images from source as a fallback for
-  testing upstream changes. The other Dockerfile-based local services
+  and builds the backend + frontend images from source — since upstream
+  stopped publishing release images (see the item above), this is the
+  required path for the Blockscout images, not just a testing fallback.
+  The other Dockerfile-based local services
   (`services/nb-ui`, `services/nb-bond-api`) build their images inside
   their own `<svc>.sh start`.
 - Planned follow-up: decide whether `./sandbox.sh build-images` should
