@@ -17,7 +17,7 @@ import cors from 'cors';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
-import { keccak256, toUtf8Bytes } from 'ethers';
+import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 import { resetProjectionAndRestart, restartIngestionLoop } from './admin';
 import { authMiddleware, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
@@ -40,6 +40,7 @@ import {
 } from './http';
 import {
   decodeCustomError,
+  describeRevert,
   getBondAuction,
   getBondAuctionAddress,
   getBondManager,
@@ -112,6 +113,7 @@ import {
 } from './central-bank';
 import { withMd5 } from './http';
 import { provider } from './chain';
+import { tbdAbi } from './abi';
 import {
   addTbdAllowlist,
   burnTbd,
@@ -473,15 +475,41 @@ app.post(
     try {
       const { isin } = req.params as { isin: string };
       const { holders } = req.body as HoldersBody;
-      const targetHolders = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
-      if (!targetHolders.length) {
+      const requested = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
+      if (!requested.length) {
         throw notFound('no holders found for coupon payment');
       }
 
-      await sendWithManagedNonce(async (nonce) => {
-        const bondManager = await getBondManager();
-        return bondManager.payCoupon(isin, targetHolders, { nonce });
-      });
+      // BondManager.payCoupon requires the holder set to cover the ENTIRE
+      // partition supply (CouponPaymentBalanceMismatch otherwise), so
+      // treasury-held units — the unsold remainder the BondManager itself
+      // keeps after a partial allocation — cannot be excluded here. When
+      // present they deadlock the payout on-chain: the government TBD's
+      // allowlist (correctly) refuses the manager contract, unless the
+      // operator explicitly allowlists it. See docs/KNOWN_ISSUES.md.
+      const bondManager = await getBondManager();
+      const managerAddress = bondManager.target.toString().toLowerCase();
+
+      try {
+        await sendWithManagedNonce(async (nonce) => {
+          return bondManager.payCoupon(isin, requested, { nonce });
+        });
+      } catch (err) {
+        // Surface on-chain reverts readably; settlement failures wrap the
+        // refusing token's own error in their lowLevelData bytes.
+        const description = describeRevert(err, [bondManager.interface, new Interface(tbdAbi)]);
+        if (description) {
+          const treasuryHint =
+            description.includes('AllowlistViolation') &&
+            description.toLowerCase().includes(managerAddress)
+              ? ' — the BondManager holds unsold units from a partial allocation and is not ' +
+                'allowlisted on the government settlement TBD; see docs/KNOWN_ISSUES.md for ' +
+                'the workaround and the planned contract-side fix'
+              : '';
+          throw conflict(`coupon payment reverted on-chain: ${description}${treasuryHint}`);
+        }
+        throw err;
+      }
 
       const bond = await composeBond(historyDb, isin);
       if (!bond) throw notFound(`bond ${isin} not found`);

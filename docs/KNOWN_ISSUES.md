@@ -1,5 +1,31 @@
 # Known Issues
 
+## Partially allocated bonds deadlock coupon payment and redemption on-chain
+- When an auction is finalised with less than full allocation (or a
+  buyback repurchases units), the remainder stays on the BondManager's
+  own balance — the manager contract is a "holder" of its own bond.
+- Such bonds cannot pay coupons or redeem on-chain today, in both
+  directions of the pincer:
+  - `BondManager.payCoupon` and `redeem` require the processed holder
+    set to cover the **entire** partition supply
+    (`CouponPaymentBalanceMismatch` / the redeem zero-supply check), so
+    the manager cannot be skipped;
+  - including the manager fails the cash leg with
+    `SettlementFailure(AllowlistViolation)` because the government
+    settlement TBD's allowlist (correctly) does not include the manager
+    contract.
+- The API surfaces these reverts as readable 409 details (nested custom
+  errors decoded, with a treasury-specific hint), and the payout modal
+  flags treasury-held units with a warning before the transaction is
+  attempted.
+- Sandbox workarounds: allowlist the BondManager on the government TBD
+  via the Banking page (the payment then succeeds; the treasury's own
+  coupon cash accrues to the manager contract), or use fully-allocated
+  auctions when coupon/redemption flows are being tested.
+- Planned follow-up (contract-side decision): burn unsold units at
+  finalisation, or skip self-held units in `payCoupon` / `redeem`
+  on-chain.
+
 ## Current Besu baseline is intentionally conservative
 - The local sandbox is still pinned to Clique proof-of-authority consensus and
   the London EVM milestone.

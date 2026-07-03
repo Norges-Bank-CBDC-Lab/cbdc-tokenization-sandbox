@@ -118,6 +118,51 @@ export function decodeCustomError(err: unknown, interfaces: Interface[]): string
   return null;
 }
 
+/**
+ * Human-readable description of a custom-error revert, following wrapper
+ * nesting: settlement failures (`SettlementFailure`) carry the inner
+ * revert bytes from the token that refused a transfer in their
+ * `lowLevelData` argument, so the description drills into any
+ * bytes-shaped argument that itself parses as a known error, e.g.
+ *   SettlementFailure(1, AllowlistViolation("TBD Nordea", 0x…, ""))
+ * Returns null when the revert bytes match none of the interfaces.
+ */
+export function describeRevert(err: unknown, interfaces: Interface[]): string | null {
+  const e = err as {
+    data?: unknown;
+    info?: { error?: { data?: unknown } };
+    error?: { data?: unknown };
+  };
+  const candidates = [e?.data, e?.info?.error?.data, e?.error?.data];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.startsWith('0x') && candidate.length >= 10) {
+      const described = describeRevertData(candidate, interfaces);
+      if (described) return described;
+    }
+  }
+  return null;
+}
+
+function describeRevertData(data: string, interfaces: Interface[]): string | null {
+  for (const iface of interfaces) {
+    try {
+      const parsed = iface.parseError(data);
+      if (!parsed) continue;
+      const args = parsed.args.map((arg) => {
+        if (typeof arg === 'string' && arg.startsWith('0x') && arg.length >= 10) {
+          const inner = describeRevertData(arg, interfaces);
+          if (inner) return inner;
+        }
+        return typeof arg === 'string' ? JSON.stringify(arg) : String(arg);
+      });
+      return `${parsed.name}(${args.join(', ')})`;
+    } catch {
+      // not this interface — try the next
+    }
+  }
+  return null;
+}
+
 async function assertProviderReady() {
   try {
     await provider.getBlockNumber();
