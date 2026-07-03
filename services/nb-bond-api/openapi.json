@@ -3715,6 +3715,17 @@
           "address": {
             "$ref": "#/components/schemas/Address"
           },
+          "wnokBalance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BigIntString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The address's current WNOK balance; null when the chain read failed."
+          },
           "md5": {
             "type": "string",
             "description": "MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.",
@@ -3725,10 +3736,11 @@
         },
         "required": [
           "address",
+          "wnokBalance",
           "md5"
         ],
         "additionalProperties": false,
-        "description": "A single allowlisted address"
+        "description": "A single allowlisted address with its live WNOK holding"
       },
       "TransactionRef": {
         "type": "object",

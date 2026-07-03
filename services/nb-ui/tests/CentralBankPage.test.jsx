@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Fmt } from '../src/utils/format.js';
 
 // CentralBankPage renders the CB summary, allowlist, and action
 // buttons. Each WNOK action button opens its modal. We stub
@@ -20,9 +21,10 @@ const FIXTURE_CB = {
 };
 
 const FIXTURE_ALLOWLIST = [
-  { address: '0xcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcb' },
-  { address: '0x1111111111111111111111111111111111111111' },
-  { address: '0x2222222222222222222222222222222222222222' },
+  { address: '0xcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcb', wnokBalance: '10000000' },
+  { address: '0x1111111111111111111111111111111111111111', wnokBalance: '4200000' },
+  // null balance = the chain read failed for this entry — renders "—".
+  { address: '0x2222222222222222222222222222222222222222', wnokBalance: null },
 ];
 
 vi.mock('../src/api/centralBankApi.js', () => ({
@@ -71,6 +73,14 @@ describe('CentralBankPage', () => {
     expect(screen.getByText('In circulation')).toBeInTheDocument();
     expect(screen.getByText('Government bank')).toBeInTheDocument();
     expect(screen.getByText('DNB')).toBeInTheDocument();
+
+    // Allowlist entries show their live WNOK holding; a failed chain
+    // read (null) renders an em dash instead of a number. The holding
+    // cell is the 4th column (address, name, type, holding, actions).
+    expect(screen.getByText('WNOK holding')).toBeInTheDocument();
+    expect(screen.getByText(Fmt.formatUnits('4200000'))).toBeInTheDocument();
+    const nullRow = screen.getByText('0x2222222222222222222222222222222222222222').closest('tr');
+    expect(within(nullRow).getAllByRole('cell')[3]).toHaveTextContent('—');
   });
 
   it('opens the Mint, Burn, and Transfer modals', async () => {

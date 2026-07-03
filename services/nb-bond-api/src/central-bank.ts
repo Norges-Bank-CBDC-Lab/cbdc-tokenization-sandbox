@@ -115,6 +115,29 @@ export async function listAllowlist(): Promise<string[]> {
   return addresses.map((a) => getAddress(a));
 }
 
+/**
+ * Allowlist entries enriched with each address's live WNOK balance.
+ * Sandbox-scale: one balanceOf per entry, parallelised. A failed balance
+ * read degrades that entry to null rather than failing the whole list.
+ */
+export async function listAllowlistWithBalances(): Promise<
+  { address: string; wnokBalance: string | null }[]
+> {
+  const wnok = await getWnokContract();
+  const addresses = (await wnok.allowlistQueryAll()) as string[];
+  return Promise.all(
+    addresses.map(async (raw) => {
+      const address = getAddress(raw);
+      try {
+        const balance = (await wnok.balanceOf(address)) as bigint;
+        return { address, wnokBalance: balance.toString() };
+      } catch {
+        return { address, wnokBalance: null };
+      }
+    }),
+  );
+}
+
 /** Check if a single address is on the allowlist. */
 export async function isAllowlisted(address: string): Promise<boolean> {
   const wnok = await getWnokContract();
