@@ -143,6 +143,9 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Central Bank/ })).not.toBeInTheDocument();
+    // Banking is tester-accessible — Central Bank is the only
+    // operator-locked surface.
+    expect(screen.getByRole('button', { name: /Banking/ })).toBeInTheDocument();
     // Manually hitting the route shows the not-authorised panel, not the CB surface.
     expect(await screen.findByText('Not authorised')).toBeInTheDocument();
     expect(screen.queryByText('WNOK actions')).not.toBeInTheDocument();
