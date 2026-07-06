@@ -6,6 +6,8 @@
  * reached the chain (rejected at gas estimation), whose decoded reason exists
  * nowhere else. Newest first. Read-only.
  */
+import { useMemo, useState } from 'react';
+
 import { useApi } from '../hooks/useApi.js';
 import { OperationsApi } from '../api/operationsApi.js';
 import { AppConfig } from '../config.js';
@@ -27,6 +29,17 @@ function statusBadgeClass(status) {
 function formatOpType(opType) {
   const [head, ...rest] = String(opType).split('_');
   return [head, ...rest.map((w) => w.toLowerCase())].join(' ');
+}
+
+/** Operation category by op-type prefix — mirrors the nav groupings. */
+function opCategory(opType) {
+  if (opType.startsWith('BOND_') || opType.startsWith('COUPON_') || opType === 'REDEMPTION') {
+    return 'bonds';
+  }
+  if (opType.startsWith('AUCTION_')) return 'auctions';
+  if (opType.startsWith('BID_')) return 'bids';
+  if (opType.startsWith('WNOK_')) return 'central-bank';
+  return 'banking'; // BANK_*, TBD_*
 }
 
 /** Compact one-line summary of the op-specific detail payload. */
@@ -92,6 +105,22 @@ export function OperationsPage() {
   const opsQ = useApi(() => OperationsApi.listOperations(), []);
   const operations = opsQ.data ?? [];
 
+  const [q, setQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return operations.filter((op) => {
+      if (statusFilter !== 'all' && op.status !== statusFilter) return false;
+      if (categoryFilter !== 'all' && opCategory(op.opType) !== categoryFilter) return false;
+      if (!needle) return true;
+      const haystack =
+        `${op.target} ${op.opType} ${formatOpType(op.opType)} ${op.error ?? ''}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [operations, q, statusFilter, categoryFilter]);
+
   return (
     <div>
       <div className="page-header">
@@ -111,17 +140,56 @@ export function OperationsPage() {
         </div>
       </div>
 
+      <div className="filter-bar">
+        <input
+          className="input search"
+          placeholder="Filter by target, operation or error…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select
+          className="select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All statuses</option>
+          <option value="SUCCEEDED">Succeeded</option>
+          <option value="REVERTED">Reverted</option>
+          <option value="FAILED">Failed</option>
+          <option value="PARTIAL">Partial</option>
+        </select>
+        <select
+          className="select"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+        >
+          <option value="all">All operations</option>
+          <option value="bonds">Bonds</option>
+          <option value="auctions">Auctions</option>
+          <option value="bids">Bids</option>
+          <option value="central-bank">Central bank</option>
+          <option value="banking">Banking</option>
+        </select>
+        <span className="count">
+          {filtered.length} of {operations.length}
+        </span>
+      </div>
+
       <div className="card flush-top">
         <div className="card-body flush">
           {opsQ.loading && <LoadingState label="Loading operations…" />}
           {!opsQ.loading && opsQ.error && <ErrorState error={opsQ.error} onRetry={opsQ.reload} />}
-          {!opsQ.loading && !opsQ.error && operations.length === 0 && (
+          {!opsQ.loading && !opsQ.error && filtered.length === 0 && (
             <EmptyState
-              title="No operations recorded yet"
-              message="Operator actions (mint, transfer, payout, auction lifecycle …) will appear here as they are attempted."
+              title={operations.length === 0 ? 'No operations recorded yet' : 'No operations match'}
+              message={
+                operations.length === 0
+                  ? 'Operator actions (mint, transfer, payout, auction lifecycle …) will appear here as they are attempted.'
+                  : 'Adjust the filters above.'
+              }
             />
           )}
-          {!opsQ.loading && !opsQ.error && operations.length > 0 && (
+          {!opsQ.loading && !opsQ.error && filtered.length > 0 && (
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead>
@@ -135,7 +203,7 @@ export function OperationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {operations.map((op) => (
+                  {filtered.map((op) => (
                     <tr key={op.id}>
                       <td title={formatUnixDate(op.createdAt)}>{formatRelative(op.createdAt)}</td>
                       <td>{formatOpType(op.opType)}</td>

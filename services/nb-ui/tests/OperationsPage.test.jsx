@@ -98,6 +98,39 @@ describe('OperationsPage', () => {
     expect(failedCell.textContent.endsWith('…')).toBe(true);
   });
 
+  it('filters by status, category and free text', async () => {
+    const { OperationsPage } = await import('../src/pages/OperationsPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const { default: userEvent } = await import('@testing-library/user-event');
+
+    render(
+      <ToastProvider>
+        <OperationsPage />
+      </ToastProvider>,
+    );
+    await screen.findByText('SUCCEEDED');
+
+    // Status filter: only the REVERTED coupon payment remains.
+    const [statusSelect, categorySelect] = screen.getAllByRole('combobox');
+    await userEvent.selectOptions(statusSelect, 'REVERTED');
+    expect(screen.queryByText('SUCCEEDED')).not.toBeInTheDocument();
+    expect(screen.getByText('REVERTED')).toBeInTheDocument();
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
+
+    // Category filter stacks on top: COUPON_PAYMENT is a bonds-category op,
+    // so central-bank + REVERTED matches nothing.
+    await userEvent.selectOptions(categorySelect, 'central-bank');
+    expect(screen.getByText('No operations match')).toBeInTheDocument();
+    await userEvent.selectOptions(categorySelect, 'all');
+    await userEvent.selectOptions(statusSelect, 'all');
+
+    // Free text matches the decoded error.
+    await userEvent.type(screen.getByPlaceholderText(/Filter by target/), 'CouponNotReady');
+    expect(screen.getByText('1 of 3')).toBeInTheDocument();
+    expect(screen.getByText('COUPON payment')).toBeInTheDocument();
+    expect(screen.queryByText('WNOK mint')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when the trail has no rows', async () => {
     const { OperationsApi } = await import('../src/api/operationsApi.js');
     OperationsApi.listOperations.mockResolvedValueOnce([]);
