@@ -1,6 +1,6 @@
 # `jupyter-removal` — Implementation Plan
 
-**Status:** Draft, ready for operator review — replaces the earlier discovery-phase removal plan in full (that plan's inventory has been re-verified and folded in here; its replacement-UI track is obsolete now that the NB UI operator frontend has shipped).
+**Status:** ✅ Implemented and shipped — PR 1 (namespace decouple) merged via #210; PR 2 (full removal) via #211. Execution deviations from this plan, all caught during verification and fixed in #211: the Dependabot `pip` job, the `.dockerignore` exclusion, the README Pylint badges, and the `DEPLOY_SCRIPTRUNNER` line in `.env.sandbox` (tracked, not operator-local as assumed). Decisions: D1=`contracts` namespace, D2=full deletion, D3=recreate, D4 verified (no required status checks).
 **Branch suggestion:** `feature/jupyter-removal-metadata-namespace` (PR 1) and `feature/jupyter-removal` (PR 2) — defer the actual branch / commit / PR / CI-gate workflow to the repo PR conventions.
 **Components touched:** `sandbox.sh`, `common/helpers.sh`, `common/images.yaml`, `common/versions.yaml`, `infra/gateway/templates/gateway.yaml`, `services/script-runner/` (deleted), `.github/workflows/pylint.yml` (deleted), `.github/workflows/license-inventory.yml`, `scripts/verification/check-third-party-licenses.py`, `THIRD_PARTY_LICENSES.md`, `docs/THIRD_PARTY_NOTES.md`, `README.md`, `CONTRIBUTING.md`, `services/README.md`, `services/DEVELOPMENT.md`, `services/AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DOCUMENTATION_INDEX.md`.
 
