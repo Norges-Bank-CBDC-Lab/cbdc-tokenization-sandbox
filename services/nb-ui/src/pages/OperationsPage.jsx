@@ -122,42 +122,44 @@ export function OperationsPage() {
             />
           )}
           {!opsQ.loading && !opsQ.error && operations.length > 0 && (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Operation</th>
-                  <th>Target</th>
-                  <th>Result</th>
-                  <th>Tx</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {operations.map((op) => (
-                  <tr key={op.id}>
-                    <td title={formatUnixDate(op.createdAt)}>{formatRelative(op.createdAt)}</td>
-                    <td>{formatOpType(op.opType)}</td>
-                    <td>
-                      <TargetCell target={op.target} />
-                    </td>
-                    <td>
-                      {op.error ? (
-                        <span title={op.error}>{truncateError(op.error)}</span>
-                      ) : (
-                        formatDetail(op.detail)
-                      )}
-                    </td>
-                    <td>
-                      <TxCell txHash={op.txHash} />
-                    </td>
-                    <td>
-                      <span className={statusBadgeClass(op.status)}>{op.status}</span>
-                    </td>
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Operation</th>
+                    <th>Target</th>
+                    <th>Result</th>
+                    <th>Tx</th>
+                    <th>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {operations.map((op) => (
+                    <tr key={op.id}>
+                      <td title={formatUnixDate(op.createdAt)}>{formatRelative(op.createdAt)}</td>
+                      <td>{formatOpType(op.opType)}</td>
+                      <td>
+                        <TargetCell target={op.target} />
+                      </td>
+                      <td className="cell-break">
+                        {op.error ? (
+                          <span title={op.error}>{truncateError(op.error)}</span>
+                        ) : (
+                          formatDetail(op.detail)
+                        )}
+                      </td>
+                      <td>
+                        <TxCell txHash={op.txHash} />
+                      </td>
+                      <td>
+                        <span className={statusBadgeClass(op.status)}>{op.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

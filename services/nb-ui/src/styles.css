@@ -476,6 +476,16 @@ footer.app-footer {
   background: var(--surface-2);
   font-weight: 500;
 }
+/* Wide-table guard: keeps a .tbl inside its card — any residual
+   overflow scrolls within the wrapper instead of escaping the box. */
+.tbl-wrap {
+  overflow-x: auto;
+}
+/* For cells carrying unbreakable tokens (hex blobs in decoded revert
+   strings) — wrap anywhere so the cell cannot stretch the table. */
+.tbl td.cell-break {
+  overflow-wrap: anywhere;
+}
 
 /* ----- badges ------------------------------------------------ */
 
