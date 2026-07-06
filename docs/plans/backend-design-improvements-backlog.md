@@ -41,13 +41,13 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 - **Problem:** the safety of drop-and-rebuild resync rests on an implicit invariant: projection tables contain only rows reproducible from chain logs. Nothing today warns a maintainer that locally-generated rows added to a projection table (e.g. `bond_events`) will be silently erased by the next resync or schema bump.
 - **Direction:** state the rule explicitly in `services/AGENTS.md` and `services/nb-bond-api/README.md`: anything not reproducible from chain goes in a preserved system-of-record table (the set exempted in `migrateToCurrentVersion()`), never in a projection table.
 - **Urgency note:** becomes load-bearing the moment the operator audit trail lands — its rows must not live in projection tables (`docs/plans/operator-audit-trail-design.md`).
-- Status: Planned (docs-only; small enough to ship immediately).
+- Status: ✅ Shipped with the operator-audit-trail implementation — rule documented in `services/AGENTS.md` and `services/nb-bond-api/README.md` ("Projection-purity rule").
 
 ### 4. Migration path for preserved tables
 
 - **Problem:** `bidders` and `banks` survive schema bumps by exemption, but there is no in-place migration mechanism for changes to those tables' own schemas. The current strategy (drop projection, recreate, preserve exempt tables untouched) works only while the exempt tables never change shape.
 - **Direction:** version the preserved tables separately (or add per-table column migrations) so their first schema change does not require manual surgery on operator databases.
-- **Relation:** becomes more pressing when the operator audit trail adds a third preserved table.
+- **Relation:** the preserved set now holds three tables (`bidders`, `banks`, `operation_attempts` — the latter added by the operator audit trail), raising the cost of the first shape change.
 - Status: Open question — build now, or on first need.
 
 ### 5. Contract-side fix for the treasury-held-units deadlock

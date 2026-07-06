@@ -47,6 +47,30 @@ Two sandbox-only resource families sit alongside the bond tree:
   `POST /v1/banking/tbd/{address}/{mint,burn,transfer}` mutate it, signed by the
   token's owning bank. Open to both operator and tester roles (Central Bank
   is the only operator-locked surface).
+- **`operations`** — the operator audit trail. Every operator-initiated
+  on-chain operation attempted through this API (bond lifecycle, auctions,
+  bids, WNOK and TBD operations) is recorded in the preserved
+  `operation_attempts` table with its outcome: `SUCCEEDED` with the
+  transaction hash, `REVERTED` with the decoded custom-error reason, or
+  `FAILED` for transport errors. Failed sends are usually rejected at gas
+  estimation and never reach the chain, so this trail is their only durable
+  record. `GET /v1/operations` lists attempts newest-first (optional
+  `?limit`, default 200); the NB UI renders it at System → Operations. See
+  [`docs/plans/operator-audit-trail-design.md`](../../docs/plans/operator-audit-trail-design.md).
+
+### Projection-purity rule (SQLite tables)
+
+The local SQLite database mixes two kinds of tables with opposite
+durability rules. **Projection tables** (`auctions`, `auction_events`,
+`partitions`, `balances`, `balance_events`, `bond_events`,
+`ingestion_state`) hold only rows reproducible from chain logs — they are
+dropped and rebuilt from chain on every schema bump and on
+`POST /v1/admin/restart-ingestion?fromBlock=0`. **System-of-record tables**
+(`bidders`, `banks`, `operation_attempts`) hold data the chain cannot
+reproduce (generated keypairs, failed-attempt records) — they are created
+additively via `CREATE TABLE IF NOT EXISTS` and must never join the
+migration drop list. Never store locally-generated rows in a projection
+table: the next resync silently erases them.
 
 ## Sandbox Helm Config
 

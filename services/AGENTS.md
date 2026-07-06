@@ -29,6 +29,7 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 
 ### Style and conventions (services)
 - Respect language-specific formatters and linters (ESLint/Prettier for TS).
+- nb-bond-api SQLite projection-purity rule: projection tables are dropped and rebuilt from chain on every resync/schema bump — never store locally-generated rows in them. Anything the chain cannot reproduce belongs in the preserved system-of-record tables (`bidders`, `banks`, `operation_attempts`). See `services/nb-bond-api/README.md` "Projection-purity rule".
 - Keep config changes explicit and documented.
 - Avoid committing secrets; use local env or configmaps as documented.
 - Treat the values files under `services/blockscout/` as sandbox-only. Do not present them as production deployment templates.

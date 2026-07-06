@@ -150,7 +150,10 @@ const NAV_CATEGORIES = [
   {
     key: 'system',
     label: 'System',
-    items: [{ label: 'Global Registry', href: '#/registry', match: ['registry'] }],
+    items: [
+      { label: 'Global Registry', href: '#/registry', match: ['registry'] },
+      { label: 'Operations', href: '#/operations', match: ['operations'] },
+    ],
   },
 ];
 
