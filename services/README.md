@@ -8,7 +8,6 @@ infrastructure and deployed contracts.
 - `blockscout/`: explorer stack with Postgres and optional BENS name service
 - `nb-bond-api/`: privileged operator API for the bond lifecycle
 - `nb-ui/`: React + Vite operator frontend served by nginx
-- `script-runner/`: JupyterHub-based notebook environment
 
 ## Start Here
 
@@ -28,9 +27,6 @@ cd services/nb-bond-api && ./nb-bond-api.sh start
 cd services/nb-ui && ./nb-ui.sh start
 ```
 
-For `script-runner`, prefer the root sandbox workflow unless you are already
-working in that area specifically.
-
 ## Local-Only Notes
 
 ### Blockscout
@@ -49,11 +45,6 @@ The service controls issuer-side workflows, unseals bids, computes allocations
 off-chain, and finalises auctions on-chain. Its local Helm values file is
 intentionally untracked and is auto-generated if missing by the sandbox and
 service start scripts.
-
-### Script Runner
-
-The hosted notebook environment is optional. Some notebook flows assume
-Blockscout is running and contracts have already been verified.
 
 ### NB UI
 

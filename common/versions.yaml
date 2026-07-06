@@ -18,10 +18,8 @@
 # - Keep chart versions aligned with any image overrides you use.
 # - Version sources (check for new releases):
 #   - Blockscout stack chart: https://github.com/blockscout/helm-charts/releases
-#   - JupyterHub chart: https://jupyterhub.github.io/helm-chart/
 #   - NGINX Gateway Fabric chart: https://github.com/nginx/nginx-gateway-fabric/releases
 #
 charts:
   blockscout_stack: 4.5.1
-  script_runner: 4.3.2
   nginx_gateway_fabric: 2.6.0

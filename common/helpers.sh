@@ -26,13 +26,6 @@ CONTRACTS_DEPLOYMENT_CONFIGMAP=contracts-deployed
 
 EVM_ENVIRONMENT_SECRET=environment
 
-SCRIPTRUNNER_NAMESPACE=jupyterhub
-SCRIPTRUNNER_DIR=$REPO_ROOT/services/script-runner
-SCRIPTRUNNER_TMPDIR=$SCRIPTRUNNER_DIR/.tmp
-SCRIPTRUNNER_BASEIMAGE_NAME=quay.io/jupyter/base-notebook
-SCRIPTRUNNER_BASEIMAGE_TAG=notebook-7.5.3
-SCRIPTRUNNER_CHART_VERSION="4.3.2"
-
 CONTRACTS_DIR=$REPO_ROOT/contracts
 CONTRACTS_BUILD_DIR=$REPO_ROOT/contracts/out
 CONTRACTS_ENV_FILE=$CONTRACTS_DIR/.env
@@ -232,7 +225,6 @@ function ensureLocalhostHostEntries() {
     local hostnames=(
         "besu.cbdc-sandbox.local"
         "blockscout.cbdc-sandbox.local"
-        "jupyterhub.cbdc-sandbox.local"
         "bond-api.cbdc-sandbox.local"
         "web.cbdc-sandbox.local"
     )
@@ -812,10 +804,6 @@ function waitForApiGateway() {
     waitMsg "$msg" end
 }
 
-function waitForScriptRunner() {
-    waitForApp jupyterhub jupyterhub
-}
-
 function waitForBlockscout() {
     waitForApp blockscout blockscout-blockscout-stack-blockscout
 }
@@ -945,10 +933,6 @@ function getBlockscoutChartVersion() {
     getVersionValue "charts.blockscout_stack" "$BLOCKSCOUT_CHART_VERSION"
 }
 
-function getScriptRunnerChartVersion() {
-    getVersionValue "charts.script_runner" "$SCRIPTRUNNER_CHART_VERSION"
-}
-
 function getNginxGatewayFabricVersion() {
     getVersionValue "charts.nginx_gateway_fabric" "2.6.0"
 }
@@ -1007,11 +991,6 @@ function getBlockscoutBackendImage() {
     fi
 
     getImageValue "blockscout.backend" "$default_image"
-}
-
-function getScriptRunnerImage() {
-    default_image="${SCRIPTRUNNER_BASEIMAGE_NAME}:${SCRIPTRUNNER_BASEIMAGE_TAG}"
-    getImageValue "script_runner.base" "$default_image"
 }
 
 function getNBBondApiBuilderImage() {
@@ -1161,7 +1140,6 @@ function syncImagesToRegistry() {
     images+=("$(getBlockscoutBackendImage)")
     images+=("$(getBlockscoutDbImage)")
     images+=("$(getBensBaseImage)")
-    images+=("$(getScriptRunnerImage)")
     # nb-bond-api Dockerfile stages: builder + runtime (both node).
     # Pulled here so the local `docker build` works without internet.
     images+=("$(getNBBondApiBuilderImage)")
@@ -1181,7 +1159,7 @@ function syncImagesToRegistry() {
 # ── Local image lifecycle: report / cleanup / registry reset ──────────────
 # These operate ONLY on the repo-owned, content-hash-tagged images
 # (nb-ui, nb-bond-api, bens-microservice). Shared base / third-party images
-# (node, nginx, python, besu, blockscout, postgres, jupyter) are
+# (node, nginx, python, besu, blockscout, postgres) are
 # deliberately never pruned — they are reused across services and removing
 # them would break offline builds.
 
@@ -1434,81 +1412,6 @@ function prepareBensImage() {
         "bens-microservice" "$bundle_hash" "$BLOCKSCOUT_BENS_DIR" "-" prepBensBases \
         "BENS_BUILDER_IMAGE=${BENS_BASE_RESOLVED}" \
         "BENS_RUNTIME_IMAGE=${BENS_BASE_RESOLVED}"
-}
-
-function deployScriptRunnerScriptsToConfigmap() {
-    deployDirectoryToConfigmap ${SCRIPTRUNNER_DIR}/notebook scripts $SCRIPTRUNNER_NAMESPACE
-}
-
-function deployScriptRunnerNotebooksToConfigmap() {
-    deployDirectoryToConfigmap ${SCRIPTRUNNER_DIR}/notebook notebooks $SCRIPTRUNNER_NAMESPACE
-}
-
-function deployScriptRunnerContractAbisToConfigmap() {
-    # extract the contract abis from the built contract jsons
-    # then store the contract abis as a base64-encoded tar archive
-    createOrResetTmpdir ${SCRIPTRUNNER_TMPDIR}
-    contract_abis_tmpdir=${SCRIPTRUNNER_TMPDIR}/contracts
-    mkdir $contract_abis_tmpdir
-
-    if [ -d $CONTRACTS_BUILD_DIR ]; then
-        for dot_sol_dir in $(ls $CONTRACTS_BUILD_DIR); do
-            # matches directories ending in .sol but not those ending in .t.sol or .s.sol
-            if [[ $dot_sol_dir =~ ^.*\.sol$ ]] && ! [[ $dot_sol_dir =~ ^.*\.[st]\.sol$ ]]; then
-                mkdir -p $contract_abis_tmpdir/$dot_sol_dir
-
-                for contract_json in $(ls $CONTRACTS_BUILD_DIR/$dot_sol_dir); do
-                    # for each json file in that directory, extract the abi and store it
-                    # with a .abi instead of .json file ending
-                    if [[ $contract_json =~ ^.*\.json$ ]]; then
-                        jq '.abi' $CONTRACTS_BUILD_DIR/$dot_sol_dir/$contract_json > $contract_abis_tmpdir/$dot_sol_dir/${contract_json%.json}.abi
-                    fi
-                done
-            fi
-        done
-    else
-        echo "⚠️ no directory with contract abis found at $CONTRACTS_BUILD_DIR"
-    fi
-
-    deployDirectoryToConfigmap ${SCRIPTRUNNER_TMPDIR} contracts $SCRIPTRUNNER_NAMESPACE
-}
-
-
-function composeScriptRunnerChart() {
-    # add jupyterhub repository so that we can use its helm chart
-    helm repo add jupyterhub https://jupyterhub.github.io/helm-chart/
-    helm repo update jupyterhub
-
-    # pull the jupyterhub helm chart into a temporary directory
-    createOrResetTmpdir ${SCRIPTRUNNER_TMPDIR}
-    SCRIPTRUNNER_CHART_VERSION="$(getScriptRunnerChartVersion)"
-    helm pull jupyterhub/jupyterhub --version $SCRIPTRUNNER_CHART_VERSION -d ${SCRIPTRUNNER_TMPDIR} --untar
-
-    # add our httproute to the helm chart from the repo
-    # and replace the NOTES.txt, which shows deployment info, with a custom version
-    cp ${SCRIPTRUNNER_DIR}/templates/* ${SCRIPTRUNNER_TMPDIR}/jupyterhub/templates/
-}
-
-function deployScriptRunner() {
-    SCRIPTRUNNER_IMAGE="$(getScriptRunnerImage)"
-    echo "🔍 Using Script Runner image: $SCRIPTRUNNER_IMAGE"
-
-    loadImageToKind $SCRIPTRUNNER_IMAGE
-    SCRIPTRUNNER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SCRIPTRUNNER_IMAGE")
-    echo "🔁 Using local registry image for Script Runner: $SCRIPTRUNNER_IMAGE_OVERRIDE"
-    SCRIPTRUNNER_BASEIMAGE_NAME="$(imageRepo "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
-    SCRIPTRUNNER_BASEIMAGE_TAG="$(imageTag "$SCRIPTRUNNER_IMAGE_OVERRIDE")"
-
-    helm upgrade jupyterhub $SCRIPTRUNNER_TMPDIR/jupyterhub \
-         --install \
-         --kube-context kind-$CLUSTER_NAME \
-         --namespace $SCRIPTRUNNER_NAMESPACE \
-         --values $SCRIPTRUNNER_DIR/values.yaml \
-         --values $SCRIPTRUNNER_DIR/values.local.yaml \
-         --version ${SCRIPTRUNNER_CHART_VERSION} \
-         --set singleuser.image.name=${SCRIPTRUNNER_BASEIMAGE_NAME} \
-         --set singleuser.image.tag=${SCRIPTRUNNER_BASEIMAGE_TAG} \
-         --set-file singleuser.extraFiles.requirements.stringData=$SCRIPTRUNNER_DIR/notebook/requirements.txt
 }
 
 function composeBlockscoutChart() {

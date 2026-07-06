@@ -44,7 +44,6 @@ License labels and deployment-time notes remain curated review items.
 | Path | Provenance | License |
 | --- | --- | --- |
 | `services/blockscout/bens-microservice/swagger/bens.swagger.yaml` | Copied from `blockscout/blockscout-rs` | MIT |
-| `services/script-runner/templates/NOTES.txt` | Adapted from JupyterHub Helm chart `templates/NOTES.txt` | BSD-3-Clause / Apache-2.0 per retained provenance note |
 
 ## Direct Node.js Dependencies
 
@@ -141,19 +140,6 @@ output and does not declare third-party npm dependencies.
 | `pydantic` | `2.13.4` | MIT |
 | `typing-extensions` | `4.15.0` | PSF-2.0 |
 
-### `services/script-runner/notebook`
-
-| Package | Version | License |
-| --- | --- | --- |
-| `ipywidgets` | `8.1.8` | BSD-3-Clause |
-| `web3` | `7.16.0` | MIT |
-| `eth-account` | `0.13.7` | MIT |
-| `ipython` | `9.15.0` | BSD-3-Clause |
-| `pytz` | `2025.2` | MIT |
-| `plotly` | `6.8.0` | MIT |
-| `pandas` | `2.3.0` | BSD-3-Clause |
-| `psycopg2-binary` | `2.9.12` | LGPL with exceptions |
-
 ## Direct Solidity Dependencies
 
 | Package | Version | License |
@@ -176,8 +162,6 @@ this source repository.
 | Node.js | MIT | External runtime image for NB Bond API |
 | Python | PSF-2.0 | External runtime image for BENS |
 | PostgreSQL | PostgreSQL License | External database image for Blockscout/BENS |
-| JupyterHub Helm chart | BSD-3-Clause | External chart dependency |
-| Jupyter Docker Stacks / `base-notebook` image | BSD-3-Clause | External image dependency |
 | Blockscout Helm charts | GPL-3.0 | Pulled at deploy time |
 | Blockscout application | GPL-3.0 | Pulled at deploy time |
 | Blockscout smart-contract-verifier | GPL-3.0 | Contract-verification microservice; pulled at deploy time (pinned in `common/images.yaml` under `blockscout.smart_contract_verifier`) |

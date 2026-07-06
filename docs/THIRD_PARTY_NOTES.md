@@ -14,9 +14,6 @@ provenance notes:
 - `services/blockscout/bens-microservice/swagger/bens.swagger.yaml`
   Copied from the `blockscout/blockscout-rs` repository and retained under its
   upstream `MIT` notice.
-- `services/script-runner/templates/NOTES.txt`
-  Adapted from the JupyterHub Helm chart `templates/NOTES.txt`, whose upstream
-  repository carries `BSD-3-Clause` and `Apache-2.0`.
 
 ## Generated code
 
@@ -44,7 +41,6 @@ pulled at build/deploy time. Current examples include:
 - Node.js runtime images
 - Python runtime images
 - PostgreSQL images
-- JupyterHub / Jupyter Docker Stacks
 - Blockscout charts and images
 - BusyBox image references in Helm templates
 - `nginxinc/nginx-unprivileged` (BSD-2-Clause), used as the runtime stage

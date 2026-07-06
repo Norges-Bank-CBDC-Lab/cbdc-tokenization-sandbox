@@ -1,7 +1,4 @@
 [![Contracts CI](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/actions/workflows/test-contracts.yml/badge.svg)](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/actions/workflows/test-contracts.yml)
-[![Pylint + Black](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/actions/workflows/pylint.yml/badge.svg)](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/actions/workflows/pylint.yml)
-[![linting: pylint](https://img.shields.io/badge/linting-pylint-yellowgreen)](https://github.com/pylint-dev/pylint)
-[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 # CBDC Sandbox Monoledger
 
@@ -23,7 +20,7 @@ documentation.
 ## Monorepo Layout
 
 - `infra/`: local cluster, gateway, Besu, and shared deployment plumbing
-- `services/`: in-cluster services such as Blockscout, NB Bond API, and script runner
+- `services/`: in-cluster services such as Blockscout, NB Bond API, and NB UI
 - `contracts/`: Solidity contracts and Foundry workflows
 - `scripts/`: reference CLIs for off-chain workflows
 - `docs/`: architecture notes, diagrams, runbooks, and reports
@@ -136,9 +133,9 @@ The shared Node.js toolchain pin is centralized in `common/node-version.env`.
 ```
 
 Typical flags in `.env.sandbox` include `DEPLOY_INFRA`, `DEPLOY_BLOCKSCOUT`,
-`DEPLOY_SCRIPTRUNNER`, `DEPLOY_CONTRACTS`, `DEPLOY_VERIFY_CONTRACTS`,
-`DEPLOY_SKIP_SIMULATION`, `DEPLOY_NB_BOND_API`, and `DEPLOY_NB_UI`. If you
-skip this step, the default root-level workflow is used.
+`DEPLOY_CONTRACTS`, `DEPLOY_VERIFY_CONTRACTS`, `DEPLOY_SKIP_SIMULATION`,
+`DEPLOY_NB_BOND_API`, and `DEPLOY_NB_UI`. If you skip this step, the default
+root-level workflow is used.
 
 8. Start the sandbox:
 
@@ -158,7 +155,6 @@ If the script does not update your hosts file, add these entries manually:
 
 ```text
 127.0.0.1 besu.cbdc-sandbox.local
-127.0.0.1 jupyterhub.cbdc-sandbox.local
 127.0.0.1 blockscout.cbdc-sandbox.local
 127.0.0.1 bond-api.cbdc-sandbox.local
 127.0.0.1 web.cbdc-sandbox.local

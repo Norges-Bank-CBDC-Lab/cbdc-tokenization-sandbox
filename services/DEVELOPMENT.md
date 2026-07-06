@@ -91,32 +91,6 @@ Current local caveat:
   `protobuf_any.py`; after regeneration this still needs to be changed to
   `ProtobufAny(BaseModel)` before using the generated server.
 
-## Script Runner
-
-The script runner is a JupyterHub-based notebook environment for interactive
-sandbox use.
-
-URL:
-
-- <http://jupyterhub.cbdc-sandbox.local/>
-
-Local behavior:
-
-- any username or password is accepted in the current sandbox setup;
-- each user gets a dedicated notebook pod with the default notebooks copied in;
-- if you make notebook changes that should be committed back into the repo, use
-  the `sync.sh` workflow from the script-runner environment as described in the
-  script-runner docs.
-
-Important notebook constraint:
-
-- some notebook flows, especially `UI.ipynb`, assume Blockscout is running and
-  contracts have been verified so ABI-backed decoding is available.
-
-General JupyterHub documentation:
-
-- <https://z2jh.jupyter.org>
-
 ## NB Bond API
 
 The NB Bond API is the privileged operator service that drives the on-chain
@@ -149,7 +123,6 @@ local sandbox. In particular:
 - <http://blockscout.cbdc-sandbox.local/api>
 - <http://blockscout.cbdc-sandbox.local/socket>
 - <http://bond-api.cbdc-sandbox.local/>
-- <http://jupyterhub.cbdc-sandbox.local/>
 
 Treat the entire service layer as trusted-local only. Do not expose it outside
 local development, and do not reuse local sandbox credentials or example
@@ -171,20 +144,6 @@ The shared Node.js toolchain pin is centralized in `common/node-version.env`.
 Chart versions are pinned in `common/versions.yaml`.
 
 ## Formatting And Linting
-
-### Python
-
-Python code in this repository is expected to stay readable and compatible with
-the existing formatter and linter setup.
-
-Representative commands:
-
-```console
-pipx install "black[jupyter]"
-pipx install pylint
-black services/script-runner/notebook/
-pylint --rcfile=services/script-runner/notebook/.pylintrc services/script-runner/notebook
-```
 
 ### TypeScript
 
