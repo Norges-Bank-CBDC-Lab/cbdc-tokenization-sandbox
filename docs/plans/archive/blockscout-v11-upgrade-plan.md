@@ -1,6 +1,6 @@
 # Blockscout v11 Upgrade — Implementation Plan
 
-**Status:** ✅ Implemented — validated locally 2026-07-03 (backend v11.2.1, chart 4.5.1, 13/13 contracts verified; Phase 5 BENS refresh not needed). Move to `docs/plans/archive/` on merge.
+**Status:** ✅ Implemented and shipped — merged via #195. Validated locally 2026-07-03 (backend v11.2.1, chart 4.5.1, 13/13 contracts verified; Phase 5 BENS refresh not needed).
 **Branch suggestion:** `feature/blockscout-v11-upgrade` — defer the actual branch / commit / PR / CI-gate workflow to the repo PR conventions
 **Components touched:** `common/images.yaml`, `common/versions.yaml`, `common/helpers.sh`, `services/blockscout/` (values files, docs, conditionally the BENS stub), `docs/`
 
