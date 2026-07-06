@@ -32,7 +32,6 @@ contracts
 infra
 docs
 services/blockscout
-services/script-runner
 
 # Build / coverage / cache outputs (gitignored but worth re-excluding)
 **/dist

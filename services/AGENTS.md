@@ -4,7 +4,6 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 
 ### Structure
 - `services/blockscout/`: Blockscout explorer stack (backend + frontend).
-- `services/script-runner/`: JupyterHub-based notebook environment.
 - `services/nb-bond-api/`: Express.js API that drives the on-chain bond lifecycle.
 - `services/DEVELOPMENT.md`: detailed run instructions and tooling notes.
 
@@ -17,10 +16,6 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
   - Default images: published GHCR images pinned in `services/blockscout/values.yaml`
   - Optional local override: `cd services/blockscout && ./build-images.sh`
   - URLs: `http://blockscout.cbdc-sandbox.local/`
-- `services/script-runner/`:
-  - Start/stop: see `services/script-runner/README.md` and `services/DEVELOPMENT.md`
-  - URL: `http://jupyterhub.cbdc-sandbox.local/`
-  - Notes: use `sync.sh` to persist changes to the repo.
 - `services/nb-bond-api/`:
   - Start: `./nb-bond-api.sh start`
   - Local Helm values: generate `services/nb-bond-api/helm/values.local.yaml` with `node scripts/generate-local-sandbox-fixtures.mjs` before direct deploys if the start script has not already created it
@@ -33,7 +28,7 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 - Most services expect infra running (see `infra/DEVELOPMENT.md`).
 
 ### Style and conventions (services)
-- Respect language-specific formatters and linters (Black/Pylint for Python, ESLint/Prettier for TS).
+- Respect language-specific formatters and linters (ESLint/Prettier for TS).
 - Keep config changes explicit and documented.
 - Avoid committing secrets; use local env or configmaps as documented.
 - Treat the values files under `services/blockscout/` as sandbox-only. Do not present them as production deployment templates.

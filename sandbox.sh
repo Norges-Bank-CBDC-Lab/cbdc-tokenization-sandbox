@@ -42,7 +42,6 @@ function printHelp() {
 # - DEPLOY_CONTRACTS: true deploys contracts; false leaves contracts untouched.
 # - DEPLOY_VERIFY_CONTRACTS: true verifies on Blockscout; false skips verification.
 # - DEPLOY_SKIP_SIMULATION: true skips forge script simulation; false runs simulation.
-# - DEPLOY_SCRIPTRUNNER: true deploys JupyterHub; false skips script runner.
 # - DEPLOY_BLOCKSCOUT: true deploys Blockscout; false skips the explorer stack.
 # - DEPLOY_NB_BOND_API: true deploys NB Bond API; false skips the API service.
 # - DEPLOY_NB_UI: true deploys the NB UI frontend; false skips the operator UI.
@@ -52,7 +51,6 @@ export DEPLOY_INFRA="true"
 export DEPLOY_CONTRACTS="true"
 export DEPLOY_VERIFY_CONTRACTS="true"
 export DEPLOY_SKIP_SIMULATION="${DEPLOY_SKIP_SIMULATION:-false}"
-export DEPLOY_SCRIPTRUNNER="false"
 export DEPLOY_BLOCKSCOUT="true"
 export DEPLOY_NB_BOND_API="true"
 export DEPLOY_NB_UI="true"
@@ -149,8 +147,8 @@ done
 
 # Source deploy-flag overrides for every lifecycle command so `stop` and
 # `delete` see the same DEPLOY_* values that `start` did. Without this,
-# stopping a session that enabled DEPLOY_SCRIPTRUNNER (or any non-default
-# flag) through .env.sandbox would skip uninstalling that service.
+# stopping a session that enabled a non-default flag through .env.sandbox
+# would skip uninstalling that service.
 if [ -f "$DEPLOYMENT_CONFIG_FILE" ]; then
     source "$DEPLOYMENT_CONFIG_FILE"
 fi
@@ -158,7 +156,7 @@ fi
 if [ "$CMD" == "start" ]; then
     checkPrereqs
 
-    if [ "$DEPLOY_CONTRACTS" == "true" ] || [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
+    if [ "$DEPLOY_CONTRACTS" == "true" ]; then
         requireContractsEnv
     fi
 
@@ -232,13 +230,6 @@ if [ "$CMD" == "start" ]; then
         deployedSomething="true"
     fi
 
-    if [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
-        echo "Deploying script runner..."
-        cd $SCRIPT_DIR/services/script-runner
-        ./script-runner.sh start --as-subtask
-        deployedSomething="true"
-    fi
-
     if [ "$DEPLOY_INFRA" == "true" ]; then
         waitForBesu
         waitForApiGateway
@@ -246,10 +237,6 @@ if [ "$CMD" == "start" ]; then
 
     if [ "$DEPLOY_BLOCKSCOUT" == "true" ]; then
         waitForBlockscout
-    fi
-
-    if [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
-        waitForScriptRunner
     fi
 
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
@@ -287,12 +274,6 @@ if [ "$CMD" == "start" ]; then
         echo "   http://blockscout.cbdc-sandbox.local"
     fi
 
-    if [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
-        echo
-        echo " - script runner, via"
-        echo "   http://jupyterhub.cbdc-sandbox.local"
-    fi
-
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
         echo
         echo " - NB Bond API, via"
@@ -321,11 +302,6 @@ elif [ "$CMD" == "stop" ]; then
     if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
         cd $SCRIPT_DIR/services/nb-bond-api
         ./nb-bond-api.sh stop --as-subtask || true
-    fi
-
-    if [ "$DEPLOY_SCRIPTRUNNER" == "true" ]; then
-        cd $SCRIPT_DIR/services/script-runner
-        ./script-runner.sh stop --as-subtask || true
     fi
 
     if [ "$DEPLOY_CONTRACTS" == "true" ]; then

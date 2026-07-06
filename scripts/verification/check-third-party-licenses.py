@@ -342,10 +342,6 @@ def main() -> int:
             "services/blockscout/bens-microservice",
             bens_requirements,
         ),
-        (
-            "services/script-runner/notebook",
-            parse_requirements(REPO_ROOT / "services/script-runner/notebook/requirements.txt"),
-        ),
     ]
 
     for section_name, expected_versions in python_sections:

@@ -41,7 +41,7 @@ What was inspected and what was actually verified this session.
   - `src/schemas.ts:531-638` — the `Health` Zod/OpenAPI schema (`HealthContracts`, `HealthChain`, `HealthIngestion`, `Health`). New SSE event payloads need their own schema entries here.
   - `src/http.ts:41-55` — `okResponse()` stamps `ETag` + `Cache-Control: no-cache, must-revalidate`; `withMd5()` stamps a per-subtree `md5`. This is the ETag the SSE invalidation must cooperate with: a push tells the client *which URL to revalidate*, and the existing `If-None-Match`/304 path does the rest cheaply.
   - `src/env-vars.ts` — Zod-validated env with `POLL_INTERVAL_MS` (`:27`), `CORS_ALLOWED_ORIGINS` (`:38`), `NB_BOND_API_AUTH_MODE` + entra fail-fast (`:44,73-94`). New SSE knobs (heartbeat interval, ring-buffer depth) follow this pattern.
-- **CI workflows present** (`.github/workflows/`): `image-hash-inputs.yml`, `license-inventory.yml`, `nb-bond-api.yml`, `nb-ui.yml`, `node-version-consistency.yml`, `publication-hygiene.yml`, `pylint.yml`, `test-contracts.yml`.
+- **CI workflows present** (`.github/workflows/`): `image-hash-inputs.yml`, `license-inventory.yml`, `nb-bond-api.yml`, `nb-ui.yml`, `node-version-consistency.yml`, `publication-hygiene.yml`, `test-contracts.yml`.
 - **Live local checks: BLOCKED — local sandbox is down.** The Docker daemon is not running (`kind get clusters` and `docker ps` fail with `dial unix …docker.sock: no such file`; kube context is `kind-cluster-cbdc-monoledger` but unreachable). This does **not** block planning or the unit-test validation surface, but **Phase 0 live verification and the Phase 4 end-to-end stop must be run by the operator after `./sandbox.sh start`.**
 - **Local validation entry points the plan uses:** `cd services/nb-bond-api && npm test` (jest); `cd services/nb-ui && npm test` (`vitest run`) + `npm run lint` + `npm run build`; `helm template` for both charts if any chart value is added; `curl -N http://bond-api.cbdc-sandbox.local/v1/events`; `python3 scripts/verification/{check-public-repo-hygiene.py,check-markdown-links.py}`.
 
@@ -298,7 +298,7 @@ Defer the exact reproduction commands to `sandbox-pr-workflow`; these are the wo
 - **`image-hash-inputs.yml`** (`validate-image-hash-inputs`) — likely, since `services/*/src/**` changes feed the image content hash.
 - **`node-version-consistency.yml`** — only if a Node/engines pin changes (not expected); local equivalent `scripts/verification/check-node-version-consistency.py`.
 - **`license-inventory.yml`** — should be a no-op (no dependency change); if any `package.json` dep changes, **stop and ask** and update `THIRD_PARTY_LICENSES.md`.
-- **`test-contracts.yml`, `pylint.yml`** — not triggered (no contract or notebook changes).
+- **`test-contracts.yml`** — not triggered (no contract changes).
 - GitHub-side CodeQL + Aikido scans run on the PR regardless (note: the SSE handler must avoid the `js/polynomial-redos` and `js/missing-rate-limiting` traps the codebase already guards against — see `auth.ts:63-70` and the `rateLimit` note in Phase 1).
 
 ## Documentation And PR Plan

@@ -14,7 +14,6 @@ on:
       - "scripts/bid-submitter/package.json"
       - "services/blockscout/bens-microservice/requirements.txt"
       - "services/blockscout/bens-microservice/src/requirements.txt"
-      - "services/script-runner/notebook/requirements.txt"
       - ".github/workflows/license-inventory.yml"
   workflow_dispatch:
 

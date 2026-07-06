@@ -35,7 +35,7 @@ Non-goals:
 
 - `infra/`: Kind bootstrap, Besu, gateway, and shared deployment plumbing
 - `services/`: in-cluster applications such as Blockscout, NB Bond API, and
-  script runner
+  NB UI
 - `contracts/`: Solidity contracts, Foundry configuration, and deploy/verify
   helpers
 - `scripts/`: reference CLIs and repository verification utilities
@@ -65,9 +65,8 @@ order:
 4. **Operator API (`services/nb-bond-api`)**
    - deploys the privileged service that drives issuer-side workflows and
      off-chain auction computation
-5. **Script runner (`services/script-runner`, optional)**
-   - deploys the JupyterHub-based notebook environment for interactive sandbox
-     use
+5. **Operator frontend (`services/nb-ui`)**
+   - deploys the React operator UI served by nginx
 
 Ingress and routing are hostname-based through `*.cbdc-sandbox.local` host
 entries:
@@ -75,7 +74,6 @@ entries:
 - `besu.cbdc-sandbox.local` for JSON-RPC and WS
 - `blockscout.cbdc-sandbox.local` for the explorer
 - `bond-api.cbdc-sandbox.local` for the NB Bond API
-- `jupyterhub.cbdc-sandbox.local` for the script runner
 - `web.cbdc-sandbox.local` for the NB UI operator frontend
 
 ### Component Diagram
@@ -97,7 +95,6 @@ entries:
                       |
                       +--> [NB UI (React, nginx)] -- /v1/* --> [NB Bond API]
 
-  (optional) [JupyterHub script runner] -> calls Blockscout / Besu / NB Bond API
   (optional) [scripts/* CLIs] ----------> submit on-chain bids via Besu JSON-RPC
 ```
 
@@ -194,16 +191,6 @@ this sandbox it is configured conservatively for local use:
   predictable
 - optional BENS microservice for name resolution
 
-### Script Runner (`services/script-runner`)
-
-The script runner is a JupyterHub-based notebook environment used as an
-interactive UI and workflow runner. It typically assumes:
-
-- contracts are already deployed
-- Blockscout is available for exploration and, in some notebook flows,
-  contract verification
-- Besu and NB Bond API are reachable through the gateway hostnames
-
 ### Dealer And Bidder CLIs (`scripts/`)
 
 The repository also includes reference tools for client-side workflows:
@@ -282,8 +269,8 @@ Recommended prerequisite on Kind, especially on Docker Desktop:
 Contracts are deployed as part of `./sandbox.sh start` unless disabled, or
 manually through the scripts under `contracts/`.
 
-Verification is performed against Blockscout so explorers and notebooks can
-decode transactions and logs by ABI.
+Verification is performed against Blockscout so the explorer can decode
+transactions and logs by ABI.
 
 ### 3. Run a sealed-bid auction
 
@@ -323,7 +310,6 @@ local development, including:
 - Besu JSON-RPC and WS
 - Blockscout HTTP endpoints
 - NB Bond API
-- JupyterHub
 - NB UI (no sign-in chrome when `AUTH_MODE=none`, which is the default)
 
 Treat the entire environment as trusted-local only. Do not reuse keys,

@@ -39,15 +39,6 @@ npm run format:check
 npm test
 ```
 
-### Script Runner Notebook
-
-```console
-python3 -m pip install -r services/script-runner/notebook/requirements.txt
-python3 -m pip install pylint==3.3.7 "black[jupyter]"==25.1.0
-pylint --rcfile=services/script-runner/notebook/.pylintrc services/script-runner/notebook
-black --check --diff services/script-runner/notebook
-```
-
 ### Documentation-Only Changes
 
 If your change is documentation-only, note that clearly in the pull request and

@@ -19,13 +19,6 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
-  - name: jupyterhub-http
-    port: 80
-    protocol: HTTP
-    hostname: "jupyterhub.{{ .Values.rootDnsZone }}"
-    allowedRoutes:
-      namespaces:
-        from: All
   - name: nb-bond-api-http
     port: 80
     protocol: HTTP
