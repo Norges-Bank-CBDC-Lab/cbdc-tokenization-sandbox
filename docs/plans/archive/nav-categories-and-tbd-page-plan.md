@@ -1,6 +1,6 @@
 # Nav Categories + Banking / TBD Page — Implementation Plan
 
-**Status:** Implemented locally — nav refactor + Banking/TBD page (backend + frontend) built, verified, and deployed to the local sandbox; pending PR. Phases 0–4 done; Phase 5 (docs) landed with this change. The Central Bank/WNOK allowlist enrichment was split out to `docs/plans/central-bank-wnok-allowlist-enrichment-plan.md`.
+**Status:** ✅ Implemented and shipped — merged via #179 (nav categories + Banking/TBD page in one PR); follow-ups shipped separately: tester-role access to the Banking page (#198), bank creation (#200). The Central Bank/WNOK allowlist enrichment was split out to `docs/plans/central-bank-wnok-allowlist-enrichment-plan.md`.
 **Branch suggestion:** `feature/nav-categories` (PR1) and `feature/banking-tbd-page` (PR2) — defer branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-ui/` (nav, router, capabilities, new Banking page + modals, new API module), `services/nb-bond-api/` (new `/v1/banking/tbd/*` route surface, schemas, Tbd ABI, ingestion), docs (`ARCHITECTURE.md`, `nb-ui` + `nb-bond-api` READMEs, `DOCUMENTATION_INDEX.md`). No contract changes.
 
@@ -49,7 +49,7 @@ Give the sandbox operator a **Banking → TBD** page that surfaces every deploye
 | Frontend API | `services/nb-ui/src/api/bankingApi.js` | Mirrors `centralBankApi.js` |
 | Backend route module | `services/nb-bond-api/src/banking/tbd.ts` | Mirrors the `central-bank` module imported in `index.ts` |
 | Tbd ABI | `services/nb-bond-api/src/abi/Tbd.json` | New; alongside existing `BondManager.json` etc. |
-| Plan doc | `docs/plans/nav-categories-and-tbd-page-plan.md` | This file (single-file plan convention) |
+| Plan doc | `docs/plans/archive/nav-categories-and-tbd-page-plan.md` | This file (single-file plan convention; archived after shipping) |
 
 ## Decisions And Open Questions
 

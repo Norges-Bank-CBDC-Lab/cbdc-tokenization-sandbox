@@ -1,6 +1,6 @@
 # `role-based-access-control` — Implementation Plan
 
-**Status:** Approved — implemented on `feature/role-based-access-control`, pending review/merge
+**Status:** ✅ Implemented and shipped — merged via #163 (Entra App Roles, enforced in both nb-ui and nb-bond-api; local `none` mode stays fully open)
 **Branch suggestion:** `feature/role-based-access-control` — defer the actual branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-ui/` (auth seam, gate, nav, config, chart), `services/nb-bond-api/` (auth middleware, env-vars, OpenAPI, chart example), `docs/` (ARCHITECTURE, AZURE_BOUNDARY, per-service DEVELOPMENT, DOCUMENTATION_INDEX)
 
