@@ -12,6 +12,7 @@
  */
 const defaults = {
   API_BASE_URL: 'http://bond-api.cbdc-sandbox.local',
+  EXPLORER_BASE_URL: 'http://blockscout.cbdc-sandbox.local',
   AUTH_MODE: 'none',
   AUTH_TENANT_ID: '',
   AUTH_CLIENT_ID: '',

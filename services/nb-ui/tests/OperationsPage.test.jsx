@@ -6,7 +6,19 @@ import { render, screen, waitFor } from '@testing-library/react';
 
 const NOW_SECS = Math.floor(Date.now() / 1000);
 
+const LONG_ERROR = `execution reverted ${'x'.repeat(200)}`;
+
 const FIXTURE_OPERATIONS = [
+  {
+    id: 4,
+    opType: 'REDEMPTION',
+    target: 'NO0012345678',
+    status: 'FAILED',
+    txHash: null,
+    error: LONG_ERROR,
+    detail: null,
+    createdAt: NOW_SECS - 30,
+  },
   {
     id: 3,
     opType: 'COUPON_PAYMENT',
@@ -63,9 +75,27 @@ describe('OperationsPage', () => {
     expect(screen.getByText('SUCCEEDED')).toBeInTheDocument();
     expect(screen.getByText('amount: 1000')).toBeInTheDocument();
 
-    // Status badge classes map to existing palette classes.
+    // Status badge classes map to existing palette classes; Status is the
+    // last column.
     expect(screen.getByText('REVERTED').className).toContain('badge-rejected');
     expect(screen.getByText('SUCCEEDED').className).toContain('badge-open');
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers).toEqual(['Time', 'Operation', 'Target', 'Result', 'Tx', 'Status']);
+
+    // Tx hash renders shortened and links to the explorer's tx page
+    // (EXPLORER_BASE_URL default from src/config.js in tests).
+    const txLink = screen.getByRole('link', { name: '0xaaaaaaaa…' });
+    expect(txLink).toHaveAttribute(
+      'href',
+      'http://blockscout.cbdc-sandbox.local/tx/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    );
+    expect(txLink).toHaveAttribute('target', '_blank');
+
+    // Oversized decoded errors are excerpted so the row cannot stretch
+    // the table outside the card; the full text stays on the hover title.
+    const failedCell = screen.getByTitle(LONG_ERROR);
+    expect(failedCell.textContent.length).toBeLessThanOrEqual(141);
+    expect(failedCell.textContent.endsWith('…')).toBe(true);
   });
 
   it('shows the empty state when the trail has no rows', async () => {

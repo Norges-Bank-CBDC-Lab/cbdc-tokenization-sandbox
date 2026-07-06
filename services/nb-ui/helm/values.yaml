@@ -35,6 +35,9 @@ securityContext:
 # backend, or to switch the auth plugin without rebuilding.
 runtimeConfig:
   apiBaseUrl: http://bond-api.cbdc-sandbox.local
+  # Block-explorer base URL for outbound transaction links (System →
+  # Operations). Leave empty to render plain hashes without links.
+  explorerBaseUrl: http://blockscout.cbdc-sandbox.local
   authMode: none
   authTenantId: ""
   authClientId: ""

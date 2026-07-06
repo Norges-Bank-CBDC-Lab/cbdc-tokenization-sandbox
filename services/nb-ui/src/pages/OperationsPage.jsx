@@ -8,6 +8,7 @@
  */
 import { useApi } from '../hooks/useApi.js';
 import { OperationsApi } from '../api/operationsApi.js';
+import { AppConfig } from '../config.js';
 import { Button, CopyableHex, EmptyState, ErrorState, LoadingState } from '../components/ui.jsx';
 import { formatRelative, formatUnixDate } from '../utils/format.js';
 
@@ -34,6 +35,46 @@ function formatDetail(detail) {
   return Object.entries(detail)
     .map(([k, v]) => `${k}: ${v}`)
     .join(' · ');
+}
+
+const MAX_ERROR_CELL = 140;
+
+/**
+ * Decoded revert strings can run to hundreds of characters (raw revert
+ * bytes included) — render a bounded excerpt so the row never stretches
+ * the table outside its card; the full text stays on the hover title.
+ */
+function truncateError(error) {
+  if (error.length <= MAX_ERROR_CELL) return error;
+  return `${error.slice(0, MAX_ERROR_CELL)}…`;
+}
+
+/**
+ * Shortened tx hash, linked to the block explorer's transaction page
+ * when EXPLORER_BASE_URL is configured (empty = plain text, no link).
+ */
+function TxCell({ txHash }) {
+  if (!txHash) return '—';
+  const short = `${txHash.slice(0, 10)}…`;
+  const base = (AppConfig.EXPLORER_BASE_URL || '').replace(/\/$/, '');
+  if (!base) {
+    return (
+      <span className="mono" title={txHash}>
+        {short}
+      </span>
+    );
+  }
+  return (
+    <a
+      className="mono"
+      href={`${base}/tx/${txHash}`}
+      target="_blank"
+      rel="noreferrer"
+      title={txHash}
+    >
+      {short}
+    </a>
+  );
 }
 
 function TargetCell({ target }) {
@@ -87,9 +128,9 @@ export function OperationsPage() {
                   <th>Time</th>
                   <th>Operation</th>
                   <th>Target</th>
-                  <th>Status</th>
                   <th>Result</th>
                   <th>Tx</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -101,16 +142,18 @@ export function OperationsPage() {
                       <TargetCell target={op.target} />
                     </td>
                     <td>
-                      <span className={statusBadgeClass(op.status)}>{op.status}</span>
-                    </td>
-                    <td>
                       {op.error ? (
-                        <span title={op.error}>{op.error}</span>
+                        <span title={op.error}>{truncateError(op.error)}</span>
                       ) : (
                         formatDetail(op.detail)
                       )}
                     </td>
-                    <td className="mono">{op.txHash ? <CopyableHex value={op.txHash} /> : '—'}</td>
+                    <td>
+                      <TxCell txHash={op.txHash} />
+                    </td>
+                    <td>
+                      <span className={statusBadgeClass(op.status)}>{op.status}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
