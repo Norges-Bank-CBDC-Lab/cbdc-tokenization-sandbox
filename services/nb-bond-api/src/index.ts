@@ -52,6 +52,7 @@ import {
 import { getIngestionStatus } from './ingestion';
 import { getBalancesByIsin, openDatabase } from './ingestion-db';
 import { initSealingKeypair, type SealingKeypair } from './keys';
+import { listOperationAttempts, toOperationAttemptDto, withOperationRecording } from './operations';
 import { logger } from './logger';
 import { parseBigInt } from './parsing';
 import { computeBuybackAllocation, computeUniformAllocation } from './allocation';
@@ -114,7 +115,7 @@ import {
 } from './central-bank';
 import { withMd5 } from './http';
 import { provider } from './chain';
-import { tbdAbi } from './abi';
+import { tbdAbi, wnokAbi } from './abi';
 import {
   addTbdAllowlist,
   burnTbd,
@@ -373,9 +374,21 @@ app.post('/v1/bonds', validateRequest(createBondBodySchema), async (req, res, ne
     if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
 
     const bondManager = await getBondManager();
-    await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
-    await sendWithManagedNonce(async (nonce) =>
-      bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
+    await withOperationRecording(
+      {
+        db: biddersDb,
+        opType: 'BOND_CREATE',
+        target: body.isin,
+        detail: { maturityDuration: body.maturityDuration },
+        interfaces: [bondManager.interface],
+        txHashOf: (sent) => sent.tx.hash,
+      },
+      async () => {
+        await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
+        return sendWithManagedNonce(async (nonce) =>
+          bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
+        );
+      },
     );
 
     const bond = await composeBond(historyDb, body.isin);
@@ -443,7 +456,16 @@ app.delete(
         throw err;
       }
 
-      await sendWithManagedNonce(async (nonce) => bondManager.disableBond(isin, { nonce }));
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'BOND_DISABLE',
+          target: isin,
+          interfaces: [bondManager.interface],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        () => sendWithManagedNonce(async (nonce) => bondManager.disableBond(isin, { nonce })),
+      );
 
       res.status(204).end();
     } catch (err) {
@@ -492,9 +514,20 @@ app.post(
       const managerAddress = bondManager.target.toString().toLowerCase();
 
       try {
-        await sendWithManagedNonce(async (nonce) => {
-          return bondManager.payCoupon(isin, requested, { nonce });
-        });
+        await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'COUPON_PAYMENT',
+            target: isin,
+            detail: { holders: requested.length },
+            interfaces: [bondManager.interface, new Interface(tbdAbi)],
+            txHashOf: (sent) => sent.tx.hash,
+          },
+          () =>
+            sendWithManagedNonce(async (nonce) => {
+              return bondManager.payCoupon(isin, requested, { nonce });
+            }),
+        );
       } catch (err) {
         // Surface on-chain reverts readably; settlement failures wrap the
         // refusing token's own error in their lowLevelData bytes.
@@ -534,10 +567,21 @@ app.post(
         throw notFound('no holders found for redemption');
       }
 
-      await sendWithManagedNonce(async (nonce) => {
-        const bondManager = await getBondManager();
-        return bondManager.redeem(isin, targetHolders, { nonce });
-      });
+      const bondManager = await getBondManager();
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'REDEMPTION',
+          target: isin,
+          detail: { holders: targetHolders.length },
+          interfaces: [bondManager.interface, new Interface(tbdAbi)],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        () =>
+          sendWithManagedNonce(async (nonce) => {
+            return bondManager.redeem(isin, targetHolders, { nonce });
+          }),
+      );
 
       const bond = await composeBond(historyDb, isin);
       if (!bond) throw notFound(`bond ${isin} not found`);
@@ -625,45 +669,57 @@ app.post(
       // Solidity enum mapping (must match IBondAuction.AuctionType).
       const auctionTypeEnum = auctionType === 'RATE' ? 0 : auctionType === 'PRICE' ? 1 : 2;
 
-      // Static-call validation first so revert reasons surface cleanly.
-      if (auctionType === 'RATE' && !bondAlreadyStaged) {
-        await bondManager.deployBondWithAuction.staticCall(
-          isin,
-          endSeconds,
-          pubKey,
-          sizeUnits,
-          maturitySeconds!,
-        );
-      } else {
-        await bondManager.deployAuctionForBond.staticCall(
-          isin,
-          endSeconds,
-          pubKey,
-          sizeUnits,
-          auctionTypeEnum,
-        );
-      }
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'AUCTION_CREATE',
+          target: isin,
+          detail: { auctionType, size: String(sizeUnits) },
+          interfaces: [bondManager.interface],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        async () => {
+          // Static-call validation first so revert reasons surface cleanly.
+          if (auctionType === 'RATE' && !bondAlreadyStaged) {
+            await bondManager.deployBondWithAuction.staticCall(
+              isin,
+              endSeconds,
+              pubKey,
+              sizeUnits,
+              maturitySeconds!,
+            );
+          } else {
+            await bondManager.deployAuctionForBond.staticCall(
+              isin,
+              endSeconds,
+              pubKey,
+              sizeUnits,
+              auctionTypeEnum,
+            );
+          }
 
-      await sendWithManagedNonce(async (nonce) => {
-        if (auctionType === 'RATE' && !bondAlreadyStaged) {
-          return bondManager.deployBondWithAuction(
-            isin,
-            endSeconds,
-            pubKey,
-            sizeUnits,
-            maturitySeconds!,
-            { nonce },
-          );
-        }
-        return bondManager.deployAuctionForBond(
-          isin,
-          endSeconds,
-          pubKey,
-          sizeUnits,
-          auctionTypeEnum,
-          { nonce },
-        );
-      });
+          return sendWithManagedNonce(async (nonce) => {
+            if (auctionType === 'RATE' && !bondAlreadyStaged) {
+              return bondManager.deployBondWithAuction(
+                isin,
+                endSeconds,
+                pubKey,
+                sizeUnits,
+                maturitySeconds!,
+                { nonce },
+              );
+            }
+            return bondManager.deployAuctionForBond(
+              isin,
+              endSeconds,
+              pubKey,
+              sizeUnits,
+              auctionTypeEnum,
+              { nonce },
+            );
+          });
+        },
+      );
 
       const bond = await composeBond(historyDb, isin);
       if (!bond) throw notFound(`bond ${isin} not found after creation`);
@@ -752,38 +808,52 @@ app.patch(
           const manager = await getBondManager();
           return manager.closeAuction(isin, { nonce, ...extra });
         });
-      try {
-        await sendClose();
-      } catch (err) {
-        const manager = await getBondManager();
-        const errorName = decodeCustomError(err, [
-          bondAuctionContract.interface,
-          manager.interface,
-        ]);
-        if (errorName === 'InBidPhase' && !testMode) {
-          // Local Besu mints blocks only on transactions (genesis
-          // createemptyblocks=false), so the latest block's timestamp lags
-          // wall-clock and ethers' eth_estimateGas simulates the close against
-          // a stale block -> a false InBidPhase revert before broadcast. The
-          // precheck above already confirmed wall-clock > end, so retry once
-          // with an explicit gasLimit to skip estimation; the mined block is
-          // stamped at wall-clock > end and the contract accepts it. This stays
-          // correct after a future QBFT/Besu upgrade: if regular block
-          // production resumes, the first attempt's estimation succeeds and
-          // this fallback never runs.
-          await sendClose({ gasLimit: envVariables.NB_BOND_API_CLOSE_GAS_LIMIT });
-        } else if (errorName === 'InBidPhase') {
-          // testMode: a close was attempted before the on-chain end timestamp.
-          throw conflict(
-            'auction is still in its on-chain bidding window (block timestamp has not passed the' +
-              ' end timestamp). Note the local Besu clock only advances when a transaction is mined.',
-          );
-        } else if (errorName) {
-          throw conflict(`cannot close auction: ${errorName}`);
-        } else {
-          throw err;
-        }
-      }
+      // One audit row per close attempt regardless of the internal
+      // gas-limit retry — the recorded outcome is the final one.
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'AUCTION_CLOSE',
+          target: auctionId,
+          detail: { isin },
+          interfaces: [bondAuctionContract.interface],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        async () => {
+          try {
+            return await sendClose();
+          } catch (err) {
+            const manager = await getBondManager();
+            const errorName = decodeCustomError(err, [
+              bondAuctionContract.interface,
+              manager.interface,
+            ]);
+            if (errorName === 'InBidPhase' && !testMode) {
+              // Local Besu mints blocks only on transactions (genesis
+              // createemptyblocks=false), so the latest block's timestamp lags
+              // wall-clock and ethers' eth_estimateGas simulates the close against
+              // a stale block -> a false InBidPhase revert before broadcast. The
+              // precheck above already confirmed wall-clock > end, so retry once
+              // with an explicit gasLimit to skip estimation; the mined block is
+              // stamped at wall-clock > end and the contract accepts it. This stays
+              // correct after a future QBFT/Besu upgrade: if regular block
+              // production resumes, the first attempt's estimation succeeds and
+              // this fallback never runs.
+              return await sendClose({ gasLimit: envVariables.NB_BOND_API_CLOSE_GAS_LIMIT });
+            } else if (errorName === 'InBidPhase') {
+              // testMode: a close was attempted before the on-chain end timestamp.
+              throw conflict(
+                'auction is still in its on-chain bidding window (block timestamp has not passed the' +
+                  ' end timestamp). Note the local Besu clock only advances when a transaction is mined.',
+              );
+            } else if (errorName) {
+              throw conflict(`cannot close auction: ${errorName}`);
+            } else {
+              throw err;
+            }
+          }
+        },
+      );
 
       const auction = await composeAuction(historyDb, auctionId);
       if (!auction) throw notFound(`auction ${auctionId} not found after close`);
@@ -810,10 +880,21 @@ app.delete(
       if (currentStatus === 3) throw conflict('auction already finalised');
       if (currentStatus === 4) throw conflict('auction already cancelled');
 
-      await sendWithManagedNonce(async (nonce) => {
-        const bondManager = await getBondManager();
-        return bondManager.cancelAuction(isin, { nonce });
-      });
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'AUCTION_CANCEL',
+          target: auctionId,
+          detail: { isin },
+          interfaces: [bondAuctionContract.interface],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        () =>
+          sendWithManagedNonce(async (nonce) => {
+            const bondManager = await getBondManager();
+            return bondManager.cancelAuction(isin, { nonce });
+          }),
+      );
 
       const auction = await composeAuction(historyDb, auctionId);
       if (!auction) throw notFound(`auction ${auctionId} not found after cancel`);
@@ -947,9 +1028,20 @@ app.put(
         };
       });
 
-      await sendWithManagedNonce(async (nonce) => {
-        return bondManager.finaliseAuction(isin, allocPayload, proofs, { nonce });
-      });
+      await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'AUCTION_FINALISE',
+          target: auctionId,
+          detail: { isin, allocations: allocPayload.length },
+          interfaces: [bondManager.interface, new Interface(tbdAbi)],
+          txHashOf: (sent) => sent.tx.hash,
+        },
+        () =>
+          sendWithManagedNonce(async (nonce) => {
+            return bondManager.finaliseAuction(isin, allocPayload, proofs, { nonce });
+          }),
+      );
 
       const refreshed = await composeAuction(historyDb, auctionId);
       if (!refreshed) throw notFound(`auction ${auctionId} not found after finalisation`);
@@ -1064,12 +1156,22 @@ app.post(
 
       let result;
       try {
-        result = await submitImpersonatedBid({
-          bidder,
-          auctionId: body.auctionId,
-          units: body.units,
-          rate: body.rate,
-        });
+        result = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'BID_SUBMISSION',
+            target: body.auctionId,
+            detail: { bidder: address },
+            txHashOf: (r) => r.txHash ?? null,
+          },
+          () =>
+            submitImpersonatedBid({
+              bidder,
+              auctionId: body.auctionId,
+              units: body.units,
+              rate: body.rate,
+            }),
+        );
       } catch (err) {
         if (err instanceof BidderBidError) {
           if (err.code === 'AUCTION_NOT_FOUND') throw notFound(err.message);
@@ -1157,6 +1259,17 @@ app.get('/v1/registry', async (req, res, next) => {
   }
 });
 
+app.get('/v1/operations', (req, res, next) => {
+  try {
+    const raw = req.query.limit ? Number(req.query.limit) : NaN;
+    const limit = Number.isFinite(raw) ? Math.min(Math.max(Math.trunc(raw), 1), 1000) : 200;
+    const rows = listOperationAttempts(historyDb, limit);
+    okResponse(req, res, rows.map(toOperationAttemptDto));
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use('/v1/central-bank', requireAnyRole(operatorRoles));
 
 app.get('/v1/central-bank', async (req, res, next) => {
@@ -1238,7 +1351,16 @@ app.put('/v1/central-bank/allowlist/:address', async (req, res, next) => {
     }
     let ref;
     try {
-      ref = await addToAllowlist(address);
+      ref = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'WNOK_ALLOWLIST_ADD',
+          target: address,
+          interfaces: [new Interface(wnokAbi)],
+          txHashOf: (r) => r.hash,
+        },
+        () => addToAllowlist(address),
+      );
     } catch (err) {
       mapCentralBankError(err);
       return;
@@ -1257,7 +1379,16 @@ app.delete('/v1/central-bank/allowlist/:address', async (req, res, next) => {
     }
     let ref;
     try {
-      ref = await removeFromAllowlist(address);
+      ref = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'WNOK_ALLOWLIST_REMOVE',
+          target: address,
+          interfaces: [new Interface(wnokAbi)],
+          txHashOf: (r) => r.hash,
+        },
+        () => removeFromAllowlist(address),
+      );
     } catch (err) {
       mapCentralBankError(err);
       return;
@@ -1283,7 +1414,17 @@ app.post(
       if (amount <= 0n) throw badRequest('amount must be positive');
       let ref;
       try {
-        ref = await mintWnok(body.address, amount);
+        ref = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'WNOK_MINT',
+            target: body.address,
+            detail: { amount: body.amount },
+            interfaces: [new Interface(wnokAbi)],
+            txHashOf: (r) => r.hash,
+          },
+          () => mintWnok(body.address, amount),
+        );
       } catch (err) {
         mapCentralBankError(err);
         return;
@@ -1310,7 +1451,17 @@ app.post(
       if (amount <= 0n) throw badRequest('amount must be positive');
       let ref;
       try {
-        ref = await burnWnok(body.address, amount);
+        ref = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'WNOK_BURN',
+            target: body.address,
+            detail: { amount: body.amount },
+            interfaces: [new Interface(wnokAbi)],
+            txHashOf: (r) => r.hash,
+          },
+          () => burnWnok(body.address, amount),
+        );
       } catch (err) {
         mapCentralBankError(err);
         return;
@@ -1337,7 +1488,17 @@ app.post(
       if (amount <= 0n) throw badRequest('amount must be positive');
       let ref;
       try {
-        ref = await transferWnokFromCb(body.to, amount);
+        ref = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'WNOK_TRANSFER',
+            target: body.to,
+            detail: { amount: body.amount },
+            interfaces: [new Interface(wnokAbi)],
+            txHashOf: (r) => r.hash,
+          },
+          () => transferWnokFromCb(body.to, amount),
+        );
       } catch (err) {
         mapCentralBankError(err);
         return;
@@ -1397,11 +1558,24 @@ app.post('/v1/banking/banks', validateRequest(createBankBodySchema), async (req,
     const body = req.body as CreateBankBody;
     let record;
     try {
-      record = await createBank(biddersDb, {
-        name: body.name,
-        privateKey: body.privateKey,
-        enableWnokSettlement: body.enableWnokSettlement,
-      });
+      // BANK_CREATE spans several transactions (TBD deploy, registry
+      // entry, optional WNOK allowlisting) — recorded without a single
+      // tx hash; the bank address lands in the row via detail.
+      record = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'BANK_CREATE',
+          target: body.name,
+          detail: { enableWnokSettlement: body.enableWnokSettlement ?? false },
+          txHashOf: () => null,
+        },
+        () =>
+          createBank(biddersDb, {
+            name: body.name,
+            privateKey: body.privateKey,
+            enableWnokSettlement: body.enableWnokSettlement,
+          }),
+      );
     } catch (err) {
       if (err instanceof BankValidationError) {
         throw badRequest(err.message);
@@ -1429,8 +1603,21 @@ app.put('/v1/banking/tbd/:address/allowlist/:holder', async (req, res, next) => 
     if (!/^0x[a-fA-F0-9]{40}$/.test(address) || !/^0x[a-fA-F0-9]{40}$/.test(holder)) {
       throw badRequest('address and holder must be valid EVM addresses');
     }
-    const ref = await addTbdAllowlist(address, holder);
-    if (!ref) throw notFound(`no TBD token registered at ${address}`);
+    const ref = await withOperationRecording(
+      {
+        db: biddersDb,
+        opType: 'TBD_ALLOWLIST_ADD',
+        target: address,
+        detail: { holder },
+        interfaces: [new Interface(tbdAbi)],
+        txHashOf: (r) => r?.hash ?? null,
+      },
+      async () => {
+        const sent = await addTbdAllowlist(address, holder);
+        if (!sent) throw notFound(`no TBD token registered at ${address}`);
+        return sent;
+      },
+    );
     okResponse(req, res, ref);
   } catch (err) {
     next(err);
@@ -1443,8 +1630,21 @@ app.delete('/v1/banking/tbd/:address/allowlist/:holder', async (req, res, next) 
     if (!/^0x[a-fA-F0-9]{40}$/.test(address) || !/^0x[a-fA-F0-9]{40}$/.test(holder)) {
       throw badRequest('address and holder must be valid EVM addresses');
     }
-    const ref = await removeTbdAllowlist(address, holder);
-    if (!ref) throw notFound(`no TBD token registered at ${address}`);
+    const ref = await withOperationRecording(
+      {
+        db: biddersDb,
+        opType: 'TBD_ALLOWLIST_REMOVE',
+        target: address,
+        detail: { holder },
+        interfaces: [new Interface(tbdAbi)],
+        txHashOf: (r) => r?.hash ?? null,
+      },
+      async () => {
+        const sent = await removeTbdAllowlist(address, holder);
+        if (!sent) throw notFound(`no TBD token registered at ${address}`);
+        return sent;
+      },
+    );
     okResponse(req, res, ref);
   } catch (err) {
     next(err);
@@ -1468,8 +1668,21 @@ app.post(
         throw badRequest('amount must be a decimal uint256 string');
       }
       if (amount <= 0n) throw badRequest('amount must be positive');
-      const ref = await mintTbd(address, body.address, amount);
-      if (!ref) throw notFound(`no TBD token registered at ${address}`);
+      const ref = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'TBD_MINT',
+          target: address,
+          detail: { to: body.address, amount: body.amount },
+          interfaces: [new Interface(tbdAbi)],
+          txHashOf: (r) => r?.hash ?? null,
+        },
+        async () => {
+          const sent = await mintTbd(address, body.address, amount);
+          if (!sent) throw notFound(`no TBD token registered at ${address}`);
+          return sent;
+        },
+      );
       okResponse(req, res, ref);
     } catch (err) {
       next(err);
@@ -1494,8 +1707,21 @@ app.post(
         throw badRequest('amount must be a decimal uint256 string');
       }
       if (amount <= 0n) throw badRequest('amount must be positive');
-      const ref = await burnTbd(address, body.address, amount);
-      if (!ref) throw notFound(`no TBD token registered at ${address}`);
+      const ref = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'TBD_BURN',
+          target: address,
+          detail: { from: body.address, amount: body.amount },
+          interfaces: [new Interface(tbdAbi)],
+          txHashOf: (r) => r?.hash ?? null,
+        },
+        async () => {
+          const sent = await burnTbd(address, body.address, amount);
+          if (!sent) throw notFound(`no TBD token registered at ${address}`);
+          return sent;
+        },
+      );
       okResponse(req, res, ref);
     } catch (err) {
       next(err);
@@ -1520,8 +1746,21 @@ app.post(
         throw badRequest('amount must be a decimal uint256 string');
       }
       if (amount <= 0n) throw badRequest('amount must be positive');
-      const ref = await transferTbd(address, body.to, amount);
-      if (!ref) throw notFound(`no TBD token registered at ${address}`);
+      const ref = await withOperationRecording(
+        {
+          db: biddersDb,
+          opType: 'TBD_TRANSFER',
+          target: address,
+          detail: { to: body.to, amount: body.amount },
+          interfaces: [new Interface(tbdAbi)],
+          txHashOf: (r) => r?.hash ?? null,
+        },
+        async () => {
+          const sent = await transferTbd(address, body.to, amount);
+          if (!sent) throw notFound(`no TBD token registered at ${address}`);
+          return sent;
+        },
+      );
       okResponse(req, res, ref);
     } catch (err) {
       next(err);

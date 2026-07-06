@@ -29,13 +29,15 @@ import { logger } from './logger';
  *        after upgrade — CREATE TABLE IF NOT EXISTS would otherwise
  *        keep the old shape.
  *
- * Note on the `bidders` and `banks` tables: unlike every other table
- * in this file, they are *systems of record*, not chain projections.
- * They are created additively via `CREATE TABLE IF NOT EXISTS` and
- * must NEVER be added to the drop list in `migrateToCurrentVersion` —
- * that function only drops projection tables that can be rebuilt from
- * chain. Bidder and bank keypairs are sandbox-impersonation keys and
- * cannot be recovered from chain state.
+ * Note on the `bidders`, `banks` and `operation_attempts` tables:
+ * unlike every other table in this file, they are *systems of record*,
+ * not chain projections. They are created additively via
+ * `CREATE TABLE IF NOT EXISTS` and must NEVER be added to the drop
+ * list in `migrateToCurrentVersion` — that function only drops
+ * projection tables that can be rebuilt from chain. Bidder and bank
+ * keypairs are sandbox-impersonation keys, and operation attempts
+ * record failed sends that never reached the chain; neither can be
+ * recovered from chain state.
  */
 const SCHEMA_VERSION = 3;
 
@@ -181,6 +183,26 @@ function createTables(db: IngestionDatabase) {
       tbd_address TEXT NOT NULL UNIQUE,
       created_at INTEGER NOT NULL
     );
+
+    -- System-of-record table: the operator audit trail. One row per
+    -- operator-initiated on-chain operation attempt (success, revert
+    -- with decoded reason, or transport failure). Failed sends are
+    -- usually rejected at gas estimation and never reach the chain, so
+    -- these rows cannot be rebuilt from chain logs. NEVER add this to
+    -- the drop list in migrateToCurrentVersion — see the
+    -- SCHEMA_VERSION doc comment.
+    CREATE TABLE IF NOT EXISTS operation_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      op_type TEXT NOT NULL,
+      target TEXT NOT NULL,
+      status TEXT NOT NULL,
+      tx_hash TEXT,
+      error TEXT,
+      detail TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_operation_attempts_created
+      ON operation_attempts(created_at, id);
   `);
 }
 
@@ -484,6 +506,45 @@ export function insertBankRow(db: IngestionDatabase, row: BankRow): void {
     `INSERT INTO banks(${BANK_ROW_COLUMNS})
      VALUES (?, ?, ?, ?, ?, ?)`,
   ).run(row.address, row.name, row.private_key, row.contract_name, row.tbd_address, row.created_at);
+}
+
+// #endregion
+
+// #region Operation attempts (system-of-record) ─────────────────────
+
+export interface OperationAttemptRow {
+  id: number;
+  op_type: string;
+  target: string;
+  status: string;
+  tx_hash: string | null;
+  error: string | null;
+  detail: string | null;
+  created_at: number;
+}
+
+export function insertOperationAttemptRow(
+  db: IngestionDatabase,
+  row: Omit<OperationAttemptRow, 'id'>,
+): void {
+  db.prepare(
+    `INSERT INTO operation_attempts(op_type, target, status, tx_hash, error, detail, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(row.op_type, row.target, row.status, row.tx_hash, row.error, row.detail, row.created_at);
+}
+
+export function listOperationAttemptRows(
+  db: IngestionDatabase,
+  limit = 200,
+): OperationAttemptRow[] {
+  return db
+    .prepare(
+      `SELECT id, op_type, target, status, tx_hash, error, detail, created_at
+       FROM operation_attempts
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`,
+    )
+    .all(limit) as OperationAttemptRow[];
 }
 
 // #endregion

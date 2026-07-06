@@ -10,6 +10,7 @@
  *   #/coupon-payout                  -> { name: "coupon-payout" }
  *   #/stocks                         -> { name: "stocks" }
  *   #/tbd                            -> { name: "tbd" }
+ *   #/operations                     -> { name: "operations" }
  */
 import { useState, useEffect, useCallback } from 'react';
 
@@ -43,6 +44,9 @@ export function parseHash(hash) {
   }
   if (section === 'registry') {
     return { name: 'registry' };
+  }
+  if (section === 'operations') {
+    return { name: 'operations' };
   }
   return { name: 'bonds' };
 }

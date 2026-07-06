@@ -9,6 +9,7 @@ data:
   config.js: |
     window.__APP_CONFIG__ = {
       API_BASE_URL: {{ .Values.runtimeConfig.apiBaseUrl | quote }},
+      EXPLORER_BASE_URL: {{ .Values.runtimeConfig.explorerBaseUrl | default "" | quote }},
       AUTH_MODE: {{ .Values.runtimeConfig.authMode | default "none" | quote }},
       AUTH_TENANT_ID: {{ .Values.runtimeConfig.authTenantId | default "" | quote }},
       AUTH_CLIENT_ID: {{ .Values.runtimeConfig.authClientId | default "" | quote }},

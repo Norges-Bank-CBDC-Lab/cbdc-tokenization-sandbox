@@ -20,6 +20,7 @@ import { CentralBankPage } from './pages/CentralBankPage.jsx';
 import { CouponPayoutPage } from './pages/CouponPayoutPage.jsx';
 import { BankingPage } from './pages/BankingPage.jsx';
 import { GlobalRegistryPage } from './pages/GlobalRegistryPage.jsx';
+import { OperationsPage } from './pages/OperationsPage.jsx';
 
 /**
  * ComingSoon — placeholder for nav destinations that exist in the category
@@ -120,6 +121,7 @@ export function App() {
     );
   else if (route.name === 'stocks') page = <ComingSoon title="Stocks" />;
   else if (route.name === 'registry') page = <GlobalRegistryPage />;
+  else if (route.name === 'operations') page = <OperationsPage />;
   else if (route.name === 'tbd')
     page = caps.canAccessBanking ? (
       <BankingPage navigate={navigate} />

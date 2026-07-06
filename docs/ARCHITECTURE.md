@@ -161,8 +161,14 @@ The NB Bond API is the privileged operator service. It:
 - recomputes auction allocations off-chain over the operator-selected winning
   bids (addressed by on-chain `bidIndex`), cross-checks the operator's expected
   clearing rate, and finalises auctions on-chain using bidder proofs
-- maintains a local SQLite database for ingestion and operational views such as
-  holders and history
+- maintains a local SQLite database with two kinds of tables: a disposable
+  **projection** of chain events (rebuilt from chain on resync) and
+  **system-of-record** tables the chain cannot reproduce — the sandbox
+  bidder/bank keypairs and the `operation_attempts` operator audit trail
+  (`GET /v1/operations`, rendered at System → Operations in the NB UI),
+  which records every operator-initiated on-chain operation with its
+  outcome, including reverts that were rejected at gas estimation and
+  never reached the chain
 - exposes a v2 OpenAPI surface designed as a **bulky resource tree**: a single
   `GET /v1/bonds` returns every bond with its nested auctions, bids,
   allocations, and holders. Mutations return the updated parent so the

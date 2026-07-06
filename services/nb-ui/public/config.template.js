@@ -4,6 +4,7 @@
 // every environment without a rebuild. See services/nb-ui/DEVELOPMENT.md.
 window.__APP_CONFIG__ = {
   API_BASE_URL: '__API_BASE_URL__',
+  EXPLORER_BASE_URL: '__EXPLORER_BASE_URL__',
   AUTH_MODE: '__AUTH_MODE__',
   AUTH_TENANT_ID: '__AUTH_TENANT_ID__',
   AUTH_CLIENT_ID: '__AUTH_CLIENT_ID__',
