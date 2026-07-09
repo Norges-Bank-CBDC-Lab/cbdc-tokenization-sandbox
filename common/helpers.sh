@@ -48,7 +48,7 @@ NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
 NB_UI_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
-NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.27-alpine
+NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.3-alpine
 # Backwards-compat alias; older code paths and external callers may still
 # reference NB_UI_BASEIMAGE expecting the nginx runtime base.
 NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
@@ -845,13 +845,16 @@ function deployApiGateway() {
     kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v${NGINX_GATEWAY_FABRIC_VERSION}" | kubectl --context=kind-$CLUSTER_NAME apply -f -
 
     # install api gateway
+    # NOTE: no `--set service.create=false` here anymore — the value was
+    # removed in the NGF 2.x chart (the data-plane Service is provisioned
+    # per Gateway by the control plane; the local NodePort Service in
+    # infra/gateway selects the provisioned data-plane pods directly).
     helm upgrade ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
          --install \
          --version ${NGINX_GATEWAY_FABRIC_VERSION} \
          --kube-context kind-$CLUSTER_NAME \
          --namespace nginx-gateway \
-         --create-namespace \
-         --set service.create=false
+         --create-namespace
 
     helm upgrade gateway $REPO_ROOT/infra/gateway \
          --install \
@@ -934,7 +937,7 @@ function getBlockscoutChartVersion() {
 }
 
 function getNginxGatewayFabricVersion() {
-    getVersionValue "charts.nginx_gateway_fabric" "2.6.0"
+    getVersionValue "charts.nginx_gateway_fabric" "2.6.6"
 }
 
 function getBlockscoutDbImage() {
