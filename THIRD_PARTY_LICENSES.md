@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of July 6, 2026.
+deployment-time components used by this repository as of July 10, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -78,7 +78,7 @@ License labels and deployment-time notes remain curated review items.
 | `jest` | `30.4.2` | MIT |
 | `prettier` | `3.9.4` | MIT |
 | `ts-jest` | `29.4.11` | MIT |
-| `tsx` | `4.22.4` | MIT |
+| `tsx` | `4.23.0` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 | `typescript-eslint` | `8.62.1` | MIT |
 
@@ -89,7 +89,7 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.0.1` | MIT |
-| `tsx` | `4.22.4` | MIT |
+| `tsx` | `4.23.0` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
@@ -99,20 +99,20 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.0.1` | MIT |
-| `tsx` | `4.22.4` | MIT |
+| `tsx` | `4.23.0` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
 ### `services/nb-ui`
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@azure/msal-browser` | `5.14.0` | MIT |
+| `@azure/msal-browser` | `5.16.0` | MIT |
 | `react` | `19.2.7` | MIT |
 | `react-dom` | `19.2.7` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
-| `@vitejs/plugin-react` | `6.0.2` | MIT |
+| `@vitejs/plugin-react` | `6.0.3` | MIT |
 | `eslint` | `9.39.4` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
