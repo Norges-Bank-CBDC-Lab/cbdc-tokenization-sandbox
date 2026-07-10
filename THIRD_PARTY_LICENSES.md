@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of July 6, 2026.
+deployment-time components used by this repository as of July 10, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -62,7 +62,7 @@ License labels and deployment-time notes remain curated review items.
 | `jose` | `6.2.3` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
-| `zod-openapi` | `5.4.6` | MIT |
+| `zod-openapi` | `6.0.0` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
