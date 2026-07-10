@@ -194,13 +194,22 @@ def main() -> int:
             f"common/node-version.env: SANDBOX_NODE_IMAGE is {node_image!r}, "
             f"expected 'node:{node_version}'"
         )
-    if node_version and types_node_version and (
-        types_node_version.split(".")[:2] != node_version.split(".")[:2]
-    ):
-        errors.append(
-            "common/node-version.env: SANDBOX_TYPES_NODE_VERSION must stay on "
-            "the same Node major/minor line as SANDBOX_NODE_VERSION"
+    if node_version and types_node_version:
+        # DefinitelyTyped publishing trails Node.js runtime releases, so
+        # @types/node may sit on an older minor of the same major, but it
+        # must never be newer than the pinned runtime.
+        types_major, types_minor = (
+            int(part) for part in types_node_version.split(".")[:2]
         )
+        runtime_major, runtime_minor = (
+            int(part) for part in node_version.split(".")[:2]
+        )
+        if types_major != runtime_major or types_minor > runtime_minor:
+            errors.append(
+                "common/node-version.env: SANDBOX_TYPES_NODE_VERSION must stay "
+                "on the same Node major as SANDBOX_NODE_VERSION and must not "
+                "be newer than its minor line"
+            )
     if node_version and node_major and node_major != node_version.split(".", 1)[0]:
         errors.append(
             f"common/node-version.env: SANDBOX_NODE_MAJOR is {node_major!r}, "
