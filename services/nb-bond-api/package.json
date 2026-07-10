@@ -27,7 +27,7 @@
     "jose": "6.2.3",
     "winston": "3.19.0",
     "zod": "4.4.3",
-    "zod-openapi": "5.4.6"
+    "zod-openapi": "6.0.0"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",

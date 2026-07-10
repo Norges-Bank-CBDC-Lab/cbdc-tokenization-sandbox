@@ -62,7 +62,7 @@ License labels and deployment-time notes remain curated review items.
 | `jose` | `6.2.3` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
-| `zod-openapi` | `5.4.6` | MIT |
+| `zod-openapi` | `6.0.0` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
