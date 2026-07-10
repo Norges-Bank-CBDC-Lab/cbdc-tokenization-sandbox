@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of July 6, 2026.
+deployment-time components used by this repository as of July 10, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -70,7 +70,7 @@ License labels and deployment-time notes remain curated review items.
 | `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `26.0.1` | MIT |
+| `@types/node` | `26.1.1` | MIT |
 | `babel-jest` | `30.4.1` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
@@ -88,7 +88,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.0.1` | MIT |
+| `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
@@ -98,7 +98,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.0.1` | MIT |
+| `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.22.4` | MIT |
 | `typescript` | `6.0.3` | Apache-2.0 |
 
