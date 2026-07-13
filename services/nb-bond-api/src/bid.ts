@@ -1,7 +1,7 @@
 import { decryptBid } from './encryption';
 import { getSealingKeypair } from './keys';
 import { SealedBid, UnsealedBid } from './types';
-import { bidPlaintextSchema } from './schemas';
+import { bidPlaintextSchema } from './contracts/bids';
 
 export function normalizeSealedBid(
   bid: Pick<SealedBid, 'bidder' | 'ciphertext' | 'plaintextHash'>,

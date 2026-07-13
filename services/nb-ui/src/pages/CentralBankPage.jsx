@@ -14,7 +14,8 @@
 import { useState } from 'react';
 import { CentralBankApi } from '../api/centralBankApi.js';
 import { BiddersApi } from '../api/biddersApi.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -22,6 +23,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  RefreshState,
   SandboxOnlyBanner,
   useToast,
 } from '../components/ui.jsx';
@@ -31,9 +33,9 @@ import { BurnWnokModal } from './BurnWnokModal.jsx';
 import { TransferWnokModal } from './TransferWnokModal.jsx';
 
 export function CentralBankPage() {
-  const cbQ = useApi(() => CentralBankApi.getCentralBank(), []);
-  const listQ = useApi(() => CentralBankApi.listAllowlist(), []);
-  const biddersQ = useApi(() => BiddersApi.listBidders(), []);
+  const cbQ = useLiveQuery([LiveResource.CENTRAL_BANK], () => CentralBankApi.getCentralBank(), []);
+  const listQ = useLiveQuery([LiveResource.CENTRAL_BANK], () => CentralBankApi.listAllowlist(), []);
+  const biddersQ = useLiveQuery([LiveResource.BIDDERS], () => BiddersApi.listBidders(), []);
   const [showAdd, setShowAdd] = useState(false);
   const [showMint, setShowMint] = useState(false);
   const [showBurn, setShowBurn] = useState(false);
@@ -131,6 +133,15 @@ export function CentralBankPage() {
           </Button>
         </div>
       </div>
+
+      <RefreshState
+        refreshing={cbQ.refreshing || listQ.refreshing || biddersQ.refreshing}
+        error={cbQ.refreshError || listQ.refreshError || biddersQ.refreshError}
+        onRetry={() => {
+          reloadAll();
+          biddersQ.reload();
+        }}
+      />
 
       <SandboxOnlyBanner />
 

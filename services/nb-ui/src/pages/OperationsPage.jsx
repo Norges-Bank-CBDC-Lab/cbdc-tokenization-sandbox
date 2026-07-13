@@ -8,7 +8,7 @@
  */
 import { useMemo, useState } from 'react';
 
-import { useApi } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { OperationsApi } from '../api/operationsApi.js';
 import { AppConfig } from '../config.js';
 import { Button, CopyableHex, EmptyState, ErrorState, LoadingState } from '../components/ui.jsx';
@@ -102,8 +102,8 @@ function TargetCell({ target }) {
 }
 
 export function OperationsPage() {
-  const opsQ = useApi(() => OperationsApi.listOperations(), []);
-  const operations = opsQ.data ?? [];
+  const opsQ = useLiveQuery([LiveResource.OPERATIONS], () => OperationsApi.listOperations(), []);
+  const operations = useMemo(() => opsQ.data ?? [], [opsQ.data]);
 
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');

@@ -195,8 +195,7 @@ describe('banks', () => {
         created_at: Date.now(),
       });
 
-      bankingTbd.setCreatedBanksDb(db);
-      const banks = bankingTbd.listBanks();
+      const banks = bankingTbd.createBankingService(db).listBanks();
 
       expect(banks.map((b) => b.name)).toEqual(['Nordea Bank', 'DNB Bank', 'Testbanken']);
       expect(banks[2].address).toBe(deriveBidderAddress(pk));

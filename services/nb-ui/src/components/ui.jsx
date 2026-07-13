@@ -197,6 +197,43 @@ export function ErrorState({ error, onRetry }) {
   );
 }
 
+/** Non-blocking status for stale-while-revalidate queries with rendered data. */
+export function RefreshState({ refreshing = false, error = null, onRetry }) {
+  if (!refreshing && !error) return null;
+  return (
+    <div
+      role={error ? 'alert' : 'status'}
+      style={{
+        marginBottom: 12,
+        padding: '8px 12px',
+        borderRadius: 6,
+        fontSize: 13,
+        background: error ? '#fff7e6' : 'var(--surface-2, #f5f6fa)',
+        border: error ? '1px solid #f3c969' : '1px solid var(--line, #d9dde5)',
+      }}
+    >
+      {error ? (
+        <>
+          Refresh failed: {error.message || String(error)}. Showing the last successful data.
+          {onRetry && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={onRetry}
+              style={{ marginLeft: 8 }}
+            >
+              Retry
+            </Button>
+          )}
+        </>
+      ) : (
+        'Refreshing…'
+      )}
+    </div>
+  );
+}
+
 export function EmptyState({ title, message, action }) {
   return (
     <div className="state">

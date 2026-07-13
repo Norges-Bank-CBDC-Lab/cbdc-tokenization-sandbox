@@ -267,7 +267,9 @@ function migrateToCurrentVersion(db: IngestionDatabase): {
 }
 
 export function openDatabase(config: IngestionConfig): IngestionDatabase {
-  const fullPath = path.resolve(config.dbPath);
+  // Preserve SQLite's special in-memory filename. Resolving it as a normal
+  // path creates an accidental file literally named `:memory:` in the cwd.
+  const fullPath = config.dbPath === ':memory:' ? ':memory:' : path.resolve(config.dbPath);
   const options: { fileMustExist: boolean; readonly: boolean } = {
     fileMustExist: false,
     readonly: config.readonly ?? false,

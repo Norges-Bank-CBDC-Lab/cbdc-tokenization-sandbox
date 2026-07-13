@@ -14,7 +14,7 @@
  */
 import { useMemo, useState } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
-import { useApi } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -35,7 +35,11 @@ function payButtonTitle(coupon) {
 }
 
 export function CouponPayoutPage({ navigate }) {
-  const { data, loading, error, reload } = useApi(() => BondsApi.listBonds(), []);
+  const { data, loading, error, reload } = useLiveQuery(
+    [LiveResource.BONDS],
+    () => BondsApi.listBonds(),
+    [],
+  );
   const [payTarget, setPayTarget] = useState(null);
   const toast = useToast();
 
@@ -68,11 +72,9 @@ export function CouponPayoutPage({ navigate }) {
       title: 'Coupon paid',
       body: `${updatedBond?.isin ?? ''} — cash leg settled to all holders`,
     });
-    // First reload races the backend ingestion loop (default 3s tick);
-    // the delayed second reload covers the worst case where the
-    // immediate one just missed a tick. See BondsPage handleCreated.
+    // Keep the same-tab response immediate; ingestion publishes the durable
+    // bond update to every mounted live query after its commit.
     reload();
-    setTimeout(reload, 4000);
   }
 
   return (

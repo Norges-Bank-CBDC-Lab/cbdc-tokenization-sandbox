@@ -21,6 +21,7 @@ const defaults = {
   AUTH_REDIRECT_URI: '',
   AUTH_OPERATOR_ROLES: '',
   AUTH_TESTER_ROLES: '',
+  LIVE_UPDATES: true,
 };
 
 function readWindowConfig() {
@@ -28,4 +29,18 @@ function readWindowConfig() {
   return window.__APP_CONFIG__ ?? {};
 }
 
-export const AppConfig = { ...defaults, ...readWindowConfig() };
+const configured = { ...defaults, ...readWindowConfig() };
+
+function booleanConfig(value, fallback) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (value.toLowerCase() === 'true') return true;
+    if (value.toLowerCase() === 'false') return false;
+  }
+  return fallback;
+}
+
+export const AppConfig = {
+  ...configured,
+  LIVE_UPDATES: booleanConfig(configured.LIVE_UPDATES, defaults.LIVE_UPDATES),
+};

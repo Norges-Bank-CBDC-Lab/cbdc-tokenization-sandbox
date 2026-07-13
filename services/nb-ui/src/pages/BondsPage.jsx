@@ -3,13 +3,14 @@
  */
 import { useState, useMemo } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
-import { useApi } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
   EmptyState,
   ErrorState,
   LoadingState,
+  RefreshState,
   StatusBadge,
   useToast,
 } from '../components/ui.jsx';
@@ -40,7 +41,8 @@ export function BondsPage({ navigate }) {
   // Setting persists across reloads, mirrors the "Hide cancelled" pattern
   // on AuctionsPage (PR #117).
   const [showDisabled, setShowDisabled] = useState(() => readShowDisabled());
-  const { data, loading, error, reload } = useApi(
+  const { data, loading, error, refreshing, refreshError, reload } = useLiveQuery(
+    [LiveResource.BONDS, LiveResource.AUCTIONS],
     () => BondsApi.listBonds({ includeDisabled: showDisabled }),
     [showDisabled],
   );
@@ -97,6 +99,8 @@ export function BondsPage({ navigate }) {
           </Button>
         </div>
       </div>
+
+      <RefreshState refreshing={refreshing} error={refreshError} onRetry={reload} />
 
       <div className="kpi-grid">
         <div className="kpi">

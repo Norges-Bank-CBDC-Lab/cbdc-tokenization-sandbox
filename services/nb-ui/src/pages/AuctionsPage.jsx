@@ -3,13 +3,14 @@
  */
 import { useState, useMemo } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
-import { useApi } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
   EmptyState,
   ErrorState,
   LoadingState,
+  RefreshState,
   StatusBadge,
   TypeBadge,
   useToast,
@@ -37,7 +38,11 @@ function writeHideCancelled(value) {
 }
 
 export function AuctionsPage({ navigate }) {
-  const { data, loading, error, reload } = useApi(() => AuctionsApi.listAuctions(), []);
+  const { data, loading, error, refreshing, refreshError, reload } = useLiveQuery(
+    [LiveResource.AUCTIONS],
+    () => AuctionsApi.listAuctions(),
+    [],
+  );
   const [showCreate, setShowCreate] = useState(false);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -77,11 +82,9 @@ export function AuctionsPage({ navigate }) {
       title: 'Auction created',
       body: `${newAuction ? Fmt.shortHex(newAuction.id) : ''} on ${updatedBond.isin}`,
     });
-    // First reload races the backend ingestion loop (default 3s tick); the
-    // delayed second reload covers the worst case where the immediate one
-    // just missed a tick. See BondsPage handleCreated for details.
+    // Keep the same-tab response immediate; ingestion publishes the durable
+    // auction update to every mounted live query after its commit.
     reload();
-    setTimeout(reload, 4000);
   }
 
   return (
@@ -103,6 +106,8 @@ export function AuctionsPage({ navigate }) {
           </Button>
         </div>
       </div>
+
+      <RefreshState refreshing={refreshing} error={refreshError} onRetry={reload} />
 
       <div className="kpi-grid">
         <div className="kpi">

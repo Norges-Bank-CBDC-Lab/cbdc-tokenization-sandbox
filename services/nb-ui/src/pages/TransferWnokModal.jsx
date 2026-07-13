@@ -10,6 +10,7 @@ import { CentralBankApi } from '../api/centralBankApi.js';
 import { useMutation } from '../hooks/useApi.js';
 import { Button, Field, Input, Modal, Select } from '../components/ui.jsx';
 import { Fmt } from '../utils/format.js';
+import { isPositiveInteger } from '../domain/amounts.js';
 
 const ADDR_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
@@ -25,14 +26,14 @@ export function TransferWnokModal({ cbAddress, cbBalance, allowlist, onClose, on
   const addrError =
     to && !ADDR_PATTERN.test(to.trim()) ? 'Must be an EVM address (0x + 40 hex chars).' : null;
   const amountError =
-    amount && (!/^\d+$/.test(amount) || Number(amount) <= 0)
+    amount && !isPositiveInteger(amount)
       ? 'Amount must be a positive integer (1-NOK units).'
       : null;
-  const balanceWarn = amount && /^\d+$/.test(amount) && BigInt(amount) > BigInt(cbBalance ?? '0');
+  const balanceWarn = isPositiveInteger(amount) && BigInt(amount) > BigInt(cbBalance ?? '0');
 
   const cbOnAllowlist = allowlist.some((a) => a.toLowerCase() === cbAddress.toLowerCase());
 
-  const valid = ADDR_PATTERN.test(to.trim()) && /^\d+$/.test(amount) && Number(amount) > 0;
+  const valid = ADDR_PATTERN.test(to.trim()) && isPositiveInteger(amount);
 
   async function submit() {
     if (!valid) return;

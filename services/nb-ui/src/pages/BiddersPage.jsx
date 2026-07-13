@@ -13,7 +13,8 @@ import { useState } from 'react';
 import { BiddersApi } from '../api/biddersApi.js';
 import { BondsApi } from '../api/bondsApi.js';
 import { selectBidAcceptingAuctions } from '../api/selectors.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -29,12 +30,20 @@ import { PlaceBidModal } from './PlaceBidModal.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
 
 export function BiddersPage() {
-  const { data, loading, error, reload } = useApi(() => BiddersApi.listBidders(), []);
+  const { data, loading, error, reload } = useLiveQuery(
+    [LiveResource.BIDDERS],
+    () => BiddersApi.listBidders(),
+    [],
+  );
   // Side query for the "is anything bid-acceptable right now?" check
   // used to disable the per-row Place bid button when there's nothing
   // for the operator to bid on. Cheap — same bondsApi cache as the
   // PlaceBidModal itself.
-  const bondsQ = useApi(() => BondsApi.listBonds(), []);
+  const bondsQ = useLiveQuery(
+    [LiveResource.BONDS, LiveResource.AUCTIONS],
+    () => BondsApi.listBonds(),
+    [],
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [placeBidFor, setPlaceBidFor] = useState(null);
   const [revealedKey, setRevealedKey] = useState(null);

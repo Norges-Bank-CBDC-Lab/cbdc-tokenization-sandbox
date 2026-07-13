@@ -74,4 +74,62 @@ describe('HttpClient + AuthProvider integration', () => {
       body: { error: 'missing' },
     });
   });
+
+  it('streams SSE with a fresh bearer header and parses split frames', async () => {
+    const encoder = new TextEncoder();
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({ done: false, value: encoder.encode(': connected\n\nevent: chan') })
+      .mockResolvedValueOnce({
+        done: false,
+        value: encoder.encode('ged\ndata: {"changed":["bonds","unknown"]}\n\n'),
+      })
+      .mockResolvedValueOnce({ done: true });
+    const releaseLock = vi.fn();
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: () => 'text/event-stream; charset=utf-8' },
+      body: { getReader: () => ({ read, releaseLock }) },
+    });
+    vi.doMock('../src/auth/index.js', () => ({
+      auth: { getAuthHeader: vi.fn().mockResolvedValue('Bearer stream-token') },
+      authMode: 'entra',
+    }));
+
+    const { HttpClient } = await import('../src/api/httpClient.js');
+    const onOpen = vi.fn();
+    const onChanged = vi.fn();
+    await HttpClient.streamLiveEvents({
+      signal: new AbortController().signal,
+      onOpen,
+      onChanged,
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'http://test.local/v1/events',
+      expect.objectContaining({
+        headers: { Accept: 'text/event-stream', Authorization: 'Bearer stream-token' },
+      }),
+    );
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onChanged).toHaveBeenCalledWith(['bonds']);
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+});
+
+describe('createSseParser', () => {
+  it('handles comments, CRLF, multiple data lines, and malformed events', async () => {
+    const { createSseParser } = await import('../src/sync/liveEventProtocol.js');
+    const onChanged = vi.fn();
+    const parser = createSseParser(onChanged);
+
+    parser.push(': heartbeat\r\n\r\nevent: changed\r\ndata: {"changed":\r\n');
+    parser.push('data: ["operations","operations"]}\r\n\r\n');
+    parser.push('event: changed\n' + 'data: not-json\n\n' + 'event: other\n' + 'data: {}\n\n');
+
+    expect(onChanged).toHaveBeenCalledOnce();
+    expect(onChanged).toHaveBeenCalledWith(['operations']);
+  });
 });

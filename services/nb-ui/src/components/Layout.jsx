@@ -160,8 +160,8 @@ const NAV_CATEGORIES = [
 /**
  * CategoryNav — top-bar nav grouped into dropdown categories. One menu is open
  * at a time; it closes on outside click, Escape, or after navigating. A gated
- * category is hidden when its capability flag is false, so a non-operator in
- * entra mode never sees Central Bank or Banking.
+ * category is hidden when its capability flag is false. Testers may use
+ * Banking; Central Bank remains operator-only.
  */
 function CategoryNav({ route, navigate, canAccessCentralBank = true, canAccessBanking = true }) {
   const gates = { canAccessCentralBank, canAccessBanking };
@@ -267,13 +267,13 @@ export function Layout({
             <AuthChrome />
             <TestModeToggle />
             <HealthBadge />
-            <span>v1.0.0</span>
+            <span>API /v1</span>
           </div>
         </div>
       </header>
       <main className="content">{children}</main>
       <footer className="app-footer">
-        NB Bond Auction Service · OpenAPI 1.0.0 · {AppConfig.API_BASE_URL}
+        NB Bond Auction Service · API /v1 · {AppConfig.API_BASE_URL}
       </footer>
     </div>
   );

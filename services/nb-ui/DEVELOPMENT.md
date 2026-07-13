@@ -51,13 +51,34 @@ per-feature endpoints like `getBondHolders` or `getAuctionBids` in v2.
 
 When adding a new page:
 
-1. Fetch the bulky parent (`listBonds` or `getBond` / `getAuction`)
-   via `useApi`.
+1. Fetch live bulky parents (`listBonds` or `getBond` / `getAuction`)
+   via `useLiveQuery(resourceKeys, fetcher, deps)`; reserve `useApi` for
+   deliberately one-shot reads.
 2. Slice with `selectBond` / `selectAuction` / `selectBids` /
    `selectHolders` rather than calling a feature endpoint.
 3. Mutations should use `useMutation` and either reload the parent
    via the hook's `reload()` or splice the returned DTO into local
    state directly.
+
+### Live updates
+
+`LiveUpdatesProvider` opens one `fetch` + `ReadableStream` SSE connection per
+tab after the auth gate. Before every connection or reconnect it asks the
+configured auth provider for a fresh header, so local `none` mode sends no
+token and `entra` mode sends the current MSAL bearer token. A `401` marks the
+session expired; a `403` stops retrying because reconnecting cannot grant a
+role.
+
+The stream carries resource invalidations, not data. `useLiveQuery` reloads a
+mounted query when one of its resource keys changes. It does not clear the
+HTTP cache, so the existing ETag is retained and the API returns fresh `200`
+data or a cheap `304`. Opening or reopening a connection reconciles all
+mounted live queries once, which provides gap recovery without event replay.
+Heartbeat comments do not trigger queries, and the separate health poll is
+unchanged.
+
+Set runtime config `LIVE_UPDATES=false` to disable streaming while diagnosing
+a gateway. Manual Refresh controls and the health poll continue to work.
 
 ## Tests
 
@@ -219,6 +240,10 @@ Local-acceptable defaults a non-local deployment must set explicitly:
   roles, sign-in lands on the access-denied screen.
 - **CSP** — see "Known gotchas"; a non-local deployment should tighten the nginx
   CSP (also flagged in `docs/plans/archive/nb-ui-frontend-plan.md`).
+- **Authenticated SSE** — `LIVE_UPDATES` defaults to `true`. The Azure gateway
+  must forward Authorization, disable response buffering, and use an idle
+  timeout above the API heartbeat interval. Keep the API at one replica until
+  shared event fan-out exists. See `docs/AZURE_BOUNDARY.md`.
 
 ## Follow-ups
 

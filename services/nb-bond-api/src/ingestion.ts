@@ -5,6 +5,7 @@ import { envVariables } from './env-vars';
 import { RpcUnavailableError, getBondManagerAddress } from './chain';
 import { logger } from './logger';
 import { type IngestionDatabase, openDatabase } from './ingestion-db';
+import { type LiveResourceKey, publishLiveChange } from './live-events';
 import { toPlainObject } from './utils';
 
 type Checkpoint = { contract: string; last_block: number; last_tx_index: number };
@@ -362,7 +363,7 @@ async function processBlockRange(
   bondToken: Contract,
   fromBlock: number,
   toBlock: number,
-): Promise<{ latestTxHash: string | null }> {
+): Promise<{ latestTxHash: string | null; changedResources: Set<LiveResourceKey> }> {
   const managerAddress = bondManager.target.toString();
   const tokenAddress = bondToken.target.toString();
 
@@ -373,6 +374,7 @@ async function processBlockRange(
 
   const parsedManager = decodeManagerEvents(managerLogs, bondManager);
   const parsedToken = decodeTokenEvents(tokenLogs, bondToken);
+  const changedResources = new Set<LiveResourceKey>();
 
   // Resolve partition hashes seen in manager events back to ISINs to keep bond status accurate
   const partitionsNeedingResolution = new Set<string>();
@@ -467,6 +469,8 @@ async function processBlockRange(
         name === 'BondExtensionAuctionInitialised' ||
         name === 'BondBuybackAuctionInitialised'
       ) {
+        changedResources.add('auctions');
+        changedResources.add('bonds');
         const auctionId = args.id as string;
         const isin = args.isin as string;
         const type =
@@ -496,6 +500,8 @@ async function processBlockRange(
         // should reappear in the default listing.
         setPartitionDisabled(db, isin, false);
       } else if (name === 'BondAuctionClosed') {
+        changedResources.add('auctions');
+        changedResources.add('bonds');
         const auctionId = args.id as string;
         const isin = args.isin as string;
         upsertAuctionEvent(db, {
@@ -508,6 +514,8 @@ async function processBlockRange(
           payload: {},
         });
       } else if (name === 'BondAuctionFinalised') {
+        changedResources.add('auctions');
+        changedResources.add('bonds');
         const auctionId = args.id as string;
         const isin = args.isin as string;
         upsertAuctionEvent(db, {
@@ -520,6 +528,8 @@ async function processBlockRange(
           payload: {},
         });
       } else if (name === 'BondAuctionCancelled') {
+        changedResources.add('auctions');
+        changedResources.add('bonds');
         const auctionId = args.id as string;
         const isin = args.isin as string;
         upsertAuctionEvent(db, {
@@ -532,6 +542,7 @@ async function processBlockRange(
           payload: {},
         });
       } else if (name === 'CouponPaid') {
+        changedResources.add('bonds');
         const isin = resolveIsin(db, args.isin, resolvedPartitions);
         insertBondEvent(db, {
           isin: isin ?? '',
@@ -546,6 +557,7 @@ async function processBlockRange(
           },
         });
       } else if (name === 'AllCouponsPaid') {
+        changedResources.add('bonds');
         const isin = resolveIsin(db, args.isin, resolvedPartitions);
         insertBondEvent(db, {
           isin: isin ?? '',
@@ -556,6 +568,7 @@ async function processBlockRange(
           payload: {},
         });
       } else if (name === 'BondRedeemed') {
+        changedResources.add('bonds');
         const isin = resolveIsin(db, args.isin, resolvedPartitions);
         insertBondEvent(db, {
           isin: isin ?? '',
@@ -570,6 +583,7 @@ async function processBlockRange(
           },
         });
       } else if (name === 'BondCreated') {
+        changedResources.add('bonds');
         // Pre-staged bond (no auction yet). Upsert the partition row so the
         // bond shows up in /v1/bonds before any auction is scheduled.
         const isin = args.isin as string;
@@ -596,6 +610,7 @@ async function processBlockRange(
           },
         });
       } else if (name === 'BondDisabled') {
+        changedResources.add('bonds');
         const isin = args.isin as string;
         setPartitionDisabled(db, isin, true);
         insertBondEvent(db, {
@@ -618,6 +633,7 @@ async function processBlockRange(
           logger.debug(`ingestion missing partition mapping for transfer; skipping ${partition}`);
           continue;
         }
+        changedResources.add('bonds');
         // Both rows share (tx_hash, log_index) — the UNIQUE INDEX on
         // balance_events also includes `holder` so the debit/credit
         // pair stays distinct under replay.
@@ -640,6 +656,7 @@ async function processBlockRange(
           kind: 'transfer',
         });
       } else {
+        changedResources.add('bonds');
         if (action.partition) {
           upsertPartition(db, action.partition, action.isin, null, action.block);
         }
@@ -685,7 +702,7 @@ async function processBlockRange(
       latest = entry;
     }
   }
-  return { latestTxHash: latest?.txHash ?? null };
+  return { latestTxHash: latest?.txHash ?? null, changedResources };
 }
 
 /**
@@ -738,13 +755,20 @@ export async function startIngestionLoop() {
       const { from, to } = window;
 
       logger.debug(`ingestion processing blocks [${from}, ${to}]`);
-      const { latestTxHash } = await processBlockRange(db, bondManager, bondToken, from, to);
+      const { latestTxHash, changedResources } = await processBlockRange(
+        db,
+        bondManager,
+        bondToken,
+        from,
+        to,
+      );
       saveCheckpoint(db, { contract: 'bond-manager', last_block: to + 1, last_tx_index: 0 });
       nextBlock = to + 1;
       lastBlockProcessed = to;
       if (latestTxHash) lastEventTxHash = latestTxHash;
       consecutiveFailures = 0;
       logger.debug(`ingestion advanced checkpoint to block ${nextBlock}`);
+      publishLiveChange(changedResources);
     } catch (err) {
       consecutiveFailures++;
       pushError(err);
@@ -759,6 +783,41 @@ export async function startIngestionLoop() {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export type IngestionWaitOptions = {
+  timeoutMs?: number;
+  pollMs?: number;
+  getStatus?: () => Pick<IngestionStatus, 'lastBlockProcessed'>;
+  sleepFn?: (ms: number) => Promise<void>;
+  now?: () => number;
+};
+
+/**
+ * Wait until the projection has processed a mined transaction's block.
+ *
+ * This is deliberately bounded and returns false on timeout. A transaction
+ * has already committed by the time this helper is called, so turning a slow
+ * projection into an HTTP error would invite a caller to retry the mutation
+ * and potentially submit it twice.
+ */
+export async function waitForIngestionBlock(
+  targetBlock: number,
+  options: IngestionWaitOptions = {},
+): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? envVariables.POLL_INTERVAL_MS * 2 + 1000;
+  const pollMs = options.pollMs ?? 50;
+  const status = options.getStatus ?? getIngestionStatus;
+  const sleepFn = options.sleepFn ?? sleep;
+  const now = options.now ?? Date.now;
+  const deadline = now() + timeoutMs;
+
+  for (;;) {
+    const processed = status().lastBlockProcessed;
+    if (processed !== null && processed >= targetBlock) return true;
+    if (now() >= deadline) return false;
+    await sleepFn(Math.min(pollMs, Math.max(0, deadline - now())));
+  }
+}
 
 export type RetryOptions = {
   initialDelayMs?: number;

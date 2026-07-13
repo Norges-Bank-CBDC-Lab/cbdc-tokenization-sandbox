@@ -11,8 +11,10 @@
 import { useMemo, useState } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { BondsApi } from '../api/bondsApi.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Button, Field, Input, Modal, RadioGroup, Select } from '../components/ui.jsx';
+import { isPositiveInteger } from '../domain/amounts.js';
 
 export function CreateAuctionModal({ onClose, onCreated }) {
   const [isin, setIsin] = useState('');
@@ -23,7 +25,11 @@ export function CreateAuctionModal({ onClose, onCreated }) {
 
   // The dropdown needs the full bond list to determine each bond's auction
   // history. We pull non-disabled bonds; the gate is computed locally.
-  const bondsQ = useApi(() => BondsApi.listBonds(), []);
+  const bondsQ = useLiveQuery(
+    [LiveResource.BONDS, LiveResource.AUCTIONS],
+    () => BondsApi.listBonds(),
+    [],
+  );
   const bonds = useMemo(() => bondsQ.data ?? [], [bondsQ.data]);
 
   // Determine which auction types are valid for the currently-selected
@@ -57,7 +63,7 @@ export function CreateAuctionModal({ onClose, onCreated }) {
       : selectedBond
         ? null
         : 'Pick a bond.';
-  const valid = !isinError && Number(size) > 0 && Number(endDays) > 0;
+  const valid = !isinError && isPositiveInteger(size) && Number(endDays) > 0;
 
   async function submit() {
     if (!valid) return;
@@ -67,7 +73,7 @@ export function CreateAuctionModal({ onClose, onCreated }) {
       const body = {
         type: auctionType,
         end: String(now + Math.round(Number(endDays) * 86400)),
-        size: String(Math.round(Number(size))),
+        size,
         // RATE on a pre-staged bond doesn't need a fresh maturity — the
         // bond already carries it from deployBond. The API tolerates
         // null in this path.

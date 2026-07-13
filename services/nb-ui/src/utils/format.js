@@ -4,6 +4,7 @@
  * The API speaks in BigInt strings, bps, unix seconds, and hex addresses.
  * These helpers turn them into UI-ready text. Keep them dumb and pure.
  */
+import { formatInteger, parseUnsignedInteger } from '../domain/amounts.js';
 
 export function shortHex(hex, head = 6, tail = 4) {
   if (!hex) return '—';
@@ -13,16 +14,17 @@ export function shortHex(hex, head = 6, tail = 4) {
 
 export function bpsToPct(bps) {
   if (bps == null || bps === '') return '—';
-  const n = Number(bps);
-  if (!isFinite(n)) return String(bps);
-  return (n / 100).toFixed(2) + '%';
+  try {
+    const value = parseUnsignedInteger(bps, 'basis points');
+    return `${value / 100n}.${String(value % 100n).padStart(2, '0')}%`;
+  } catch {
+    return String(bps);
+  }
 }
 
 export function formatUnits(units) {
   if (units == null || units === '') return '—';
-  const n = Number(units);
-  if (!isFinite(n)) return String(units);
-  return n.toLocaleString('en-US');
+  return formatInteger(units);
 }
 
 export function formatNok(units) {

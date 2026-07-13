@@ -1,4 +1,4 @@
-import { computeIngestionWindow } from '../src/ingestion';
+import { computeIngestionWindow, waitForIngestionBlock } from '../src/ingestion';
 
 describe('computeIngestionWindow', () => {
   it('returns null when latest is behind nextBlock (no new chain activity)', () => {
@@ -27,5 +27,48 @@ describe('computeIngestionWindow', () => {
   it('honours a caller-supplied batch size', () => {
     expect(computeIngestionWindow(0, 100, 10)).toEqual({ from: 0, to: 10 });
     expect(computeIngestionWindow(50, 60, 5)).toEqual({ from: 50, to: 55 });
+  });
+});
+
+describe('waitForIngestionBlock', () => {
+  it('returns once the projection reaches the target block', async () => {
+    let currentTime = 0;
+    const blocks: Array<number | null> = [null, 41, 42];
+    const getStatus = jest.fn(() => {
+      const next = blocks.shift();
+      return { lastBlockProcessed: next === undefined ? 42 : next };
+    });
+    const sleepFn = jest.fn(async (ms: number) => {
+      currentTime += ms;
+    });
+
+    await expect(
+      waitForIngestionBlock(42, {
+        timeoutMs: 500,
+        pollMs: 25,
+        getStatus,
+        sleepFn,
+        now: () => currentTime,
+      }),
+    ).resolves.toBe(true);
+    expect(sleepFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns false instead of throwing when the bounded wait expires', async () => {
+    let currentTime = 0;
+    const sleepFn = jest.fn(async (ms: number) => {
+      currentTime += ms;
+    });
+
+    await expect(
+      waitForIngestionBlock(42, {
+        timeoutMs: 100,
+        pollMs: 25,
+        getStatus: () => ({ lastBlockProcessed: 41 }),
+        sleepFn,
+        now: () => currentTime,
+      }),
+    ).resolves.toBe(false);
+    expect(currentTime).toBe(100);
   });
 });

@@ -68,6 +68,10 @@ Banking). `#/bidders`, `#/central-bank`, and `#/tbd` carry a visible
 **sandbox-only** banner; private keys are stored in plaintext server-side and
 these pages must never be enabled outside the local sandbox.
 
+In Entra mode, Banking is available to authenticated users with a recognised
+operator or tester App Role. Central Bank and administrative operations remain
+operator-only. Local `none` mode keeps all sandbox surfaces open.
+
 See `docs/plans/archive/nb-ui-frontend-plan.md` for the original frontend plan
 and `docs/plans/archive/bidders-and-central-bank-plan.md` for the bidders +
 Central Bank iteration. Follow-ups are tracked in

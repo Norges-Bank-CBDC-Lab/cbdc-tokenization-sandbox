@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { CentralBankApi } from '../api/centralBankApi.js';
 import { useMutation } from '../hooks/useApi.js';
 import { Button, Field, Input, Modal } from '../components/ui.jsx';
+import { isPositiveInteger } from '../domain/amounts.js';
 
 const ADDR_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
@@ -23,10 +24,10 @@ export function MintWnokModal({ onClose, onSubmitted }) {
       ? 'Must be an EVM address (0x + 40 hex chars).'
       : null;
   const amountError =
-    amount && (!/^\d+$/.test(amount) || Number(amount) <= 0)
+    amount && !isPositiveInteger(amount)
       ? 'Amount must be a positive integer (1-NOK units).'
       : null;
-  const valid = ADDR_PATTERN.test(address.trim()) && /^\d+$/.test(amount) && Number(amount) > 0;
+  const valid = ADDR_PATTERN.test(address.trim()) && isPositiveInteger(amount);
 
   async function submit() {
     if (!valid) return;

@@ -11,4 +11,5 @@ window.__APP_CONFIG__ = {
   AUTH_AUTHORITY: '',
   AUTH_SCOPES: '',
   AUTH_REDIRECT_URI: '',
+  LIVE_UPDATES: true,
 };

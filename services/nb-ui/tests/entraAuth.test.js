@@ -120,6 +120,19 @@ describe('entraAuth session model', () => {
     expect(auth.isSessionExpired()).toBe(false);
   });
 
+  it('marks the session expired when the API rejects a stream token with 401', async () => {
+    msalState.accounts = [ACCOUNT];
+    const auth = createEntraAuth(CFG);
+    await auth.init();
+    const listener = vi.fn();
+    auth.subscribe(listener);
+
+    auth.handleUnauthorized();
+
+    expect(auth.isSessionExpired()).toBe(true);
+    expect(listener).toHaveBeenCalled();
+  });
+
   it('clears the expired state when a redirect sign-in completes', async () => {
     msalState.accounts = [ACCOUNT];
     const auth = createEntraAuth(CFG);

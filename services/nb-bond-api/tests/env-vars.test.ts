@@ -32,6 +32,17 @@ describe('env-vars', () => {
     expect(envVariables.AUCTION_OWNER_SEAL_PK).toBeUndefined();
   });
 
+  it('defaults the SSE heartbeat interval', () => {
+    process.env.RPC_URL = 'http://localhost:8545';
+    process.env.GLOBAL_REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
+    process.env.BOND_ADMIN_PK = 'test';
+    delete process.env.NB_BOND_API_SSE_HEARTBEAT_MS;
+
+    const { envVariables } = loadEnvVars();
+
+    expect(envVariables.NB_BOND_API_SSE_HEARTBEAT_MS).toBe(15_000);
+  });
+
   it('requires operator roles when AUTH_MODE=entra', () => {
     process.env.RPC_URL = 'http://localhost:8545';
     process.env.GLOBAL_REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
