@@ -7,7 +7,8 @@
  */
 import { useState } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -21,7 +22,11 @@ import {
 import { ConfirmDisableBondModal } from './ConfirmDisableBondModal.jsx';
 
 export function BondDetailPage({ isin, navigate }) {
-  const bondQ = useApi(() => BondsApi.getBond(isin), [isin]);
+  const bondQ = useLiveQuery(
+    [LiveResource.BONDS, LiveResource.AUCTIONS],
+    () => BondsApi.getBond(isin),
+    [isin],
+  );
   const [showDisable, setShowDisable] = useState(false);
   const disableMut = useMutation(() => BondsApi.disableBond(isin));
   const toast = useToast();

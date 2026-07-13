@@ -9,7 +9,8 @@ import { useState } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { BiddersApi } from '../api/biddersApi.js';
 import { isAuctionExpired } from '../api/selectors.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -17,6 +18,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  RefreshState,
   StatusBadge,
   TypeBadge,
   useToast,
@@ -26,8 +28,10 @@ import { PlaceBidModal } from './PlaceBidModal.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
 
 export function AuctionDetailPage({ auctionId, navigate }) {
-  const auctionQ = useApi(() => AuctionsApi.getAuction(auctionId), [auctionId]);
-  const biddersQ = useApi(() => BiddersApi.listBidders(), []);
+  const auctionQ = useLiveQuery([LiveResource.AUCTIONS], () => AuctionsApi.getAuction(auctionId), [
+    auctionId,
+  ]);
+  const biddersQ = useLiveQuery([LiveResource.BIDDERS], () => BiddersApi.listBidders(), []);
   const [showPlaceBid, setShowPlaceBid] = useState(false);
   const toast = useToast();
 
@@ -148,6 +152,15 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           </Button>
         </div>
       </div>
+
+      <RefreshState
+        refreshing={auctionQ.refreshing || biddersQ.refreshing}
+        error={auctionQ.refreshError || biddersQ.refreshError}
+        onRetry={() => {
+          auctionQ.reload();
+          biddersQ.reload();
+        }}
+      />
 
       <div className="kpi-grid">
         <div className="kpi">

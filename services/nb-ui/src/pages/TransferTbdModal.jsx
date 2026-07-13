@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { BankingApi } from '../api/bankingApi.js';
 import { useMutation } from '../hooks/useApi.js';
 import { Button, Field, Input, Modal } from '../components/ui.jsx';
+import { isPositiveInteger } from '../domain/amounts.js';
 
 const ADDR_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
@@ -20,10 +21,8 @@ export function TransferTbdModal({ tbdAddress, symbol, bankName, onClose, onSubm
   const toError =
     to && !ADDR_PATTERN.test(to.trim()) ? 'Must be an EVM address (0x + 40 hex chars).' : null;
   const amountError =
-    amount && (!/^\d+$/.test(amount) || Number(amount) <= 0)
-      ? 'Amount must be a positive whole number.'
-      : null;
-  const valid = ADDR_PATTERN.test(to.trim()) && /^\d+$/.test(amount) && Number(amount) > 0;
+    amount && !isPositiveInteger(amount) ? 'Amount must be a positive whole number.' : null;
+  const valid = ADDR_PATTERN.test(to.trim()) && isPositiveInteger(amount);
 
   async function submit() {
     if (!valid) return;

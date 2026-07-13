@@ -1,6 +1,15 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
-import { buildProblem, computeMd5, okResponse, withMd5 } from '../src/http';
+import { DependencyUnavailableError } from '../src/application-errors';
+import {
+  HttpError,
+  buildProblem,
+  computeMd5,
+  okResponse,
+  problemErrorMiddleware,
+  successResponse,
+  withMd5,
+} from '../src/http';
 
 function mockRes() {
   const headers: Record<string, string> = {};
@@ -22,11 +31,14 @@ function mockRes() {
   };
 }
 
-function mockReq(opts: { ifNoneMatch?: string; originalUrl?: string } = {}): Request {
+function mockReq(
+  opts: { ifNoneMatch?: string; originalUrl?: string; method?: string } = {},
+): Request {
   return {
     header: (name: string) =>
       name.toLowerCase() === 'if-none-match' ? opts.ifNoneMatch : undefined,
     originalUrl: opts.originalUrl ?? '/v1/test',
+    method: opts.method ?? 'GET',
   } as unknown as Request;
 }
 
@@ -104,6 +116,29 @@ describe('okResponse', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalled();
   });
+
+  it('uses the requested mutation status and never turns it into a 304', () => {
+    const body = { isin: 'NO0001' };
+    const req = mockReq({ ifNoneMatch: `"${computeMd5(body)}"`, method: 'POST' });
+    const res = mockRes();
+
+    successResponse(req, res, body, { status: 201 });
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(body);
+    expect(res.end).not.toHaveBeenCalled();
+  });
+
+  it('supports explicit no-store responses without an ETag', () => {
+    const req = mockReq();
+    const res = mockRes();
+
+    successResponse(req, res, { accepted: true }, { status: 202, cache: 'no-store' });
+
+    expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
+    expect(res.setHeader).not.toHaveBeenCalledWith('ETag', expect.anything());
+    expect(res.status).toHaveBeenCalledWith(202);
+  });
 });
 
 describe('buildProblem', () => {
@@ -128,5 +163,73 @@ describe('buildProblem', () => {
     });
     expect(p.detail).toBe('Invalid body');
     expect(p.errors).toEqual([{ field: 'isin', message: 'required' }]);
+  });
+});
+
+describe('problemErrorMiddleware', () => {
+  const next = jest.fn() as NextFunction;
+
+  it('exposes the thrown message for unknown sandbox errors', () => {
+    const req = mockReq();
+    const res = mockRes();
+    problemErrorMiddleware(
+      new Error('RPC https://private.example.invalid failed from /secret/path'),
+      req,
+      res,
+      next,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Internal Server Error',
+        detail: 'RPC https://private.example.invalid failed from /secret/path',
+      }),
+    );
+  });
+
+  it('stringifies non-Error throws in the sandbox response', () => {
+    const req = mockReq();
+    const res = mockRes();
+    problemErrorMiddleware('plain thrown value', req, res, next);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: 'plain thrown value' }),
+    );
+  });
+
+  it('maps required dependency failures to a safe 503', () => {
+    const req = mockReq();
+    const res = mockRes();
+    problemErrorMiddleware(
+      new DependencyUnavailableError('chain', 'auction test', new Error('private RPC detail')),
+      req,
+      res,
+      next,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Service Unavailable',
+        detail: 'Required chain state is temporarily unavailable.',
+      }),
+    );
+    expect(JSON.stringify(res.json.mock.calls)).not.toContain('private RPC detail');
+  });
+
+  it('preserves deliberate safe HttpError details', () => {
+    const req = mockReq();
+    const res = mockRes();
+    problemErrorMiddleware(
+      new HttpError(409, 'Conflict', { detail: 'auction already closed' }),
+      req,
+      res,
+      next,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: 'auction already closed' }),
+    );
   });
 });

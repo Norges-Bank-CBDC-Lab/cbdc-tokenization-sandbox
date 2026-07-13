@@ -56,6 +56,43 @@ its own values:
   App Roles and assigning groups to them is a deployment-repo / Entra-portal
   responsibility, not this repo's.
 
+## Authenticated SSE deployment contract
+
+The UI's live-update transport is `GET /v1/events`. It uses browser `fetch`
+rather than native `EventSource` so it can attach the Entra access token. The
+API validates that token and requires a recognised operator or tester App
+Role before opening the stream. The stream payload contains resource keys
+only; subsequent GET endpoints retain their existing authorization.
+
+The Azure deployment repository must explicitly verify and configure all of
+the following:
+
+- Keep nb-ui `AUTH_MODE=entra` and nb-bond-api
+  `NB_BOND_API_AUTH_MODE=entra`, tenant, audience, scopes, and role values in
+  sync. The gateway must forward the `Authorization` header unchanged.
+- Disable response buffering for `/v1/events`. `X-Accel-Buffering: no` is a
+  useful response hint, but it cannot override every Application Gateway,
+  ingress, proxy, or WAF configuration.
+- Set the backend request/idle timeout comfortably above
+  `NB_BOND_API_SSE_HEARTBEAT_MS` (default 15 seconds), and confirm heartbeat
+  bytes arrive incrementally rather than in batches.
+- Keep nb-bond-api at one replica for this sandbox implementation. The
+  broadcaster is process-local; multiple replicas would give each subscriber
+  only the events observed by its selected pod unless shared fan-out or sticky
+  routing is added deliberately.
+- Do not log or inspect the streaming response body. Normal access metadata
+  is sufficient and avoids noisy, long-lived log records.
+- Bound concurrent connections at the Azure edge. The API's request-rate
+  limiter covers reconnect attempts but does not cap sockets that remain
+  open.
+- Verify `401` without a token, `403` with no recognised role, successful
+  incremental streaming for a recognised user, token reacquisition on
+  reconnect, and stream abort on sign-out.
+
+`LIVE_UPDATES=false` in nb-ui runtime config is the deployment-safe fallback:
+it disables the stream while leaving manual refresh and the independent
+health poll available.
+
 ## Charts that are local-shape and need new wrappers for cloud
 
 ### Blockscout

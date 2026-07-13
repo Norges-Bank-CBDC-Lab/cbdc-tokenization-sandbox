@@ -169,7 +169,7 @@ The NB Bond API is the privileged operator service. It:
   which records every operator-initiated on-chain operation with its
   outcome, including reverts that were rejected at gas estimation and
   never reached the chain
-- exposes a v2 OpenAPI surface designed as a **bulky resource tree**: a single
+- exposes a `/v1` HTTP/OpenAPI surface designed as a **bulky resource tree**: a single
   `GET /v1/bonds` returns every bond with its nested auctions, bids,
   allocations, and holders. Mutations return the updated parent so the
   frontend can swap its cache atomically without a follow-up GET. The full
@@ -178,6 +178,34 @@ The NB Bond API is the privileged operator service. It:
   [`docs/plans/archive/openapi-v2-plan.md`](plans/archive/openapi-v2-plan.md). This design deliberately
   decouples the API shape from UI feature evolution: pages slice from the
   cached tree client-side rather than driving new endpoints.
+
+The service remains a modular monolith. `src/index.ts` is the process
+composition root: it constructs the Express application, binds the configured
+port, and starts ingestion. `src/app.ts` owns middleware and route composition
+without listening or starting background work, which lets HTTP contract tests
+construct the app with isolated database dependencies. Feature services bind
+their infrastructure explicitly where extracted; banking is the first such
+slice and no longer relies on a mutable module-global database handle. Auction
+create/close/cancel/finalise orchestration lives in
+`src/features/auctions/service.ts`; its Express handlers only validate/map the
+HTTP request and response.
+
+Composers receive an explicit request-scoped read context. Contract handles and
+chain-wide values are memoized only for that composition pass, avoiding ambient
+global request caches. Ingested auctions take lifecycle status from the SQLite
+event projection; chain status remains the fallback for chain-only resources.
+Mutation responses that depend on projected state wait for ingestion through
+the mined receipt block with a bounded timeout. A timeout is logged rather than
+returned as a failed mutation, because the chain write has already committed.
+
+Zod contracts remain the OpenAPI source of truth. `src/schemas.ts` assembles the
+document while reusable primitives, internal bid payload validation, and the
+operation-audit contract live under `src/contracts/`.
+
+Unknown `500` responses intentionally include the thrown message in RFC 7807
+`detail`. This is a sandbox diagnostic choice, not a production-safe disclosure
+policy. Required chain reads use an explicit `503` instead of returning a
+successful collection with silently omitted resources.
 
 Operational caveat:
 
@@ -221,6 +249,11 @@ The UI is a thin client over the NB Bond API:
 
 - the only network seam is `services/nb-ui/src/api/`; the rest of the UI does
   not call `fetch` directly
+- `useApi` distinguishes initial loading from background refresh, retains the
+  last successful data during revalidation, and exposes a non-blocking refresh
+  error; live pages render that state without blanking their content
+- integer-sensitive auction rules live in `src/domain/` and the stateful
+  finalisation review is separated from the lifecycle presentation component
 - all backend URLs come from runtime configuration (`/config.js`), so the
   same built bundle is re-pointable per deployment without a rebuild
 - auth is pluggable: a `noneAuth` provider is the default (no `Authorization`
@@ -328,6 +361,24 @@ client-specific values are intentionally **not** committed in this repo. In
 `entra` mode both tiers additionally enforce role-based access from Entra App
 Roles (operator vs tester; the Central Bank surface is operator-only), with the
 NB Bond API as the authoritative boundary.
+
+### Live updates
+
+The NB Bond API exposes `GET /v1/events` as a notification-only
+Server-Sent Events stream. It is mounted behind the same authentication and
+recognised-role gate as protected reads: local `none` mode permits it, while
+`entra` mode requires a valid bearer token with an operator or tester App
+Role. Events contain only coarse resource keys such as `bonds` or
+`operations`; they never contain transaction hashes, addresses, errors, or
+domain payloads.
+
+The UI owns one authenticated fetch stream per tab. A change notification
+re-runs only matching mounted queries, preserving their ETags so the normal
+API remains authoritative and may answer with fresh `200` data or `304 Not
+Modified`. Every stream connection also performs one coarse reconciliation,
+which recovers from missed events without a replay buffer. The `/v1/health`
+poll remains independent: loss of the notification stream does not mean the
+chain or API is down.
 
 ## Read Next
 

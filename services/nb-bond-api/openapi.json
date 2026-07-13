@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "NB Bond Auction Service",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "description": "Public API for the CBDC tokenization sandbox bond service. Sandbox-scale demo backing the nb-ui reference frontend. See docs/plans/archive/openapi-v2-plan.md for design notes.",
     "license": {
       "name": "Apache-2.0",
@@ -38,7 +38,7 @@
     },
     {
       "name": "banking",
-      "description": "Commercial-bank tokenized deposits (TBD): one ERC-20 per bank, with supply, WNOK reserve backing, holders, and (mutations) allowlist / mint / burn / transfer. Operator-only — entra mode requires an operator App Role (403 otherwise). Sandbox-only."
+      "description": "Commercial-bank tokenized deposits (TBD): one ERC-20 per bank, with supply, WNOK reserve backing, holders, and (mutations) allowlist / mint / burn / transfer. In entra mode, authenticated users with a recognised operator or tester App Role may use this surface. Sandbox-only."
     },
     {
       "name": "admin",
@@ -77,6 +77,49 @@
                 }
               }
             }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "subscribeLiveEvents",
+        "summary": "Subscribe to authenticated resource invalidations",
+        "description": "Long-lived SSE stream for UI refresh hints. Requires the same authenticated, recognised Entra role as other protected reads. Events contain coarse resource keys only; clients fetch current data through the normal API. There is no event replay.",
+        "x-live-resource-keys": [
+          "auctions",
+          "banking",
+          "bidders",
+          "bonds",
+          "central-bank",
+          "operations",
+          "registry"
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream opened",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveEventStream"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "description": "Too Many Requests — connection attempts exceeded the global limit."
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -152,6 +195,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -207,6 +253,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -274,6 +323,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -314,6 +366,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -381,6 +436,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -448,6 +506,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -529,6 +590,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -596,6 +660,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -658,6 +725,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -725,6 +795,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -800,6 +873,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -855,6 +931,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -950,6 +1029,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1000,6 +1082,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -1055,6 +1140,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1097,6 +1185,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1164,6 +1255,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1211,6 +1305,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1261,6 +1358,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1318,6 +1418,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -1373,6 +1476,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1430,6 +1536,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1487,6 +1596,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1544,6 +1656,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1594,6 +1709,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -1649,6 +1767,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1699,6 +1820,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1756,6 +1880,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1821,6 +1948,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -1884,6 +2014,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -1951,6 +2084,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -2018,6 +2154,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -2085,6 +2224,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -2165,6 +2307,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -2232,6 +2377,9 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -2863,6 +3011,13 @@
         ],
         "additionalProperties": false,
         "description": "Single entry in the ring buffer of recent ingestion errors"
+      },
+      "LiveEventStream": {
+        "type": "string",
+        "description": "UTF-8 Server-Sent Events stream. `changed` event data is JSON with one `changed` array. Allowed resource keys are auctions, banking, bidders, bonds, central-bank, operations, and registry. Comment frames are connection/heartbeat signals. No domain data is sent.",
+        "examples": [
+          "event: changed\ndata: {\"changed\":[\"auctions\",\"bonds\"]}\n\n"
+        ]
       },
       "Bond": {
         "type": "object",
@@ -4171,7 +4326,7 @@
         }
       },
       "Forbidden": {
-        "description": "Authenticated, but the token lacks a role required for this resource (entra mode only). Central Bank endpoints require an operator App Role; every other endpoint requires at least one recognised role.",
+        "description": "Authenticated, but the token lacks a role required for this resource (entra mode only). Central Bank and admin endpoints require an operator App Role; banking and other protected endpoints require at least one recognised operator or tester role.",
         "content": {
           "application/json": {
             "schema": {
@@ -4201,7 +4356,17 @@
         }
       },
       "InternalError": {
-        "description": "Unexpected server error.",
+        "description": "Unexpected sandbox server error. `detail` contains the thrown message to support technology testing and must not be treated as a production-safe disclosure policy.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ProblemDetails"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Required chain or sandbox service state is temporarily unavailable.",
         "content": {
           "application/json": {
             "schema": {
@@ -4216,7 +4381,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Microsoft Entra ID access token. In deployments where NB_BOND_API_AUTH_MODE=none (local sandbox default), the header is accepted but not validated. In entra mode the token must carry a recognised App Role in its `roles` claim (see the 403 response); Central Bank endpoints require an operator role."
+        "description": "Microsoft Entra ID access token. In deployments where NB_BOND_API_AUTH_MODE=none (local sandbox default), the header is accepted but not validated. In entra mode the token must carry a recognised App Role in its `roles` claim (see the 403 response); Central Bank and admin endpoints require an operator role."
       }
     }
   }

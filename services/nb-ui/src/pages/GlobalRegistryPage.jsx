@@ -5,12 +5,12 @@
  * directory the sandbox resolves everything through. The registry itself is the
  * first row. Read-only: no add/change surface yet.
  */
-import { useApi } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { RegistryApi } from '../api/registryApi.js';
 import { Button, CopyableHex, EmptyState, ErrorState, LoadingState } from '../components/ui.jsx';
 
 export function GlobalRegistryPage() {
-  const regQ = useApi(() => RegistryApi.listRegistry(), []);
+  const regQ = useLiveQuery([LiveResource.REGISTRY], () => RegistryApi.listRegistry(), []);
   const contracts = regQ.data ?? [];
 
   return (

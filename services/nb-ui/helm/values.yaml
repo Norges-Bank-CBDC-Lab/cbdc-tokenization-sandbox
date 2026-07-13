@@ -51,3 +51,6 @@ runtimeConfig:
   # nb-bond-api NB_BOND_API_AUTH_ENTRA_*_ROLES env.
   authOperatorRoles: "Sandbox.Operator"
   authTesterRoles: "Sandbox.Tester"
+  # Opens one authenticated SSE stream per tab when true. Set false to fall
+  # back to manual refresh while diagnosing gateway or streaming behaviour.
+  liveUpdates: true

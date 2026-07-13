@@ -48,15 +48,6 @@ export const TBD_BANKS: ReadonlyArray<{ bankName: string; role: string; contract
   { bankName: 'DNB Bank', role: 'PK_DNB', contractName: envVariables.TBD_DNB_CONTRACT_NAME },
 ];
 
-// Handle onto the `banks` system-of-record table, injected once at boot
-// (index.ts). Modules under test that never call setCreatedBanksDb see the
-// configured roster only.
-let createdBanksDb: IngestionDatabase | null = null;
-
-export function setCreatedBanksDb(db: IngestionDatabase): void {
-  createdBanksDb = db;
-}
-
 /** One bank the operator can act as: label, registry key, and signing key. */
 interface BankRosterEntry {
   bankName: string;
@@ -65,7 +56,7 @@ interface BankRosterEntry {
 }
 
 /** The full roster: configured fixture banks + banks created from the UI. */
-function bankRoster(): BankRosterEntry[] {
+function bankRoster(createdBanksDb: IngestionDatabase | null): BankRosterEntry[] {
   const configured = TBD_BANKS.map((b) => ({
     bankName: b.bankName,
     contractName: b.contractName,
@@ -142,11 +133,11 @@ async function composeToken(bankName: string, address: string) {
 }
 
 /** Resolve each roster bank's TBD address; skips any not registered. */
-async function resolveRosterTbds(): Promise<
-  { bankName: string; privateKey: string; address: string }[]
-> {
+async function resolveRosterTbds(
+  createdBanksDb: IngestionDatabase | null,
+): Promise<{ bankName: string; privateKey: string; address: string }[]> {
   const resolved = await Promise.all(
-    bankRoster().map(async (b) => {
+    bankRoster(createdBanksDb).map(async (b) => {
       const address = await resolveRegisteredAddress(b.contractName);
       return address
         ? { bankName: b.bankName, privateKey: b.privateKey, address: getAddress(address) }
@@ -159,20 +150,23 @@ async function resolveRosterTbds(): Promise<
 }
 
 /** Read every roster TBD token (configured + created). */
-export async function listTbdTokens() {
-  const present = await resolveRosterTbds();
+export async function listTbdTokens(createdBanksDb: IngestionDatabase | null = null) {
+  const present = await resolveRosterTbds(createdBanksDb);
   return Promise.all(present.map((r) => composeToken(r.bankName, r.address)));
 }
 
 /** Read one TBD by contract address. Returns null when it isn't a roster TBD. */
-export async function getTbdToken(address: string) {
+export async function getTbdToken(
+  address: string,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
   let target: string;
   try {
     target = getAddress(address);
   } catch {
     return null;
   }
-  const present = await resolveRosterTbds();
+  const present = await resolveRosterTbds(createdBanksDb);
   const match = present.find((r) => r.address === target);
   return match ? composeToken(match.bankName, match.address) : null;
 }
@@ -189,14 +183,17 @@ export interface TbdTransactionRef {
   block: number | null;
 }
 
-async function tbdWriteContract(address: string): Promise<Contract | null> {
+async function tbdWriteContract(
+  address: string,
+  createdBanksDb: IngestionDatabase | null,
+): Promise<Contract | null> {
   let target: string;
   try {
     target = getAddress(address);
   } catch {
     return null;
   }
-  const match = (await resolveRosterTbds()).find((r) => r.address === target);
+  const match = (await resolveRosterTbds(createdBanksDb)).find((r) => r.address === target);
   if (!match) return null;
   const wallet = new Wallet(match.privateKey, provider);
   return new Contract(match.address, tbdAbi, wallet);
@@ -205,64 +202,110 @@ async function tbdWriteContract(address: string): Promise<Contract | null> {
 async function sendTbdTx(
   address: string,
   invoke: (tbd: Contract) => Promise<ContractTransactionResponse>,
+  createdBanksDb: IngestionDatabase | null,
 ): Promise<TbdTransactionRef | null> {
-  const tbd = await tbdWriteContract(address);
+  const tbd = await tbdWriteContract(address, createdBanksDb);
   if (!tbd) return null;
   const tx = await invoke(tbd);
   const receipt = (await tx.wait()) as ContractTransactionReceipt | null;
   return { hash: tx.hash, block: receipt?.blockNumber ?? null };
 }
 
-export function addTbdAllowlist(address: string, holder: string) {
-  return sendTbdTx(address, (tbd) => {
-    const fn = tbd.add as unknown as (a: string) => Promise<ContractTransactionResponse>;
-    return fn(getAddress(holder));
-  });
+export function addTbdAllowlist(
+  address: string,
+  holder: string,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
+  return sendTbdTx(
+    address,
+    (tbd) => {
+      const fn = tbd.add as unknown as (a: string) => Promise<ContractTransactionResponse>;
+      return fn(getAddress(holder));
+    },
+    createdBanksDb,
+  );
 }
 
-export function removeTbdAllowlist(address: string, holder: string) {
-  return sendTbdTx(address, (tbd) => {
-    const fn = tbd.remove as unknown as (a: string) => Promise<ContractTransactionResponse>;
-    return fn(getAddress(holder));
-  });
+export function removeTbdAllowlist(
+  address: string,
+  holder: string,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
+  return sendTbdTx(
+    address,
+    (tbd) => {
+      const fn = tbd.remove as unknown as (a: string) => Promise<ContractTransactionResponse>;
+      return fn(getAddress(holder));
+    },
+    createdBanksDb,
+  );
 }
 
-export function mintTbd(address: string, to: string, amount: bigint) {
-  return sendTbdTx(address, (tbd) => {
-    const fn = tbd.mint as unknown as (
-      a: string,
-      b: bigint,
-    ) => Promise<ContractTransactionResponse>;
-    return fn(getAddress(to), amount);
-  });
+export function mintTbd(
+  address: string,
+  to: string,
+  amount: bigint,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
+  return sendTbdTx(
+    address,
+    (tbd) => {
+      const fn = tbd.mint as unknown as (
+        a: string,
+        b: bigint,
+      ) => Promise<ContractTransactionResponse>;
+      return fn(getAddress(to), amount);
+    },
+    createdBanksDb,
+  );
 }
 
-export function burnTbd(address: string, from: string, amount: bigint) {
-  return sendTbdTx(address, (tbd) => {
-    const fn = tbd.burn as unknown as (
-      a: string,
-      b: bigint,
-    ) => Promise<ContractTransactionResponse>;
-    return fn(getAddress(from), amount);
-  });
+export function burnTbd(
+  address: string,
+  from: string,
+  amount: bigint,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
+  return sendTbdTx(
+    address,
+    (tbd) => {
+      const fn = tbd.burn as unknown as (
+        a: string,
+        b: bigint,
+      ) => Promise<ContractTransactionResponse>;
+      return fn(getAddress(from), amount);
+    },
+    createdBanksDb,
+  );
 }
 
-export function transferTbd(address: string, to: string, amount: bigint) {
-  return sendTbdTx(address, (tbd) => {
-    const fn = tbd.transfer as unknown as (
-      a: string,
-      b: bigint,
-    ) => Promise<ContractTransactionResponse>;
-    return fn(getAddress(to), amount);
-  });
+export function transferTbd(
+  address: string,
+  to: string,
+  amount: bigint,
+  createdBanksDb: IngestionDatabase | null = null,
+) {
+  return sendTbdTx(
+    address,
+    (tbd) => {
+      const fn = tbd.transfer as unknown as (
+        a: string,
+        b: bigint,
+      ) => Promise<ContractTransactionResponse>;
+      return fn(getAddress(to), amount);
+    },
+    createdBanksDb,
+  );
 }
 
 /**
  * The banks the operator can act as (configured + created). Addresses
  * only — keys stay server-side.
  */
-export function listBanks(): { name: string; address: string }[] {
-  return bankRoster().map((b) => ({
+export function listBanks(
+  createdBanksDb: IngestionDatabase | null = null,
+): { name: string; address: string }[] {
+  return bankRoster(createdBanksDb).map((b) => ({
     name: b.bankName,
     address: deriveBidderAddress(b.privateKey),
   }));
@@ -273,10 +316,32 @@ export function listBanks(): { name: string; address: string }[] {
  * `BondManager.GOV_TBD` resolved against the roster. Name is `'Unknown'`
  * when GOV_TBD points at a TBD that is not in the roster.
  */
-export async function getGovSettlementBank(): Promise<{ name: string; address: string }> {
+export async function getGovSettlementBank(
+  createdBanksDb: IngestionDatabase | null = null,
+): Promise<{ name: string; address: string }> {
   const manager = await getBondManager();
   const govTbd = getAddress((await manager.GOV_TBD()) as string);
-  const tbds = await resolveRosterTbds();
+  const tbds = await resolveRosterTbds(createdBanksDb);
   const match = tbds.find((t) => t.address === govTbd);
   return { name: match?.bankName ?? 'Unknown', address: govTbd };
+}
+
+/** Explicitly bound banking operations for one application/database instance. */
+export function createBankingService(createdBanksDb: IngestionDatabase) {
+  return {
+    listTbdTokens: () => listTbdTokens(createdBanksDb),
+    getTbdToken: (address: string) => getTbdToken(address, createdBanksDb),
+    addTbdAllowlist: (address: string, holder: string) =>
+      addTbdAllowlist(address, holder, createdBanksDb),
+    removeTbdAllowlist: (address: string, holder: string) =>
+      removeTbdAllowlist(address, holder, createdBanksDb),
+    mintTbd: (address: string, to: string, amount: bigint) =>
+      mintTbd(address, to, amount, createdBanksDb),
+    burnTbd: (address: string, from: string, amount: bigint) =>
+      burnTbd(address, from, amount, createdBanksDb),
+    transferTbd: (address: string, to: string, amount: bigint) =>
+      transferTbd(address, to, amount, createdBanksDb),
+    listBanks: () => listBanks(createdBanksDb),
+    getGovSettlementBank: () => getGovSettlementBank(createdBanksDb),
+  };
 }

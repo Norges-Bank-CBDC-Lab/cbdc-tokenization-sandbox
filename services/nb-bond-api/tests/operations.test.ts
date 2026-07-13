@@ -5,6 +5,7 @@ import * as path from 'path';
 import { Interface } from 'ethers';
 
 import { openDatabase, type IngestionDatabase } from '../src/ingestion-db';
+import { liveEvents } from '../src/live-events';
 import {
   classifyFailure,
   listOperationAttempts,
@@ -122,6 +123,29 @@ describe('operation attempts (audit trail)', () => {
       expect(row.status).toBe('SUCCEEDED');
       expect(row.tx_hash).toBe('0xsent');
       expect(row.error).toBeNull();
+    });
+
+    it('publishes the audit row and successful non-projection resource changes', async () => {
+      const frames: string[] = [];
+      const unsubscribe = liveEvents.subscribe((frame) => frames.push(frame));
+      try {
+        await withOperationRecording(
+          {
+            db,
+            opType: 'WNOK_MINT',
+            target: '0xholder',
+            changedResources: ['central-bank', 'bidders'],
+          },
+          async () => ({ hash: '0xsent' }),
+        );
+      } finally {
+        unsubscribe();
+      }
+
+      expect(frames).toEqual([
+        'event: changed\ndata: {"changed":["operations"]}\n\n',
+        'event: changed\ndata: {"changed":["bidders","central-bank"]}\n\n',
+      ]);
     });
 
     it('records a decoded custom-error revert and rethrows', async () => {

@@ -74,6 +74,9 @@ env:
   # by Microsoft Entra ID and requires NB_BOND_API_AUTH_ENTRA_* below.
   # ArgoCD-managed deployments MUST keep this in sync with nb-ui AUTH_MODE.
   NB_BOND_API_AUTH_MODE: "none"
+  # Comment heartbeat interval for authenticated /v1/events subscribers.
+  # Keep any gateway idle timeout comfortably above this value.
+  NB_BOND_API_SSE_HEARTBEAT_MS: "15000"
   # Required only when NB_BOND_API_AUTH_MODE=entra:
   # NB_BOND_API_AUTH_ENTRA_TENANT_ID: "<tenant-guid>"
   # NB_BOND_API_AUTH_ENTRA_AUDIENCE: "<bond-api-app-registration-client-id>"

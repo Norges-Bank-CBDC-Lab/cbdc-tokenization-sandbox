@@ -18,4 +18,5 @@ data:
       AUTH_REDIRECT_URI: {{ .Values.runtimeConfig.authRedirectUri | default "" | quote }},
       AUTH_OPERATOR_ROLES: {{ .Values.runtimeConfig.authOperatorRoles | default "" | quote }},
       AUTH_TESTER_ROLES: {{ .Values.runtimeConfig.authTesterRoles | default "" | quote }},
+      LIVE_UPDATES: {{ if hasKey .Values.runtimeConfig "liveUpdates" }}{{ .Values.runtimeConfig.liveUpdates }}{{ else }}true{{ end }},
     };

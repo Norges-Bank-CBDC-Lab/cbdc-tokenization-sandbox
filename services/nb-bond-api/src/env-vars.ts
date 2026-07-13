@@ -32,6 +32,7 @@ const envSchema = z.object({
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
+  NB_BOND_API_SSE_HEARTBEAT_MS: z.coerce.number().int().positive().default(15000),
   // Fallback gas limit for closeAuction. The local Besu mints blocks only on
   // transactions, so its clock lags wall-clock and ethers' eth_estimateGas can
   // simulate the close against a stale block and false-revert with InBidPhase.

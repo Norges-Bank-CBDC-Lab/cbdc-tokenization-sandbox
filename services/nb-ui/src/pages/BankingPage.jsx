@@ -11,7 +11,8 @@
  */
 import { useEffect, useState } from 'react';
 import { BankingApi } from '../api/bankingApi.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import {
   Button,
@@ -19,6 +20,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  RefreshState,
   SandboxOnlyBanner,
   Select,
   useToast,
@@ -31,8 +33,8 @@ import { TransferTbdModal } from './TransferTbdModal.jsx';
 const PAGE_SIZE = 5;
 
 export function BankingPage() {
-  const tbdQ = useApi(() => BankingApi.listTbd(), []);
-  const banksQ = useApi(() => BankingApi.listBanks(), []);
+  const tbdQ = useLiveQuery([LiveResource.BANKING], () => BankingApi.listTbd(), []);
+  const banksQ = useLiveQuery([LiveResource.BANKING], () => BankingApi.listBanks(), []);
   const [selectedBank, setSelectedBank] = useState('');
   const [modal, setModal] = useState(null);
   const [page, setPage] = useState(0);
@@ -135,6 +137,12 @@ export function BankingPage() {
           </Button>
         </div>
       </div>
+
+      <RefreshState
+        refreshing={tbdQ.refreshing || banksQ.refreshing}
+        error={tbdQ.refreshError || banksQ.refreshError}
+        onRetry={reload}
+      />
 
       <SandboxOnlyBanner>
         Tokenized bank deposits. Operations are signed by each token&apos;s owning bank using local

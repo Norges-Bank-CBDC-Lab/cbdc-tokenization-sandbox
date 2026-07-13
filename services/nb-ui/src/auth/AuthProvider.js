@@ -13,9 +13,10 @@
  * @property {() => AuthAccount | null} getAccount - current account, or null when signed out
  * @property {() => boolean} isSessionExpired - true when an account exists but silent renewal needs interaction (the auth gate shows the login page with an "expired" notice)
  * @property {() => Promise<string | null>} getAuthHeader - Bearer header value or null when no auth
+ * @property {() => void} handleUnauthorized - mark the current session unusable after an API 401
  * @property {(listener: () => void) => () => void} subscribe - auth-state-change subscription (account or expiry); returns unsubscribe
  *
- * Plugin authors: implement these seven methods and export a factory the
+ * Plugin authors: implement these eight methods and export a factory the
  * resolver in ./index.js can call. See noneAuth.js and entraAuth.js.
  */
 export {};

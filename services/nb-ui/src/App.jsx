@@ -21,6 +21,7 @@ import { CouponPayoutPage } from './pages/CouponPayoutPage.jsx';
 import { BankingPage } from './pages/BankingPage.jsx';
 import { GlobalRegistryPage } from './pages/GlobalRegistryPage.jsx';
 import { OperationsPage } from './pages/OperationsPage.jsx';
+import { LiveUpdatesProvider } from './sync/LiveUpdatesProvider.jsx';
 
 /**
  * ComingSoon — placeholder for nav destinations that exist in the category
@@ -129,22 +130,24 @@ export function App() {
       <div className="card">
         <EmptyState
           title="Not authorised"
-          message="The Banking surface is operator-only. Ask an operator if you need access."
+          message="The Banking surface requires a recognised operator or tester role."
         />
       </div>
     );
   else page = <BondsPage navigate={navigate} />;
 
   return (
-    <ToastProvider>
-      <Layout
-        route={route}
-        navigate={navigate}
-        canAccessCentralBank={caps.canAccessCentralBank}
-        canAccessBanking={caps.canAccessBanking}
-      >
-        {page}
-      </Layout>
-    </ToastProvider>
+    <LiveUpdatesProvider>
+      <ToastProvider>
+        <Layout
+          route={route}
+          navigate={navigate}
+          canAccessCentralBank={caps.canAccessCentralBank}
+          canAccessBanking={caps.canAccessBanking}
+        >
+          {page}
+        </Layout>
+      </ToastProvider>
+    </LiveUpdatesProvider>
   );
 }

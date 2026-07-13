@@ -21,10 +21,12 @@ import { useState } from 'react';
 import { BiddersApi } from '../api/biddersApi.js';
 import { BondsApi } from '../api/bondsApi.js';
 import { isAuctionExpired, selectOpenAuctions } from '../api/selectors.js';
-import { useApi, useMutation } from '../hooks/useApi.js';
+import { useMutation } from '../hooks/useApi.js';
+import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import { Button, Field, Input, Modal, Select } from '../components/ui.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
+import { isPositiveInteger } from '../domain/amounts.js';
 
 export function PlaceBidModal({
   bidder = null,
@@ -33,7 +35,11 @@ export function PlaceBidModal({
   onClose,
   onSubmitted,
 }) {
-  const bondsQ = useApi(() => BondsApi.listBonds(), []);
+  const bondsQ = useLiveQuery(
+    [LiveResource.BONDS, LiveResource.AUCTIONS],
+    () => BondsApi.listBonds(),
+    [],
+  );
   const openAuctions = selectOpenAuctions(bondsQ.data ?? []);
   const testMode = getTestMode();
   // Decorate each option with `expired` (status open AND end <= now).
@@ -72,8 +78,8 @@ export function PlaceBidModal({
   const auctionId = selectedAuctionId || firstAcceptingId;
   const auction = auctionOptions.find((a) => a.id === auctionId) ?? null;
   const auctionExpired = Boolean(auction?.expired);
-  const unitsValid = Number(units) > 0 && /^\d+$/.test(units);
-  const rateValid = /^\d+$/.test(rate) && Number(rate) > 0;
+  const unitsValid = isPositiveInteger(units);
+  const rateValid = isPositiveInteger(rate);
   // Submit is allowed when the selection is currently accepting bids,
   // OR when Test mode is ON (operator wants the chain rejection).
   const auctionAllowed = !auctionExpired || testMode;

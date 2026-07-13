@@ -5,44 +5,65 @@
  *
  * Keeps components free of fetch boilerplate.
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export function useApi(fetcher, deps = []) {
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshError, setRefreshError] = useState(null);
   const [tick, setTick] = useState(0);
-  const cancelled = useRef(false);
-
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
-    cancelled.current = false;
+    let cancelled = false;
+    const hasData = data !== null;
     // Fetch lifecycle state is intentionally synchronized with the request effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError(null);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (hasData) {
+      setRefreshing(true);
+      setRefreshError(null);
+    } else {
+      setInitialLoading(true);
+      setError(null);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
     Promise.resolve()
       .then(fetcher)
       .then((res) => {
-        if (cancelled.current) return;
+        if (cancelled) return;
         setData(res);
+        setError(null);
+        setRefreshError(null);
       })
       .catch((e) => {
-        if (cancelled.current) return;
-        setError(e);
+        if (cancelled) return;
+        if (hasData) setRefreshError(e);
+        else setError(e);
       })
       .finally(() => {
-        if (cancelled.current) return;
-        setLoading(false);
+        if (cancelled) return;
+        setInitialLoading(false);
+        setRefreshing(false);
       });
     return () => {
-      cancelled.current = true;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
 
-  return { data, loading, error, reload };
+  return {
+    data,
+    // Compatibility alias: loaded pages no longer enter their full-screen
+    // loading branch during SSE/manual background revalidation.
+    loading: initialLoading,
+    initialLoading,
+    refreshing,
+    error,
+    refreshError,
+    reload,
+  };
 }
 
 /**

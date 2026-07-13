@@ -134,7 +134,7 @@ visible at a glance.
   reverted (a real domain error worth understanding) or the chain
   is simply unreachable (a wait-and-retry condition). The UI surfaces
   the raw 500 as a toast, which is unhelpful.
-- Planned follow-up: in `services/nb-bond-api/src/index.ts`'s error
+- Planned follow-up: in `services/nb-bond-api/src/app.ts`'s error
   middleware, detect `RpcUnavailableError` (already exported by
   `chain.ts`) and `getaddrinfo EAI_AGAIN` / `ECONNREFUSED` /
   `request timeout` patterns from raw ethers errors, and translate

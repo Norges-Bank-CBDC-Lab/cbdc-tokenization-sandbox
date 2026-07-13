@@ -1,5 +1,5 @@
 /**
- * OpenAPI v2 schemas for nb-bond-api.
+ * Zod contracts and OpenAPI 3.1 document for the /v1 nb-bond-api.
  *
  * Single source of truth: every DTO and route is declared here.
  * `npm run regen:openapi` writes services/nb-bond-api/openapi.json from
@@ -9,83 +9,22 @@
  * Plan reference: docs/plans/archive/openapi-v2-plan.md.
  */
 import { createDocument, type ZodOpenApiPathsObject } from 'zod-openapi';
+
+import { LIVE_RESOURCE_KEYS } from './live-event-contract';
+import {
+  addressSchema,
+  auctionIdSchema,
+  bigIntStringSchema,
+  blockNumberSchema,
+  bpsSchema,
+  hexStringSchema,
+  isinSchema,
+  md5Schema,
+  unixMillisSchema,
+  unixSecondsSchema,
+} from './contracts/common';
+import { operationAttemptSchema } from './contracts/operations';
 import { z } from 'zod';
-
-// #region Primitives ─────────────────────────────────────────────────
-
-const addressSchema = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/)
-  .meta({
-    id: 'Address',
-    description: 'Ethereum address',
-    examples: ['0x1234567890abcdef1234567890abcdef12345678'],
-  });
-
-const hexStringSchema = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]+$/)
-  .meta({
-    id: 'HexString',
-    description: 'Hex string',
-    examples: ['0xabc123'],
-  });
-
-const bigIntStringSchema = z
-  .string()
-  .regex(/^[0-9]+$/)
-  .meta({
-    id: 'BigIntString',
-    description: 'Decimal string representation of a uint256',
-    examples: ['1000000000000000000'],
-  });
-
-const bpsSchema = z
-  .string()
-  .regex(/^[0-9]+$/)
-  .meta({
-    id: 'Bps',
-    description: 'Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.',
-    examples: ['425', '9875', '10123'],
-  });
-
-const isinSchema = z
-  .string()
-  .min(1)
-  .meta({
-    id: 'Isin',
-    description: 'ISIN identifying a bond',
-    examples: ['NO0012345678'],
-  });
-
-const auctionIdSchema = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]{64}$/)
-  .meta({
-    id: 'AuctionId',
-    description: 'Auction identifier (bytes32 hex)',
-    examples: ['0x1234abcd'.padEnd(66, '0')],
-  });
-
-const md5Schema = z.string().meta({
-  description:
-    'MD5 of canonical (key-sorted) JSON of this DTO. Server-computed; clients compare as opaque strings for cache validation.',
-  examples: ['9e107d9d372bb6826bd81d3542a419d6'],
-});
-
-const blockNumberSchema = z.number().int().nullable().meta({
-  description: 'Block number, or null if not yet mined / unknown.',
-});
-
-const unixSecondsSchema = bigIntStringSchema.meta({
-  description: 'Unix timestamp in seconds (decimal string).',
-});
-
-const unixMillisSchema = z.number().int().meta({
-  description: 'Unix timestamp in milliseconds.',
-});
-
-// #endregion
 
 // #region Enums ──────────────────────────────────────────────────────
 
@@ -107,41 +46,6 @@ const bondStatusSchema = z.enum(['minting', 'maturing', 'matured', 'redeemed', '
 export const bidStateSchema = z.enum(['sealed', 'unsealed']).meta({
   id: 'BidState',
   description: 'Bid disclosure state',
-});
-
-const operationTypeSchema = z
-  .enum([
-    'BOND_CREATE',
-    'BOND_DISABLE',
-    'AUCTION_CREATE',
-    'AUCTION_CLOSE',
-    'AUCTION_CANCEL',
-    'AUCTION_FINALISE',
-    'COUPON_PAYMENT',
-    'REDEMPTION',
-    'BID_SUBMISSION',
-    'WNOK_MINT',
-    'WNOK_BURN',
-    'WNOK_TRANSFER',
-    'WNOK_ALLOWLIST_ADD',
-    'WNOK_ALLOWLIST_REMOVE',
-    'BANK_CREATE',
-    'TBD_MINT',
-    'TBD_BURN',
-    'TBD_TRANSFER',
-    'TBD_ALLOWLIST_ADD',
-    'TBD_ALLOWLIST_REMOVE',
-  ])
-  .meta({
-    id: 'OperationType',
-    description: 'Operator-initiated on-chain operation recorded in the audit trail',
-  });
-
-const operationStatusSchema = z.enum(['SUCCEEDED', 'REVERTED', 'FAILED', 'PARTIAL']).meta({
-  id: 'OperationStatus',
-  description:
-    'Attempt outcome. REVERTED carries the decoded on-chain reason; FAILED is a transport ' +
-    'or validation failure; PARTIAL is reserved for future per-leg settlement outcomes.',
 });
 
 // #endregion
@@ -754,44 +658,6 @@ const createBankBodySchema = z
 
 // #endregion
 
-// #region Operations (audit trail) ───────────────────────────────────
-
-const operationAttemptSchema = z
-  .object({
-    id: z.number().int().meta({ description: 'Monotonic attempt id (higher = newer)' }),
-    opType: operationTypeSchema,
-    target: z.string().meta({
-      description:
-        'Primary resource the operation acted on: ISIN, auction id, address, or bank name',
-    }),
-    status: operationStatusSchema,
-    txHash: hexStringSchema.nullable().meta({
-      description:
-        'Transaction hash when one was broadcast; null when gas estimation rejected the send ' +
-        'before broadcast or the operation spans multiple transactions',
-    }),
-    error: z.string().nullable().meta({
-      description: 'Decoded revert reason or failure message; null on success',
-    }),
-    detail: z
-      .record(z.string(), z.unknown())
-      .nullable()
-      .meta({ description: 'Small operation-specific payload (amounts as strings, counts)' }),
-    createdAt: z
-      .number()
-      .int()
-      .meta({ description: 'Attempt timestamp (unix seconds, server clock)' }),
-  })
-  .meta({
-    id: 'OperationAttempt',
-    description:
-      'One operator-initiated on-chain operation attempt from the persistent audit trail. ' +
-      'Failed attempts mostly never reach the chain (rejected at gas estimation), so this ' +
-      'trail is their only durable record.',
-  });
-
-// #endregion
-
 // #region Health ─────────────────────────────────────────────────────
 
 const healthContractsSchema = z
@@ -1064,6 +930,7 @@ const errorRefs = {
     401: { $ref: '#/components/responses/Unauthorized' },
     403: { $ref: '#/components/responses/Forbidden' },
     404: { $ref: '#/components/responses/NotFound' },
+    503: { $ref: '#/components/responses/ServiceUnavailable' },
     500: { $ref: '#/components/responses/InternalError' },
   },
   mutate: {
@@ -1072,6 +939,7 @@ const errorRefs = {
     403: { $ref: '#/components/responses/Forbidden' },
     404: { $ref: '#/components/responses/NotFound' },
     409: { $ref: '#/components/responses/Conflict' },
+    503: { $ref: '#/components/responses/ServiceUnavailable' },
     500: { $ref: '#/components/responses/InternalError' },
   },
 };
@@ -1152,6 +1020,15 @@ const noContent204 = {
   description: 'No Content — operation succeeded; response body intentionally empty.',
 };
 
+const liveEventStreamSchema = z.string().meta({
+  id: 'LiveEventStream',
+  description:
+    'UTF-8 Server-Sent Events stream. `changed` event data is JSON with one `changed` array. ' +
+    'Allowed resource keys are auctions, banking, bidders, bonds, central-bank, operations, ' +
+    'and registry. Comment frames are connection/heartbeat signals. No domain data is sent.',
+  examples: ['event: changed\ndata: {"changed":["auctions","bonds"]}\n\n'],
+});
+
 const paths: ZodOpenApiPathsObject = {
   // system ─────────────────────────────────────────
   '/v1/health': {
@@ -1162,6 +1039,28 @@ const paths: ZodOpenApiPathsObject = {
       security: [],
       responses: {
         200: successJson('Health and binding information', healthSchema),
+        500: { $ref: '#/components/responses/InternalError' },
+      },
+    },
+  },
+  '/v1/events': {
+    get: {
+      tags: ['system'],
+      operationId: 'subscribeLiveEvents',
+      summary: 'Subscribe to authenticated resource invalidations',
+      description:
+        'Long-lived SSE stream for UI refresh hints. Requires the same authenticated, ' +
+        'recognised Entra role as other protected reads. Events contain coarse resource keys ' +
+        'only; clients fetch current data through the normal API. There is no event replay.',
+      'x-live-resource-keys': LIVE_RESOURCE_KEYS,
+      responses: {
+        200: {
+          description: 'SSE stream opened',
+          content: { 'text/event-stream': { schema: liveEventStreamSchema } },
+        },
+        401: { $ref: '#/components/responses/Unauthorized' },
+        403: { $ref: '#/components/responses/Forbidden' },
+        429: { description: 'Too Many Requests — connection attempts exceeded the global limit.' },
         500: { $ref: '#/components/responses/InternalError' },
       },
     },
@@ -1724,7 +1623,7 @@ export const openApiDocument = createDocument({
   openapi: '3.1.0',
   info: {
     title: 'NB Bond Auction Service',
-    version: '2.0.0',
+    version: '1.0.0',
     description:
       'Public API for the CBDC tokenization sandbox bond service. ' +
       'Sandbox-scale demo backing the nb-ui reference frontend. ' +
@@ -1762,7 +1661,8 @@ export const openApiDocument = createDocument({
       description:
         'Commercial-bank tokenized deposits (TBD): one ERC-20 per bank, with supply, WNOK ' +
         'reserve backing, holders, and (mutations) allowlist / mint / burn / transfer. ' +
-        'Operator-only — entra mode requires an operator App Role (403 otherwise). Sandbox-only.',
+        'In entra mode, authenticated users with a recognised operator or tester App Role may ' +
+        'use this surface. Sandbox-only.',
     },
     {
       name: 'admin',
@@ -1784,7 +1684,7 @@ export const openApiDocument = createDocument({
           'Microsoft Entra ID access token. In deployments where NB_BOND_API_AUTH_MODE=none ' +
           '(local sandbox default), the header is accepted but not validated. In entra mode the ' +
           'token must carry a recognised App Role in its `roles` claim (see the 403 response); ' +
-          'Central Bank endpoints require an operator role.',
+          'Central Bank and admin endpoints require an operator role.',
       },
     },
     responses: {
@@ -1799,8 +1699,8 @@ export const openApiDocument = createDocument({
       Forbidden: {
         description:
           'Authenticated, but the token lacks a role required for this resource (entra mode ' +
-          'only). Central Bank endpoints require an operator App Role; every other endpoint ' +
-          'requires at least one recognised role.',
+          'only). Central Bank and admin endpoints require an operator App Role; banking and ' +
+          'other protected endpoints require at least one recognised operator or tester role.',
         content: { 'application/json': { schema: problemDetailsSchema } },
       },
       NotFound: {
@@ -1812,28 +1712,17 @@ export const openApiDocument = createDocument({
         content: { 'application/json': { schema: problemDetailsSchema } },
       },
       InternalError: {
-        description: 'Unexpected server error.',
+        description:
+          'Unexpected sandbox server error. `detail` contains the thrown message to support ' +
+          'technology testing and must not be treated as a production-safe disclosure policy.',
+        content: { 'application/json': { schema: problemDetailsSchema } },
+      },
+      ServiceUnavailable: {
+        description: 'Required chain or sandbox service state is temporarily unavailable.',
         content: { 'application/json': { schema: problemDetailsSchema } },
       },
     },
   },
-});
-
-// #endregion
-
-// #region Internal-only schemas (not part of the OpenAPI surface) ────
-
-// Decrypted bid plaintext; validated server-side after bid unsealing.
-// Not exposed in any response — auctioneer-internal only.
-export const bidPlaintextSchema = z.object({
-  isin: z.string(),
-  bidder: addressSchema,
-  nonce: z.string(),
-  rate: bpsSchema,
-  units: bigIntStringSchema,
-  salt: z.string(),
-  bidderNonce: bigIntStringSchema,
-  bidderSig: hexStringSchema,
 });
 
 // #endregion

@@ -49,6 +49,8 @@ Important optional settings:
 - `DB_PATH`: path to SQLite database used for ingestion (default `data/ingestion.sqlite`).
 - `START_BLOCK`: initial backfill block for ingestion (default `0`).
 - `POLL_INTERVAL_MS`: ingestion polling interval (default `3000`).
+- `NB_BOND_API_SSE_HEARTBEAT_MS`: authenticated SSE comment-heartbeat interval
+  in milliseconds (default `15000`). Gateway idle timeouts must be higher.
 - `EXPRESS_PORT`: listen port (default `8080`).
 - `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
 - `NB_BOND_API_AUTH_MODE`: `none` (default) or `entra`. See §7.7.
@@ -79,7 +81,9 @@ automatically if it is missing.
 
 ## 3. Data model and field conventions
 
-These conventions come directly from `services/nb-bond-api/openapi.json` and `services/nb-bond-api/src/schemas.ts`.
+These conventions come directly from `services/nb-bond-api/openapi.json`, the
+feature contracts under `services/nb-bond-api/src/contracts/`, and the document
+assembly in `services/nb-bond-api/src/schemas.ts`.
 
 ### 3.1 Common types
 
@@ -113,7 +117,9 @@ Important: the same field name `rate` is reused across auction types:
 
 ### 3.4 Bond unit sizing (`size`, `units`)
 
-The API treats bond quantities as whole "units". In this sandbox, `size` and `units` are expressed in whole 1,000 NOK nominal units (see `CreateAuctionRequest.size` description in `services/nb-bond-api/src/schemas.ts`).
+The API treats bond quantities as whole "units". In this sandbox, `size` and
+`units` are expressed in whole 1,000 NOK nominal units (see the generated
+`CreateAuctionRequest.size` description in `services/nb-bond-api/openapi.json`).
 
 ### 3.5 Rate vs yield (naming convention)
 
@@ -343,9 +349,10 @@ appropriate writable tmp mounts — deliberately deferred from the sandbox
 default since it requires per-platform validation of any transitive write
 paths under `/tmp` or `~/.npm`).
 
-The service still does not implement authentication; treat it as a
-privileged internal service and protect it with network-level controls in
-any non-local deployment.
+The local default uses `NB_BOND_API_AUTH_MODE=none`. Deployed environments may
+use `entra`, which validates Entra bearer tokens and app roles. This remains a
+privileged sandbox service: authentication does not make plaintext fixture keys
+or sandbox diagnostics suitable for real funds.
 
 ### 7.4 Ingestion database behaviour
 
@@ -367,13 +374,12 @@ processes blocks `[nextBlock, latest]` inclusive — the local Besu node uses
 Clique PoA, which produces blocks only on transaction activity, so the head
 sits at `nextBlock - 1 + 1 === nextBlock` for arbitrarily long idle stretches.
 The single-block case is handled in `computeIngestionWindow` so the head is
-not silently dropped on idle chains. Frontends that need the head block
-visible immediately after a write (see `services/nb-ui/src/pages/BondsPage.jsx`
-`handleCreated`) typically schedule a delayed second reload at ~one
-`POLL_INTERVAL_MS` past the immediate one to cover the worst-case race
-between the create POST returning and the next ingestion tick.
+not silently dropped on idle chains. The live-update stream publishes bond
+and auction resource keys only after the projection transaction and
+checkpoint save complete, so clients no longer need a delayed second reload
+to race the ingestion tick.
 
-The schema is versioned via `PRAGMA user_version` (current version `2`).
+The schema is versioned via `PRAGMA user_version` (current version `3`).
 When the on-disk value is lower than the current `SCHEMA_VERSION` in
 `src/ingestion-db.ts`, `openDatabase` runs a one-shot migration that
 drops the full projection (`auction_events`, `balance_events`,
@@ -402,6 +408,14 @@ Auction bid sets and computed allocations are derived per-request from
 chain + ingestion DB by [`src/compose.ts`](src/compose.ts). The service
 does not retain in-memory state between requests for cacheable DTOs —
 the bulky GETs are stateless. On restart there is nothing to hydrate.
+
+One explicit read context is passed through each composition pass. It reuses
+contract handles and chain-wide values only inside that request. Auction
+lifecycle status is projection-first once the auction has been ingested.
+After bond and auction mutations that return composed state, the API waits a
+bounded period for the projection to reach the mined receipt block before it
+builds the response. If the bound expires, the API logs the lag and still
+returns the committed operation instead of encouraging a duplicate retry.
 
 For durable audit artefacts, use the on-chain allocations and the
 ingestion-backed history endpoints rather than client-side caches.
@@ -470,6 +484,21 @@ through the middleware.
 ArgoCD-managed deployments must keep `NB_BOND_API_AUTH_MODE` and the
 nb-ui `AUTH_MODE` in sync. A mismatch (e.g. backend `entra`, frontend
 `none`) produces clear 401s rather than silent partial behaviour.
+
+#### Authenticated live-update stream
+
+`GET /v1/events` is below the baseline auth and recognised-role middleware.
+In `none` mode those checks no-op; in `entra` mode the request needs the same
+valid bearer token and operator-or-tester role as protected reads. The stream
+emits `changed` events containing only coarse resource keys and comment
+heartbeats at `NB_BOND_API_SSE_HEARTBEAT_MS`; it never sends domain data or a
+health snapshot. There is no replay buffer, so clients reconcile mounted
+queries whenever a new connection opens.
+
+For Azure, response buffering must be disabled, the gateway idle timeout must
+exceed the heartbeat interval, and the bearer header must reach the API. Keep
+one API replica until shared fan-out is designed; the broadcaster is
+in-process. See [`docs/AZURE_BOUNDARY.md`](../../docs/AZURE_BOUNDARY.md).
 
 ### 7.8 Health payload and status derivation
 

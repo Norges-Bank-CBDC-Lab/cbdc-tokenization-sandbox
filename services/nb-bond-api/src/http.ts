@@ -7,7 +7,10 @@
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
+import { DependencyUnavailableError } from './application-errors';
 import type { ProblemDetails } from './schemas';
+
+const DEPENDENCY_UNAVAILABLE_DETAIL = 'Required chain state is temporarily unavailable.';
 
 /**
  * Canonical-JSON serializer: sorts object keys recursively so a DTO
@@ -43,24 +46,46 @@ export function withMd5<T extends Record<string, unknown>>(dto: T): T & { md5: s
   return { ...(rest as T), md5: computeMd5(rest) };
 }
 
-/**
- * Success-response helper. Sets ETag + Cache-Control, honours
- * If-None-Match with a 304 short-circuit, otherwise returns 200 JSON.
- */
-export function okResponse(req: Request, res: Response, body: unknown): void {
+export interface SuccessResponseOptions {
+  status?: number;
+  cache?: 'revalidate' | 'no-store';
+}
+
+/** Emit a JSON success with explicit status and cache semantics. */
+export function successResponse(
+  req: Request,
+  res: Response,
+  body: unknown,
+  options: SuccessResponseOptions = {},
+): void {
+  const status = options.status ?? 200;
+  const cache = options.cache ?? 'revalidate';
+
+  if (cache === 'no-store') {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(status).json(body);
+    return;
+  }
+
   const etagValue = computeMd5(body);
   const etag = `"${etagValue}"`;
 
   res.setHeader('ETag', etag);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
 
+  const isConditionalRead = status === 200 && ['GET', 'HEAD'].includes(req.method ?? 'GET');
   const ifNoneMatch = req.header('If-None-Match');
-  if (ifNoneMatch === etag) {
+  if (isConditionalRead && ifNoneMatch === etag) {
     res.status(304).end();
     return;
   }
 
-  res.status(200).json(body);
+  res.status(status).json(body);
+}
+
+/** Backwards-compatible 200 + ETag helper used by existing handlers. */
+export function okResponse(req: Request, res: Response, body: unknown): void {
+  successResponse(req, res, body);
 }
 
 /** Build an RFC 7807 ProblemDetails body. */
@@ -119,6 +144,8 @@ export const badRequest = (detail?: string, errors?: { field: string; message: s
 export const unauthorized = (detail?: string) => new HttpError(401, 'Unauthorized', { detail });
 export const notFound = (detail?: string) => new HttpError(404, 'Not Found', { detail });
 export const conflict = (detail?: string) => new HttpError(409, 'Conflict', { detail });
+export const serviceUnavailable = (detail = DEPENDENCY_UNAVAILABLE_DETAIL) =>
+  new HttpError(503, 'Service Unavailable', { detail });
 export const internalError = (detail?: string) =>
   new HttpError(500, 'Internal Server Error', { detail });
 
@@ -135,6 +162,14 @@ export function problemErrorMiddleware(
       .json(buildProblem(req, err.status, err.title, { detail: err.detail, errors: err.errors }));
     return;
   }
-  const message = err instanceof Error ? err.message : String(err);
-  res.status(500).json(buildProblem(req, 500, 'Internal Server Error', { detail: message }));
+  if (err instanceof DependencyUnavailableError) {
+    res.status(503).json(
+      buildProblem(req, 503, 'Service Unavailable', {
+        detail: DEPENDENCY_UNAVAILABLE_DETAIL,
+      }),
+    );
+    return;
+  }
+  const detail = err instanceof Error ? err.message : String(err);
+  res.status(500).json(buildProblem(req, 500, 'Internal Server Error', { detail }));
 }

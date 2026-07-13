@@ -16,6 +16,7 @@ import {
   computeBuybackAllocation,
   computeUniformAllocation,
 } from './allocation';
+import { DependencyUnavailableError } from './application-errors';
 import {
   getBondAuction,
   getBondAuctionAddress,
@@ -58,6 +59,32 @@ import type {
 import { auctionTypeToString } from './utils';
 
 type TxRefT = TxRef;
+
+export interface ComposeReadContext {
+  getBondAuction: typeof getBondAuction;
+  getBondAuctionAddress: typeof getBondAuctionAddress;
+  getBondManager: typeof getBondManager;
+  getBondToken: typeof getBondToken;
+  getDurationScalar: typeof getDurationScalar;
+  getLatestBlockTimestamp: typeof getLatestBlockTimestamp;
+}
+
+function memoizeAsync<T>(load: () => Promise<T>): () => Promise<T> {
+  let pending: Promise<T> | undefined;
+  return () => (pending ??= load());
+}
+
+/** One explicitly passed cache of chain-wide reads for a composition pass. */
+export function createComposeReadContext(): ComposeReadContext {
+  return {
+    getBondAuction: memoizeAsync(getBondAuction),
+    getBondAuctionAddress: memoizeAsync(getBondAuctionAddress),
+    getBondManager: memoizeAsync(getBondManager),
+    getBondToken: memoizeAsync(getBondToken),
+    getDurationScalar: memoizeAsync(getDurationScalar),
+    getLatestBlockTimestamp: memoizeAsync(getLatestBlockTimestamp),
+  };
+}
 
 // #region On-chain enum mapping ──────────────────────────────────────
 
@@ -177,11 +204,15 @@ function composeHolderBalance(holder: string, balance: string): HolderBalance {
   return withMd5({ holder, balance });
 }
 
-async function composeHolders(db: IngestionDatabase, isin: string): Promise<HolderBalance[]> {
+async function composeHolders(
+  db: IngestionDatabase,
+  isin: string,
+  readContext: ComposeReadContext,
+): Promise<HolderBalance[]> {
   const dbHolders = getBalancesByIsin(db, isin);
   let bondToken;
   try {
-    bondToken = await getBondToken();
+    bondToken = await readContext.getBondToken();
   } catch (err) {
     logger.debug(`composeHolders: bondToken unavailable: ${(err as Error).message}`);
     // Fall back to DB-only balances.
@@ -228,6 +259,20 @@ function buildAuctionTxs(row: AuctionRow | null, events: AuctionEventRow[]): Auc
   return { create, close, finalise, cancel };
 }
 
+function projectedAuctionStatus(
+  row: AuctionRow | null,
+  events: AuctionEventRow[],
+): AuctionStatus | null {
+  if (!row) return null;
+  let status: AuctionStatus = 'open';
+  for (const event of events) {
+    if (event.type === 'CLOSED') status = 'closed';
+    else if (event.type === 'FINALISED') status = 'finalised';
+    else if (event.type === 'CANCELLED') status = 'cancelled';
+  }
+  return status;
+}
+
 // #endregion
 
 // #region Auction composer ───────────────────────────────────────────
@@ -242,7 +287,7 @@ interface AuctionChainState {
     bond: string;
     auctionType: AuctionType;
   };
-  status: AuctionStatus;
+  status: AuctionStatus | null;
   sealedBids: ReturnType<typeof normalizeSealedBid>[];
   unsealedBids: ReturnType<typeof unsealBid>[] | null;
   onChainAllocations: Array<{
@@ -254,19 +299,24 @@ interface AuctionChainState {
   }>;
 }
 
-async function fetchAuctionChainState(auctionId: string): Promise<AuctionChainState | null> {
+async function fetchAuctionChainState(
+  auctionId: string,
+  includeStatus: boolean,
+  readContext: ComposeReadContext,
+): Promise<AuctionChainState | null> {
   try {
-    const bondAuction = await getBondAuction();
+    const bondAuction = await readContext.getBondAuction();
     const [metaRaw, statusRaw, allocRaw] = await Promise.all([
       bondAuction.getAuction(auctionId),
-      bondAuction.getAuctionStatus(auctionId),
-      bondAuction.getAllocations(auctionId).catch(() => []),
+      includeStatus ? bondAuction.getAuctionStatus(auctionId) : Promise.resolve(null),
+      bondAuction.getAllocations(auctionId),
     ]);
 
     const isin = metaRaw.isin as string;
+    if (!isin) return null;
     const auctionType = onChainAuctionTypeToApi(metaRaw.auctionType);
 
-    const bondManager = await getBondManager();
+    const bondManager = await readContext.getBondManager();
     const sealed = await bondManager.getSealedBids(isin).catch(() => []);
     const sealedBids = (
       sealed as Array<{ bidder: string; ciphertext: string; plaintextHash: string }>
@@ -310,18 +360,21 @@ async function fetchAuctionChainState(auctionId: string): Promise<AuctionChainSt
         bond: metaRaw.bond as string,
         auctionType,
       },
-      status: onChainStatusToApi(Number(statusRaw)),
+      status: statusRaw === null ? null : onChainStatusToApi(Number(statusRaw)),
       sealedBids,
       unsealedBids,
       onChainAllocations,
     };
   } catch (err) {
     logger.warn(`fetchAuctionChainState failed for ${auctionId}: ${(err as Error).message}`);
-    return null;
+    throw new DependencyUnavailableError('chain', `auction ${auctionId}`, err);
   }
 }
 
 export interface ComposeOptions {
+  /** Shared, request-scoped cache for chain-wide handles and values. */
+  readContext?: ComposeReadContext;
+
   /**
    * Reveal sealed bid contents on auctions still in `open` (BIDDING) phase.
    *
@@ -357,12 +410,31 @@ export async function composeAuction(
   auctionId: string,
   opts: ComposeOptions = {},
 ): Promise<Auction | null> {
-  const chain = await fetchAuctionChainState(auctionId);
-  if (!chain) return null;
-
-  const { metadata, status, sealedBids, unsealedBids, onChainAllocations } = chain;
+  const readContext = opts.readContext ?? createComposeReadContext();
   const row = getAuctionRowById(db, auctionId);
   const events = getAuctionEventsById(db, auctionId, 500, 0);
+  const projectionStatus = projectedAuctionStatus(row, events);
+  const chain = await fetchAuctionChainState(auctionId, projectionStatus === null, readContext);
+  if (!chain) {
+    if (row) {
+      throw new DependencyUnavailableError(
+        'chain',
+        `auction ${auctionId}`,
+        new Error('projection row exists but required chain metadata is missing'),
+      );
+    }
+    return null;
+  }
+
+  const { metadata, sealedBids, unsealedBids, onChainAllocations } = chain;
+  const status = projectionStatus ?? chain.status;
+  if (status === null) {
+    throw new DependencyUnavailableError(
+      'chain',
+      `auction ${auctionId}`,
+      new Error('auction status is unavailable from both projection and chain'),
+    );
+  }
 
   // Bids: only reveal plaintext after the bidding window has closed, OR
   // when the caller explicitly requests it via `revealOpenBids` (operator
@@ -453,7 +525,7 @@ export async function composeAuction(
   let maturityDuration: string | null = null;
   if (metadata.auctionType === 'RATE') {
     try {
-      const bondToken = await getBondToken();
+      const bondToken = await readContext.getBondToken();
       const partition = keccak256(toUtf8Bytes(metadata.isin));
       const duration = await bondToken.maturityDuration(partition);
       maturityDuration = duration?.toString?.() ?? null;
@@ -464,8 +536,8 @@ export async function composeAuction(
     }
   }
 
-  const bondAuctionAddress = await getBondAuctionAddress().catch(() => '0x');
-  const bondManager = await getBondManager().catch(() => null);
+  const bondAuctionAddress = await readContext.getBondAuctionAddress().catch(() => '0x');
+  const bondManager = await readContext.getBondManager().catch(() => null);
   const bondTokenAddress = bondManager ? await bondManager.BOND_TOKEN().catch(() => '0x') : '0x';
 
   return withMd5({
@@ -508,20 +580,38 @@ export async function composeBond(
   isin: string,
   opts: ComposeOptions = {},
 ): Promise<Bond | null> {
+  const readContext = opts.readContext ?? createComposeReadContext();
   let bondToken;
   let bondManager;
   let bondAuctionAddress: string;
   try {
-    bondToken = await getBondToken();
-    bondManager = await getBondManager();
-    bondAuctionAddress = await getBondAuctionAddress();
+    bondToken = await readContext.getBondToken();
+    bondManager = await readContext.getBondManager();
+    bondAuctionAddress = await readContext.getBondAuctionAddress();
   } catch (err) {
     logger.warn(`composeBond: contracts unavailable for ${isin}: ${(err as Error).message}`);
-    return null;
+    throw new DependencyUnavailableError('chain', `bond ${isin}`, err);
   }
 
   const partition = keccak256(toUtf8Bytes(isin));
 
+  let coreReads: unknown[];
+  try {
+    coreReads = await Promise.all([
+      bondToken.maturityDuration(partition),
+      bondToken.couponDuration(partition),
+      bondToken.couponYield(partition),
+      bondToken.lastCouponPayment(partition),
+      bondToken.couponPaymentCount(partition),
+      bondToken.isMatured(partition),
+      bondToken.totalSupplyByPartition(partition),
+      bondToken.maturityDate(partition),
+      bondManager.BOND_TOKEN(),
+    ]);
+  } catch (err) {
+    logger.warn(`composeBond: required reads failed for ${isin}: ${(err as Error).message}`);
+    throw new DependencyUnavailableError('chain', `bond ${isin}`, err);
+  }
   const [
     maturityDurationRaw,
     couponDurationRaw,
@@ -532,17 +622,7 @@ export async function composeBond(
     totalSupplyRaw,
     maturityDateRaw,
     bondTokenAddress,
-  ] = await Promise.all([
-    bondToken.maturityDuration(partition).catch(() => null),
-    bondToken.couponDuration(partition).catch(() => null),
-    bondToken.couponYield(partition).catch(() => null),
-    bondToken.lastCouponPayment(partition).catch(() => null),
-    bondToken.couponPaymentCount(partition).catch(() => null),
-    bondToken.isMatured(partition).catch(() => null),
-    bondToken.totalSupplyByPartition(partition).catch(() => null),
-    bondToken.maturityDate(partition).catch(() => null),
-    bondManager.BOND_TOKEN().catch(() => '0x'),
-  ]);
+  ] = coreReads;
 
   const bondEvents = getBondEventsByIsin(db, isin, 1000, 0);
   const hasRedeemEvent = bondEvents.some((e) => e.type === 'REDEEMED');
@@ -557,7 +637,7 @@ export async function composeBond(
   // makes payments.remaining null so the FIRST coupon could never show
   // as payable. Only a failed chain read (null) maps to null.
   const couponPaymentCount =
-    couponPaymentCountRaw !== null ? BigInt(couponPaymentCountRaw.toString()) : null;
+    couponPaymentCountRaw != null ? BigInt(couponPaymentCountRaw.toString()) : null;
   const maturityDate = maturityDateRaw ? BigInt(maturityDateRaw.toString()) : null;
   const totalSupply = totalSupplyRaw ? BigInt(totalSupplyRaw.toString()) : null;
   const isMatured = Boolean(isMaturedRaw);
@@ -596,7 +676,7 @@ export async function composeBond(
   const latestBlockTimestamp =
     opts.latestBlockTimestamp !== undefined
       ? opts.latestBlockTimestamp
-      : await getLatestBlockTimestamp();
+      : await readContext.getLatestBlockTimestamp();
   let couponNextPaymentDue: bigint | null = null;
   let couponPayable = false;
   if (
@@ -631,16 +711,18 @@ export async function composeBond(
   // Auctions for this bond, in chronological order.
   const auctionRows = listAuctionRowsByIsin(db, isin);
   const auctions = (
-    await Promise.all(auctionRows.map((r) => composeAuction(db, r.auction_id, opts)))
+    await Promise.all(
+      auctionRows.map((r) => composeAuction(db, r.auction_id, { ...opts, readContext })),
+    )
   ).filter((a): a is Auction => a !== null);
 
-  const holders = await composeHolders(db, isin);
+  const holders = await composeHolders(db, isin, readContext);
 
   // Cached chain-wide DURATION_SCALAR. Lets the API report durations in
   // both raw seconds (legacy field, used for date arithmetic) and chain
   // years (1 unit = one DURATION_SCALAR; matches what the operator typed
   // in the create-bond modal).
-  const durationScalar = await getDurationScalar();
+  const durationScalar = await readContext.getDurationScalar();
   const toYears = (s: bigint | null): string | null => {
     if (s === null || durationScalar === null || durationScalar === 0n) return null;
     return (s / durationScalar).toString();
@@ -652,7 +734,7 @@ export async function composeBond(
     disabled: isBondDisabled(db, isin),
     totalSupply: resolvedSupply !== null ? resolvedSupply.toString() : null,
     contracts: {
-      token: bondTokenAddress,
+      token: String(bondTokenAddress),
       auction: bondAuctionAddress,
       manager: bondManager.target.toString(),
     },
@@ -699,15 +781,16 @@ export async function composeAllBonds(
   db: IngestionDatabase,
   opts: ComposeOptions = {},
 ): Promise<Bond[]> {
+  const readContext = opts.readContext ?? createComposeReadContext();
   const rows = listBondRows(db, { includeDisabled: opts.includeDisabled });
   // One latest-block read per compose pass, fanned out to every bond's
   // coupon-payability check (see ComposeOptions.latestBlockTimestamp).
   const latestBlockTimestamp =
     opts.latestBlockTimestamp !== undefined
       ? opts.latestBlockTimestamp
-      : await getLatestBlockTimestamp();
+      : await readContext.getLatestBlockTimestamp();
   const bonds = await Promise.all(
-    rows.map((r) => composeBond(db, r.isin, { ...opts, latestBlockTimestamp })),
+    rows.map((r) => composeBond(db, r.isin, { ...opts, readContext, latestBlockTimestamp })),
   );
   return bonds.filter((b): b is Bond => b !== null);
 }
@@ -716,8 +799,11 @@ export async function composeAllAuctions(
   db: IngestionDatabase,
   opts: ComposeOptions = {},
 ): Promise<Auction[]> {
+  const readContext = opts.readContext ?? createComposeReadContext();
   const rows = listAuctionRows(db);
-  const auctions = await Promise.all(rows.map((r) => composeAuction(db, r.auction_id, opts)));
+  const auctions = await Promise.all(
+    rows.map((r) => composeAuction(db, r.auction_id, { ...opts, readContext })),
+  );
   return auctions.filter((a): a is Auction => a !== null);
 }
 

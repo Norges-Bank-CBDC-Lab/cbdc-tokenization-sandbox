@@ -15,6 +15,7 @@
  */
 import { AppConfig } from '../config.js';
 import { auth } from '../auth/index.js';
+import { createSseParser } from '../sync/liveEventProtocol.js';
 
 /**
  * Format an HttpError message from an RFC 7807 problem+json body so
@@ -45,6 +46,44 @@ export class NotImplementedError extends Error {
     super(message);
     this.status = 501;
     this.name = 'NotImplementedError';
+  }
+}
+
+/** Open and consume one authenticated SSE connection. Resolves when it closes. */
+async function streamLiveEvents({ signal, onOpen, onChanged }) {
+  const base = AppConfig.API_BASE_URL.replace(/\/$/, '');
+  const res = await fetch(`${base}/v1/events`, {
+    method: 'GET',
+    headers: {
+      Accept: 'text/event-stream',
+      ...(await authHeaders()),
+    },
+    signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new HttpError(res.status, res.statusText, text ? safeJson(text) : null);
+  }
+  const contentType = res.headers?.get?.('Content-Type') ?? '';
+  if (!contentType.toLowerCase().startsWith('text/event-stream')) {
+    throw new Error(`Expected text/event-stream, received ${contentType || 'no content type'}`);
+  }
+  if (!res.body) throw new Error('SSE response has no readable body');
+
+  onOpen();
+  const parser = createSseParser(onChanged);
+  const decoder = new TextDecoder();
+  const reader = res.body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parser.push(decoder.decode(value, { stream: true }));
+    }
+    parser.push(decoder.decode());
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -130,6 +169,7 @@ export const HttpClient = {
   patch: (path, body, opts) => request('PATCH', path, { ...opts, body }),
   del: (path, opts) => request('DELETE', path, opts),
   clearCache: clearHttpCache,
+  streamLiveEvents,
   HttpError,
   NotImplementedError,
 };

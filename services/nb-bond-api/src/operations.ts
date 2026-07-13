@@ -7,6 +7,7 @@ import {
   insertOperationAttemptRow,
   listOperationAttemptRows,
 } from './ingestion-db';
+import { type LiveResourceKey, publishLiveChange } from './live-events';
 
 /**
  * Operator audit trail.
@@ -152,6 +153,8 @@ export interface OperationRecordingOptions<T> {
   interfaces?: Interface[];
   /** Extract the tx hash from a successful result (null when the op has no single tx). */
   txHashOf?: (result: T) => string | null;
+  /** Non-projection resources made stale when the operation succeeds. */
+  changedResources?: LiveResourceKey[];
 }
 
 /**
@@ -177,6 +180,7 @@ export async function withOperationRecording<T>(
       txHash: opts.txHashOf ? opts.txHashOf(result) : null,
       error: null,
     });
+    if (opts.changedResources) publishLiveChange(opts.changedResources);
     return result;
   } catch (err) {
     const failure = classifyFailure(err, opts.interfaces ?? []);
@@ -193,6 +197,7 @@ export async function withOperationRecording<T>(
 function safeRecord(db: IngestionDatabase, op: RecordedOperation): void {
   try {
     recordOperationAttempt(db, op);
+    publishLiveChange(['operations']);
   } catch {
     // Swallow: an audit-trail write failure must not fail the operation.
     // (WAL-mode SQLite makes this effectively unreachable locally.)

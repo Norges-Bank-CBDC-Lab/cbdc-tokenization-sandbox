@@ -216,6 +216,9 @@ export function createEntraAuth(cfg) {
         return null;
       }
     },
+    handleUnauthorized() {
+      markSessionExpired();
+    },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

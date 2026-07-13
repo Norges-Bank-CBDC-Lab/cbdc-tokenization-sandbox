@@ -24,17 +24,21 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 ### 1. Read-your-writes on mutation responses
 
-- **Problem:** mutation handlers compose the response from the projection, which lags the just-mined receipt by up to one poll interval. The "mutations return the updated parent" contract is therefore not always true at response time, and the NB UI compensates with a delayed second reload (`services/nb-ui/src/pages/PayCouponModal.jsx`).
+- **Problem:** mutation handlers historically composed the response from the projection, which could lag the just-mined receipt by up to one poll interval. The "mutations return the updated parent" contract was therefore not always true at response time, and the NB UI previously compensated with delayed reload behavior.
 - **Direction:** after `tx.wait()`, run one synchronous ingestion pass up to `receipt.blockNumber` (or block until the ingestion checkpoint reaches that block) before composing the response.
 - **Relation:** `docs/plans/cursor-reconcile-sync-plan.md` addresses the client-side half (cursor compare + refetch on divergence). This item is the complementary server-side half: mutation responses become fresh at the source, so the client-side reconcile fires only for genuinely external changes.
-- Status: Planned (direction agreed; no implementation plan yet).
+- Status: First increment shipped in the architecture work: bond/auction
+  mutation responses use a bounded checkpoint wait through the mined receipt
+  block. Further mutation families can reuse the same helper as needed.
 
 ### 2. Projection-first reads — shrink request-path chain reads
 
 - **Problem:** `composeBond()` merges chain-head reads with checkpoint-height projection reads, so a composed DTO is not a consistent snapshot. Separately, every request-path chain read becomes an opaque 500 when Besu is unreachable (`docs/KNOWN_ISSUES.md`, "nb-bond-api request-path chain reads bubble up as opaque 500s").
 - **Direction:** ingest more state into the projection (supply, coupon schedule counters, allowlist membership) and reserve live chain reads for what genuinely cannot be derived from events (e.g. balances of arbitrary untracked addresses). DTOs then read from one consistent source, and the RPC-down blast radius shrinks structurally rather than cosmetically.
 - **Relation:** already sketched as a companion phase of `docs/plans/sse-live-updates-plan.md`; this item promotes it to a standalone work item so it does not ride on the SSE schedule.
-- Status: Planned.
+- Status: First increment shipped in the architecture work: auction lifecycle
+  status is projection-first and composers share an explicit request-level read
+  context. Supply/coupon/allowlist projection expansion remains planned.
 
 ### 3. Codify the projection-purity rule
 
@@ -59,7 +63,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 ### 6. Preflight simulation for all state-changing sends
 
-- **Current state (verified):** an explicit `staticCall` preflight exists for four operations — `deployBond`, `disableBond`, `deployBondWithAuction`, `deployAuctionForBond` (`services/nb-bond-api/src/index.ts`). Every other state-changing send — `payCoupon`, `redeem`, `finaliseAuction`, `closeAuction`, `cancelAuction`, bid submission, central-bank `Wnok` mint/burn/transfer, banking TBD operations — relies only on the implicit `eth_estimateGas` that ethers runs before broadcast. Worse, the close-auction retry path deliberately sets an explicit gas limit to *skip* estimation (the stale-chain-clock false-revert workaround behind `NB_BOND_API_CLOSE_GAS_LIMIT`), so that path transmits with no simulation at all.
+- **Current state (verified):** an explicit `staticCall` preflight exists for four operations — `deployBond`, `disableBond`, `deployBondWithAuction`, `deployAuctionForBond` (`services/nb-bond-api/src/app.ts`). Every other state-changing send — `payCoupon`, `redeem`, `finaliseAuction`, `closeAuction`, `cancelAuction`, bid submission, central-bank `Wnok` mint/burn/transfer, banking TBD operations — relies only on the implicit `eth_estimateGas` that ethers runs before broadcast. Worse, the close-auction retry path deliberately sets an explicit gas limit to *skip* estimation (the stale-chain-clock false-revert workaround behind `NB_BOND_API_CLOSE_GAS_LIMIT`), so that path transmits with no simulation at all.
 - **Direction:** make preflight deliberate and universal for important state-changing actions. Plain `staticCall` suffices for state-only operations (transfers, mint/burn, finalisation); time-dependent operations (`payCoupon`, `closeAuction`) need `eth_simulateV1` with a block-timestamp override set to wall clock, so the simulation sees what the mined transaction will see — this properly retires the blind-send gas-limit workaround instead of bypassing simulation. After a passing preflight, send with an explicit gas limit derived from the simulation's `gasUsed` (plus margin) to avoid re-running estimation.
 - **Verified:** `eth_simulateV1` responds on the running sandbox node; `infra/besu/config/config.toml` enables the ETH, DEBUG, and TRACE RPC namespaces.
 - **Relation:** `docs/plans/operator-audit-trail-design.md` ("simulation predicts, the audit trail records"; includes the payout dry-run preview using the same mechanism) and `docs/KNOWN_ISSUES.md`, "Auction close timing is chain-enforced — no operator discretion".

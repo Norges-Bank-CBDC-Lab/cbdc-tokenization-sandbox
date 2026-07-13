@@ -20,6 +20,7 @@ export function createNoneAuth() {
     async getAuthHeader() {
       return null;
     },
+    handleUnauthorized() {},
     subscribe() {
       return () => {};
     },

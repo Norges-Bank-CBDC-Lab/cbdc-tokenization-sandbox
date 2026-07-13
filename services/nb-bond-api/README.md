@@ -118,6 +118,8 @@ host source mount is required and the chart no longer runs `npm ci` /
   against real funds.
 - `LOG_LEVEL` – defaults to `info`
 - `EXPRESS_PORT` – defaults to `8080`
+- `NB_BOND_API_SSE_HEARTBEAT_MS` – SSE comment-heartbeat interval in
+  milliseconds (default `15000`). Keep any gateway idle timeout above it.
 - `CORS_ALLOWED_ORIGINS` – comma-separated list of origins the CORS middleware accepts.
   Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend).
   Override (with multiple comma-separated origins if needed) for a non-local deployment.
@@ -133,6 +135,20 @@ host source mount is required and the chart no longer runs `npm ci` /
   authenticated endpoints. Must match the nb-ui `AUTH_OPERATOR_ROLES` /
   `AUTH_TESTER_ROLES`.
 
+## Live updates
+
+`GET /v1/events` is a notification-only SSE stream. It is open in local
+`none` auth mode and requires a valid bearer token with a recognised operator
+or tester role in `entra` mode. `changed` events contain only coarse resource
+keys (`auctions`, `banking`, `bidders`, `bonds`, `central-bank`, `operations`,
+or `registry`); clients retrieve current data through the normal API. There is
+no replay buffer or `Last-Event-ID` contract.
+
+Projected bond and auction notifications are emitted only after ingestion
+commits and advances its checkpoint. Other supported API mutations publish
+after their receipt or local system-of-record write is readable. Comment
+heartbeats keep idle streams active and carry no health data.
+
 ## Scripts
 
 - `npm run dev` – run ts-node via tsx
@@ -145,5 +161,6 @@ host source mount is required and the chart no longer runs `npm ci` /
 
 An OpenAPI 3.1 spec is served at `GET /docs` and `GET /v1/openapi.json`.
 The on-disk snapshot at [`openapi.json`](openapi.json) is regenerated from
-[`src/schemas.ts`](src/schemas.ts) via `npm run regen:openapi`; keep them in
-sync after every schema change.
+the Zod contracts under [`src/contracts/`](src/contracts/) and the document
+assembly in [`src/schemas.ts`](src/schemas.ts) via `npm run regen:openapi`;
+keep them in sync after every schema change.
