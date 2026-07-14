@@ -16,6 +16,7 @@ import {
   useToast,
 } from '../components/ui.jsx';
 import { CreateAuctionModal } from './CreateAuctionModal.jsx';
+import { isMutationAccepted, mutationAcceptedMessage } from '../api/httpClient.js';
 
 const HIDE_CANCELLED_KEY = 'nb-ui:auctions:hideCancelled';
 
@@ -76,6 +77,14 @@ export function AuctionsPage({ navigate }) {
 
   function handleCreated(updatedBond) {
     setShowCreate(false);
+    if (isMutationAccepted(updatedBond)) {
+      toast.push({
+        kind: 'ok',
+        title: 'Auction transaction committed',
+        body: mutationAcceptedMessage(updatedBond),
+      });
+      return;
+    }
     const newAuction = updatedBond?.auctions?.[0];
     toast.push({
       kind: 'ok',
@@ -144,7 +153,6 @@ export function AuctionsPage({ navigate }) {
           <option value="open">Open</option>
           <option value="closed">Closed</option>
           <option value="finalised">Finalised</option>
-          <option value="rejected">Rejected</option>
           <option value="cancelled">Cancelled</option>
         </select>
         <select

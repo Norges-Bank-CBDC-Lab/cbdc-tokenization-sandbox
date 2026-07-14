@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { DependencyUnavailableError } from '../src/application-errors';
+import { DependencyUnavailableError, MutationAcceptedError } from '../src/application-errors';
+import { mutationAcceptedSchema } from '../src/contracts/mutations';
 import {
   HttpError,
   buildProblem,
@@ -168,6 +169,30 @@ describe('buildProblem', () => {
 
 describe('problemErrorMiddleware', () => {
   const next = jest.fn() as NextFunction;
+
+  it('maps committed projection lag to the documented 202 success shape', () => {
+    const req = mockReq();
+    const res = mockRes();
+    problemErrorMiddleware(
+      new MutationAcceptedError({
+        transactionHash: '0xabc',
+        blockNumber: 42,
+        resource: { type: 'auction', id: '0x01' },
+      }),
+      req,
+      res,
+      next,
+    );
+
+    expect(res.status).toHaveBeenCalledWith(202);
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'accepted',
+      projectionPending: true,
+      transaction: { hash: '0xabc', block: 42 },
+      resource: { type: 'auction', id: '0x01' },
+    });
+    expect(mutationAcceptedSchema.safeParse(res.json.mock.calls[0][0]).success).toBe(true);
+  });
 
   it('exposes the thrown message for unknown sandbox errors', () => {
     const req = mockReq();

@@ -25,6 +25,7 @@ import {
   useToast,
 } from '../components/ui.jsx';
 import { PayCouponModal } from './PayCouponModal.jsx';
+import { isMutationAccepted, mutationAcceptedMessage } from '../api/httpClient.js';
 
 function payButtonTitle(coupon) {
   if (coupon.payable) return 'Pay this coupon to all current holders';
@@ -67,6 +68,14 @@ export function CouponPayoutPage({ navigate }) {
 
   function handlePaid(updatedBond) {
     setPayTarget(null);
+    if (isMutationAccepted(updatedBond)) {
+      toast.push({
+        kind: 'ok',
+        title: 'Coupon transaction committed',
+        body: mutationAcceptedMessage(updatedBond),
+      });
+      return;
+    }
     toast.push({
       kind: 'ok',
       title: 'Coupon paid',

@@ -84,6 +84,89 @@
         }
       }
     },
+    "/v1/admin/restart-ingestion": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "restartIngestion",
+        "summary": "Restart the in-process ingestion loop",
+        "description": "Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. With `?fromBlock=0`, also drops every table in the central projection list so the rebuild starts from `START_BLOCK`. The bidders, banks, and operation-attempt audit tables are preserved systems of record. Returns once `loopRunning=true` or after a 5s timeout; the operator UI polls `/v1/health` to track the rest of the rebuild.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fromBlock",
+            "required": false,
+            "description": "Set to `0` to drop the projection before restarting (destructive — operator UI gates with a type-to-confirm phrase). Any other value, or absent, performs a plain restart without touching the projection.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restart completed within the timeout; payload reflects post-restart state.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartOutcome"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Restart accepted; loop is still coming up after the 5s timeout (e.g. chain still unreachable). Poll /v1/health to observe readiness.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          },
+          "503": {
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
     "/v1/events": {
       "get": {
         "tags": [
@@ -165,6 +248,13 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
@@ -226,12 +316,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -295,6 +411,13 @@
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             },
@@ -409,12 +532,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -479,12 +628,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -633,12 +808,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Bond"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -694,6 +895,13 @@
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             },
@@ -767,6 +975,13 @@
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
                 "schema": {
                   "type": "string"
+                }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
                 }
               }
             },
@@ -846,12 +1061,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -904,12 +1145,38 @@
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Auction"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
                 }
               }
             }
@@ -938,82 +1205,77 @@
         }
       }
     },
-    "/v1/registry": {
-      "get": {
+    "/v1/auctions/{auctionId}/finalisation": {
+      "put": {
         "tags": [
-          "system"
+          "auctions"
         ],
-        "operationId": "listRegistry",
-        "summary": "List contracts registered in the GlobalRegistry",
-        "responses": {
-          "200": {
-            "description": "Registered contracts (name -> address); the GlobalRegistry itself is first.",
-            "headers": {
-              "ETag": {
-                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/RegisteredContract"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/operations": {
-      "get": {
-        "tags": [
-          "system"
-        ],
-        "operationId": "listOperations",
-        "summary": "List operator operation attempts (audit trail), newest first",
+        "operationId": "finaliseAuction",
+        "summary": "Approve and submit the selected allocation",
         "parameters": [
           {
-            "in": "query",
-            "name": "limit",
-            "required": false,
+            "in": "path",
+            "name": "auctionId",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1000,
-              "default": 200
+              "$ref": "#/components/schemas/AuctionId"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinaliseBody"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Operation attempts, newest first",
+            "description": "Updated auction after finalisation",
             "headers": {
               "ETag": {
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
                 "schema": {
                   "type": "string"
                 }
+              },
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             },
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OperationAttempt"
-                  }
+                  "$ref": "#/components/schemas/Auction"
                 }
               }
             }
           },
-          "304": {
-            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
+          "202": {
+            "description": "Transaction accepted, but the resource projection is still catching up. This is not a failed mutation and must not be retried blindly.",
+            "headers": {
+              "X-Projection-Block": {
+                "description": "Highest chain block included in the SQLite projection used for this response.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationAccepted"
+                }
+              }
+            }
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -1026,6 +1288,9 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -1258,6 +1523,38 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/registry": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "listRegistry",
+        "summary": "List contracts registered in the GlobalRegistry",
+        "responses": {
+          "200": {
+            "description": "Registered contracts (name -> address); the GlobalRegistry itself is first.",
+            "headers": {
+              "ETag": {
+                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RegisteredContract"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2231,31 +2528,29 @@
         }
       }
     },
-    "/v1/admin/restart-ingestion": {
-      "post": {
+    "/v1/operations": {
+      "get": {
         "tags": [
-          "admin"
+          "system"
         ],
-        "operationId": "restartIngestion",
-        "summary": "Restart the in-process ingestion loop",
-        "description": "Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. With `?fromBlock=0`, also drops every projection table (auctions, bond_events, balance_events, balances, partitions, ingestion_state, auction_events) so the rebuild starts from `START_BLOCK`. The bidder roster (`bidders` table) is preserved — it is a sandbox system-of-record that cannot be recovered from chain. Returns once `loopRunning=true` or after a 5s timeout; the operator UI polls `/v1/health` to track the rest of the rebuild.",
+        "operationId": "listOperations",
+        "summary": "List operator operation attempts (audit trail), newest first",
         "parameters": [
           {
             "in": "query",
-            "name": "fromBlock",
+            "name": "limit",
             "required": false,
-            "description": "Set to `0` to drop the projection before restarting (destructive — operator UI gates with a type-to-confirm phrase). Any other value, or absent, performs a plain restart without touching the projection.",
             "schema": {
-              "type": "string",
-              "enum": [
-                "0"
-              ]
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 200
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Restart completed within the timeout; payload reflects post-restart state.",
+            "description": "Operation attempts, newest first",
             "headers": {
               "ETag": {
                 "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
@@ -2267,28 +2562,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RestartOutcome"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperationAttempt"
+                  }
                 }
               }
             }
           },
-          "202": {
-            "description": "Restart accepted; loop is still coming up after the 5s timeout (e.g. chain still unreachable). Poll /v1/health to observe readiness.",
-            "headers": {
-              "ETag": {
-                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RestartOutcome"
-                }
-              }
-            }
+          "304": {
+            "description": "Not Modified — If-None-Match matched current ETag; cached body still valid."
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -2301,79 +2584,6 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
-    "/v1/auctions/{auctionId}/finalisation": {
-      "put": {
-        "tags": [
-          "auctions"
-        ],
-        "operationId": "finaliseAuction",
-        "summary": "Approve or reject the computed allocation",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "auctionId",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/AuctionId"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FinaliseBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated auction after finalisation",
-            "headers": {
-              "ETag": {
-                "description": "MD5 of the response body. Reuse via If-None-Match for cache revalidation.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Auction"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2394,7 +2604,7 @@
             "$ref": "#/components/schemas/Isin"
           },
           "maturityDuration": {
-            "description": "Maturity in DURATION_SCALAR units (years on a real chain; sandbox treats each unit as 60 seconds for fast testing). The contract multiplies by DURATION_SCALAR to derive seconds — do not pre-convert.",
+            "description": "Maturity in DURATION_SCALAR units. The contract multiplies by DURATION_SCALAR; do not pre-convert.",
             "$ref": "#/components/schemas/BigIntString"
           }
         },
@@ -2434,8 +2644,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Optional subset of holders to pay/redeem. null = all holders."
+            ]
           }
         },
         "required": [
@@ -2513,6 +2722,49 @@
         ],
         "description": "PATCH body for the close transition"
       },
+      "FinaliseBody": {
+        "type": "object",
+        "properties": {
+          "approve": {
+            "type": "boolean",
+            "const": true,
+            "description": "Approve and submit the selected allocation on-chain."
+          },
+          "winningBidIndexes": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BidIndex"
+            },
+            "description": "Sealed-bid indexes (each Bid.bidIndex) selected as winners. The server recomputes the allocation over exactly these bids and ignores all unselected bids."
+          },
+          "expectedClearingRate": {
+            "$ref": "#/components/schemas/Bps"
+          }
+        },
+        "required": [
+          "approve",
+          "winningBidIndexes",
+          "expectedClearingRate"
+        ],
+        "description": "Approve-only finalisation request. The server recomputes the clearing rate over the selected bids and rejects on mismatch, so issuance cannot silently diverge from what the operator reviewed. Use the durable cancel transition instead of a local-only rejection."
+      },
+      "BidIndex": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "On-chain sealed-bid array index identifying this bid within its auction. Stable for the life of the auction; used by the operator UI to address winners at finalisation."
+      },
+      "Bps": {
+        "type": "string",
+        "pattern": "^[0-9]+$",
+        "description": "Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.",
+        "examples": [
+          "425",
+          "9875",
+          "10123"
+        ]
+      },
       "CreateBidderBody": {
         "type": "object",
         "properties": {
@@ -2561,16 +2813,6 @@
         "description": "Auction identifier (bytes32 hex)",
         "examples": [
           "0x1234abcd00000000000000000000000000000000000000000000000000000000"
-        ]
-      },
-      "Bps": {
-        "type": "string",
-        "pattern": "^[0-9]+$",
-        "description": "Basis points (1e4 precision). 425 = 4.25%, 9875 = 98.75%.",
-        "examples": [
-          "425",
-          "9875",
-          "10123"
         ]
       },
       "WnokMintBurnBody": {
@@ -2665,35 +2907,6 @@
           "amount"
         ],
         "description": "Body for a transfer from the owning bank's account"
-      },
-      "FinaliseBody": {
-        "type": "object",
-        "properties": {
-          "approve": {
-            "type": "boolean",
-            "description": "true → finalised; false → rejected (allocation discarded)"
-          },
-          "winningBidIndexes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BidIndex"
-            },
-            "description": "Sealed-bid indexes (each Bid.bidIndex) selected as winners. Required and non-empty when approve=true: the server recomputes the allocation over exactly these bids and ignores all unselected bids. Ignored when approve=false."
-          },
-          "expectedClearingRate": {
-            "$ref": "#/components/schemas/Bps"
-          }
-        },
-        "required": [
-          "approve"
-        ],
-        "description": "PUT body for finalisation. Approve: approve=true with winningBidIndexes plus expectedClearingRate (bps) — the server recomputes the clearing rate over the selected bids and rejects on mismatch, so the minted coupon can never silently diverge from what the operator saw. Reject: approve=false (allocation discarded; selection ignored)."
-      },
-      "BidIndex": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 9007199254740991,
-        "description": "On-chain sealed-bid array index identifying this bid within its auction. Stable for the life of the auction; used by the operator UI to address winners at finalisation."
       },
       "ProblemDetails": {
         "type": "object",
@@ -3012,6 +3225,25 @@
         "additionalProperties": false,
         "description": "Single entry in the ring buffer of recent ingestion errors"
       },
+      "RestartOutcome": {
+        "type": "object",
+        "properties": {
+          "restarted": {
+            "type": "boolean",
+            "description": "True when the ingestion loop confirmed `loopRunning=true` within the 5s timeout. False means the loop is still coming up (e.g. chain unreachable); operator UI should poll /v1/health to track readiness."
+          },
+          "status": {
+            "description": "Post-restart snapshot of the ingestion-loop state",
+            "$ref": "#/components/schemas/HealthIngestion"
+          }
+        },
+        "required": [
+          "restarted",
+          "status"
+        ],
+        "additionalProperties": false,
+        "description": "Result of POST /v1/admin/restart-ingestion"
+      },
       "LiveEventStream": {
         "type": "string",
         "description": "UTF-8 Server-Sent Events stream. `changed` event data is JSON with one `changed` array. Allowed resource keys are auctions, banking, bidders, bonds, central-bank, operations, and registry. Comment frames are connection/heartbeat signals. No domain data is sent.",
@@ -3029,8 +3261,7 @@
             "$ref": "#/components/schemas/BondStatus"
           },
           "disabled": {
-            "type": "boolean",
-            "description": "True when the bond has been soft-deleted via DELETE /v1/bonds/{isin}. Disabled bonds are excluded from the default GET /v1/bonds response — pass ?includeDisabled=true to see them. Chain history (events) is preserved."
+            "type": "boolean"
           },
           "totalSupply": {
             "anyOf": [
@@ -3098,16 +3329,16 @@
           "md5"
         ],
         "additionalProperties": false,
-        "description": "Bond resource. Carries the full subtree of auctions, bids, allocations, and holders. A single GET /v1/bonds populates the entire UI cache."
+        "description": "Bond resource carrying the full subtree of auctions, bids, allocations, and holders."
       },
       "BondStatus": {
         "type": "string",
         "enum": [
-          "minting",
-          "maturing",
+          "staged",
+          "auctioning",
+          "outstanding",
           "matured",
-          "redeemed",
-          "unknown"
+          "redeemed"
         ],
         "description": "Bond lifecycle status"
       },
@@ -3115,15 +3346,12 @@
         "type": "object",
         "properties": {
           "token": {
-            "description": "ERC20 bond token contract",
             "$ref": "#/components/schemas/Address"
           },
           "auction": {
-            "description": "BondAuction contract",
             "$ref": "#/components/schemas/Address"
           },
           "manager": {
-            "description": "BondManager contract",
             "$ref": "#/components/schemas/Address"
           }
         },
@@ -3133,7 +3361,7 @@
           "manager"
         ],
         "additionalProperties": false,
-        "description": "On-chain contract addresses for this bond"
+        "description": "Contracts involved in this bond"
       },
       "BondMaturity": {
         "type": "object",
@@ -3146,8 +3374,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Configured maturity duration in seconds (raw chain value)"
+            ]
           },
           "durationYears": {
             "anyOf": [
@@ -3157,8 +3384,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Maturity in DURATION_SCALAR units (= years on a real chain; sandbox compresses 1 unit to DURATION_SCALAR seconds). Derived as duration / DURATION_SCALAR — use this for human-readable display; use `duration` for second-level arithmetic."
+            ]
           },
           "date": {
             "anyOf": [
@@ -3169,8 +3395,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Maturity date as unix timestamp"
+            ]
           },
           "remaining": {
             "anyOf": [
@@ -3180,8 +3405,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Seconds until maturity; 0 once matured"
+            ]
           },
           "remainingYears": {
             "anyOf": [
@@ -3191,8 +3415,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Remaining time in DURATION_SCALAR units (see durationYears for semantics)"
+            ]
           }
         },
         "required": [
@@ -3203,7 +3426,7 @@
           "remainingYears"
         ],
         "additionalProperties": false,
-        "description": "Maturity configuration and remaining time"
+        "description": "Maturity schedule at the projection checkpoint"
       },
       "BondCoupon": {
         "type": "object",
@@ -3216,8 +3439,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Seconds between coupon payments (raw chain value)"
+            ]
           },
           "durationYears": {
             "anyOf": [
@@ -3227,8 +3449,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Coupon interval in DURATION_SCALAR units (= years on a real chain; see BondMaturity.durationYears for the unit semantics)."
+            ]
           },
           "rateBps": {
             "anyOf": [
@@ -3238,8 +3459,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Contractual annualised coupon rate in bps, fixed at bond issuance. Not the same as yield-to-maturity, which depends on the secondary-market price the holder paid; the sandbox has no secondary market so they coincide at par issuance."
+            ]
           },
           "lastPaymentAt": {
             "anyOf": [
@@ -3251,7 +3471,7 @@
                 "type": "null"
               }
             ],
-            "description": "Raw lastCouponPayment chain value (unix seconds). NOTE: the contract initialises this to the finalise/issuance timestamp, so until the first payout (payments.made === 0) it equals the issuance date, not an actual payout."
+            "description": "Timestamp of the most recent coupon baseline. The projection initialises this to the finalise/issuance timestamp, so until the first payout it is the issuance date."
           },
           "nextPaymentDue": {
             "anyOf": [
@@ -3262,12 +3482,11 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "When the next coupon becomes payable: lastPaymentAt + duration (unix seconds). Null when the bond has no coupon schedule or all coupons are paid."
+            ]
           },
           "payable": {
             "type": "boolean",
-            "description": "True when a coupon can be paid now: payments.remaining > 0 and the LATEST BLOCK timestamp has reached nextPaymentDue. Computed server-side against the chain clock — the sandbox chain only mints blocks on transactions, so it lags wall clock. Clients must not recompute this from local time."
+            "description": "True when the projection checkpoint timestamp has reached the next payment and payments remain."
           },
           "payments": {
             "$ref": "#/components/schemas/CouponPayments"
@@ -3376,8 +3595,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Scheduled close timestamp"
+            ]
           },
           "size": {
             "anyOf": [
@@ -3387,8 +3605,7 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Offering or buyback size in 1000-NOK units"
+            ]
           },
           "maturityDuration": {
             "anyOf": [
@@ -3398,14 +3615,12 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Seconds from distribution until maturity (required for RATE auctions)"
+            ]
           },
           "owner": {
             "$ref": "#/components/schemas/Address"
           },
           "sealingPubKey": {
-            "description": "Public key used by bidders to encrypt sealed bids",
             "$ref": "#/components/schemas/HexString"
           },
           "contracts": {
@@ -3455,7 +3670,7 @@
           "md5"
         ],
         "additionalProperties": false,
-        "description": "Auction resource with bids and allocation subtree"
+        "description": "Auction subtree. Bid shape is discriminated by state; allocation is null until close."
       },
       "AuctionStatus": {
         "type": "string",
@@ -3463,7 +3678,6 @@
           "open",
           "closed",
           "finalised",
-          "rejected",
           "cancelled"
         ],
         "description": "Auction lifecycle status"
@@ -3483,7 +3697,7 @@
           "token"
         ],
         "additionalProperties": false,
-        "description": "On-chain contract addresses owning this auction"
+        "description": "Contracts involved in this auction"
       },
       "Bid": {
         "oneOf": [
@@ -3494,7 +3708,7 @@
             "$ref": "#/components/schemas/UnsealedBid"
           }
         ],
-        "description": "Bid; discriminated by `state` — sealed during open, unsealed after close",
+        "description": "Bid in its sealed or unsealed disclosure state",
         "type": "object",
         "discriminator": {
           "propertyName": "state",
@@ -3540,7 +3754,7 @@
           "md5"
         ],
         "additionalProperties": false,
-        "description": "Bid in sealed (encrypted) state during an open auction"
+        "description": "Encrypted bid visible before auction close"
       },
       "UnsealedBid": {
         "type": "object",
@@ -3578,7 +3792,7 @@
           "md5"
         ],
         "additionalProperties": false,
-        "description": "Bid in unsealed (revealed) state after auction close"
+        "description": "Decrypted bid visible after auction close"
       },
       "Allocation": {
         "type": "object",
@@ -3693,7 +3907,7 @@
           "cancel"
         ],
         "additionalProperties": false,
-        "description": "Latest transaction per state-changing action on this auction"
+        "description": "Lifecycle transaction references"
       },
       "TxRef": {
         "type": "object",
@@ -3722,6 +3936,81 @@
         "additionalProperties": false,
         "description": "Reference to an on-chain transaction"
       },
+      "MutationAccepted": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "accepted"
+          },
+          "projectionPending": {
+            "type": "boolean",
+            "const": true
+          },
+          "transaction": {
+            "type": "object",
+            "properties": {
+              "hash": {
+                "$ref": "#/components/schemas/HexString"
+              },
+              "block": {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Block number, or null if not yet mined / unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "hash",
+              "block"
+            ],
+            "additionalProperties": false
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "bond",
+                  "auction"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "status",
+          "projectionPending",
+          "transaction",
+          "resource"
+        ],
+        "additionalProperties": false,
+        "description": "The transaction was broadcast or mined, but the read projection did not catch up within the bounded response wait. Re-fetch the identified resource after the next SSE event."
+      },
       "HistoryEvent": {
         "type": "object",
         "properties": {
@@ -3736,12 +4025,10 @@
               {
                 "type": "null"
               }
-            ],
-            "description": "Set for auction-scoped events; null for bond-level events"
+            ]
           },
           "type": {
-            "type": "string",
-            "description": "Event name as emitted by the contracts (e.g. \"BidSubmitted\", \"CouponPaid\")"
+            "type": "string"
           },
           "block": {
             "type": "integer",
@@ -3751,9 +4038,7 @@
           "txHash": {
             "$ref": "#/components/schemas/HexString"
           },
-          "payload": {
-            "description": "Event-specific opaque payload; clients treat as untyped JSON"
-          }
+          "payload": {}
         },
         "required": [
           "isin",
@@ -3764,137 +4049,7 @@
           "payload"
         ],
         "additionalProperties": false,
-        "description": "Auction or bond event observed on-chain"
-      },
-      "RegisteredContract": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name the contract is registered under in GlobalRegistry"
-          },
-          "address": {
-            "$ref": "#/components/schemas/Address"
-          }
-        },
-        "required": [
-          "name",
-          "address"
-        ],
-        "additionalProperties": false,
-        "description": "A contract registered in the GlobalRegistry (name -> address)"
-      },
-      "OperationAttempt": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Monotonic attempt id (higher = newer)"
-          },
-          "opType": {
-            "$ref": "#/components/schemas/OperationType"
-          },
-          "target": {
-            "type": "string",
-            "description": "Primary resource the operation acted on: ISIN, auction id, address, or bank name"
-          },
-          "status": {
-            "$ref": "#/components/schemas/OperationStatus"
-          },
-          "txHash": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HexString"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Transaction hash when one was broadcast; null when gas estimation rejected the send before broadcast or the operation spans multiple transactions"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Decoded revert reason or failure message; null on success"
-          },
-          "detail": {
-            "anyOf": [
-              {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {}
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Small operation-specific payload (amounts as strings, counts)"
-          },
-          "createdAt": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991,
-            "description": "Attempt timestamp (unix seconds, server clock)"
-          }
-        },
-        "required": [
-          "id",
-          "opType",
-          "target",
-          "status",
-          "txHash",
-          "error",
-          "detail",
-          "createdAt"
-        ],
-        "additionalProperties": false,
-        "description": "One operator-initiated on-chain operation attempt from the persistent audit trail. Failed attempts mostly never reach the chain (rejected at gas estimation), so this trail is their only durable record."
-      },
-      "OperationType": {
-        "type": "string",
-        "enum": [
-          "BOND_CREATE",
-          "BOND_DISABLE",
-          "AUCTION_CREATE",
-          "AUCTION_CLOSE",
-          "AUCTION_CANCEL",
-          "AUCTION_FINALISE",
-          "COUPON_PAYMENT",
-          "REDEMPTION",
-          "BID_SUBMISSION",
-          "WNOK_MINT",
-          "WNOK_BURN",
-          "WNOK_TRANSFER",
-          "WNOK_ALLOWLIST_ADD",
-          "WNOK_ALLOWLIST_REMOVE",
-          "BANK_CREATE",
-          "TBD_MINT",
-          "TBD_BURN",
-          "TBD_TRANSFER",
-          "TBD_ALLOWLIST_ADD",
-          "TBD_ALLOWLIST_REMOVE"
-        ],
-        "description": "Operator-initiated on-chain operation recorded in the audit trail"
-      },
-      "OperationStatus": {
-        "type": "string",
-        "enum": [
-          "SUCCEEDED",
-          "REVERTED",
-          "FAILED",
-          "PARTIAL"
-        ],
-        "description": "Attempt outcome. REVERTED carries the decoded on-chain reason; FAILED is a transport or validation failure; PARTIAL is reserved for future per-leg settlement outcomes."
+        "description": "Immutable projected bond or auction event"
       },
       "Bidder": {
         "type": "object",
@@ -3948,6 +4103,24 @@
         ],
         "additionalProperties": false,
         "description": "Sandbox bidder roster entry. The same private key signs transactions, signs EIP-712 bid intents, and acts as the bidder pubkey for the dual-wrap encryption."
+      },
+      "RegisteredContract": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name the contract is registered under in GlobalRegistry"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          }
+        },
+        "required": [
+          "name",
+          "address"
+        ],
+        "additionalProperties": false,
+        "description": "A contract registered in the GlobalRegistry (name -> address)"
       },
       "CentralBank": {
         "type": "object",
@@ -4284,24 +4457,117 @@
         "additionalProperties": false,
         "description": "An allowlisted TBD holder and its balance. Always read with its parent token."
       },
-      "RestartOutcome": {
+      "OperationAttempt": {
         "type": "object",
         "properties": {
-          "restarted": {
-            "type": "boolean",
-            "description": "True when the ingestion loop confirmed `loopRunning=true` within the 5s timeout. False means the loop is still coming up (e.g. chain unreachable); operator UI should poll /v1/health to track readiness."
+          "id": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Monotonic attempt id (higher = newer)"
+          },
+          "opType": {
+            "$ref": "#/components/schemas/OperationType"
+          },
+          "target": {
+            "type": "string",
+            "description": "Primary resource the operation acted on: ISIN, auction id, address, or bank name"
           },
           "status": {
-            "description": "Post-restart snapshot of the ingestion-loop state",
-            "$ref": "#/components/schemas/HealthIngestion"
+            "$ref": "#/components/schemas/OperationStatus"
+          },
+          "txHash": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HexString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Transaction hash when one was broadcast; null when gas estimation rejected the send before broadcast or the operation spans multiple transactions"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Decoded revert reason or failure message; null on success"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Small operation-specific payload (amounts as strings, counts)"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Attempt timestamp (unix seconds, server clock)"
           }
         },
         "required": [
-          "restarted",
-          "status"
+          "id",
+          "opType",
+          "target",
+          "status",
+          "txHash",
+          "error",
+          "detail",
+          "createdAt"
         ],
         "additionalProperties": false,
-        "description": "Result of POST /v1/admin/restart-ingestion"
+        "description": "One operator-initiated on-chain operation attempt from the persistent audit trail. Failed attempts mostly never reach the chain (rejected at gas estimation), so this trail is their only durable record."
+      },
+      "OperationType": {
+        "type": "string",
+        "enum": [
+          "BOND_CREATE",
+          "BOND_DISABLE",
+          "AUCTION_CREATE",
+          "AUCTION_CLOSE",
+          "AUCTION_CANCEL",
+          "AUCTION_FINALISE",
+          "COUPON_PAYMENT",
+          "REDEMPTION",
+          "BID_SUBMISSION",
+          "WNOK_MINT",
+          "WNOK_BURN",
+          "WNOK_TRANSFER",
+          "WNOK_ALLOWLIST_ADD",
+          "WNOK_ALLOWLIST_REMOVE",
+          "BANK_CREATE",
+          "TBD_MINT",
+          "TBD_BURN",
+          "TBD_TRANSFER",
+          "TBD_ALLOWLIST_ADD",
+          "TBD_ALLOWLIST_REMOVE"
+        ],
+        "description": "Operator-initiated on-chain operation recorded in the audit trail"
+      },
+      "OperationStatus": {
+        "type": "string",
+        "enum": [
+          "SUCCEEDED",
+          "REVERTED",
+          "FAILED",
+          "PARTIAL"
+        ],
+        "description": "Attempt outcome. REVERTED carries the decoded on-chain reason; FAILED is a transport or validation failure; PARTIAL is reserved for future per-leg settlement outcomes."
       }
     },
     "responses": {

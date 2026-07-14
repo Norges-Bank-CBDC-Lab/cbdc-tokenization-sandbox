@@ -161,6 +161,7 @@ heartbeats keep idle streams active and carry no health data.
 
 An OpenAPI 3.1 spec is served at `GET /docs` and `GET /v1/openapi.json`.
 The on-disk snapshot at [`openapi.json`](openapi.json) is regenerated from
-the Zod contracts under [`src/contracts/`](src/contracts/) and the document
-assembly in [`src/schemas.ts`](src/schemas.ts) via `npm run regen:openapi`;
+the Zod contracts and path fragments under [`src/contracts/`](src/contracts/)
+and the document assembly in
+[`src/openapi/document.ts`](src/openapi/document.ts) via `npm run regen:openapi`;
 keep them in sync after every schema change.

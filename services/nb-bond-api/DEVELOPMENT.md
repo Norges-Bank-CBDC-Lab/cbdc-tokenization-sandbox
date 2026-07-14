@@ -82,8 +82,10 @@ automatically if it is missing.
 ## 3. Data model and field conventions
 
 These conventions come directly from `services/nb-bond-api/openapi.json`, the
-feature contracts under `services/nb-bond-api/src/contracts/`, and the document
-assembly in `services/nb-bond-api/src/schemas.ts`.
+feature contracts and path fragments under
+`services/nb-bond-api/src/contracts/`, shared responses under
+`services/nb-bond-api/src/openapi/shared-responses.ts`, and the document
+assembly in `services/nb-bond-api/src/openapi/document.ts`.
 
 ### 3.1 Common types
 
@@ -199,9 +201,9 @@ failures populate `errors[]` with `{ field, message }` entries.
   - Effects: sends `BondManager.cancelAuction(isin)`.
   - Returns the cancelled `Auction`.
 - `PUT /v1/auctions/{auctionId}/finalisation` (`operationId: finaliseAuction`)
-  - Body: `FinaliseBody` — `{ approve, winningBidIndexes?, expectedClearingRate? }`. When `approve=true`, `winningBidIndexes` (the on-chain `bidIndex` of each winning Bid) and `expectedClearingRate` (bps) are required.
-  - When `approve=true`: re-fetches the sealed bids from chain, recomputes the uniform-price allocation + clearing rate over **exactly the selected bids**, rejects (`400`) if the recomputed rate differs from `expectedClearingRate`, rebuilds per-allocation proofs (paired to bids by `bidIndex`), and sends `BondManager.finaliseAuction(isin, allocations, proofs)`. The server is the sole authority for the economic terms — unselected bids never reach the chain.
-  - When `approve=false`: marks the allocation rejected; no on-chain transaction (selection fields ignored).
+  - Body: `FinaliseBody` — `{ approve: true, winningBidIndexes, expectedClearingRate }`. Both selection fields are required.
+  - Re-fetches the sealed bids from chain, recomputes the uniform-price allocation + clearing rate over **exactly the selected bids**, rejects (`400`) if the recomputed rate differs from `expectedClearingRate`, rebuilds per-allocation proofs (paired to bids by `bidIndex`), and sends `BondManager.finaliseAuction(isin, allocations, proofs).`
+  - There is no local-only reject state. Use the durable cancel transition when the allocation must not be issued.
   - Returns the updated `Auction`.
 
 ### 4.4 Admin
@@ -209,7 +211,7 @@ failures populate `errors[]` with `{ field, message }` entries.
 - `POST /v1/admin/restart-ingestion` (`operationId: restartIngestion`)
   - Operator-only: sits under the standard auth gate (no-op in `none` mode, JWT-validated in `entra` mode) plus an operator-role check in `entra` mode (`403` otherwise). See [§7.9](#79-admin-restart-ingestion).
   - `POST /v1/admin/restart-ingestion` — plain restart. Tears down the running ingestion loop and starts a fresh one via the same retry-with-backoff helper used at boot. Projection survives.
-  - `POST /v1/admin/restart-ingestion?fromBlock=0` — destructive reset. Drops every projection table (`auctions`, `auction_events`, `bond_events`, `balance_events`, `balances`, `partitions`, `ingestion_state`) and restarts the loop, which will rebuild from `START_BLOCK`. The `bidders` table is **preserved** because it holds sandbox impersonation keypairs that cannot be recovered from chain.
+  - `POST /v1/admin/restart-ingestion?fromBlock=0` — destructive reset. Drops every table listed in `PROJECTION_TABLE_NAMES` and restarts the loop from `START_BLOCK`. The `bidders`, `banks`, and `operation_attempts` system-of-record tables are preserved.
   - Returns `RestartOutcome` — `{ restarted: boolean, status: HealthIngestion }`. `200` when the loop confirmed `loopRunning=true` within the 5s timeout, `202` when it's still coming up (e.g. Besu still unreachable). The operator UI polls `/v1/health` to track the rest of the rebuild either way.
 
 ## 5. Bid submission (dealer workflow, CLIs)
@@ -263,9 +265,9 @@ This section provides step-by-step "operator runbooks" that use only this OpenAP
 4. Close and compute:
    - `PATCH /v1/auctions/{auctionId}` body `{ "status": "closed" }`.
    - Response is the updated `Auction`. Review `bids[]` (each carries its on-chain `bidIndex`), `allocation.entries`, and `allocation.clearingRate`.
-5. Finalise (or reject):
+5. Finalise or cancel:
    - `PUT /v1/auctions/{auctionId}/finalisation` body `{ "approve": true, "winningBidIndexes": [0, 1, 3], "expectedClearingRate": "<bps>" }` to submit on-chain. Send the `bidIndex` of each winning bid plus the clearing rate you expect; the server recomputes over that selection and rejects (`400`) on mismatch.
-   - If the operator does not approve the computed outcome, send `{ "approve": false }` to record rejection (no on-chain transaction).
+   - If the operator does not approve the outcome, cancel the auction. Rejection is not advertised because the contracts emit no durable rejection transition that projection replay could recover.
 6. Verify: subsequent `GET /v1/auctions/{auctionId}` (or `GET /v1/bonds/{isin}`) reflects the new status.
 
 ### 6.2 Issuance extension (PRICE auction)
@@ -379,11 +381,10 @@ and auction resource keys only after the projection transaction and
 checkpoint save complete, so clients no longer need a delayed second reload
 to race the ingestion tick.
 
-The schema is versioned via `PRAGMA user_version` (current version `3`).
+The schema is versioned via `PRAGMA user_version` (current version `6`).
 When the on-disk value is lower than the current `SCHEMA_VERSION` in
 `src/ingestion-db.ts`, `openDatabase` runs a one-shot migration that
-drops the full projection (`auction_events`, `balance_events`,
-`bond_events`, `auctions`, `partitions`, `balances`, `ingestion_state`)
+drops the full projection through the central `PROJECTION_TABLE_NAMES` list
 and stamps the new version. The polling loop then rebuilds every table
 from chain on its next tick. This works because the database is a
 projection of chain state, not a system of record; rebuildability is the
@@ -402,29 +403,43 @@ never double-counts the delta. This guarantee is the precondition for
 any future move to event-driven ingestion (WebSocket + watchdog) where
 the same log can legitimately be delivered more than once.
 
+`TransferByPartition` is the sole balance movement source. The token also emits
+high-level `IsinMinted` and `IsinRedeemed` events for the same operations; those
+events must not be reduced as additional deltas. Mint and burn transfers apply
+only the non-zero side, and self-transfers are net-zero. Schema version 4 forces
+a projection rebuild so older doubled deltas and zero-address pseudo-holders
+cannot survive the reducer correction. Schema version 5 adds the `bond_state`
+projection, which reduces chain-reproducible lifecycle, offering, coupon,
+maturity, supply, and redemption facts without mixing them into the HTTP DTO.
+Schema version 6 adds `auction_bids`, `auction_allocations`, and full auction
+metadata columns. BondAuction owns metadata and sealed-bid facts; BondManager
+continues to own business lifecycle and DvP outcome history. Final allocations
+are enriched with a block-tagged read at the `AuctionFinalized` source block so
+a full resync remains deterministic.
+
 ### 7.5 Cache behaviour
 
-Auction bid sets and computed allocations are derived per-request from
-chain + ingestion DB by [`src/compose.ts`](src/compose.ts). The service
-does not retain in-memory state between requests for cacheable DTOs —
-the bulky GETs are stateless. On restart there is nothing to hydrate.
+Bond and auction DTOs are composed from synchronous SQLite snapshot loaders in
+[`src/projection/snapshots.ts`](src/projection/snapshots.ts). No request-path RPC
+read contributes lifecycle, supply, holder, bid, or allocation state. Each
+response exposes the snapshot checkpoint as `X-Projection-Block`.
 
-One explicit read context is passed through each composition pass. It reuses
-contract handles and chain-wide values only inside that request. Auction
-lifecycle status is projection-first once the auction has been ingested.
-After bond and auction mutations that return composed state, the API waits a
-bounded period for the projection to reach the mined receipt block before it
-builds the response. If the bound expires, the API logs the lag and still
-returns the committed operation instead of encouraging a duplicate retry.
+The polling loop and mutations share one serialized ingestion coordinator.
+After a mutation mines, `advanceProjectionTo(receipt.blockNumber)` processes
+missing ranges before composing the updated resource. If bounded catch-up does
+not finish, the API returns `202 MutationAccepted` with the public transaction
+reference, resource identity, and `projectionPending:true`; it never returns a
+stale success DTO or a false post-commit failure.
 
 For durable audit artefacts, use the on-chain allocations and the
 ingestion-backed history endpoints rather than client-side caches.
 
 ### 7.6 ETag / md5 caching protocol
 
-Every successful response sets two headers:
+Projection-backed Bond/Auction responses set:
 
 - `ETag: "<md5>"` — md5 of canonical (key-sorted) JSON of the response body.
+- `X-Projection-Block: <number>` — highest chain block represented by the snapshot.
 - `Cache-Control: no-cache, must-revalidate`.
 
 Each cacheable DTO (`Bond`, `Auction`, `Bid` variants, `Allocation`,
@@ -583,13 +598,14 @@ recommended follow-up before a non-local deployment.
 
 The SQLite database under `/app/data` holds two very different things:
 
-- **Chain projection** — `auctions`, `auction_events`, `bond_events`,
-  `balance_events`, `balances`, `partitions`, `ingestion_state`. These
+- **Chain projection** — every table in `PROJECTION_TABLE_NAMES`, including
+  bond state, auction metadata/bids/allocations, balances, events, checkpoint,
+  and static projection context. These
   are derivable from chain logs; the ingestion loop rebuilds them on
   next tick after a wipe.
-- **System-of-record** — the `bidders` table holds sandbox
-  impersonation keypairs. Plaintext, sandbox-only, **cannot be
-  recovered from chain**. If this is wiped the canonical fixture
+- **System-of-record** — `bidders`, `banks`, and `operation_attempts` are
+  deliberately excluded from projection resets. Bidder keypairs are plaintext,
+  sandbox-only, and **cannot be recovered from chain**. If this is wiped the canonical fixture
   bidders re-seed but any operator-added bidder is permanently gone.
 
 To prevent that, the helm chart mounts a `PersistentVolumeClaim`

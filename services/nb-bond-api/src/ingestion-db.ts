@@ -28,6 +28,12 @@ import { logger } from './logger';
  *        the version so the projection is rebuilt cleanly on first boot
  *        after upgrade — CREATE TABLE IF NOT EXISTS would otherwise
  *        keep the old shape.
+ *  - v4: rebuilt balance projection after making TransferByPartition the
+ *        sole canonical balance source. Older databases may contain doubled
+ *        mint/redeem deltas and zero-address pseudo-holders.
+ *  - v5: added checkpoint-rebuildable bond_state lifecycle, coupon, offering,
+ *        and supply facts.
+ *  - v6: added projected auction metadata, sealed bids, and final allocations.
  *
  * Note on the `bidders`, `banks` and `operation_attempts` tables:
  * unlike every other table in this file, they are *systems of record*,
@@ -39,7 +45,7 @@ import { logger } from './logger';
  * record failed sends that never reached the chain; neither can be
  * recovered from chain state.
  */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 6;
 
 export interface IngestionDatabaseStatement<T = unknown> {
   all: (...args: unknown[]) => T[];
@@ -68,10 +74,51 @@ export interface AuctionEventRow {
   payload: string;
 }
 
+export interface AuctionBidRow {
+  auction_id: string;
+  bid_index: number;
+  bidder: string;
+  ciphertext: string;
+  plaintext_hash: string;
+  cancelled: number;
+  source_block: number;
+  source_log_index: number;
+}
+
+export interface AuctionAllocationRow {
+  auction_id: string;
+  position: number;
+  bidder: string;
+  units: string;
+  rate: string;
+  auction_type: string;
+  source_block: number;
+}
+
 export interface BalanceRow {
   isin: string;
   holder: string;
   balance: string;
+}
+
+export interface BondStateRow {
+  isin: string;
+  partition: string;
+  bond_address: string | null;
+  disabled: number;
+  maturity_duration: string | null;
+  maturity_date: string | null;
+  coupon_duration: string | null;
+  coupon_yield: string | null;
+  last_coupon_payment: string | null;
+  coupon_payment_count: string;
+  is_matured: number;
+  total_supply: string;
+  offering: string;
+  ever_issued: number;
+  redemption_complete: number;
+  updated_block: number;
+  updated_log_index: number;
 }
 
 function createTables(db: IngestionDatabase) {
@@ -84,7 +131,16 @@ function createTables(db: IngestionDatabase) {
     CREATE TABLE IF NOT EXISTS ingestion_state (
       contract TEXT PRIMARY KEY,
       last_block INTEGER,
-      last_tx_index INTEGER
+      last_tx_index INTEGER,
+      block_timestamp INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS projection_context (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      manager_address TEXT NOT NULL,
+      token_address TEXT NOT NULL,
+      auction_address TEXT NOT NULL,
+      duration_scalar TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS auctions (
@@ -93,7 +149,14 @@ function createTables(db: IngestionDatabase) {
       type TEXT,
       created_block INTEGER,
       created_tx TEXT,
-      bond TEXT
+      bond TEXT,
+      owner TEXT,
+      end TEXT,
+      offering TEXT,
+      auction_pub_key TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      closed_at INTEGER,
+      finalised_at INTEGER
     );
 
     CREATE TABLE IF NOT EXISTS auction_events (
@@ -110,6 +173,31 @@ function createTables(db: IngestionDatabase) {
     CREATE INDEX IF NOT EXISTS idx_auction_events_auction_block ON auction_events(auction_id, block, id);
     CREATE UNIQUE INDEX IF NOT EXISTS uq_auction_events_dedup ON auction_events(tx_hash, log_index);
 
+    CREATE TABLE IF NOT EXISTS auction_bids (
+      auction_id TEXT NOT NULL,
+      bid_index INTEGER NOT NULL,
+      bidder TEXT NOT NULL,
+      ciphertext TEXT NOT NULL,
+      plaintext_hash TEXT NOT NULL,
+      cancelled INTEGER NOT NULL DEFAULT 0,
+      source_block INTEGER NOT NULL,
+      source_log_index INTEGER NOT NULL,
+      PRIMARY KEY (auction_id, bid_index)
+    );
+    CREATE INDEX IF NOT EXISTS idx_auction_bids_active
+      ON auction_bids(auction_id, cancelled, bid_index);
+
+    CREATE TABLE IF NOT EXISTS auction_allocations (
+      auction_id TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      bidder TEXT NOT NULL,
+      units TEXT NOT NULL,
+      rate TEXT NOT NULL,
+      auction_type TEXT NOT NULL,
+      source_block INTEGER NOT NULL,
+      PRIMARY KEY (auction_id, position)
+    );
+
     CREATE TABLE IF NOT EXISTS partitions (
       partition TEXT PRIMARY KEY,
       isin TEXT,
@@ -118,6 +206,27 @@ function createTables(db: IngestionDatabase) {
       disabled INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_partitions_isin ON partitions(isin);
+
+    CREATE TABLE IF NOT EXISTS bond_state (
+      isin TEXT PRIMARY KEY,
+      partition TEXT NOT NULL,
+      bond_address TEXT,
+      disabled INTEGER NOT NULL DEFAULT 0,
+      maturity_duration TEXT,
+      maturity_date TEXT,
+      coupon_duration TEXT,
+      coupon_yield TEXT,
+      last_coupon_payment TEXT,
+      coupon_payment_count TEXT NOT NULL DEFAULT '0',
+      is_matured INTEGER NOT NULL DEFAULT 0,
+      total_supply TEXT NOT NULL DEFAULT '0',
+      offering TEXT NOT NULL DEFAULT '0',
+      ever_issued INTEGER NOT NULL DEFAULT 0,
+      redemption_complete INTEGER NOT NULL DEFAULT 0,
+      updated_block INTEGER NOT NULL DEFAULT 0,
+      updated_log_index INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_bond_state_partition ON bond_state(partition);
 
     CREATE TABLE IF NOT EXISTS balances (
       isin TEXT,
@@ -239,9 +348,13 @@ function createTables(db: IngestionDatabase) {
  */
 export const PROJECTION_TABLE_NAMES = [
   'ingestion_state',
+  'projection_context',
   'auctions',
   'auction_events',
+  'auction_bids',
+  'auction_allocations',
   'partitions',
+  'bond_state',
   'balances',
   'balance_events',
   'bond_events',
@@ -321,6 +434,37 @@ export function getBalancesByIsin(db: IngestionDatabase, isin: string) {
   return stmt.all(isin) as BalanceRow[];
 }
 
+export function getBondStateByIsin(db: IngestionDatabase, isin: string): BondStateRow | null {
+  const stmt = db.prepare(`SELECT * FROM bond_state WHERE isin = ?`);
+  return (stmt.get(isin) as BondStateRow | undefined) ?? null;
+}
+
+export interface ProjectionContextRow {
+  manager_address: string;
+  token_address: string;
+  auction_address: string;
+  duration_scalar: string;
+}
+
+export function getProjectionContext(db: IngestionDatabase): ProjectionContextRow | null {
+  return (
+    (db.prepare(`SELECT * FROM projection_context WHERE id = 1`).get() as
+      ProjectionContextRow | undefined) ?? null
+  );
+}
+
+export function getProjectionCheckpoint(
+  db: IngestionDatabase,
+): { asOfBlock: number; blockTimestamp: number | null } | null {
+  const row = db
+    .prepare(
+      `SELECT last_block - 1 AS as_of_block, block_timestamp
+       FROM ingestion_state WHERE contract = 'bond-manager'`,
+    )
+    .get() as { as_of_block: number; block_timestamp: number | null } | undefined;
+  return row ? { asOfBlock: row.as_of_block, blockTimestamp: row.block_timestamp ?? null } : null;
+}
+
 export function getBondEventsByIsin(db: IngestionDatabase, isin: string, limit = 200, offset = 0) {
   const stmt = db.prepare(
     `SELECT isin, type, block, tx_hash, payload
@@ -345,11 +489,19 @@ export interface AuctionRow {
   created_block: number | null;
   created_tx: string | null;
   bond: string | null;
+  owner: string | null;
+  end: string | null;
+  offering: string | null;
+  auction_pub_key: string | null;
+  status: string;
+  closed_at: number | null;
+  finalised_at: number | null;
 }
 
 export function getAuctionRowById(db: IngestionDatabase, auctionId: string): AuctionRow | null {
   const stmt = db.prepare(
-    `SELECT auction_id, isin, type, created_block, created_tx, bond
+    `SELECT auction_id, isin, type, created_block, created_tx, bond,
+            owner, end, offering, auction_pub_key, status, closed_at, finalised_at
      FROM auctions
      WHERE auction_id = ?`,
   );
@@ -374,7 +526,8 @@ export function getAuctionEventsById(
 
 export function listAuctionRowsByIsin(db: IngestionDatabase, isin: string): AuctionRow[] {
   const stmt = db.prepare(
-    `SELECT auction_id, isin, type, created_block, created_tx, bond
+    `SELECT auction_id, isin, type, created_block, created_tx, bond,
+            owner, end, offering, auction_pub_key, status, closed_at, finalised_at
      FROM auctions
      WHERE isin = ?
      ORDER BY created_block, auction_id`,
@@ -384,11 +537,34 @@ export function listAuctionRowsByIsin(db: IngestionDatabase, isin: string): Auct
 
 export function listAllAuctions(db: IngestionDatabase): AuctionRow[] {
   const stmt = db.prepare(
-    `SELECT auction_id, isin, type, created_block, created_tx, bond
+    `SELECT auction_id, isin, type, created_block, created_tx, bond,
+            owner, end, offering, auction_pub_key, status, closed_at, finalised_at
      FROM auctions
      ORDER BY created_block DESC, auction_id`,
   );
   return stmt.all() as AuctionRow[];
+}
+
+export function getAuctionBids(db: IngestionDatabase, auctionId: string): AuctionBidRow[] {
+  return db
+    .prepare(
+      `SELECT auction_id, bid_index, bidder, ciphertext, plaintext_hash,
+              cancelled, source_block, source_log_index
+       FROM auction_bids WHERE auction_id = ? ORDER BY bid_index`,
+    )
+    .all(auctionId) as AuctionBidRow[];
+}
+
+export function getAuctionAllocations(
+  db: IngestionDatabase,
+  auctionId: string,
+): AuctionAllocationRow[] {
+  return db
+    .prepare(
+      `SELECT auction_id, position, bidder, units, rate, auction_type, source_block
+       FROM auction_allocations WHERE auction_id = ? ORDER BY position`,
+    )
+    .all(auctionId) as AuctionAllocationRow[];
 }
 
 export interface BondRow {

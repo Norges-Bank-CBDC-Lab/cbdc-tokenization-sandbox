@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
-import { DependencyUnavailableError } from './application-errors';
+import { DependencyUnavailableError, MutationAcceptedError } from './application-errors';
 import type { ProblemDetails } from './schemas';
 
 const DEPENDENCY_UNAVAILABLE_DETAIL = 'Required chain state is temporarily unavailable.';
@@ -156,6 +156,19 @@ export function problemErrorMiddleware(
   res: Response,
   _next: NextFunction,
 ): void {
+  if (err instanceof MutationAcceptedError) {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(202).json({
+      status: 'accepted',
+      projectionPending: true,
+      transaction: {
+        hash: err.transactionHash,
+        block: err.blockNumber,
+      },
+      resource: err.resource,
+    });
+    return;
+  }
   if (err instanceof HttpError) {
     res
       .status(err.status)

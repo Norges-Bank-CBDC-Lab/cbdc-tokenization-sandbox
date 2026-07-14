@@ -103,7 +103,10 @@ describe('auction service', () => {
       31536000n,
       { nonce: 7 },
     );
-    expect(awaitProjection).toHaveBeenCalledWith(12);
+    expect(awaitProjection).toHaveBeenCalledWith(
+      { tx: { hash: '0xtx' }, receipt: { blockNumber: 12 } },
+      { type: 'bond', id: 'NO0000000001' },
+    );
   });
 
   it('fails closed when the required bond-staging read is unavailable', async () => {
@@ -141,6 +144,9 @@ describe('auction service', () => {
 
     await expect(service.close('0x01')).resolves.toEqual(mockState.composedAuction);
     expect(mockCloseAuction).toHaveBeenCalledWith('NO0000000001', { nonce: 7 });
-    expect(awaitProjection).toHaveBeenCalledWith(12);
+    expect(awaitProjection).toHaveBeenCalledWith(
+      { tx: { hash: '0xtx' }, receipt: { blockNumber: 12 } },
+      { type: 'auction', id: '0x01' },
+    );
   });
 });

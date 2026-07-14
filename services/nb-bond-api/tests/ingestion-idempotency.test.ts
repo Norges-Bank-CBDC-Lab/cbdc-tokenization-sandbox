@@ -223,6 +223,20 @@ describe('ingestion event idempotency (schema v2)', () => {
       expect(getBalance(db, isin, '0xalice')).toBe('-50');
       expect(getBalance(db, isin, '0xbob')).toBe('50');
     });
+
+    it('defensively ignores a zero-address holder', () => {
+      applyBalanceDelta(db, {
+        isin,
+        holder: '0x0000000000000000000000000000000000000000',
+        delta: 100n,
+        block: 30,
+        logIndex,
+        txHash,
+        kind: 'mint',
+      });
+      expect(rowCount(db, 'balance_events')).toBe(0);
+      expect(getBalance(db, isin, '0x0000000000000000000000000000000000000000')).toBeNull();
+    });
   });
 });
 
@@ -279,12 +293,15 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     const db = openDatabase({ dbPath }) as ClosableIngestionDatabase;
     try {
       const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(3);
+      expect(userVersion).toBe(6);
 
       // Tables exist (recreated by createTables after the drop).
       expect(rowCount(db, 'auction_events')).toBe(0);
       expect(rowCount(db, 'bond_events')).toBe(0);
       expect(rowCount(db, 'balance_events')).toBe(0);
+      expect(rowCount(db, 'bond_state')).toBe(0);
+      expect(rowCount(db, 'auction_bids')).toBe(0);
+      expect(rowCount(db, 'auction_allocations')).toBe(0);
 
       // Checkpoint was cleared so the polling loop will rebuild from
       // START_BLOCK.
@@ -336,7 +353,7 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     try {
       expect(rowCount(second, 'auction_events')).toBe(1);
       const userVersion = Number(second.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(3);
+      expect(userVersion).toBe(6);
     } finally {
       second.close();
     }

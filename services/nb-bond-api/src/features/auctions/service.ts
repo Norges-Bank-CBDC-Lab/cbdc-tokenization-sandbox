@@ -2,7 +2,7 @@ import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 import { tbdAbi } from '../../abi';
 import { computeBuybackAllocation, computeUniformAllocation } from '../../allocation';
-import { DependencyUnavailableError } from '../../application-errors';
+import { DependencyUnavailableError, type MutationResource } from '../../application-errors';
 import { normalizeSealedBid, unsealBid } from '../../bid';
 import {
   decodeCustomError,
@@ -25,14 +25,20 @@ export interface AuctionServiceDependencies {
   operationsDb: IngestionDatabase;
   sealingPublicKey: string;
   nowSeconds?: () => bigint;
-  awaitProjection?: (blockNumber: number) => Promise<void>;
+  awaitProjection?: (
+    sent: { tx: { hash: string }; receipt: { blockNumber: number } | null },
+    resource: MutationResource,
+  ) => Promise<void>;
 }
 
 export function createAuctionService(dependencies: AuctionServiceDependencies) {
   const nowSeconds = dependencies.nowSeconds ?? (() => BigInt(Math.floor(Date.now() / 1000)));
-  const awaitProjection = async (sent: { receipt: { blockNumber: number } | null }) => {
-    if (sent.receipt && dependencies.awaitProjection) {
-      await dependencies.awaitProjection(sent.receipt.blockNumber);
+  const awaitProjection = async (
+    sent: { tx: { hash: string }; receipt: { blockNumber: number } | null },
+    resource: MutationResource,
+  ) => {
+    if (dependencies.awaitProjection) {
+      await dependencies.awaitProjection(sent, resource);
     }
   };
 
@@ -141,7 +147,7 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
         });
       },
     );
-    await awaitProjection(sent);
+    await awaitProjection(sent, { type: 'bond', id: isin });
 
     const bond = await composeBond(dependencies.historyDb, isin);
     if (!bond) throw notFound(`bond ${isin} not found after auction creation`);
@@ -173,7 +179,7 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
           return bondManager.cancelAuction(isin, { nonce });
         }),
     );
-    await awaitProjection(sent);
+    await awaitProjection(sent, { type: 'auction', id: auctionId });
 
     const auction = await composeAuction(dependencies.historyDb, auctionId);
     if (!auction) throw notFound(`auction ${auctionId} not found after cancel`);
@@ -238,7 +244,7 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
         }
       },
     );
-    await awaitProjection(sent);
+    await awaitProjection(sent, { type: 'auction', id: auctionId });
 
     const auction = await composeAuction(dependencies.historyDb, auctionId);
     if (!auction) throw notFound(`auction ${auctionId} not found after close`);
@@ -246,25 +252,13 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
   }
 
   async function finalise(auctionId: string, body: FinaliseBody): Promise<Auction> {
-    const { approve, winningBidIndexes, expectedClearingRate } = body;
+    const { winningBidIndexes, expectedClearingRate } = body;
     const auction = await composeAuction(dependencies.historyDb, auctionId);
     if (!auction) throw notFound(`auction ${auctionId} not found`);
     if (auction.status === 'finalised') throw conflict('auction already finalised');
     if (auction.status === 'cancelled') throw conflict('auction cancelled');
 
-    if (!approve) {
-      const refreshed = await composeAuction(dependencies.historyDb, auctionId);
-      if (!refreshed) throw notFound(`auction ${auctionId} not found after reject`);
-      return refreshed;
-    }
-
     if (auction.status !== 'closed') throw conflict('auction must be closed to finalise');
-    if (!winningBidIndexes || winningBidIndexes.length === 0) {
-      throw badRequest('winningBidIndexes is required and must be non-empty when approve is true');
-    }
-    if (expectedClearingRate === undefined) {
-      throw badRequest('expectedClearingRate is required when approve is true');
-    }
     if (!auction.size) throw conflict('auction has no offering size');
 
     const offering = BigInt(auction.size);
@@ -336,7 +330,7 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
           return bondManager.finaliseAuction(isin, allocations, proofs, { nonce });
         }),
     );
-    await awaitProjection(sent);
+    await awaitProjection(sent, { type: 'auction', id: auctionId });
 
     const refreshed = await composeAuction(dependencies.historyDb, auctionId);
     if (!refreshed) throw notFound(`auction ${auctionId} not found after finalisation`);

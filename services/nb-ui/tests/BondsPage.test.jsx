@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 const FIXTURE_BONDS = [
   {
     isin: 'NO0012345678',
-    status: 'maturing',
+    status: 'outstanding',
     totalSupply: '5000000000',
     contracts: { token: '0xaaaa', auction: '0xbbbb' },
     maturity: { duration: '157680000', date: '1893456000', remaining: '126144000' },
@@ -26,7 +26,7 @@ const FIXTURE_BONDS = [
   },
   {
     isin: 'NO0098765432',
-    status: 'minting',
+    status: 'outstanding',
     totalSupply: '2500000000',
     contracts: { token: '0xcccc', auction: '0xdddd' },
     maturity: { duration: '157680000', date: '1893456000', remaining: '126144000' },
@@ -60,7 +60,7 @@ const FIXTURE_BONDS = [
 
 const FIXTURE_BOND_DISABLED = {
   isin: 'NO9999DISABLE',
-  status: 'unknown',
+  status: 'staged',
   totalSupply: '0',
   contracts: { token: '0x1', auction: '0x2' },
   maturity: { duration: null, date: null, remaining: null },

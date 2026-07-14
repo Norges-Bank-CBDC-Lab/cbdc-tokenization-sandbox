@@ -1,6 +1,8 @@
 # Backend Design Improvements — Backlog
 
-Status: Backlog — pre-planning. Each item is a candidate for its own implementation plan; none is scheduled yet. The operator audit trail is deliberately excluded from this list — it has its own design brief in `docs/plans/operator-audit-trail-design.md`.
+Status: Backlog. Projection/read-your-writes items now have a concrete follow-up
+plan in `docs/plans/projection-aligned-api-contract-plan.md`. The operator audit
+trail remains excluded from this list because it has its own design brief.
 
 Date: 2026-07-06
 
@@ -29,7 +31,9 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 - **Relation:** `docs/plans/cursor-reconcile-sync-plan.md` addresses the client-side half (cursor compare + refetch on divergence). This item is the complementary server-side half: mutation responses become fresh at the source, so the client-side reconcile fires only for genuinely external changes.
 - Status: First increment shipped in the architecture work: bond/auction
   mutation responses use a bounded checkpoint wait through the mined receipt
-  block. Further mutation families can reuse the same helper as needed.
+  block. The complete ingestion-coordinator and honest `202` fallback are
+  implemented by `projection-aligned-api-contract-plan.md`: mutations actively
+  advance the shared coordinator and return an honest `202` when still pending.
 
 ### 2. Projection-first reads — shrink request-path chain reads
 
@@ -38,7 +42,9 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 - **Relation:** already sketched as a companion phase of `docs/plans/sse-live-updates-plan.md`; this item promotes it to a standalone work item so it does not ride on the SSE schedule.
 - Status: First increment shipped in the architecture work: auction lifecycle
   status is projection-first and composers share an explicit request-level read
-  context. Supply/coupon/allowlist projection expansion remains planned.
+  context. Bond/auction snapshot projection expansion is planned in
+  implemented for Bond/Auction DTOs by `projection-aligned-api-contract-plan.md`;
+  broader WNOK/TBD allowlist projection remains separate.
 
 ### 3. Codify the projection-purity rule
 
@@ -63,7 +69,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 ### 6. Preflight simulation for all state-changing sends
 
-- **Current state (verified):** an explicit `staticCall` preflight exists for four operations — `deployBond`, `disableBond`, `deployBondWithAuction`, `deployAuctionForBond` (`services/nb-bond-api/src/app.ts`). Every other state-changing send — `payCoupon`, `redeem`, `finaliseAuction`, `closeAuction`, `cancelAuction`, bid submission, central-bank `Wnok` mint/burn/transfer, banking TBD operations — relies only on the implicit `eth_estimateGas` that ethers runs before broadcast. Worse, the close-auction retry path deliberately sets an explicit gas limit to *skip* estimation (the stale-chain-clock false-revert workaround behind `NB_BOND_API_CLOSE_GAS_LIMIT`), so that path transmits with no simulation at all.
+- **Current state (verified):** an explicit `staticCall` preflight exists for four operations — `deployBond`, `disableBond`, `deployBondWithAuction`, `deployAuctionForBond` (`services/nb-bond-api/src/app.ts`). Every other state-changing send — `payCoupon`, `redeem`, `finaliseAuction`, `closeAuction`, `cancelAuction`, bid submission, central-bank `Wnok` mint/burn/transfer, banking TBD operations — relies only on the implicit `eth_estimateGas` that ethers runs before broadcast. Worse, the close-auction retry path deliberately sets an explicit gas limit to _skip_ estimation (the stale-chain-clock false-revert workaround behind `NB_BOND_API_CLOSE_GAS_LIMIT`), so that path transmits with no simulation at all.
 - **Direction:** make preflight deliberate and universal for important state-changing actions. Plain `staticCall` suffices for state-only operations (transfers, mint/burn, finalisation); time-dependent operations (`payCoupon`, `closeAuction`) need `eth_simulateV1` with a block-timestamp override set to wall clock, so the simulation sees what the mined transaction will see — this properly retires the blind-send gas-limit workaround instead of bypassing simulation. After a passing preflight, send with an explicit gas limit derived from the simulation's `gasUsed` (plus margin) to avoid re-running estimation.
 - **Verified:** `eth_simulateV1` responds on the running sandbox node; `infra/besu/config/config.toml` enables the ETH, DEBUG, and TRACE RPC namespaces.
 - **Relation:** `docs/plans/operator-audit-trail-design.md` ("simulation predicts, the audit trail records"; includes the payout dry-run preview using the same mechanism) and `docs/KNOWN_ISSUES.md`, "Auction close timing is chain-enforced — no operator discretion".
@@ -72,7 +78,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 ### 7. Retire the "Bond Auction Service" naming
 
 - **Problem:** the product name predates the current scope. The solution now covers bond lifecycle, auctions, coupon payouts, central-bank cash (`Wnok`), banking deposit tokens (TBD), and the registry — "Bond Auction Service" undersells and misdescribes it.
-- **Current state (verified occurrences):** OpenAPI `info.title` in `services/nb-bond-api/src/schemas.ts` (line 1634; propagates to the generated `openapi.json` — fix in `schemas.ts` and run `npm run regen:openapi`, never hand-edit the JSON), `services/nb-ui/index.html` page title, `services/nb-ui/src/components/Layout.jsx` (brand subtitle and footer), `services/nb-ui/src/components/LoginPage.jsx`, `services/nb-ui/src/components/AccessDeniedPage.jsx`, and prose in `services/nb-ui/README.md`. The archived plan documents keep the old name (historical record — leave unchanged).
+- **Current state (verified occurrences):** OpenAPI `info.title` in `services/nb-bond-api/src/openapi/document.ts` (propagates to the generated `openapi.json` — fix the document source and run `npm run regen:openapi`, never hand-edit the JSON), `services/nb-ui/index.html` page title, `services/nb-ui/src/components/Layout.jsx` (brand subtitle and footer), `services/nb-ui/src/components/LoginPage.jsx`, `services/nb-ui/src/components/AccessDeniedPage.jsx`, and prose in `services/nb-ui/README.md`. The archived plan documents keep the old name (historical record — leave unchanged).
 - **Direction:** pick one replacement name and apply it across all live occurrences in a single pass.
 - **Open question:** the replacement name itself (e.g. "NB Tokenization Sandbox") — operator's call.
 - Status: Planned.
@@ -80,10 +86,11 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 ### 8. Overhaul the bond status model
 
 - **Problem:** a bond shows status `minting` immediately after creation, which is misleading — nothing is being minted for a staged bond with no auction and no supply.
-- **Current state (verified):** `deriveBondStatus()` (`services/nb-bond-api/src/compose.ts`, lines 492–504) returns `minting` for *any* live bond with zero coupon payments: freshly staged bonds, bonds mid-auction, and fully issued bonds awaiting their first coupon all collapse into one label. `maturing` only begins after the first coupon payment, which is equally off — an issued bond is economically "maturing" from issuance. The enum is `['minting', 'maturing', 'matured', 'redeemed', 'unknown']` (`services/nb-bond-api/src/schemas.ts`, line 102).
-- **Direction:** replace with lifecycle-truthful statuses derived from signals already available at compose time — e.g. `staged` (created, no auction) → `in auction` (open/closed/finalising, from the auction projection) → `issued` / `outstanding` (supply > 0) → `matured` → `redeemed`, plus the existing disabled soft-delete flag and `unknown` for failed chain reads. Breaking enum change: update `schemas.ts`, regenerate the OpenAPI document, and update NB UI badges/filters/predicates in the same pass (single team, contract breaks together by convention).
+- **Previous state:** `minting` collapsed freshly staged, mid-auction, and issued-before-first-coupon bonds into one misleading label.
+- **Direction:** replace with lifecycle-truthful statuses derived from signals already available at compose time — e.g. `staged` (created, no auction) → `in auction` (open/closed/finalising, from the auction projection) → `issued` / `outstanding` (supply > 0) → `matured` → `redeemed`, plus the existing disabled soft-delete flag and `unknown` for failed chain reads. Breaking enum changes belong in the owning feature contract under `src/contracts/`; regenerate the OpenAPI document and update NB UI badges/filters/predicates in the same pass (single team, contract breaks together by convention).
 - **Relation:** item 2 (projection-first reads) — the status inputs (supply, auction state, coupon count) are exactly the reads that should increasingly come from the projection.
-- Status: Planned.
+- Status: Implemented as `staged`, `auctioning`, `outstanding`, `matured`, and
+  `redeemed`, derived only from replayable projection facts.
 
 ## Explicitly out of scope
 

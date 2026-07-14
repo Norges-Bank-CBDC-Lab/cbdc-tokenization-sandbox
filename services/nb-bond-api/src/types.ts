@@ -54,7 +54,7 @@ export interface AllocationResult {
   computedAt: number;
 }
 
-export type AuctionStatus = 'open' | 'closed' | 'finalised' | 'rejected' | 'cancelled';
+export type AuctionStatus = 'open' | 'closed' | 'finalised' | 'cancelled';
 
 export interface AuctionCache {
   auctionId: string;
@@ -66,7 +66,6 @@ export interface AuctionCache {
   allocationResult?: AllocationResult;
   closedAt?: number;
   finalised?: boolean;
-  rejected?: boolean;
   cancelled?: boolean;
   metadata?: {
     end?: bigint;

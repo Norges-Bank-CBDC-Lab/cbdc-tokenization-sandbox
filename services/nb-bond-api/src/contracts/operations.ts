@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import type { ZodOpenApiPathsObject } from 'zod-openapi';
 
 import { hexStringSchema } from './common';
+import { errorRefs, successJson } from '../openapi/shared-responses';
 
 export const operationTypeSchema = z
   .enum([
@@ -70,3 +72,25 @@ export const operationAttemptSchema = z
       'Failed attempts mostly never reach the chain (rejected at gas estimation), so this ' +
       'trail is their only durable record.',
   });
+
+export const operationPaths: ZodOpenApiPathsObject = {
+  '/v1/operations': {
+    get: {
+      tags: ['system'],
+      operationId: 'listOperations',
+      summary: 'List operator operation attempts (audit trail), newest first',
+      parameters: [
+        {
+          in: 'query',
+          name: 'limit',
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: 1000, default: 200 },
+        },
+      ],
+      responses: {
+        200: successJson('Operation attempts, newest first', z.array(operationAttemptSchema)),
+        ...errorRefs.read,
+      },
+    },
+  },
+};
