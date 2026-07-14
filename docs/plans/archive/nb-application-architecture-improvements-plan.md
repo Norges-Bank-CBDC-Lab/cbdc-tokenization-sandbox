@@ -1,11 +1,11 @@
 # NB Application Architecture Improvements — Implementation Plan
 
-**Status:** Implemented — core architecture increments complete; broader projection expansion and additional feature slices remain intentionally incremental
+**Status:** ✅ Implemented — core architecture increments shipped via #224; the projection and feature-contract follow-up is implemented in #225. Further feature slices remain intentionally incremental.
 **Date:** 2026-07-13
 **Owner / operator:** sandbox operator (this repo)
 **Branch suggestion:** `imp/nb-application-architecture-improvements` — use separate PRs for the phases below rather than one large refactor PR.
 **Components touched:** `services/nb-bond-api/`, `services/nb-ui/`, generated NB Bond API OpenAPI, and relevant documentation.
-**Related:** `docs/plans/backend-design-improvements-backlog.md` owns the broader projection-first and read-your-writes backlog; `docs/plans/sse-live-updates-plan.md` owns authenticated live-update transport and Azure streaming constraints.
+**Related:** `docs/plans/backend-design-improvements-backlog.md` owns the remaining backend backlog; `docs/plans/archive/sse-live-updates-plan.md` owns authenticated live-update transport and Azure streaming constraints.
 
 ## Decision Summary
 

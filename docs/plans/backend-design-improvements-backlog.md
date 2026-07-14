@@ -1,7 +1,7 @@
 # Backend Design Improvements — Backlog
 
 Status: Backlog. Projection/read-your-writes items now have a concrete follow-up
-plan in `docs/plans/projection-aligned-api-contract-plan.md`. The operator audit
+plan in `docs/plans/archive/projection-aligned-api-contract-plan.md`. The operator audit
 trail remains excluded from this list because it has its own design brief.
 
 Date: 2026-07-06
@@ -39,7 +39,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 - **Problem:** `composeBond()` merges chain-head reads with checkpoint-height projection reads, so a composed DTO is not a consistent snapshot. Separately, every request-path chain read becomes an opaque 500 when Besu is unreachable (`docs/KNOWN_ISSUES.md`, "nb-bond-api request-path chain reads bubble up as opaque 500s").
 - **Direction:** ingest more state into the projection (supply, coupon schedule counters, allowlist membership) and reserve live chain reads for what genuinely cannot be derived from events (e.g. balances of arbitrary untracked addresses). DTOs then read from one consistent source, and the RPC-down blast radius shrinks structurally rather than cosmetically.
-- **Relation:** already sketched as a companion phase of `docs/plans/sse-live-updates-plan.md`; this item promotes it to a standalone work item so it does not ride on the SSE schedule.
+- **Relation:** already sketched as a companion phase of `docs/plans/archive/sse-live-updates-plan.md`; this item promotes it to a standalone work item so it does not ride on the SSE schedule.
 - Status: First increment shipped in the architecture work: auction lifecycle
   status is projection-first and composers share an explicit request-level read
   context. Bond/auction snapshot projection expansion is planned in
