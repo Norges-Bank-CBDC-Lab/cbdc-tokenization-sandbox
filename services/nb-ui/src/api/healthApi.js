@@ -1,9 +1,9 @@
 /**
  * healthApi — wrapper for the /v1/health endpoint.
  *
- * The HealthBadge component polls this every few seconds. /v1/health
- * bypasses backend auth (per OpenAPI security: []) so no token is
- * needed.
+ * The HealthBadge component uses an adaptive poll: once per minute while
+ * healthy, faster while degraded, and paused in hidden tabs. /v1/health
+ * bypasses backend auth (per OpenAPI security: []) so no token is needed.
  */
 import { HttpClient } from './httpClient.js';
 

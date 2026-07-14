@@ -52,8 +52,13 @@ import {
   getWnokAddress,
   sendWithManagedNonce,
 } from './chain';
-import { getIngestionStatus, waitForIngestionBlock } from './ingestion';
-import { getBalancesByIsin, openDatabase, type IngestionDatabase } from './ingestion-db';
+import { advanceProjectionTo, getIngestionStatus } from './ingestion';
+import {
+  getBalancesByIsin,
+  getProjectionCheckpoint,
+  openDatabase,
+  type IngestionDatabase,
+} from './ingestion-db';
 import { initSealingKeypair, type SealingKeypair } from './keys';
 import { listOperationAttempts, toOperationAttemptDto, withOperationRecording } from './operations';
 import { liveEvents, publishLiveChange } from './live-events';
@@ -122,6 +127,7 @@ import { createBankingService } from './banking-tbd';
 import { BankConflictError, BankValidationError, DvpUnavailableError, createBank } from './banks';
 import { listRegisteredContracts } from './registry';
 import { createAuctionService } from './features/auctions/service';
+import { MutationAcceptedError, type MutationResource } from './application-errors';
 
 export interface AppDependencies {
   historyDb?: IngestionDatabase;
@@ -144,7 +150,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       origin: corsAllowedOrigins,
       credentials: false,
       allowedHeaders: ['Content-Type', 'Authorization', 'If-None-Match'],
-      exposedHeaders: ['ETag'],
+      exposedHeaders: ['ETag', 'X-Projection-Block'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),
   );
@@ -182,19 +188,29 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   // Banking operations are explicitly bound to the preserved banks table;
   // no process-wide mutable database handle is used.
   const banking = createBankingService(biddersDb);
-  const awaitProjectionBlock = async (blockNumber: number) => {
-    const caughtUp = await waitForIngestionBlock(blockNumber);
-    if (!caughtUp) {
-      logger.warn(
-        `projection did not reach block ${blockNumber} before the bounded response wait expired`,
-      );
-    }
+  const awaitMutationProjection = async (
+    sent: { tx: { hash: string }; receipt: { blockNumber: number } | null },
+    resource: MutationResource,
+  ) => {
+    const blockNumber = sent.receipt?.blockNumber ?? null;
+    const caughtUp = blockNumber !== null && (await advanceProjectionTo(blockNumber));
+    if (caughtUp) return;
+
+    logger.warn(
+      `projection did not reach block ${String(blockNumber)} for ${resource.type} ${resource.id} ` +
+        'before the bounded response wait expired',
+    );
+    throw new MutationAcceptedError({
+      transactionHash: sent.tx.hash,
+      blockNumber,
+      resource,
+    });
   };
   const auctionService = createAuctionService({
     historyDb,
     operationsDb: biddersDb,
     sealingPublicKey: sealingKeys.publicKey,
-    awaitProjection: awaitProjectionBlock,
+    awaitProjection: awaitMutationProjection,
   });
 
   // #region Unauthenticated routes (mounted before authMiddleware) ─────
@@ -291,6 +307,15 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   // no recognised role is rejected — the server mirror of the nb-ui access gate.
   // No-op in `none` mode.
   app.use(requireAnyRole(recognizedRoles));
+
+  // Every bond/auction response is composed from one stored checkpoint.
+  // Keep the checkpoint outside the DTO/md5 while exposing it to callers and
+  // browser diagnostics, including on 304 responses.
+  app.use(['/v1/bonds', '/v1/auctions'], (_req, res, next) => {
+    const checkpoint = getProjectionCheckpoint(historyDb);
+    if (checkpoint) res.setHeader('X-Projection-Block', String(checkpoint.asOfBlock));
+    next();
+  });
 
   // #endregion
 
@@ -429,7 +454,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
           );
         },
       );
-      if (sent.receipt) await awaitProjectionBlock(sent.receipt.blockNumber);
+      await awaitMutationProjection(sent, { type: 'bond', id: body.isin });
 
       const bond = await composeBond(historyDb, body.isin);
       if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
@@ -572,7 +597,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
                 return bondManager.payCoupon(isin, requested, { nonce });
               }),
           );
-          if (sent.receipt) await awaitProjectionBlock(sent.receipt.blockNumber);
+          await awaitMutationProjection(sent, { type: 'bond', id: isin });
         } catch (err) {
           // Surface on-chain reverts readably; settlement failures wrap the
           // refusing token's own error in their lowLevelData bytes.
@@ -628,7 +653,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
               return bondManager.redeem(isin, targetHolders, { nonce });
             }),
         );
-        if (sent.receipt) await awaitProjectionBlock(sent.receipt.blockNumber);
+        await awaitMutationProjection(sent, { type: 'bond', id: isin });
 
         const bond = await composeBond(historyDb, isin);
         if (!bond) throw notFound(`bond ${isin} not found`);

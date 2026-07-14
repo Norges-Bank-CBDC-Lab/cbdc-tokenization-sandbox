@@ -17,7 +17,7 @@ const HOLDER_B = '0x2222222222222222222222222222222222222222';
 // chain clock.
 const PAYABLE_BOND = {
   isin: 'NO0000000001',
-  status: 'maturing',
+  status: 'outstanding',
   disabled: false,
   totalSupply: '1000',
   contracts: { token: '0xa', auction: '0xb', manager: '0xc' },
@@ -43,7 +43,7 @@ const PAYABLE_BOND = {
 // issuance date), next payout still ahead of the chain clock.
 const NOT_DUE_BOND = {
   isin: 'NO0000000002',
-  status: 'minting',
+  status: 'outstanding',
   disabled: false,
   totalSupply: '500',
   contracts: { token: '0xa', auction: '0xb', manager: '0xc' },
@@ -87,7 +87,7 @@ const ALL_PAID_BOND = {
 // Never listed: no minted supply (created, not issued).
 const UNISSUED_BOND = {
   isin: 'NO0000000009',
-  status: 'minting',
+  status: 'staged',
   disabled: false,
   totalSupply: '0',
   contracts: { token: '0xa', auction: '0xb', manager: '0xc' },

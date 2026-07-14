@@ -16,15 +16,16 @@
  *
  *  - Page Visibility gating — while the tab is hidden the poll is paused
  *    entirely; focusing the tab probes once immediately and resumes.
- *  - Exponential backoff — while the backend is `down`/unreachable the poll
- *    interval doubles (up to MAX_BACKOFF_INTERVAL_MS) instead of hammering a
- *    dead endpoint at full cadence, then snaps back to base on recovery or a
- *    manual reload().
+ *  - Adaptive cadence — healthy state is checked once a minute because SSE
+ *    owns resource freshness. Degraded state is checked more frequently so a
+ *    resync remains visible, while an unreachable backend backs off to the
+ *    healthy cadence.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { HealthApi } from '../api/healthApi.js';
 
-export const DEFAULT_POLL_INTERVAL_MS = 7000;
+export const DEFAULT_POLL_INTERVAL_MS = 60000;
+export const DEGRADED_POLL_INTERVAL_MS = 10000;
 export const MAX_BACKOFF_INTERVAL_MS = 60000;
 
 const DOWN_SHAPE = Object.freeze({
@@ -49,38 +50,47 @@ const DOWN_SHAPE = Object.freeze({
   },
 });
 
-// `down` (or a missing payload) is the only state we back off on; `degraded`
-// is still reachable, so we keep watching it at the base cadence.
-function isReachable(payload) {
-  return payload != null && payload.status !== 'down';
+function probeStatus(payload) {
+  if (payload?.status === 'ok' || payload?.status === 'degraded') return payload.status;
+  return 'down';
 }
 
-export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled = true } = {}) {
+export function useHealthPoll({
+  intervalMs = DEFAULT_POLL_INTERVAL_MS,
+  degradedIntervalMs = DEGRADED_POLL_INTERVAL_MS,
+  enabled = true,
+} = {}) {
   const [health, setHealth] = useState(null);
   const mountedRef = useRef(true);
   const failuresRef = useRef(0);
+  const statusRef = useRef('ok');
   const scheduleRef = useRef(null);
 
-  // Never throws; returns whether the probe reached a non-`down` backend so
-  // the scheduler can grow or reset the backoff.
+  // Never throws; returns the scheduling state derived from the response.
   const fetchOnce = useCallback(async () => {
     try {
       const next = await HealthApi.getHealth();
       if (mountedRef.current) setHealth(next);
-      return isReachable(next);
+      return probeStatus(next);
     } catch {
       if (mountedRef.current) setHealth(DOWN_SHAPE);
-      return false;
+      return 'down';
     }
   }, []);
 
-  // Manual refresh: clear backoff, probe now, and re-arm at the base cadence.
+  const recordProbe = useCallback((status) => {
+    statusRef.current = status;
+    failuresRef.current = status === 'down' ? failuresRef.current + 1 : 0;
+  }, []);
+
+  // Manual refresh: probe now and re-arm from the newly observed state.
   const reload = useCallback(async () => {
     failuresRef.current = 0;
-    const reachable = await fetchOnce();
+    const status = await fetchOnce();
+    recordProbe(status);
     scheduleRef.current?.();
-    return reachable;
-  }, [fetchOnce]);
+    return status !== 'down';
+  }, [fetchOnce, recordProbe]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -97,8 +107,12 @@ export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled =
     };
 
     const nextDelay = () => {
-      const factor = 2 ** Math.min(failuresRef.current, 10);
-      return Math.min(intervalMs * factor, MAX_BACKOFF_INTERVAL_MS);
+      if (statusRef.current === 'ok') return intervalMs;
+      if (statusRef.current === 'degraded') return degradedIntervalMs;
+
+      const exponent = Math.max(0, failuresRef.current - 1);
+      const factor = 2 ** Math.min(exponent, 10);
+      return Math.min(degradedIntervalMs * factor, MAX_BACKOFF_INTERVAL_MS);
     };
 
     const schedule = () => {
@@ -109,9 +123,9 @@ export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled =
     };
 
     const tick = async () => {
-      const reachable = await fetchOnce();
+      const status = await fetchOnce();
       if (cancelled) return;
-      failuresRef.current = reachable ? 0 : failuresRef.current + 1;
+      recordProbe(status);
       schedule();
     };
 
@@ -121,10 +135,10 @@ export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled =
         clearTimer();
         return;
       }
-      // Back in view: reset backoff, probe immediately, resume the loop.
+      // Back in view: reset backoff, probe immediately, then resume using the
+      // state-specific cadence.
       failuresRef.current = 0;
-      void fetchOnce();
-      schedule();
+      void tick();
     };
 
     scheduleRef.current = schedule;
@@ -133,11 +147,8 @@ export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled =
     // sync setState-via-effect is satisfied (the effect body itself never
     // calls setHealth synchronously). Skip it while the tab is hidden.
     Promise.resolve().then(() => {
-      if (!cancelled && !document.hidden) void fetchOnce();
+      if (!cancelled && !document.hidden) void tick();
     });
-    // Arm the recurring timer eagerly — independent of the first probe's
-    // resolution — then keep it alive across tab focus changes.
-    schedule();
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
@@ -147,7 +158,7 @@ export function useHealthPoll({ intervalMs = DEFAULT_POLL_INTERVAL_MS, enabled =
       scheduleRef.current = null;
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [enabled, intervalMs, fetchOnce]);
+  }, [degradedIntervalMs, enabled, intervalMs, fetchOnce, recordProbe]);
 
   return { health, reload };
 }

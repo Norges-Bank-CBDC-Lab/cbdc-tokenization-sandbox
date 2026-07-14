@@ -15,6 +15,7 @@ import {
   useToast,
 } from '../components/ui.jsx';
 import { CreateBondModal } from './CreateBondModal.jsx';
+import { isMutationAccepted, mutationAcceptedMessage } from '../api/httpClient.js';
 
 const SHOW_DISABLED_KEY = 'nb-ui:bonds:showDisabled';
 
@@ -63,7 +64,7 @@ export function BondsPage({ navigate }) {
   }, [bonds, q, statusFilter]);
 
   const counts = useMemo(() => {
-    const acc = { total: bonds.length, minting: 0, maturing: 0, matured: 0 };
+    const acc = { total: bonds.length, staged: 0, auctioning: 0, outstanding: 0 };
     bonds.forEach((b) => {
       if (acc[b.status] != null) acc[b.status]++;
     });
@@ -72,6 +73,14 @@ export function BondsPage({ navigate }) {
 
   function handleCreated(bond) {
     setShowCreate(false);
+    if (isMutationAccepted(bond)) {
+      toast.push({
+        kind: 'ok',
+        title: 'Bond transaction committed',
+        body: mutationAcceptedMessage(bond),
+      });
+      return;
+    }
     toast.push({
       kind: 'ok',
       title: 'Bond created',
@@ -108,16 +117,16 @@ export function BondsPage({ navigate }) {
           <div className="kpi-value">{counts.total}</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Minting</div>
-          <div className="kpi-value">{counts.minting}</div>
+          <div className="kpi-label">Staged</div>
+          <div className="kpi-value">{counts.staged}</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Maturing</div>
-          <div className="kpi-value">{counts.maturing}</div>
+          <div className="kpi-label">Auctioning</div>
+          <div className="kpi-value">{counts.auctioning}</div>
         </div>
         <div className="kpi">
-          <div className="kpi-label">Matured</div>
-          <div className="kpi-value">{counts.matured}</div>
+          <div className="kpi-label">Outstanding</div>
+          <div className="kpi-value">{counts.outstanding}</div>
         </div>
       </div>
 
@@ -134,8 +143,9 @@ export function BondsPage({ navigate }) {
           onChange={(e) => setStatusFilter(e.target.value)}
         >
           <option value="all">All statuses</option>
-          <option value="minting">Minting</option>
-          <option value="maturing">Maturing</option>
+          <option value="staged">Staged</option>
+          <option value="auctioning">Auctioning</option>
+          <option value="outstanding">Outstanding</option>
           <option value="matured">Matured</option>
           <option value="redeemed">Redeemed</option>
         </select>

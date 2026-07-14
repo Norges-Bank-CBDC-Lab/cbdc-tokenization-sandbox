@@ -171,8 +171,11 @@ The NB Bond API is the privileged operator service. It:
   never reached the chain
 - exposes a `/v1` HTTP/OpenAPI surface designed as a **bulky resource tree**: a single
   `GET /v1/bonds` returns every bond with its nested auctions, bids,
-  allocations, and holders. Mutations return the updated parent so the
-  frontend can swap its cache atomically without a follow-up GET. The full
+  allocations, and holders. Bond/Auction reads come from one atomic SQLite
+  projection checkpoint, exposed as `X-Projection-Block`. Mutations return the
+  updated parent only after the shared ingestion coordinator reaches the mined
+  receipt block; bounded lag returns `202 MutationAccepted` so clients do not
+  retry a committed transaction. The full
   design — DTOs, endpoint catalog, ETag/md5 caching protocol, and two
   auth modes (`none`, `entra`) — is documented in
   [`docs/plans/archive/openapi-v2-plan.md`](plans/archive/openapi-v2-plan.md). This design deliberately
@@ -190,17 +193,17 @@ create/close/cancel/finalise orchestration lives in
 `src/features/auctions/service.ts`; its Express handlers only validate/map the
 HTTP request and response.
 
-Composers receive an explicit request-scoped read context. Contract handles and
-chain-wide values are memoized only for that composition pass, avoiding ambient
-global request caches. Ingested auctions take lifecycle status from the SQLite
-event projection; chain status remains the fallback for chain-only resources.
-Mutation responses that depend on projected state wait for ingestion through
-the mined receipt block with a bounded timeout. A timeout is logged rather than
-returned as a failed mutation, because the chain write has already committed.
+Bond and auction composers consume synchronous snapshot objects loaded under one
+SQLite read transaction. Lifecycle, supply, holders, metadata, bids, and
+allocations therefore represent one checkpoint and ordinary reads do not fan
+out to Besu. The polling loop and post-mutation catch-up share one serialized
+coordinator; projection rows and their checkpoint commit atomically before SSE
+publication.
 
-Zod contracts remain the OpenAPI source of truth. `src/schemas.ts` assembles the
-document while reusable primitives, internal bid payload validation, and the
-operation-audit contract live under `src/contracts/`.
+Zod contracts remain the OpenAPI source of truth. Feature schemas and OpenAPI
+path fragments live under `src/contracts/`; `src/openapi/document.ts` only
+assembles them with shared responses. `src/schemas.ts` remains a compatibility
+export facade for existing handlers and tests.
 
 Unknown `500` responses intentionally include the thrown message in RFC 7807
 `detail`. This is a sandbox diagnostic choice, not a production-safe disclosure

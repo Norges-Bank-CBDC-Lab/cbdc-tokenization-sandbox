@@ -34,10 +34,12 @@
   --status-rejected-fg: #8a2a14;
   --status-cancelled-bg: #ddd4ba;
   --status-cancelled-fg: #5f5a4e;
-  --status-minting-bg: #d4dae0;
-  --status-minting-fg: #051838;
-  --status-maturing-bg: #ead9b1;
-  --status-maturing-fg: #6e4f12;
+  --status-staged-bg: #d4dae0;
+  --status-staged-fg: #051838;
+  --status-auctioning-bg: #ead9b1;
+  --status-auctioning-fg: #6e4f12;
+  --status-outstanding-bg: #d8e4c0;
+  --status-outstanding-fg: #345016;
   --status-matured-bg: #c8cfb0;
   --status-matured-fg: #3f4d24;
   --status-redeemed-bg: #ddd4ba;
@@ -533,13 +535,17 @@ footer.app-footer {
   background: var(--status-cancelled-bg);
   color: var(--status-cancelled-fg);
 }
-.badge-minting {
-  background: var(--status-minting-bg);
-  color: var(--status-minting-fg);
+.badge-staged {
+  background: var(--status-staged-bg);
+  color: var(--status-staged-fg);
 }
-.badge-maturing {
-  background: var(--status-maturing-bg);
-  color: var(--status-maturing-fg);
+.badge-auctioning {
+  background: var(--status-auctioning-bg);
+  color: var(--status-auctioning-fg);
+}
+.badge-outstanding {
+  background: var(--status-outstanding-bg);
+  color: var(--status-outstanding-fg);
 }
 .badge-matured {
   background: var(--status-matured-bg);
@@ -553,7 +559,6 @@ footer.app-footer {
   background: var(--surface-2);
   color: var(--ink-3);
 }
-
 .badge-type {
   background: transparent;
   color: var(--ink-2);

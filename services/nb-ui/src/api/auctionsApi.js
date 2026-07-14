@@ -5,13 +5,13 @@
  * docs/plans/archive/openapi-v2-plan.md §5):
  *   - PATCH /v1/auctions/{id} { status: "closed" }  → close
  *   - DELETE /v1/auctions/{id}                       → cancel
- *   - PUT /v1/auctions/{id}/finalisation             → approve/reject
+ *   - PUT /v1/auctions/{id}/finalisation             → approve selected allocation
  *
  * Mutations return the updated parent (Bond on create, Auction on
  * close/cancel/finalise) — the cache layer in httpClient drops stale
  * entries automatically.
  */
-import { HttpClient, NotImplementedError } from './httpClient.js';
+import { HttpClient } from './httpClient.js';
 import { getTestMode } from '../utils/debugSettings.js';
 
 function testModeQuery() {
@@ -47,18 +47,6 @@ async function cancelAuction(auctionId) {
 }
 
 /**
- * Reopen a closed auction. NOT in the v2 spec and not supported on
- * the BondAuction contract (no closed→open transition). Throws
- * NotImplementedError so the UI can show a clear "reopen unsupported"
- * toast — see docs/KNOWN_ISSUES.md.
- */
-async function reopenAuction(_auctionId) {
-  throw new NotImplementedError(
-    'Reopen auction is not implemented in the backend — see docs/KNOWN_ISSUES.md.',
-  );
-}
-
-/**
  * Finalise an auction.
  *
  * Approve: pass { approve: true, winningBidIndexes, expectedClearingRate }.
@@ -67,12 +55,9 @@ async function reopenAuction(_auctionId) {
  * cross-checks `expectedClearingRate`, and submits. The operator's selection,
  * not the full close-time allocation, determines what is minted.
  *
- * Reject: pass { approve: false }; selection fields are ignored.
  */
-async function finaliseAuction(auctionId, { approve, winningBidIndexes, expectedClearingRate }) {
-  const body = approve
-    ? { approve: true, winningBidIndexes, expectedClearingRate }
-    : { approve: false };
+async function finaliseAuction(auctionId, { winningBidIndexes, expectedClearingRate }) {
+  const body = { approve: true, winningBidIndexes, expectedClearingRate };
   return HttpClient.put(`/v1/auctions/${encodeURIComponent(auctionId)}/finalisation`, body, {
     query: testModeQuery(),
   });
@@ -84,6 +69,5 @@ export const AuctionsApi = {
   createAuction,
   closeAuction,
   cancelAuction,
-  reopenAuction,
   finaliseAuction,
 };

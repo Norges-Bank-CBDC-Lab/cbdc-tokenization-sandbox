@@ -141,7 +141,7 @@ describe('HealthBadge', () => {
     });
   });
 
-  it('polls again after the configured interval', async () => {
+  it('polls healthy state again after the one-minute interval', async () => {
     vi.useFakeTimers();
     vi.resetModules();
     const getHealth = vi.fn().mockResolvedValue(okPayload());
@@ -162,7 +162,7 @@ describe('HealthBadge', () => {
     });
     expect(getHealth).toHaveBeenCalledTimes(1);
     await act(async () => {
-      vi.advanceTimersByTime(7000);
+      await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(getHealth).toHaveBeenCalledTimes(2);
   });

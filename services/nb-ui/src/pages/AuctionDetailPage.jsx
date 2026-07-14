@@ -26,6 +26,7 @@ import {
 import { AuctionLifecyclePanel } from './AuctionLifecyclePanel.jsx';
 import { PlaceBidModal } from './PlaceBidModal.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
+import { isMutationAccepted, mutationAcceptedMessage } from '../api/httpClient.js';
 
 export function AuctionDetailPage({ auctionId, navigate }) {
   const auctionQ = useLiveQuery([LiveResource.AUCTIONS], () => AuctionsApi.getAuction(auctionId), [
@@ -36,7 +37,6 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   const toast = useToast();
 
   const closeMut = useMutation(() => AuctionsApi.closeAuction(auctionId));
-  const reopenMut = useMutation(() => AuctionsApi.reopenAuction(auctionId));
   const cancelMut = useMutation(() => AuctionsApi.cancelAuction(auctionId));
   const finaliseMut = useMutation((args) => AuctionsApi.finaliseAuction(auctionId, args));
 
@@ -59,26 +59,33 @@ export function AuctionDetailPage({ auctionId, navigate }) {
 
   async function doClose() {
     try {
-      await closeMut.run();
-      toast.push({ kind: 'ok', title: 'Auction closed' });
+      const result = await closeMut.run();
+      toast.push(
+        isMutationAccepted(result)
+          ? {
+              kind: 'ok',
+              title: 'Close transaction committed',
+              body: mutationAcceptedMessage(result),
+            }
+          : { kind: 'ok', title: 'Auction closed' },
+      );
       auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Close failed', body: e.message });
     }
   }
-  async function doReopen() {
-    try {
-      await reopenMut.run();
-      toast.push({ kind: 'ok', title: 'Auction reopened' });
-      auctionQ.reload();
-    } catch (e) {
-      toast.push({ title: 'Reopen failed', body: e.message });
-    }
-  }
   async function doCancel() {
     try {
-      await cancelMut.run();
-      toast.push({ kind: 'ok', title: 'Auction cancelled' });
+      const result = await cancelMut.run();
+      toast.push(
+        isMutationAccepted(result)
+          ? {
+              kind: 'ok',
+              title: 'Cancellation transaction committed',
+              body: mutationAcceptedMessage(result),
+            }
+          : { kind: 'ok', title: 'Auction cancelled' },
+      );
       auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Cancel failed', body: e.message });
@@ -88,21 +95,25 @@ export function AuctionDetailPage({ auctionId, navigate }) {
   // finalise modal — only forwarded when approving. The backend recomputes
   // the allocation over exactly the selected bids, so what is minted matches
   // the operator's selection rather than the full close-time allocation.
-  async function doFinalise(approve, selection) {
+  async function doFinalise(selection) {
     try {
-      await finaliseMut.run(approve ? { approve: true, ...selection } : { approve: false });
-      toast.push({
-        kind: 'ok',
-        title: approve ? 'Allocation approved' : 'Allocation rejected',
-      });
+      const result = await finaliseMut.run({ approve: true, ...selection });
+      toast.push(
+        isMutationAccepted(result)
+          ? {
+              kind: 'ok',
+              title: 'Finalisation transaction committed',
+              body: mutationAcceptedMessage(result),
+            }
+          : { kind: 'ok', title: 'Allocation approved' },
+      );
       auctionQ.reload();
     } catch (e) {
       toast.push({ title: 'Finalise failed', body: e.message });
     }
   }
 
-  const mutating =
-    closeMut.loading || reopenMut.loading || cancelMut.loading || finaliseMut.loading;
+  const mutating = closeMut.loading || cancelMut.loading || finaliseMut.loading;
 
   return (
     <div>
@@ -203,13 +214,7 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           <div className="kpi-value mono" style={{ fontSize: 14 }}>
             {Fmt.shortHex(auction.allocation?.hash, 10, 6)}
           </div>
-          <div className="kpi-sub">
-            {auction.status === 'finalised'
-              ? 'Finalised'
-              : auction.status === 'rejected'
-                ? 'Rejected'
-                : 'Pending'}
-          </div>
+          <div className="kpi-sub">{auction.status === 'finalised' ? 'Finalised' : 'Pending'}</div>
         </div>
       </div>
 
@@ -218,7 +223,6 @@ export function AuctionDetailPage({ auctionId, navigate }) {
           auction={auction}
           busy={mutating}
           onClose={doClose}
-          onReopen={doReopen}
           onFinalise={doFinalise}
           onCancel={doCancel}
         />
@@ -396,7 +400,6 @@ export function BidsCard({ bids, auctionType, auctionStatus }) {
 // state. The card differentiates three states with allocation data:
 //   - closed    — allocation computed, NOT yet on-chain ("Proposed")
 //   - finalised — allocation minted on-chain ("Minted")
-//   - rejected  — operator rejected the allocation
 // Plus the no-data states (open / cancelled). This matches the operator
 // feedback that "bids show all submitted bids; allocations show what was
 // actually minted", while still letting the operator preview the
@@ -405,9 +408,6 @@ export function BidsCard({ bids, auctionType, auctionStatus }) {
 function allocationBadge(status) {
   if (status === 'finalised') {
     return { label: 'Minted on chain', color: '#10b981', bg: '#d1fae5' };
-  }
-  if (status === 'rejected') {
-    return { label: 'Allocation rejected', color: '#b91c1c', bg: '#fee2e2' };
   }
   if (status === 'closed') {
     return { label: 'Proposed — pending finalisation', color: '#92400e', bg: '#fef3c7' };

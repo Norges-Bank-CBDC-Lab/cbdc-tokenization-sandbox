@@ -41,12 +41,18 @@ export class HttpError extends Error {
   }
 }
 
-export class NotImplementedError extends Error {
-  constructor(message) {
-    super(message);
-    this.status = 501;
-    this.name = 'NotImplementedError';
-  }
+export function isMutationAccepted(value) {
+  return (
+    value?.status === 'accepted' &&
+    value?.projectionPending === true &&
+    typeof value?.transaction?.hash === 'string' &&
+    typeof value?.resource?.id === 'string'
+  );
+}
+
+export function mutationAcceptedMessage(value) {
+  const block = value?.transaction?.block;
+  return `Transaction committed${block == null ? '' : ` in block ${block}`}; waiting for the read model.`;
 }
 
 /** Open and consume one authenticated SSE connection. Resolves when it closes. */
@@ -171,5 +177,4 @@ export const HttpClient = {
   clearCache: clearHttpCache,
   streamLiveEvents,
   HttpError,
-  NotImplementedError,
 };

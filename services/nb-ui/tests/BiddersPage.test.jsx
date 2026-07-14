@@ -36,7 +36,7 @@ const FIXTURE_BIDDERS = [
 const FIXTURE_BONDS = [
   {
     isin: 'NO0012345678',
-    status: 'minting',
+    status: 'auctioning',
     totalSupply: '5000000000',
     contracts: { token: '0xaaaa', auction: '0xbbbb' },
     maturity: { duration: '157680000', date: '1893456000', remaining: '126144000' },

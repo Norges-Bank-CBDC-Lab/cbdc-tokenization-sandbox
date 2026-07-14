@@ -1,9 +1,5 @@
 import { finaliseBodySchema } from '../src/schemas';
 
-// Note: the "winners + expectedClearingRate are required when approve=true"
-// rule is enforced in the handler (PUT /v1/auctions/:id/finalisation), not the
-// schema, so the schema accepts `{ approve: true }` on its own. These tests
-// cover the field-level shape the schema is responsible for.
 describe('finaliseBodySchema', () => {
   it('accepts an approve body with winners + expected rate', () => {
     const r = finaliseBodySchema.safeParse({
@@ -14,8 +10,8 @@ describe('finaliseBodySchema', () => {
     expect(r.success).toBe(true);
   });
 
-  it('accepts a reject body with only approve', () => {
-    expect(finaliseBodySchema.safeParse({ approve: false }).success).toBe(true);
+  it('rejects the removed non-durable rejection path', () => {
+    expect(finaliseBodySchema.safeParse({ approve: false }).success).toBe(false);
   });
 
   it('rejects a body missing approve', () => {
@@ -49,10 +45,26 @@ describe('finaliseBodySchema', () => {
     ).toBe(false);
   });
 
-  it('ignores the removed allocationHash field (no longer part of the contract)', () => {
+  it('requires a non-empty winner selection and expected clearing rate', () => {
+    expect(finaliseBodySchema.safeParse({ approve: true }).success).toBe(false);
+    expect(
+      finaliseBodySchema.safeParse({
+        approve: true,
+        winningBidIndexes: [],
+        expectedClearingRate: '425',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('ignores the removed allocationHash field while validating the current contract', () => {
     // Zod strips unknown keys by default, so a stray allocationHash is harmless.
-    expect(finaliseBodySchema.safeParse({ approve: false, allocationHash: '0xdead' }).success).toBe(
-      true,
-    );
+    expect(
+      finaliseBodySchema.safeParse({
+        approve: true,
+        winningBidIndexes: [0],
+        expectedClearingRate: '425',
+        allocationHash: '0xdead',
+      }).success,
+    ).toBe(true);
   });
 });

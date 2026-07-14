@@ -75,6 +75,27 @@ describe('HttpClient + AuthProvider integration', () => {
     });
   });
 
+  it('accepts and identifies a documented projection-pending mutation', async () => {
+    const pending = {
+      status: 'accepted',
+      projectionPending: true,
+      transaction: { hash: '0xabc', block: 42 },
+      resource: { type: 'bond', id: 'NO0000000001' },
+    };
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 202,
+      statusText: 'Accepted',
+      text: async () => JSON.stringify(pending),
+    });
+    const { HttpClient, isMutationAccepted, mutationAcceptedMessage } =
+      await import('../src/api/httpClient.js');
+
+    const result = await HttpClient.post('/v1/bonds', {});
+    expect(isMutationAccepted(result)).toBe(true);
+    expect(mutationAcceptedMessage(result)).toContain('block 42');
+  });
+
   it('streams SSE with a fresh bearer header and parses split frames', async () => {
     const encoder = new TextEncoder();
     const read = vi

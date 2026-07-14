@@ -1,4 +1,9 @@
-import { computeIngestionWindow, waitForIngestionBlock } from '../src/ingestion';
+import {
+  __resetIngestionStateForTests,
+  advanceProjectionTo,
+  computeIngestionWindow,
+  waitForIngestionBlock,
+} from '../src/ingestion';
 
 describe('computeIngestionWindow', () => {
   it('returns null when latest is behind nextBlock (no new chain activity)', () => {
@@ -70,5 +75,25 @@ describe('waitForIngestionBlock', () => {
       }),
     ).resolves.toBe(false);
     expect(currentTime).toBe(100);
+  });
+});
+
+describe('advanceProjectionTo', () => {
+  beforeEach(() => __resetIngestionStateForTests());
+
+  it('delegates to the shared coordinator for the requested block', async () => {
+    const advance = jest.fn(async (target?: number) => target === 42);
+    await expect(advanceProjectionTo(42, { advance, timeoutMs: 100 })).resolves.toBe(true);
+    expect(advance).toHaveBeenCalledWith(42);
+  });
+
+  it('returns false when no ingestion coordinator is active', async () => {
+    await expect(advanceProjectionTo(42, { advance: null })).resolves.toBe(false);
+  });
+
+  it('bounds the caller wait without cancelling queued ingestion', async () => {
+    const advance = jest.fn(() => new Promise<boolean>(() => undefined));
+    await expect(advanceProjectionTo(42, { advance, timeoutMs: 5 })).resolves.toBe(false);
+    expect(advance).toHaveBeenCalledWith(42);
   });
 });

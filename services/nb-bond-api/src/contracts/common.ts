@@ -71,3 +71,10 @@ export const unixSecondsSchema = bigIntStringSchema.meta({
 export const unixMillisSchema = z.number().int().meta({
   description: 'Unix timestamp in milliseconds.',
 });
+
+export type Address = z.infer<typeof addressSchema>;
+export type HexString = z.infer<typeof hexStringSchema>;
+export type BigIntString = z.infer<typeof bigIntStringSchema>;
+export type Bps = z.infer<typeof bpsSchema>;
+export type Isin = z.infer<typeof isinSchema>;
+export type AuctionId = z.infer<typeof auctionIdSchema>;
