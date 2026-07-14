@@ -1,6 +1,6 @@
 # `sse-live-updates` — Implementation Plan
 
-**Status:** Implemented in code; local gateway and Azure deployment verification pending
+**Status:** ✅ Implemented and verified — shipped via #224. Verified through the local gateway and in an Entra-protected Azure sandbox deployment.
 **Original date:** 2026-06-18
 **Revised:** 2026-07-13
 **Owner / operator:** sandbox operator (this repo)

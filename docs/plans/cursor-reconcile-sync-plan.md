@@ -1,9 +1,9 @@
 # `cursor-reconcile-sync` — Implementation Plan
 
-**Status:** Superseded by `sse-live-updates-plan.md` (2026-07-13)
+**Status:** Superseded by `docs/plans/archive/sse-live-updates-plan.md` (2026-07-13)
 **Date:** 2026-06-18
 **Owner:** operator (greaker)
-**Related:** rides on the merged Phase-0 health-poll hardening (#166); becomes a transport-upgrade target for `docs/plans/sse-live-updates-plan.md`.
+**Related:** rides on the merged Phase-0 health-poll hardening (#166); became a transport-upgrade target for `docs/plans/archive/sse-live-updates-plan.md`.
 
 > This plan was not implemented as a separate health-cursor layer. The SSE
 > implementation absorbed its transport-agnostic `useLiveQuery` reconciliation
