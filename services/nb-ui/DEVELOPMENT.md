@@ -74,8 +74,12 @@ mounted query when one of its resource keys changes. It does not clear the
 HTTP cache, so the existing ETag is retained and the API returns fresh `200`
 data or a cheap `304`. Opening or reopening a connection reconciles all
 mounted live queries once, which provides gap recovery without event replay.
-Heartbeat comments do not trigger queries, and the separate health poll is
-unchanged.
+Heartbeat comments do not trigger queries. Health remains a separate signal:
+SSE says that data may have changed, while `/v1/health` reports chain and
+ingestion readiness. The shared health poll runs immediately on load, every 60
+seconds while healthy, every 10 seconds while degraded, backs off to at most 60
+seconds while unreachable, pauses in hidden tabs, and probes immediately when
+the tab becomes visible again.
 
 Set runtime config `LIVE_UPDATES=false` to disable streaming while diagnosing
 a gateway. Manual Refresh controls and the health poll continue to work.

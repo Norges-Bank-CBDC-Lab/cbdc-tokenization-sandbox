@@ -26,7 +26,7 @@ open-source license terms.
 ## Third-Party License Inventory
 
 This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of July 10, 2026.
+deployment-time components used by this repository as of July 15, 2026.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -74,13 +74,12 @@ License labels and deployment-time notes remain curated review items.
 | `babel-jest` | `30.4.1` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.6.0` | MIT |
+| `globals` | `17.7.0` | MIT |
 | `jest` | `30.4.2` | MIT |
-| `prettier` | `3.9.4` | MIT |
-| `ts-jest` | `29.4.11` | MIT |
+| `prettier` | `3.9.5` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
-| `typescript-eslint` | `8.62.1` | MIT |
+| `typescript` | `7.0.2` | Apache-2.0 |
+| `typescript-eslint` | `8.64.0` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -90,7 +89,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
@@ -100,7 +99,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `services/nb-ui`
 
@@ -117,11 +116,11 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
-| `globals` | `17.6.0` | MIT |
+| `globals` | `17.7.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
-| `prettier` | `3.9.4` | MIT |
+| `prettier` | `3.9.5` | MIT |
 | `vite` | `8.0.16` | MIT |
-| `vitest` | `4.1.9` | MIT |
+| `vitest` | `4.1.10` | MIT |
 
 ### `services/blockscout/bens-microservice`
 

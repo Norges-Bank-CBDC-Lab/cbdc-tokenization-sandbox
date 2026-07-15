@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { Button, Modal, RadioGroup } from '../components/ui.jsx';
+import { Button, Modal } from '../components/ui.jsx';
 import { formatPercentageRatio, parseUnsignedInteger } from '../domain/amounts.js';
 import {
   selectAuctionBidPositions,
@@ -15,7 +15,6 @@ export function FinaliseAuctionModal({ auction, onClose, onConfirm, busy }) {
     [auction.bids],
   );
   const unsealed = bids.length > 0;
-  const [mode, setMode] = useState('approve');
   const [acknowledged, setAcknowledged] = useState(false);
   const [selectionOverride, setSelectionOverride] = useState(null);
   const offering = parseUnsignedInteger(auction.size || '0', 'offering');
@@ -40,8 +39,7 @@ export function FinaliseAuctionModal({ auction, onClose, onConfirm, busy }) {
   }
 
   const allocationHash = auction.allocation?.hash || null;
-  const disabled =
-    busy || !allocationHash || !acknowledged || (mode === 'approve' && selected.size === 0);
+  const disabled = busy || !allocationHash || !acknowledged || selected.size === 0;
 
   return (
     <Modal
@@ -54,12 +52,12 @@ export function FinaliseAuctionModal({ auction, onClose, onConfirm, busy }) {
             Cancel
           </Button>
           <Button
-            variant={mode === 'approve' ? 'primary' : 'danger'}
+            variant="primary"
             onClick={() => {
               const winningBidIndexes = [...selected]
                 .map((index) => bids[index]?.bidIndex)
                 .filter((index) => Number.isInteger(index));
-              onConfirm(mode === 'approve', {
+              onConfirm({
                 winningBidIndexes,
                 expectedClearingRate: String(summary?.clearingRate ?? 0n),
               });
@@ -67,20 +65,16 @@ export function FinaliseAuctionModal({ auction, onClose, onConfirm, busy }) {
             disabled={disabled}
           >
             {busy
-              ? mode === 'approve'
-                ? 'Approving…'
-                : 'Rejecting…'
-              : mode === 'approve'
-                ? `Approve ${selected.size} winner${selected.size === 1 ? '' : 's'}`
-                : 'Reject allocation'}
+              ? 'Approving…'
+              : `Approve ${selected.size} winner${selected.size === 1 ? '' : 's'}`}
           </Button>
         </>
       }
     >
       <p className="lc-modal-lead">
         Select the bids that will be issued tokens. The clearing rate is the highest accepted rate —
-        all winners pay the same. Approving signs the allocation on-chain. Rejecting marks the
-        auction rejected and issues no tokens.
+        all winners pay the same. Approving signs the allocation on-chain. To stop without issuing,
+        close this dialog and use the durable Cancel auction action.
       </p>
 
       <div className="lc-hash">
@@ -206,21 +200,6 @@ export function FinaliseAuctionModal({ auction, onClose, onConfirm, busy }) {
           </div>
         </div>
       )}
-
-      <div className="lc-decision">
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>Decision</label>
-          <RadioGroup
-            name="finalise-mode"
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: 'approve', label: 'Approve' },
-              { value: 'reject', label: 'Reject' },
-            ]}
-          />
-        </div>
-      </div>
 
       <label className="lc-ack">
         <input

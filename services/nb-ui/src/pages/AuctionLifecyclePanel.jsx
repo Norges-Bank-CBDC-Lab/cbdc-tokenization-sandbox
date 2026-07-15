@@ -2,18 +2,12 @@
  * AuctionLifecyclePanel — drives an auction through its lifecycle.
  *
  *   open ──► closed ──► finalised
- *                  └──► rejected
  *   (cancelled is a terminal state reachable from open or closed)
  *
  * Surfaces three actions, gated by current status:
  *   - Close auction       (open → closed, PATCH)
- *   - Approve / Reject    (closed → finalised|rejected, PUT)
+ *   - Approve allocation  (closed → finalised, PUT)
  *   - Cancel auction      (open|closed → cancelled, DELETE)
- *
- * "Reopen" is rendered when status is "closed" but the backend / on-chain
- * has no closed→open transition yet — see docs/KNOWN_ISSUES.md
- * "nb-ui: reopenAuction needs backend / on-chain support". The httpClient
- * throws NotImplementedError so the UI shows a clear toast.
  */
 import { useState } from 'react';
 import { Fmt } from '../utils/format.js';
@@ -34,8 +28,6 @@ function progressFor(status) {
       return 1;
     case 'finalised':
       return 2;
-    case 'rejected':
-      return 1;
     case 'cancelled':
       return -1;
     default:
@@ -45,7 +37,7 @@ function progressFor(status) {
 
 function Stepper({ status }) {
   const reached = progressFor(status);
-  const isTerminalBad = status === 'rejected' || status === 'cancelled';
+  const isTerminalBad = status === 'cancelled';
 
   return (
     <ol className="lc-steps" aria-label="Auction lifecycle">
@@ -79,20 +71,6 @@ function Stepper({ status }) {
 }
 
 function TerminalBanner({ status }) {
-  if (status === 'rejected') {
-    return (
-      <div className="lc-terminal lc-terminal-bad">
-        <div className="lc-terminal-icon">✕</div>
-        <div>
-          <div className="lc-terminal-title">Allocation rejected</div>
-          <div className="lc-terminal-msg">
-            The computed allocation was rejected. No tokens were issued. A new auction can be
-            created to retry.
-          </div>
-        </div>
-      </div>
-    );
-  }
   if (status === 'cancelled') {
     return (
       <div className="lc-terminal lc-terminal-bad">
@@ -142,7 +120,7 @@ function CloseModal({ auction, onClose, onConfirm, busy }) {
       <p className="lc-modal-lead">
         Closing the auction stops bid submission, unseals all sealed bids, and computes the clearing
         rate and allocation. This action cannot be undone — once closed, the auction can only be
-        finalised or rejected.
+        finalised or cancelled.
       </p>
       <dl className="kv-grid lc-modal-kv">
         <dt>Auction</dt>
@@ -163,45 +141,6 @@ function CloseModal({ auction, onClose, onConfirm, busy }) {
           No sealed bids were recorded. Closing now will produce an empty allocation.
         </div>
       )}
-    </Modal>
-  );
-}
-
-function ReopenModal({ auction, onClose, onConfirm, busy }) {
-  return (
-    <Modal
-      title="Reopen auction"
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>
-            Keep closed
-          </Button>
-          <Button variant="primary" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Reopening…' : 'Reopen auction'}
-          </Button>
-        </>
-      }
-    >
-      <p className="lc-modal-lead">
-        Reopening returns the auction to <strong>open</strong> state and discards the computed
-        allocation. New bids can be submitted until the auction is closed again. Use this when a
-        counting error is spotted before finalisation, or to extend the bidding window.
-      </p>
-      <dl className="kv-grid lc-modal-kv">
-        <dt>Auction</dt>
-        <dd className="mono">{Fmt.shortHex(auction.id, 10, 8)}</dd>
-        <dt>ISIN</dt>
-        <dd className="mono">{auction.isin}</dd>
-        <dt>Current status</dt>
-        <dd>
-          <StatusBadge status={auction.status} />
-        </dd>
-      </dl>
-      <div className="lc-warning">
-        The current allocation hash will be discarded. Any in-progress finalisation review must be
-        restarted after reopening.
-      </div>
     </Modal>
   );
 }
@@ -262,15 +201,14 @@ function CancelModal({ auction, onClose, onConfirm, busy }) {
   );
 }
 
-export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, onCancel, busy }) {
+export function AuctionLifecyclePanel({ auction, onClose, onFinalise, onCancel, busy }) {
   const [modal, setModal] = useState(null);
   const s = auction.status;
 
   const canClose = s === 'open';
   const canFinalise = s === 'closed';
-  const canReopen = s === 'closed';
   const canCancel = s === 'open' || s === 'closed';
-  const terminal = s === 'finalised' || s === 'rejected' || s === 'cancelled';
+  const terminal = s === 'finalised' || s === 'cancelled';
 
   const summary =
     s === 'open'
@@ -279,11 +217,9 @@ export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, 
         ? 'Bids have been unsealed and the allocation has been computed. Review and finalise to issue tokens.'
         : s === 'finalised'
           ? 'Allocation has been approved. Tokens are issued.'
-          : s === 'rejected'
-            ? 'Allocation was rejected. No tokens were issued.'
-            : s === 'cancelled'
-              ? 'Auction was cancelled before finalisation.'
-              : '';
+          : s === 'cancelled'
+            ? 'Auction was cancelled before finalisation.'
+            : '';
 
   async function handle(action, ...args) {
     const ok = await action(...args);
@@ -314,15 +250,10 @@ export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, 
                   {canClose &&
                     'Stops new bids, unseals submissions, and computes the clearing rate.'}
                   {canFinalise &&
-                    'Pick which bids will receive tokens at the clearing rate, then approve or reject.'}
+                    'Pick which bids will receive tokens at the clearing rate, then approve the allocation.'}
                 </div>
               </div>
               <div className="lc-action-buttons">
-                {canReopen && (
-                  <Button variant="default" onClick={() => setModal('reopen')} disabled={busy}>
-                    Reopen…
-                  </Button>
-                )}
                 {canClose && (
                   <Button variant="primary" onClick={() => setModal('close')} disabled={busy}>
                     Close auction…
@@ -366,15 +297,7 @@ export function AuctionLifecyclePanel({ auction, onClose, onReopen, onFinalise, 
           auction={auction}
           busy={busy}
           onClose={() => setModal(null)}
-          onConfirm={(approve, selection) => handle(onFinalise, approve, selection)}
-        />
-      )}
-      {modal === 'reopen' && (
-        <ReopenModal
-          auction={auction}
-          busy={busy}
-          onClose={() => setModal(null)}
-          onConfirm={() => handle(onReopen)}
+          onConfirm={(selection) => handle(onFinalise, selection)}
         />
       )}
       {modal === 'cancel' && (

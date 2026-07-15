@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
-// Feature: the /v1/health poll pauses while the tab is hidden and backs off
-// while the backend is unreachable, so an idle/background tab stops hammering
-// the gateway. useHealthPoll imports healthApi.js at module load, so each case
+// Feature: the /v1/health poll pauses while the tab is hidden, uses a slow
+// healthy cadence, watches degraded recovery more closely, and backs off while
+// unreachable. useHealthPoll imports healthApi.js at module load, so each case
 // re-mocks it and dynamically imports the hook (mirrors HealthBadge.test.jsx).
 
 async function loadHook(getHealth) {
@@ -58,7 +58,7 @@ describe('useHealthPoll traffic shaping', () => {
     vi.useFakeTimers();
     defineVisibility('visible');
     const getHealth = vi.fn().mockRejectedValue(new Error('unreachable'));
-    const { useHealthPoll, DEFAULT_POLL_INTERVAL_MS } = await loadHook(getHealth);
+    const { useHealthPoll, DEGRADED_POLL_INTERVAL_MS } = await loadHook(getHealth);
 
     renderHook(() => useHealthPoll());
     await act(async () => {
@@ -66,21 +66,53 @@ describe('useHealthPoll traffic shaping', () => {
     });
     expect(getHealth).toHaveBeenCalledTimes(1); // initial probe
 
-    // First interval elapses -> second probe; now backed off to 2x base.
+    // First failure retries at the degraded cadence, then backs off to 2x.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(DEGRADED_POLL_INTERVAL_MS);
     });
     expect(getHealth).toHaveBeenCalledTimes(2);
 
-    // One more base interval is NOT enough — the next probe is at 2x base.
+    // One degraded interval is not enough — the next probe is at 2x.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(DEGRADED_POLL_INTERVAL_MS);
     });
     expect(getHealth).toHaveBeenCalledTimes(2);
 
     // Completing the doubled window fires the next probe.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS);
+      await vi.advanceTimersByTimeAsync(DEGRADED_POLL_INTERVAL_MS);
+    });
+    expect(getHealth).toHaveBeenCalledTimes(3);
+  });
+
+  it('checks degraded state more frequently than healthy state', async () => {
+    vi.useFakeTimers();
+    defineVisibility('visible');
+    const getHealth = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'degraded' })
+      .mockResolvedValue({ status: 'ok' });
+    const { useHealthPoll, DEFAULT_POLL_INTERVAL_MS, DEGRADED_POLL_INTERVAL_MS } =
+      await loadHook(getHealth);
+
+    renderHook(() => useHealthPoll());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getHealth).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEGRADED_POLL_INTERVAL_MS);
+    });
+    expect(getHealth).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_INTERVAL_MS - 1);
+    });
+    expect(getHealth).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
     });
     expect(getHealth).toHaveBeenCalledTimes(3);
   });

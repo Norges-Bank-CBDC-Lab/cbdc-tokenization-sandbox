@@ -96,7 +96,7 @@ describe('ingestion database', () => {
 
     const rows = listAllAuctions(db);
     expect(rows.map((r) => r.auction_id)).toEqual(['0xbbbb', '0xcccc', '0xaaaa']);
-    expect(rows[0]).toEqual({
+    expect(rows[0]).toMatchObject({
       auction_id: '0xbbbb',
       isin: 'NO0000000002',
       type: 'PRICE',

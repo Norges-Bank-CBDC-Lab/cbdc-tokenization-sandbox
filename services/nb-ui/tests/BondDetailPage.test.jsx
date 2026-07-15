@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 function makeBond(overrides = {}) {
   return {
     isin: 'NO-TEST-001',
-    status: 'unknown',
+    status: 'staged',
     disabled: false,
     totalSupply: '0',
     contracts: { token: '0xaaaa', auction: '0xbbbb', manager: '0xcccc' },

@@ -191,6 +191,16 @@ export async function getLatestBlockTimestamp(): Promise<bigint | null> {
   }
 }
 
+/** Stable unix-millisecond timestamp for a specific source block. */
+export async function getBlockTimestamp(blockNumber: number): Promise<number | null> {
+  try {
+    const block = await provider.getBlock(blockNumber);
+    return block ? block.timestamp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 // DURATION_SCALAR is an immutable constant on the deployed BondManager
 // (seconds-per-year on real chains; small value like 60 on the sandbox
 // for fast testing). Cache it once after the first successful read so

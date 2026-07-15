@@ -223,6 +223,20 @@ describe('ingestion event idempotency (schema v2)', () => {
       expect(getBalance(db, isin, '0xalice')).toBe('-50');
       expect(getBalance(db, isin, '0xbob')).toBe('50');
     });
+
+    it('defensively ignores a zero-address holder', () => {
+      applyBalanceDelta(db, {
+        isin,
+        holder: '0x0000000000000000000000000000000000000000',
+        delta: 100n,
+        block: 30,
+        logIndex,
+        txHash,
+        kind: 'mint',
+      });
+      expect(rowCount(db, 'balance_events')).toBe(0);
+      expect(getBalance(db, isin, '0x0000000000000000000000000000000000000000')).toBeNull();
+    });
   });
 });
 
@@ -239,10 +253,9 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('drops event tables and clears checkpoint when opening at a lower user_version', () => {
-    // Step 1: create a v0-shaped file directly with the OLD schema and
-    // a row of stale data. This simulates a deployment that pre-dates
-    // the current SCHEMA_VERSION.
+  it('rebuilds a v3 projection while preserving every system-of-record table', () => {
+    // Create the relevant v3 projection shape plus the three durable tables.
+    // These counts mirror the live migration contract without using real keys.
     {
       const raw = new DatabaseConstructor(dbPath);
       raw.exec(`
@@ -264,11 +277,33 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
         CREATE TABLE ingestion_state (
           contract TEXT PRIMARY KEY, last_block INTEGER, last_tx_index INTEGER
         );
+        CREATE TABLE bidders (
+          address TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+          public_key TEXT NOT NULL, private_key TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+        CREATE TABLE banks (
+          address TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
+          private_key TEXT NOT NULL, contract_name TEXT NOT NULL UNIQUE,
+          tbd_address TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL
+        );
+        CREATE TABLE operation_attempts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, op_type TEXT NOT NULL,
+          target TEXT NOT NULL, status TEXT NOT NULL, tx_hash TEXT,
+          error TEXT, detail TEXT, created_at INTEGER NOT NULL
+        );
         INSERT INTO auction_events(auction_id, isin, type, block, tx_hash, payload)
           VALUES ('0xpre-v2', 'NO0012345678', 'RATE', 5, '0xold', '{}');
         INSERT INTO ingestion_state(contract, last_block, last_tx_index)
           VALUES ('bond-manager', 5, 0);
-        PRAGMA user_version = 0;
+        INSERT INTO bidders(address, name, public_key, private_key, created_at)
+          VALUES ('0x0000000000000000000000000000000000000001', 'Bidder', '0xpub', '0xpriv', 1);
+        INSERT INTO banks(address, name, private_key, contract_name, tbd_address, created_at)
+          VALUES ('0x0000000000000000000000000000000000000002', 'Bank', '0xpriv', 'TBD Bank',
+                  '0x0000000000000000000000000000000000000003', 2);
+        INSERT INTO operation_attempts(op_type, target, status, tx_hash, created_at)
+          VALUES ('BOND_CREATE', 'NO0012345678', 'SUCCEEDED', '0xtx', 3);
+        PRAGMA user_version = 3;
       `);
       raw.close();
     }
@@ -279,17 +314,26 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     const db = openDatabase({ dbPath }) as ClosableIngestionDatabase;
     try {
       const userVersion = Number(db.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(3);
+      expect(userVersion).toBe(6);
 
       // Tables exist (recreated by createTables after the drop).
       expect(rowCount(db, 'auction_events')).toBe(0);
       expect(rowCount(db, 'bond_events')).toBe(0);
       expect(rowCount(db, 'balance_events')).toBe(0);
+      expect(rowCount(db, 'bond_state')).toBe(0);
+      expect(rowCount(db, 'auction_bids')).toBe(0);
+      expect(rowCount(db, 'auction_allocations')).toBe(0);
 
       // Checkpoint was cleared so the polling loop will rebuild from
       // START_BLOCK.
       const checkpointRow = db.prepare(`SELECT * FROM ingestion_state`).get();
       expect(checkpointRow).toBeUndefined();
+
+      // Locally generated records are not projections and must survive exactly.
+      expect(rowCount(db, 'bidders')).toBe(1);
+      expect(rowCount(db, 'banks')).toBe(1);
+      expect(rowCount(db, 'operation_attempts')).toBe(1);
+      expect(db.pragma('quick_check', { simple: true })).toBe('ok');
 
       // New schema is in place: the UNIQUE INDEX exists and prevents
       // duplicate (tx_hash, log_index) insertions.
@@ -317,6 +361,43 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     }
   });
 
+  it('rolls back projection drops when schema recreation fails', () => {
+    {
+      const raw = new DatabaseConstructor(dbPath);
+      raw.exec(`
+        CREATE TABLE auction_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          auction_id TEXT, isin TEXT, type TEXT,
+          block INTEGER, tx_hash TEXT, payload TEXT
+        );
+        INSERT INTO auction_events(auction_id, isin, type, block, tx_hash, payload)
+          VALUES ('0xpreserved', 'NO0012345678', 'RATE', 5, '0xold', '{}');
+        CREATE TABLE operation_attempts (id INTEGER PRIMARY KEY);
+        PRAGMA user_version = 3;
+      `);
+      raw.close();
+    }
+
+    // The incompatible durable table makes createTables fail after migration
+    // starts. The transaction must restore the old projection and version.
+    expect(() => openDatabase({ dbPath })).toThrow();
+
+    const check = new DatabaseConstructor(dbPath, { readonly: true });
+    try {
+      expect(check.pragma('user_version', { simple: true })).toBe(3);
+      expect(
+        (
+          check.prepare(`SELECT COUNT(*) AS n FROM auction_events`).get() as {
+            n: number;
+          }
+        ).n,
+      ).toBe(1);
+      expect(check.pragma('quick_check', { simple: true })).toBe('ok');
+    } finally {
+      check.close();
+    }
+  });
+
   it('is a no-op when the file is already at the current version', () => {
     // First open creates the DB at the current version.
     const first = openDatabase({ dbPath }) as ClosableIngestionDatabase;
@@ -336,7 +417,7 @@ describe('ingestion DB migration (PRAGMA user_version)', () => {
     try {
       expect(rowCount(second, 'auction_events')).toBe(1);
       const userVersion = Number(second.pragma('user_version', { simple: true }) ?? 0);
-      expect(userVersion).toBe(3);
+      expect(userVersion).toBe(6);
     } finally {
       second.close();
     }
