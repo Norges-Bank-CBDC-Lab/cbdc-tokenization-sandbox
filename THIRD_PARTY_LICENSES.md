@@ -77,9 +77,8 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.7.0` | MIT |
 | `jest` | `30.4.2` | MIT |
 | `prettier` | `3.9.5` | MIT |
-| `ts-jest` | `29.4.11` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript` | `7.0.2` | Apache-2.0 |
 | `typescript-eslint` | `8.63.0` | MIT |
 
 ### `scripts/bid-encryption`
@@ -90,7 +89,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
@@ -100,7 +99,7 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
 | `tsx` | `4.23.0` | MIT |
-| `typescript` | `6.0.3` | Apache-2.0 |
+| `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `services/nb-ui`
 
