@@ -384,15 +384,18 @@ to race the ingestion tick.
 The schema is versioned via `PRAGMA user_version` (current version `6`).
 When the on-disk value is lower than the current `SCHEMA_VERSION` in
 `src/ingestion-db.ts`, `openDatabase` runs a one-shot migration that
-drops the full projection through the central `PROJECTION_TABLE_NAMES` list
-and stamps the new version. The polling loop then rebuilds every table
-from chain on its next tick. This works because the database is a
-projection of chain state, not a system of record; rebuildability is the
-whole story. The migration logs `ingestion DB schema migrated from
-v<old> to v<new>` once at startup. **Portability note:** for any
-non-sandbox deployment that backs `data/` with a real volume, the
-drop-and-rebuild migration would be unacceptable — replace it with a
-proper additive in-place migration before promoting.
+drops the full projection through the central `PROJECTION_TABLE_NAMES` list,
+recreates it, and stamps the new version in one transaction. The polling loop
+then rebuilds every projection table from chain on its next tick. This is
+necessary when reducer semantics change; an additive migration would retain
+incorrect derived rows. The migration logs `ingestion DB schema migrated from
+v<old> to v<new>` once at startup.
+
+Persistent-volume deployments must take and verify a database backup before
+upgrading. The migration preserves `bidders`, `banks`, and
+`operation_attempts`, but rolling back to a binary with an older projection
+schema requires restoring the pre-upgrade database. Do not open a rebuilt
+database with older projection code and assume that is a supported downgrade.
 
 Event-table writes are idempotent. Each of `auction_events`,
 `balance_events`, and `bond_events` carries a `log_index` column and a

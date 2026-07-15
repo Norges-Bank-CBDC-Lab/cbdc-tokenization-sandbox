@@ -127,7 +127,6 @@ function createTables(db: IngestionDatabase) {
   // The UNIQUE indexes on `(tx_hash, log_index, …)` enforce per-chain-log
   // idempotency so re-processing the same block range is a no-op.
   db.exec(`
-    PRAGMA journal_mode=WAL;
     CREATE TABLE IF NOT EXISTS ingestion_state (
       contract TEXT PRIMARY KEY,
       last_block INTEGER,
@@ -328,11 +327,12 @@ function createTables(db: IngestionDatabase) {
  * the whole projection is the only way to guarantee a consistent
  * rebuild.
  *
- * Sandbox-appropriate: nb-bond-api's data volume is an emptyDir, so
- * this fires at most once per pod lifetime and the rebuild is cheap.
- * Before promoting to a persistent-DB deployment (PVC-backed or
- * Postgres), replace this with an in-place migration that preserves
- * existing rows.
+ * Projection rebuilds are also supported on a persistent SQLite volume:
+ * schema replacement and version stamping run in one transaction, while
+ * the non-rebuildable system-of-record tables remain untouched. Operators
+ * must still take a verified backup before upgrading. Rolling back to a
+ * binary with an older schema requires restoring that pre-upgrade backup;
+ * opening a rebuilt database with older projection code is unsupported.
  *
  * Fresh-DB safety: every DROP is `IF EXISTS`, and PRAGMA
  * user_version is set unconditionally, so on a brand-new file the
@@ -387,21 +387,34 @@ export function openDatabase(config: IngestionConfig): IngestionDatabase {
     fileMustExist: false,
     readonly: config.readonly ?? false,
   };
-  const db = new DatabaseConstructor(fullPath, options) as IngestionDatabase;
+  const sqliteDb = new DatabaseConstructor(fullPath, options);
+  const db = sqliteDb as IngestionDatabase;
   if (!config.readonly) {
-    // Migration MUST run before createTables: the migration drops the
-    // old-shape event tables so that the subsequent CREATE TABLE IF
-    // NOT EXISTS in createTables actually creates them with the new
-    // shape (otherwise IF NOT EXISTS would silently keep the old).
-    const migration = migrateToCurrentVersion(db);
-    createTables(db);
-    if (migration.ran) {
-      logger.info(
-        `ingestion DB schema migrated from v${migration.from} to v${migration.to}; ` +
-          `event tables dropped, checkpoint reset — ingestion will rebuild projection from chain.`,
-      );
-    } else {
-      logger.debug(`ingestion DB schema at v${migration.to} (no migration needed)`);
+    try {
+      // journal_mode cannot change inside a transaction. Configure it first,
+      // then make the destructive projection replacement atomic: a failure
+      // while recreating the schema rolls back the drops and version stamp.
+      db.pragma('journal_mode = WAL');
+      const initializeSchema = db.transaction(() => {
+        // Migration MUST run before createTables: the migration drops the
+        // old-shape projection tables so CREATE TABLE IF NOT EXISTS cannot
+        // silently retain an incompatible shape.
+        const migration = migrateToCurrentVersion(db);
+        createTables(db);
+        return migration;
+      });
+      const migration = initializeSchema();
+      if (migration.ran) {
+        logger.info(
+          `ingestion DB schema migrated from v${migration.from} to v${migration.to}; ` +
+            `projection tables dropped, checkpoint reset — ingestion will rebuild from chain.`,
+        );
+      } else {
+        logger.debug(`ingestion DB schema at v${migration.to} (no migration needed)`);
+      }
+    } catch (error) {
+      sqliteDb.close();
+      throw error;
     }
   }
   return db;
