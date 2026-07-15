@@ -11,7 +11,7 @@ Make the existing WNOK allowlist on the Central Bank page legible: each allowlis
 ## Current-State Evidence
 
 - `services/nb-ui/src/pages/CentralBankPage.jsx` already renders the WNOK allowlist (add via `AllowlistAddModal`, list, per-row remove). `allowlistLabel()` labels bidders (from the roster) + the CB account; everything else renders "—".
-- `GET /v1/central-bank/allowlist` returns address-only entries (`AllowlistEntry { address, md5 }`) — `services/nb-bond-api/src/index.ts` + `schemas.ts`.
+- `GET /v1/central-bank/allowlist` returns address-only entries (`AllowlistEntry { address, md5 }`) — `services/nb-bond-api/src/app.ts` + `schemas.ts`.
 - The banking roster + registry resolution already exist (`services/nb-bond-api/src/banking-tbd.ts`: `TBD_BANKS`, `listConfiguredBanks`, `resolveRegisteredAddress`) and can be reused to recognise bank + TBD-contract addresses.
 - **Needs verification (Phase 0):** which addresses are actually on the WNOK allowlist today (are the TBD contracts? the gov reserve?) — read live.
 
