@@ -97,9 +97,11 @@ local Kind registry at `localhost:5001/nb-bond-api:<hash>`, and the Helm
 chart is installed with `--set image=<that tag>`. Re-runs skip the build
 when the content hash matches an existing registry tag.
 
-The pod mounts an `emptyDir` at `/app/data` for the SQLite ingestion DB; no
-host source mount is required and the chart no longer runs `npm ci` /
-`npm run build` at container start.
+The chart mounts the `nb-bond-api-data` PVC at `/app/data` for the SQLite
+database by default (`256Mi`, `ReadWriteOnce`). Disabling
+`persistence.enabled` falls back to `emptyDir`. No host source mount is
+required and the chart no longer runs `npm ci` / `npm run build` at container
+start.
 
 ## Env
 

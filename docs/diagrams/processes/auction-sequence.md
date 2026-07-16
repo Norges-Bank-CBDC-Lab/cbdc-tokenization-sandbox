@@ -1,138 +1,99 @@
+# Sealed-Bid Auction Sequence
+
+This is the current API and contract flow for RATE, PRICE, and BUYBACK
+auctions. The operator chooses winning on-chain bid indexes; the API recomputes
+the result over exactly that selection and refuses a clearing-rate mismatch.
+
 ```mermaid
 sequenceDiagram
     autonumber
+    actor Operator as Norges Bank operator
+    participant UI as NB UI
+    participant API as NB Bond API
+    participant DB as SQLite projection / audit
+    participant BM as BondManager
+    participant BA as BondAuction
+    participant BT as BondToken
+    actor Bidder as Primary dealer
+    participant DVP as BondDvP
+    participant Cash as WNOK or government TBD
 
-    actor NB as Norges Bank
-    participant API as Bond API
-    participant DVP
-    participant wNOK
+    Operator->>UI: Create bond or schedule auction
+    UI->>API: POST /v1/bonds or POST /v1/bonds/{isin}/auctions
 
-    participant BM as Bond Manager
-    participant BT as Bond Token
-    participant BA as Bond Auction
-
-    actor PD as Primary Dealer N
-
-    note left of API: API Service to manage <br> bonds/auctions
-
-    NB ->> API: POST /v1/bonds/:isin/auctions (RATE)
-    activate API
-
-    API ->> BM: deployBondWithAuction()
-
-    note left of NB: Renews sealing PK each auction
-
-    BM -->> BT: createPartition()
-    note right of BT: ERC1400 w/ per ISIN partition
-
-    BM -->> BA: createAuction() (RATE_AUCTION)
-
-    API ->> NB: 200 OK - { auction_details }
-    deactivate API
-
-    note left of BA: Set NB public sealing key
-
-    note right of BA: BidPhase.BIDDING
-
-    PD --> PD: Double seals bid for NB & PD
-
-    note right of PD: 1 for PD visibility, 1 for NB visibility
-    note right of PD: Renews sealing PK each auction
-
-    alt PD1 bids
-        PD ->> BA: Submits sealed bid(s)
-    else PD2 bids
-        PD ->> BA: Submits sealed bid(s)
-    else PD3 bids
-        PD ->> BA: Submits sealed bid(s)
+    alt New bond staged before auction
+        API->>BM: deployBond(isin, maturityDuration)
+        BM->>BT: createPartition(isin, 0, maturityDuration)
     end
 
-    NB ->> API: /v1/auctions/:auctionId/close
-    activate API
+    alt First RATE auction on unstaged bond
+        API->>BM: deployBondWithAuction(..., sealingPublicKey)
+        BM->>BT: createPartition + extend offering
+    else RATE on staged bond, or later PRICE / BUYBACK
+        API->>BM: deployAuctionForBond(..., auctionType)
+        BM->>BT: extend offering for RATE/PRICE<br/>or validate supply for BUYBACK
+    end
+    BM->>BA: createAuction(...)
+    BA-->>BM: auctionId<br/>status = BIDDING
+    API->>DB: wait until receipt block is projected
+    API-->>UI: Updated bond or HTTP 202 if projection is pending
 
-    API ->> BM: closeAuction()
-    BM ->> BA: closeAuction()
-
-    note right of BA: BidPhase.CLOSED
-    note left of BA: Contract will time-guard bid phase
-
-    API --> BM: getSealedBids()
-    API -->> API: Unseal, sort & allocate
-    note left of API: Unsealed using NB private key
-
-    API ->> NB: 200 OK - { auction_result, pre_allocations, alloc_hash }
-    deactivate API
-
-    note right of NB: Off-chain GO/NO-GO
-
-    NB ->> API: /v1/auctions/:auctionId/finalisation
-    activate API
-
-    note right of BA: BidPhase.FINALISED
-
-    alt On Approval
-        API ->> BM: finaliseAuction()
-        note left of DVP: Allocations are public
-        BM -->> BT: mintByIsin()
-        note right of BT: Pending tokens in BM contract, withdrawable <br /> by NB in failure state
-
-        BM -->> BT: setCouponParameters()
-        BM -->> BT: startMaturityTimer()
-
-        note right of BT: Yield set by initial auction
-
-        loop on bid win
-            note right of DVP: Full price of bond paid (1000 WNOK = 1 unit)
-            BM -->> DVP: Settle
-            DVP -->> wNOK: transferFrom(PD, NB)
-            DVP -->> BT: transfer(PD)
-            note left of DVP: Settle should be atomic PER settlement loop
+    loop One or more bids
+        Bidder->>Bidder: Build EIP-712 intent, sign,<br/>encrypt payload, dual-wrap symmetric key
+        alt Sandbox bidder API
+            Bidder->>API: POST /v1/bidders/{address}/bids
+            API->>BA: submitBid(auctionId, ciphertext, plaintextHash)
+        else Reference CLI / direct chain path
+            Bidder->>BA: submitBid(auctionId, ciphertext, plaintextHash)
         end
-    else On Rejection
-        API ->> BM: cancelAuction()
-        BM ->> BA: cancelAuction()
+        BA-->>Bidder: BidSubmitted event with bidIndex
     end
 
-    API ->> NB: 200 OK - { final_allocation }
-    deactivate API
+    Operator->>UI: Close after on-chain end time
+    UI->>API: PATCH /v1/auctions/{auctionId} {status: closed}
+    API->>BM: closeAuction(isin)
+    BM->>BA: closeAuction(auctionId)
+    BA-->>BM: status = CLOSED + sealed bids
+    API->>DB: wait for projected close event
+    API-->>UI: Closed auction with review data
 
-    NB ->> API: POST /v1/bonds/:isin/auctions (PRICE)
-    activate API
+    API->>BM: getSealedBids(isin)
+    BM->>BA: getSealedBids(auctionId)
+    BA-->>API: ciphertexts + commitments + bidder addresses
+    API->>API: Unseal and validate bids
+    UI-->>Operator: Display eligible bids and proposed result
+    Operator->>UI: Select winning bid indexes and approve
+    UI->>API: PUT /v1/auctions/{auctionId}/finalisation<br/>{winningBidIndexes, expectedClearingRate}
+    API->>API: Recompute allocation over selection<br/>and cross-check clearing rate
+    API->>BM: finaliseAuction(isin, allocations, proofs)
+    BM->>BA: finaliseAuction(...)
+    BA->>BA: Verify EIP-712 proof for each allocation<br/>consume bidder nonces, publish allocations
 
-    BM -->> BT: extendPartitionOffering()
-    note right of BT: Increases partition totalSupply
-
-    BM -->> BA: createAuction() (PRICE_AUCTION)
-
-    API ->> NB: 200 OK - { auction_details }
-    deactivate API
-
-    note over NB, PD: ... Bidding, closure runs as previous ...
-
-    NB ->> API: /v1/auctions/:auctionId/finalisation
-    activate API
-
-    note right of BA: BidPhase.FINALISED
-
-    alt On Approval
-        API ->> BM: finaliseAuction()
-        BM -->> BT: mintByIsin()
-        note right of BT: Pending tokens in BM contract, withdrawable <br /> by NB in failure state
-
-        note right of BT: Use existing coupon parameters
-
-        loop on bid win
-            note right of DVP: Discount price of bond paid based on remaining payouts
-            BM -->> DVP: Settle
-            DVP -->> wNOK: transferFrom(PD, NB)
-            DVP -->> BT: transfer(PD)
-            note left of DVP: Settle should be atomic PER settlement loop
+    alt RATE or PRICE issuance
+        BM->>BT: mint allocated units to BondManager
+        opt RATE only
+            BM->>BT: set coupon yield and start maturity timer
         end
-    else On Rejection
-        API ->> BM: cancelAuction()
-        BM ->> BA: cancelAuction()
+        loop Each allocation
+            BM->>DVP: settle bond transfer + bidder WNOK payment
+            DVP->>BT: transfer partition to bidder
+            DVP->>Cash: transferFrom(bidder, government reserve)
+        end
+    else BUYBACK
+        loop Each allocation
+            BM->>DVP: settle bond burn + government TBD payment
+            DVP->>BT: buybackRedeemFor(bidder)
+            DVP->>Cash: transferFrom(government reserve, bidder)
+        end
     end
 
-    API ->> NB: 200 OK - { final_allocation }
-    deactivate API
+    BM-->>API: Auction finalised<br/>per-allocation failures emitted
+    API->>DB: Record operation and wait for receipt block projection
+    API-->>UI: Final auction or HTTP 202 if projection is pending
 ```
+
+Each `BondDvP.settle` call is atomic. Auction settlement as a whole is not:
+`BondManager` catches a failed allocation, emits `BondAllocationFailed`, and
+continues. A RATE/PRICE failure can therefore leave minted units in
+`BondManager` for `withdrawFailedIssuance` while the auction remains
+`FINALISED`.
