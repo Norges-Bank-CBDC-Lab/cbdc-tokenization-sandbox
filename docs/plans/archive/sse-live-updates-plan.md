@@ -6,7 +6,7 @@
 **Owner / operator:** sandbox operator (this repo)
 **Branch suggestion:** `feature/sse-live-updates` — defer branch / commit / PR workflow to `sandbox-pr-workflow`.
 **Components touched:** `services/nb-bond-api/` (authenticated SSE endpoint and in-process change broadcaster), `services/nb-ui/` (one authenticated fetch-stream client, transport-agnostic live-query reconciliation), and relevant documentation/runtime configuration.
-**Related:** `docs/plans/cursor-reconcile-sync-plan.md` defines the server-authoritative query reconciliation primitive. If it lands first, this plan extends it; do not build a second competing callback/reconcile layer.
+**Related:** `docs/plans/archive/cursor-reconcile-sync-plan.md` defines the server-authoritative query reconciliation primitive. If it lands first, this plan extends it; do not build a second competing callback/reconcile layer.
 
 ## Decision Summary
 
@@ -157,7 +157,7 @@ Optional  Replay, health-over-SSE experiment, more contract watchers
 
 - Record green nb-bond-api and nb-ui test/lint/build baselines.
 - Confirm the Phase-0 health-poll behavior remains present.
-- Check whether `cursor-reconcile-sync-plan.md` has landed:
+- Check whether `docs/plans/archive/cursor-reconcile-sync-plan.md` has landed:
   - if yes, extend its `SyncProvider` / `useLiveQuery` rather than introducing another query registry;
   - if no, implement the same transport-agnostic provider shape in this work and mark the overlapping cursor plan as superseded before merge.
 - Inventory every current mutation route and assign resource keys using the table above. Treat unassigned mutations as a plan failure, not an implicit `invalidate-all` fallback.

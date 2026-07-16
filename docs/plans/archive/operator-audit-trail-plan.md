@@ -2,7 +2,7 @@
 
 **Status:** ✅ Implemented and shipped — via #213 (plan folded into the implementation PR). Scope as operator-decided: all operator on-chain operations recorded (bond lifecycle + bids + central-bank WNOK + banking TBD), surfaced on the System → Operations page, per-bond merged coupon-payments GET deferred. Execution deviation: tx hashes render as copyable hex without a Blockscout link — the NB UI runtime config has no explorer-URL key (follow-up candidate). All acceptance criteria verified live, including trail survival across a `fromBlock=0` resync.
 **Branch suggestion:** `feature/operator-audit-trail` — defer the actual branch / commit / PR / CI-gate workflow to the repo PR conventions.
-**Components touched:** `services/nb-bond-api/` (`src/ingestion-db.ts`, new `src/operations.ts`, `src/index.ts`, `src/central-bank.ts`, `src/banking-tbd.ts`, `src/banks.ts`, `src/bidder-bid.ts`, `src/schemas.ts` + regenerated `openapi.json`, `tests/`), `services/nb-ui/` (`src/components/Layout.jsx`, `src/App.jsx`, new `src/pages/OperationsPage.jsx`, new `src/api/operationsApi.js`, `tests/`), docs (`services/AGENTS.md`, `services/nb-bond-api/README.md`, `docs/ARCHITECTURE.md`, `docs/DOCUMENTATION_INDEX.md`, `docs/plans/backend-design-improvements-backlog.md`).
+**Components touched:** `services/nb-bond-api/` (`src/ingestion-db.ts`, new `src/operations.ts`, `src/index.ts`, `src/central-bank.ts`, `src/banking-tbd.ts`, `src/banks.ts`, `src/bidder-bid.ts`, `src/schemas.ts` + regenerated `openapi.json`, `tests/`), `services/nb-ui/` (`src/components/Layout.jsx`, `src/App.jsx`, new `src/pages/OperationsPage.jsx`, new `src/api/operationsApi.js`, `tests/`), docs (`services/AGENTS.md`, `services/nb-bond-api/README.md`, `docs/ARCHITECTURE.md`, `docs/DOCUMENTATION_INDEX.md`, `docs/plans/archive/backend-design-improvements-backlog.md`).
 
 ## Goal
 
@@ -207,7 +207,7 @@ Feature demonstrably works end-to-end on the local stack.
 
 - **Projection-purity rule** (backlog item 3, ships here): one explicit paragraph in `services/AGENTS.md` and `services/nb-bond-api/README.md` — projection tables hold only chain-reproducible rows; anything else goes in the preserved set (`bidders`, `banks`, `operation_attempts`).
 - `services/nb-bond-api/README.md`: document the table + endpoint. `docs/ARCHITECTURE.md`: extend the off-chain architecture section (three data planes → system-of-record now includes the audit trail).
-- `docs/plans/backend-design-improvements-backlog.md`: mark item 3 shipped-with-this-PR; note item 4 (preserved-table migrations) now covers three tables.
+- `docs/plans/archive/backend-design-improvements-backlog.md`: mark item 3 shipped-with-this-PR; note item 4 (preserved-table migrations) now covers three tables.
 - `docs/DOCUMENTATION_INDEX.md`: index this plan; annotate the design brief's entry as implemented-by this plan. On shipping, move this plan to `docs/plans/archive/` with the PR number.
 - `python3 scripts/verification/check-public-repo-hygiene.py && python3 scripts/verification/check-markdown-links.py`.
 

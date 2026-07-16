@@ -1,6 +1,6 @@
 # Nav Categories + Banking / TBD Page — Implementation Plan
 
-**Status:** ✅ Implemented and shipped — merged via #179 (nav categories + Banking/TBD page in one PR); follow-ups shipped separately: tester-role access to the Banking page (#198), bank creation (#200). The Central Bank/WNOK allowlist enrichment was split out to `docs/plans/central-bank-wnok-allowlist-enrichment-plan.md`.
+**Status:** ✅ Implemented and shipped — merged via #179 (nav categories + Banking/TBD page in one PR); follow-ups shipped separately: tester-role access to the Banking page (#198), bank creation (#200). The Central Bank/WNOK allowlist enrichment was split out to `docs/plans/archive/central-bank-wnok-allowlist-enrichment-plan.md` and later archived as partially implemented.
 **Branch suggestion:** `feature/nav-categories` (PR1) and `feature/banking-tbd-page` (PR2) — defer branch / commit / PR / CI-gate workflow to `sandbox-pr-workflow`
 **Components touched:** `services/nb-ui/` (nav, router, capabilities, new Banking page + modals, new API module), `services/nb-bond-api/` (new `/v1/banking/tbd/*` route surface, schemas, Tbd ABI, ingestion), docs (`ARCHITECTURE.md`, `nb-ui` + `nb-bond-api` READMEs, `DOCUMENTATION_INDEX.md`). No contract changes.
 
