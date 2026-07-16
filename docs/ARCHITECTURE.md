@@ -54,7 +54,7 @@ order:
 1. **Infra (`infra/infra.sh`)**
    - creates or reuses the Kind cluster (`cluster-cbdc-monoledger`)
    - deploys the gateway layer and routing resources
-   - deploys the Besu node and JSON-RPC/WS endpoints
+   - deploys a QBFT validator and a separate archive/RPC Besu node
 2. **Explorer (`services/blockscout`)**
    - deploys Blockscout with local, sandbox-oriented values
    - deploys the Postgres dependency
@@ -71,7 +71,7 @@ order:
 Ingress and routing are hostname-based through `*.cbdc-sandbox.local` host
 entries:
 
-- `besu.cbdc-sandbox.local` for JSON-RPC and WS
+- `besu.cbdc-sandbox.local:8545` for HTTP JSON-RPC to the archive/RPC node
 - `blockscout.cbdc-sandbox.local` for the explorer
 - `bond-api.cbdc-sandbox.local` for the NB Bond API
 - `web.cbdc-sandbox.local` for the NB UI operator frontend
@@ -87,11 +87,13 @@ entries:
                       |  |     |      |
                       |  |     |      +--> [NB Bond API] ----+
                       |  |     |                             |
-                      |  |     +--> [Blockscout] ----+       | JSON-RPC
-                      |  |                           |       v
-                      |  +--> [Besu JSON-RPC/WS] <---+   [Besu node]
-                      |        |
-                      |        +--> [Deployed Solidity contracts]
+                      |  |     +--> [Blockscout] -----------+
+                      |  |                                  | JSON-RPC
+                      |  +--> [Forest archive/RPC] <---------+
+                      |        |             ^
+                      |        |             | Besu P2P
+                      |        v             v
+                      |  [Deployed contracts] [QBFT validator]
                       |
                       +--> [NB UI (React, nginx)] -- /v1/* --> [NB Bond API]
 
@@ -102,15 +104,24 @@ entries:
 
 The currently documented local chain baseline is:
 
-- single-node Besu deployment on Kind
-- Clique proof-of-authority consensus
-- London EVM milestone
+- Besu 26.7.0 with one QBFT validator and one non-validator archive/RPC node
+- Osaka active from genesis
+- Solidity 0.8.36 and OpenZeppelin 5.6.1
+- 1-second transaction blocks and a 5-minute idle empty-block period
 - `zeroBaseFee: true` in the genesis config
 - predeployed `GlobalRegistry` address baked into the local genesis
 
-This is the repo's current known-good baseline. It is not meant to imply that
-Clique and London are the long-term target architecture. Planned movement to a
-newer milestone and QBFT is tracked separately in `docs/KNOWN_ISSUES.md`.
+The validator produces blocks and exposes only minimal operator RPC. Blockscout,
+NB Bond API, Foundry, and the gateway use `besu-archive`, which runs FULL sync
+with Forest storage. The single validator is deterministic but not Byzantine
+fault tolerant; it is a local baseline, not a production validator topology.
+The longer idle period is intentional for this low-TPS sandbox. It limits
+empty history while allowing a transaction-bearing block on the normal
+one-second period; consumers must nevertheless treat the latest block
+timestamp—not wall clock—as authoritative for contract time gates.
+Besu WebSocket is enabled on the archive process but is not exposed through the
+gateway; maintainers must use a direct in-cluster connection or an explicit
+`kubectl port-forward` when WebSocket access is needed.
 
 ## On-Chain Architecture
 
@@ -169,6 +180,9 @@ The NB Bond API is the privileged operator service. It:
   which records every operator-initiated on-chain operation with its
   outcome, including reverts that were rejected at gas estimation and
   never reached the chain
+- binds the SQLite database to the current chain ID and genesis hash before
+  accepting an ingestion checkpoint, preventing Clique-era projections from
+  being served after the same-chain-ID QBFT replacement
 - exposes a `/v1` HTTP/OpenAPI surface designed as a **bulky resource tree**: a single
   `GET /v1/bonds` returns every bond with its nested auctions, bids,
   allocations, and holders. Bond/Auction reads come from one atomic SQLite
@@ -226,6 +240,8 @@ this sandbox it is configured conservatively for local use:
 - sandbox-only values files and hostnames
 - several heavier indexer paths reduced or disabled to keep local behavior more
   predictable
+- backend/frontend built from the pinned upstream source tags into the local
+  registry because release-tagged images are no longer published
 - optional BENS microservice for name resolution
 
 ### Dealer And Bidder CLIs (`scripts/`)
@@ -336,8 +352,8 @@ For concrete sequences, see:
 
 - sandbox deploy/build image tags are pinned in `common/images.yaml`
 - Node.js toolchain and image tags are pinned in `common/node-version.env`
-- Blockscout backend/frontend fallback tags for direct Helm use live in
-  `services/blockscout/values.yaml`
+- Blockscout backend/frontend source tags are pinned in `common/images.yaml`;
+  fallback refs for direct Helm use live in `services/blockscout/values.yaml`
 - chart versions are centralized in `common/versions.yaml`
 - deploy toggles are generated into `.env.sandbox` by
   `./sandbox.sh generate-config` and consumed by `./sandbox.sh start`
@@ -349,7 +365,8 @@ For concrete sequences, see:
 This sandbox intentionally exposes several endpoints without authentication for
 local development, including:
 
-- Besu JSON-RPC and WS
+- Besu HTTP JSON-RPC through the gateway, plus unauthenticated archive-node
+  WebSocket when accessed directly in-cluster or by port-forward
 - Blockscout HTTP endpoints
 - NB Bond API
 - NB UI (no sign-in chrome when `AUTH_MODE=none`, which is the default)

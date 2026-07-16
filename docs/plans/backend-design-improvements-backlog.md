@@ -42,8 +42,8 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 - **Relation:** already sketched as a companion phase of `docs/plans/archive/sse-live-updates-plan.md`; this item promotes it to a standalone work item so it does not ride on the SSE schedule.
 - Status: First increment shipped in the architecture work: auction lifecycle
   status is projection-first and composers share an explicit request-level read
-  context. Bond/auction snapshot projection expansion is planned in
-  implemented for Bond/Auction DTOs by `projection-aligned-api-contract-plan.md`;
+  context. Bond/auction snapshot projection expansion was implemented for
+  Bond/Auction DTOs by `projection-aligned-api-contract-plan.md`;
   broader WNOK/TBD allowlist projection remains separate.
 
 ### 3. Codify the projection-purity rule
@@ -71,7 +71,10 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 - **Current state (verified):** an explicit `staticCall` preflight exists for four operations — `deployBond`, `disableBond`, `deployBondWithAuction`, `deployAuctionForBond` (`services/nb-bond-api/src/app.ts`). Every other state-changing send — `payCoupon`, `redeem`, `finaliseAuction`, `closeAuction`, `cancelAuction`, bid submission, central-bank `Wnok` mint/burn/transfer, banking TBD operations — relies only on the implicit `eth_estimateGas` that ethers runs before broadcast. Worse, the close-auction retry path deliberately sets an explicit gas limit to _skip_ estimation (the stale-chain-clock false-revert workaround behind `NB_BOND_API_CLOSE_GAS_LIMIT`), so that path transmits with no simulation at all.
 - **Direction:** make preflight deliberate and universal for important state-changing actions. Plain `staticCall` suffices for state-only operations (transfers, mint/burn, finalisation); time-dependent operations (`payCoupon`, `closeAuction`) need `eth_simulateV1` with a block-timestamp override set to wall clock, so the simulation sees what the mined transaction will see — this properly retires the blind-send gas-limit workaround instead of bypassing simulation. After a passing preflight, send with an explicit gas limit derived from the simulation's `gasUsed` (plus margin) to avoid re-running estimation.
-- **Verified:** `eth_simulateV1` responds on the running sandbox node; `infra/besu/config/config.toml` enables the ETH, DEBUG, and TRACE RPC namespaces.
+- **Verified:** `eth_simulateV1` responds on the running sandbox archive/RPC
+  node; `infra/besu/config/archive.toml` enables the ETH, DEBUG, and TRACE RPC
+  namespaces. The validator's narrower RPC surface is deliberately not an
+  application or simulation endpoint.
 - **Relation:** `docs/plans/operator-audit-trail-design.md` ("simulation predicts, the audit trail records"; includes the payout dry-run preview using the same mechanism) and `docs/KNOWN_ISSUES.md`, "Auction close timing is chain-enforced — no operator discretion".
 - Status: Planned.
 

@@ -5,8 +5,8 @@ Inherits the root `AGENTS.md`. This file covers infra-specific structure and sty
 ### Structure
 - `infra/infra.sh`: entrypoint to start/stop/delete the local cluster and deploy charts.
 - `infra/cluster/cluster-config.yaml`: Kind cluster definition + port mappings.
-- `infra/besu/`: Helm chart + config for a Besu node.
-  - `infra/besu/config/`: Besu config + genesis files.
+- `infra/besu/`: Helm chart + config for the QBFT validator and archive/RPC node.
+  - `infra/besu/config/`: role-specific Besu configs + QBFT/Osaka genesis.
 - `infra/gateway/`: Helm chart for the nginx API gateway.
 - `infra/DEVELOPMENT.md`: operational notes and caveats (EVM version, Besu quirks).
 
@@ -28,7 +28,8 @@ Inherits the root `AGENTS.md`. This file covers infra-specific structure and sty
   - Default values: `infra/besu/values.yaml`
   - Local overrides: `infra/besu/values.local.yaml`
   - Templates: `infra/besu/templates/`
-  - Config: `infra/besu/config/config.toml`
+  - Validator config: `infra/besu/config/validator.toml`
+  - Archive/RPC config: `infra/besu/config/archive.toml`
   - Genesis: `infra/besu/config/genesis.json`
 - Gateway chart:
   - Chart: `infra/gateway/Chart.yaml`

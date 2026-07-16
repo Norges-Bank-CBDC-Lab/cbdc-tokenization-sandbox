@@ -61,6 +61,14 @@ Blockscout’s live client calls succeed once `insecure` is removed from HTTP op
    Keep `ETHEREUM_JSONRPC_HTTP_INSECURE=false` (it has no effect on HTTP).
 
 ## Commands used (with purpose)
+
+> Historical topology note: the commands below are the exact combined-node
+> targets used during the incident. The current QBFT topology uses
+> `besu-archive-0` for archive/RPC logs and
+> `http://besu-archive.besu.svc.cluster.local:8545` for Blockscout RPC. The
+> current operational commands live in
+> [`services/blockscout/debugging.md`](../../services/blockscout/debugging.md).
+
 1) **Blockscout logs**
 ```sh
 kubectl logs -n blockscout deploy/blockscout-blockscout-stack-blockscout --tail=200

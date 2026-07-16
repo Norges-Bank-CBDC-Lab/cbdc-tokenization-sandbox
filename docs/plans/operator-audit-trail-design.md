@@ -1,6 +1,7 @@
 # Operator Audit Trail — Design Brief
 
-Status: Design brief — pre-planning. Direction agreed; an implementation plan will be produced from this brief.
+Status: Historical design brief. Implemented with operator-revised scope by
+`docs/plans/archive/operator-audit-trail-plan.md` (PR #213).
 
 Date: 2026-07-06
 
@@ -74,12 +75,20 @@ A results list at the bottom of the Coupon payout page (`services/nb-ui/src/page
 
 ## Related capability: payout simulation (preflight)
 
-Besu supports executing a transaction against chain state without committing it, and the sandbox node has everything needed enabled (`infra/besu/config/config.toml` exposes the ETH, DEBUG, and TRACE RPC namespaces; `eth_simulateV1` verified responding on the running node):
+Besu supports executing a transaction against chain state without committing
+it, and the sandbox archive/RPC node has everything needed enabled
+(`infra/besu/config/archive.toml` exposes the ETH, DEBUG, and TRACE RPC
+namespaces; `eth_simulateV1` was verified against that role):
 
 - **`eth_call`** (ethers v6 `staticCall`) executes the exact call and, on failure, returns the same custom-error revert data `describeRevert` already decodes — balance and allowlist problems surface without anything being broadcast.
 - **`eth_simulateV1`** additionally returns the logs the transaction *would* emit — for `payCoupon`, the would-be `CouponPaid` events, i.e. a full per-holder payment preview (holders and amounts) with no commit. It also supports block overrides.
 
-**Time caveat:** the local chain's clock lags wall clock (blocks mint only on transactions — see ADR 0001), and plain simulation runs at the latest block's timestamp. A simulated `payCoupon` can therefore false-revert with `CouponNotReady` in the window where wall clock has passed the due date but the chain clock has not. `eth_simulateV1`'s block-timestamp override resolves this, with two distinct uses:
+**Time caveat:** plain simulation runs at the latest block's timestamp. The
+superseded Clique baseline could lag wall clock indefinitely because it minted
+only on transactions (ADR 0001); the current QBFT baseline bounds normal idle
+lag with a five-minute empty-block period. A block-timestamp override remains
+useful for deterministic send-parity and future-date diagnostics, with two
+distinct uses:
 
 - override to **current wall clock** → send-parity preflight (the simulation sees what the mined transaction will see);
 - override to the **next coupon due date** → an early diagnostic, days ahead of the due date: "when this coupon comes due, will it fail on balances or allowlists?" — catching e.g. the treasury-held-units deadlock before payout day.
@@ -91,13 +100,15 @@ Placement in this design: **simulation predicts, the audit trail records.** A dr
 - Failure rows capture only attempts made through the NB Bond API. It is the only operator surface in the sandbox, and successes remain chain-derived, so nothing durable is missed.
 - A crash between broadcast and receipt loses the attempt row (the row is written once the outcome is known). Accepted at sandbox scale; a two-phase write (`PENDING` → final status) is the upgrade path if it ever matters.
 
-## Open questions
+## Original open questions
 
 - v1 scope: coupon payments only, or also redemptions and central-bank `Wnok` operations from day one? (The table is generic either way.)
 - Does the results list live only on the Coupon payout page, or does a global "operations" view come later?
 - Pagination for the new GET (likely unnecessary at sandbox scale — ETag/304 covers polling).
 
-## Follow-up
+## Implementation outcome
 
-- Run implementation planning from this brief.
-- Backlog relations: depends on writing down the projection-purity rule (backlog item 3); adds weight to the preserved-table migration question (backlog item 4).
+The shipped implementation records all supported operator mutation types in a
+global Operations view. It retained the projection-purity rule and preserved
+`operation_attempts` table described here; the proposed per-bond merged GET was
+deferred. The preserved-table migration question remains backlog item 4.

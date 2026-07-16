@@ -5,9 +5,9 @@
  * schedule) with its payout progress: previous payout (= issuance date
  * until the first coupon lands), next payout due, payments made/total,
  * and maturity. The per-row "Pay coupon" action is enabled purely from
- * the server-computed `coupon.payable` flag — the sandbox chain only
- * mints blocks on transactions, so the chain clock lags wall clock and
- * the UI must never re-derive eligibility from Date.now().
+ * the server-computed `coupon.payable` flag — QBFT can wait five minutes
+ * between idle blocks, so the chain clock can lag wall clock and the UI
+ * must never re-derive eligibility from Date.now().
  *
  * Payment fires POST /v1/bonds/{isin}/coupon-payments (all active
  * holders) after a confirmation modal showing the per-holder amounts.

@@ -1,5 +1,5 @@
 # BaseSecurityToken
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/csd/BaseSecurityToken.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/csd/BaseSecurityToken.sol)
 
 **Inherits:**
 Initializable, ERC20Upgradeable, AccessControlUpgradeable, [AllowlistUpgradeable](../../common/AllowlistUpgradeable.sol/abstract.AllowlistUpgradeable.md)

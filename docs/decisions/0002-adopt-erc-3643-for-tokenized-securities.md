@@ -78,8 +78,9 @@ sandbox, retiring the ERC-1410 partitioned model and the bespoke ERC-20 security
 - The retired ERC-1410 and ERC-20 security contracts are **removed from the repository**; their git
   history, and this record, are where the comparison survives.
 
-The contract toolchain stays pinned to the **London EVM** baseline of ADR 0001, so the ERC-3643
-contracts must compile under `evm_version = "london"`.
+The original decision kept the contract toolchain on the **London EVM** baseline
+from ADR 0001. ADR 0003 supersedes that toolchain constraint: the ERC-3643
+contracts now compile with Solidity 0.8.36 for `evm_version = "osaka"`.
 
 ## Consequences
 
@@ -162,8 +163,8 @@ survives:
 
 - `docs/plans/erc-3643-incremental-adoption-plan.md` — the prior incremental roadmap this decision
   redirects (it kept the partitioned bond; its direction is now superseded by this ADR)
-- `docs/decisions/0001-local-chain-besu-clique-london-baseline.md` — the London EVM baseline the
-  ERC-3643 contracts must compile against
+- `docs/decisions/0003-adopt-besu-qbft-osaka-with-archive-rpc.md` — the active Besu, EVM, Solidity,
+  and OpenZeppelin baseline
 - `docs/ARCHITECTURE.md` — on-chain token model (to be updated to the ERC-3643 design)
 - `contracts/README.md` — contract set and reuse guidance (to be updated as the ERC-1410 / ERC-20
   security tokens are removed)

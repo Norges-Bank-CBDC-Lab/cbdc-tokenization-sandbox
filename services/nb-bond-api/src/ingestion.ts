@@ -4,7 +4,12 @@ import { bondAuctionAbi, bondManagerAbi, bondTokenAbi } from './abi';
 import { envVariables } from './env-vars';
 import { RpcUnavailableError, getBondManagerAddress } from './chain';
 import { logger } from './logger';
-import { type IngestionDatabase, openDatabase } from './ingestion-db';
+import {
+  bindChainIdentity,
+  ChainIdentityMismatchError,
+  type IngestionDatabase,
+  openDatabase,
+} from './ingestion-db';
 import { type LiveResourceKey, publishLiveChange } from './live-events';
 import { reducePartitionTransfer, ZERO_ADDRESS } from './projection/balance-reducer';
 import {
@@ -1140,11 +1145,10 @@ async function processBlockRange(
  * since the previous tick.
  *
  * Important: we DO process the single-block case where `latest === nextBlock`.
- * The local sandbox runs Clique PoA which produces blocks only on activity,
- * so the head sits at `nextBlock - 1 + 1 === nextBlock` for arbitrarily long
- * stretches. Skipping that case (an earlier bug) left ingestion perpetually
- * one block behind the head and silently lost any auction created during an
- * idle stretch.
+ * Skipping that case (an earlier bug) left ingestion one block behind the head
+ * and could silently lose an auction at the current head. This remains a
+ * protocol-independent boundary condition even though the QBFT sandbox creates
+ * an idle empty block every five minutes.
  */
 export function computeIngestionWindow(
   nextBlock: number,
@@ -1158,7 +1162,15 @@ export function computeIngestionWindow(
 }
 
 export async function startIngestionLoop() {
+  const [network, genesisBlock] = await Promise.all([provider.getNetwork(), provider.getBlock(0)]);
+  if (!genesisBlock?.hash) {
+    throw new RpcUnavailableError('RPC did not return genesis block 0', envVariables.RPC_URL);
+  }
   const db = openDatabase({ dbPath: envVariables.DB_PATH, readonly: false });
+  bindChainIdentity(db, {
+    chainId: network.chainId.toString(),
+    genesisHash: genesisBlock.hash,
+  });
   const bondManagerAddress = await getBondManagerAddress();
   const bondManager = new Contract(bondManagerAddress, bondManagerAbi, provider);
   const bondToken = new Contract(await bondManager.BOND_TOKEN(), bondTokenAbi, provider);
@@ -1355,6 +1367,8 @@ export async function startIngestionLoopWithRetry(options: RetryOptions = {}): P
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof RpcUnavailableError) {
         logger.info(`ingestion boot: RPC not ready yet — retrying in ${delay}ms (${message})`);
+      } else if (err instanceof ChainIdentityMismatchError) {
+        throw err;
       } else {
         logger.warn(`ingestion boot failed; retrying in ${delay}ms: ${message}`);
       }

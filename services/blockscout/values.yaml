@@ -1,5 +1,5 @@
 # Local sandbox values only.
-# These defaults target the CBDC sandbox's single-node Kind/Besu/Blockscout setup.
+# These defaults target the CBDC sandbox's two-node Kind/Besu/Blockscout setup.
 # Never reuse them as production, staging, or internet-facing deployment values.
 
 # Fallback image tags (standard sandbox scripts override from common/images.yaml)

@@ -2,8 +2,8 @@
 src = "src"
 out = "out"
 libs = ["dependencies"]
-solc = "0.8.35"
-evm_version = "london"
+solc = "0.8.36"
+evm_version = "osaka"
 bytecode_hash = "none" # cf https://book.getfoundry.sh/guides/deterministic-deployments-using-create2
 cbor_metadata = false
 # We find that optimizer is disabled (according to JSON in out/) unless explicitly enabled
@@ -13,10 +13,10 @@ via_ir = true
 
 [dependencies]
 forge-std = "1.16.1"
-# OpenZeppelin 5.5.0+ uses Cancun-only MCOPY paths; keep this on 5.4.x
-# while the sandbox intentionally compiles for the London EVM milestone.
-"@openzeppelin-contracts" = "5.4.0"
-"@openzeppelin-contracts-upgradeable" = "5.4.0"
+# The Besu chain activates Osaka from genesis, so current OpenZeppelin MCOPY
+# paths are supported by the configured EVM milestone.
+"@openzeppelin-contracts" = "5.6.1"
+"@openzeppelin-contracts-upgradeable" = "5.6.1"
 
 [rpc_endpoints]
 besu-local = "${BESU_LOCAL_RPC_URL}"

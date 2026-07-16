@@ -33,7 +33,7 @@ function printHelp() {
     echo "      registry-reset: Recreate the local registry container and re-sync base images (reclaims registry disk)"
     echo "      cleanup-images: Prune old content-hash images for nb-ui/nb-bond-api/bens-microservice (keeps current + 2)"
     echo "      image-report: Read-only report of running pod images, registry tags, and current/deployed markers"
-    echo "      build-images: Optional local override: build Blockscout backend/frontend from upstream source tags"
+    echo "      build-images: Build pinned Blockscout backend/frontend sources for a fresh local registry"
 }
 
 ################################################################################

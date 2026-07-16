@@ -236,7 +236,7 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
           if (errorName === 'InBidPhase') {
             throw conflict(
               'auction is still in its on-chain bidding window (block timestamp has not passed the' +
-                ' end timestamp). Note the local Besu clock only advances when a transaction is mined.',
+                ' end timestamp). Wait for a later QBFT block or use an auction end in the past.',
             );
           }
           if (errorName) throw conflict(`cannot close auction: ${errorName}`);

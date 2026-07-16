@@ -35,7 +35,8 @@ import { logger } from './logger';
  *        and supply facts.
  *  - v6: added projected auction metadata, sealed bids, and final allocations.
  *
- * Note on the `bidders`, `banks` and `operation_attempts` tables:
+ * Note on the `bidders`, `banks`, `operation_attempts`, and `chain_identity`
+ * tables:
  * unlike every other table in this file, they are *systems of record*,
  * not chain projections. They are created additively via
  * `CREATE TABLE IF NOT EXISTS` and must NEVER be added to the drop
@@ -43,7 +44,8 @@ import { logger } from './logger';
  * projection tables that can be rebuilt from chain. Bidder and bank
  * keypairs are sandbox-impersonation keys, and operation attempts
  * record failed sends that never reached the chain; neither can be
- * recovered from chain state.
+ * recovered from chain state. `chain_identity` binds every checkpoint to
+ * one genesis and deliberately survives projection rebuilds.
  */
 const SCHEMA_VERSION = 6;
 
@@ -63,6 +65,18 @@ export interface IngestionDatabase {
 export interface IngestionConfig {
   dbPath: string;
   readonly?: boolean;
+}
+
+export class ChainIdentityMismatchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ChainIdentityMismatchError';
+  }
+}
+
+export interface ChainIdentity {
+  chainId: string;
+  genesisHash: string;
 }
 
 export interface AuctionEventRow {
@@ -311,7 +325,59 @@ function createTables(db: IngestionDatabase) {
     );
     CREATE INDEX IF NOT EXISTS idx_operation_attempts_created
       ON operation_attempts(created_at, id);
+
+    -- Database identity guard. This is not a chain projection and must survive
+    -- projection schema rebuilds so a checkpoint can never cross genesis.
+    CREATE TABLE IF NOT EXISTS chain_identity (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      chain_id TEXT NOT NULL,
+      genesis_hash TEXT NOT NULL
+    );
   `);
+}
+
+/**
+ * Bind a database to one chain genesis before reading its checkpoint.
+ *
+ * A pre-guard database that already contains a checkpoint is rejected because
+ * there is no trustworthy way to infer which same-chain-ID genesis produced
+ * it. A fresh database records its identity on first use.
+ */
+export function bindChainIdentity(db: IngestionDatabase, identity: ChainIdentity): void {
+  const expected = {
+    chainId: identity.chainId.trim().toLowerCase(),
+    genesisHash: identity.genesisHash.trim().toLowerCase(),
+  };
+  if (!expected.chainId || !/^0x[0-9a-f]{64}$/.test(expected.genesisHash)) {
+    throw new Error('cannot bind ingestion database to an invalid chain identity');
+  }
+
+  const current = db
+    .prepare(`SELECT chain_id, genesis_hash FROM chain_identity WHERE id = 1`)
+    .get() as { chain_id: string; genesis_hash: string } | undefined;
+
+  if (!current) {
+    const hasCheckpoint = db.prepare(`SELECT 1 AS present FROM ingestion_state LIMIT 1`).get();
+    if (hasCheckpoint) {
+      throw new ChainIdentityMismatchError(
+        'ingestion database contains an unbound legacy checkpoint; delete the database or recreate the sandbox before using the new chain',
+      );
+    }
+    db.prepare(`INSERT INTO chain_identity(id, chain_id, genesis_hash) VALUES (1, ?, ?)`).run(
+      expected.chainId,
+      expected.genesisHash,
+    );
+    return;
+  }
+
+  if (
+    current.chain_id.toLowerCase() !== expected.chainId ||
+    current.genesis_hash.toLowerCase() !== expected.genesisHash
+  ) {
+    throw new ChainIdentityMismatchError(
+      `ingestion database chain identity ${current.chain_id}/${current.genesis_hash} does not match RPC chain ${expected.chainId}/${expected.genesisHash}; delete the database or recreate the sandbox`,
+    );
+  }
 }
 
 /**

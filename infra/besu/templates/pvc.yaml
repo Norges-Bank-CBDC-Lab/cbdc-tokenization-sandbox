@@ -1,11 +1,21 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: besu-pvc
+  name: besu-validator-pvc
   namespace: {{ .Values.namespace }}
 spec:
-  accessModes:
-    - ReadWriteOnce
+  accessModes: ["ReadWriteOnce"]
   resources:
     requests:
-      storage: {{ .Values.diskSize | default "1Gi" }}
+      storage: {{ .Values.validator.diskSize }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: besu-archive-pvc
+  namespace: {{ .Values.namespace }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.archive.diskSize }}

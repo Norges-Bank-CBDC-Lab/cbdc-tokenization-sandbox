@@ -12,14 +12,15 @@ npm install
 
 ```bash
 node ../generate-local-sandbox-fixtures.mjs
-npm run submit --sealed-bids ../../.tmp/bid-encryption/examples/basic/sealed.json --keys ./examples/bids.keys.json --bond-auction 0x... --auction-id 0x... --rpc-url http://localhost:8545
+npm run submit --sealed-bids ../../.tmp/bid-encryption/examples/basic/sealed.json --keys ./examples/bids.keys.json --bond-auction 0x... --auction-id 0x... --rpc-url http://besu.cbdc-sandbox.local:8545
 ```
 
 - `--sealed-bids` path to JSON containing `{ ciphertext, plaintextHash, bidder }` objects (single or array).
 - `--keys` path to JSON mapping bidder addresses to `{ "privateKey": "0x..." }` (extra fields are ignored).
 - `--bond-auction` target `BondAuction` contract address.
 - `--auction-id` auction ID (bytes32) returned from createAuction/buybackWithAuction on BondManager.
-- `--rpc-url` RPC endpoint used for submissions.
+- `--rpc-url` RPC endpoint used for submissions. The local hostname routes to
+  the archive/RPC node, which propagates transactions to the QBFT validator.
 
 ## Demonstration Usage
 

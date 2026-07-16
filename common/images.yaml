@@ -28,7 +28,7 @@
 #   - Python: https://hub.docker.com/_/python/tags
 #   - Node: https://hub.docker.com/_/node/tags
 #
-besu: hyperledger/besu:26.1.0
+besu: hyperledger/besu:26.7.0
 
 blockscout:
   # Backend + frontend refs name the upstream release tags, but upstream no

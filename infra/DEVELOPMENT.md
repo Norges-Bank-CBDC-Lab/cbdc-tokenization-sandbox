@@ -10,11 +10,13 @@ From `infra/`:
 - start infra and create the Kind cluster if needed: `./infra.sh start`
 - stop infra workloads but keep the cluster and cached images:
   `./infra.sh stop`
-- delete the Kind cluster and cached images: `./infra.sh delete`
+- delete the Kind cluster while retaining the separate local-registry
+  container and its cached images: `./infra.sh delete`
 - start the local registry container: `./infra.sh registry-start`
 - push pinned images into the local registry: `./infra.sh registry-sync`
 
-If you want to preserve image caches across runs, prefer `stop` over `delete`.
+If you want to preserve the Kind node's own image cache, prefer `stop` over
+`delete`. The separate local-registry cache survives either command.
 
 ## Local Registry Workflow
 
@@ -46,7 +48,8 @@ Mount behavior worth keeping explicit:
   `kind create cluster` from that directory.
 
 If sandbox startup fails with missing digest or image-pull errors, run
-`registry-start` and `registry-sync` before retrying.
+`registry-start`, populate missing Blockscout source-built images with
+`./sandbox.sh build-images`, and then run `registry-sync` before retrying.
 
 Offline builds and `FORCE_IMAGE_PULL`:
 
@@ -77,13 +80,26 @@ curl -X POST \
 
 The currently supported local Besu baseline is:
 
-- Clique proof-of-authority consensus
-- `londonBlock: 0` in `infra/besu/config/genesis.json`
+- Besu 26.7.0 with QBFT consensus
+- one validator using Bonsai and one non-validator archive/RPC node using
+  `FULL` sync with Forest storage
+- 1-second transaction blocks and a 300-second idle empty-block period
+- London, Shanghai, Cancun, Prague, and Osaka active from genesis
 - `zeroBaseFee: true` in the genesis config
-- `evm_version = "london"` in `contracts/foundry.toml`
+- `evm_version = "osaka"` and Solidity 0.8.36 in `contracts/foundry.toml`
+- sequenced transaction pools on both nodes for unfunded zero-fee accounts
 
-Treat this as the known-good local baseline before experimenting with QBFT or
-later EVM milestones.
+The sole validator is not Byzantine fault tolerant. Applications and Blockscout
+must use `besu-archive.besu:8545`; `besu-validator` is operator-only.
+The public local hostname `besu.cbdc-sandbox.local:8545` also routes to the
+archive/RPC service, never to the validator.
+
+The five-minute idle period deliberately trades a latest-block timestamp that
+can lag wall clock by up to roughly five minutes for substantially less empty
+history. A pending transaction returns block production to the one-second
+period and its mined block advances chain time. Code deciding whether a
+time-gated contract action is currently valid must still use the latest chain
+timestamp rather than `Date.now()`.
 
 ## GlobalRegistry Predeploy
 
@@ -97,12 +113,14 @@ Current references:
 - current address: `0x700b6A60ce7EaaEA56F065753d8dcB9653dbAD35`
 - current owner: `PK_NORGES_BANK` address
   (`0xf4E18004902a34499bB6E5b23ff4CD99a864Dcd0`)
-- current clique signer: `BESU_SIGNER_KEY` address
+- current QBFT validator: `BESU_SIGNER_KEY` address
   (`0xc777bfE2C2398BEB62CD6897F913F1b64eE57EA6`)
+- archive node identity: `BESU_ARCHIVE_KEY` (not a validator or transaction
+  signing account)
 - genesis source: `infra/besu/config/genesis.json`
 
 If you change the registry bytecode or owner, update both the genesis `alloc`
-entry, the clique signer in `extraData`, and the local contracts config so the
+entry, the QBFT validator in `extraData`, and the local contracts config so the
 addresses stay in sync.
 
 ## Contract Deployment Caveats
@@ -121,7 +139,7 @@ forge create \
   --broadcast \
   --gas-price 0 \
   --priority-gas-price 0 \
-  --gas-limit "0x1ffffffffffffe" \
+  --gas-limit 10000000 \
   --constructor-args <account-address>
 ```
 
@@ -144,19 +162,20 @@ Recommendation:
 - if you run manual deploy commands, keep them aligned with the zero-fee local
   baseline above.
 
-## When Revisiting The Chain Baseline
+## Chain Replacement And Node Operations
 
-The long-form debugging history that led to the current configuration has been
-trimmed from this document. The important takeaways are:
+The Clique-to-QBFT transition was a clean-chain replacement. A working copy
+that still has the legacy `besu-pvc` must run `./sandbox.sh delete` before its
+first upgraded start; the deploy helper rejects that PVC rather than attempting
+to reuse incompatible chain data.
 
-- later milestone experiments produced unstable local behavior in this sandbox;
-- alternative consensus settings need to be revalidated together with contract
-  deployment, fee estimation, and Blockscout behavior;
-- the stable local combination for this repo is still Clique plus the London
-  EVM baseline and the explicit zero-gas-price deploy path.
+The archive and validator have separate PVCs and keys. Stopping the archive
+must not stop block production; stopping the only validator stops new blocks
+while archive history remains readable. Do not create additional replicas with
+the same validator key. A beacon client is not used with QBFT.
 
-If you revisit those decisions, re-test the full local workflow before
-assuming previous workarounds still apply.
+Osaka limits an individual transaction to 16,777,216 gas even though the local
+block gas limit is 60,000,000.
 
 ## Security
 
