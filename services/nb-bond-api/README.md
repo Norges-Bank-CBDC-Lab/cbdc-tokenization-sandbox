@@ -56,7 +56,7 @@ Two sandbox-only resource families sit alongside the bond tree:
   estimation and never reach the chain, so this trail is their only durable
   record. `GET /v1/operations` lists attempts newest-first (optional
   `?limit`, default 200); the NB UI renders it at System → Operations. See
-  [`docs/plans/operator-audit-trail-design.md`](../../docs/plans/operator-audit-trail-design.md).
+  [`docs/plans/archive/operator-audit-trail-design.md`](../../docs/plans/archive/operator-audit-trail-design.md).
 
 ### Projection-purity rule (SQLite tables)
 

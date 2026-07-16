@@ -1,6 +1,6 @@
 # Operator Audit Trail — Design Brief
 
-Status: Historical design brief. Implemented with operator-revised scope by
+Status: Archived historical design brief. Implemented with operator-revised scope by
 `docs/plans/archive/operator-audit-trail-plan.md` (PR #213).
 
 Date: 2026-07-06
@@ -27,7 +27,7 @@ Current state: a partial success cannot occur for coupon payments — the contra
 - the treasury-held-units fix lands (manager-held units skipped, so a payout can cover a subset of the supply), and/or
 - later phases of `docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md` introduce two-tier coupon/redemption, where per-holder legs can fail independently.
 
-Designing for per-item outcomes now avoids a schema migration on a preserved table later (see item 4 in `docs/plans/backend-design-improvements-backlog.md`).
+Designing for per-item outcomes now avoids a schema migration on a preserved table later (see item 4 in `docs/plans/archive/backend-design-improvements-backlog.md`).
 
 ## Design
 
@@ -93,7 +93,7 @@ distinct uses:
 - override to **current wall clock** → send-parity preflight (the simulation sees what the mined transaction will see);
 - override to the **next coupon due date** → an early diagnostic, days ahead of the due date: "when this coupon comes due, will it fail on balances or allowlists?" — catching e.g. the treasury-held-units deadlock before payout day.
 
-Placement in this design: **simulation predicts, the audit trail records.** A dry-run affordance on the Coupon payout page (preview per-holder amounts, or the decoded would-be failure, before sending) composes naturally with the results list; whether it is a `dryRun` flag on the existing POST or a separate preview endpoint is left to the implementation plan. Making preflight simulation universal for state-changing sends is tracked separately as item 6 of `docs/plans/backend-design-improvements-backlog.md`.
+Placement in this design: **simulation predicts, the audit trail records.** A dry-run affordance on the Coupon payout page (preview per-holder amounts, or the decoded would-be failure, before sending) composes naturally with the results list; whether it is a `dryRun` flag on the existing POST or a separate preview endpoint is left to the implementation plan. Making preflight simulation universal for state-changing sends is tracked separately as item 6 of `docs/plans/archive/backend-design-improvements-backlog.md`.
 
 ## Accepted limitations
 

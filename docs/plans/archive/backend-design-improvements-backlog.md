@@ -1,8 +1,9 @@
 # Backend Design Improvements — Backlog
 
-Status: Backlog. Projection/read-your-writes items now have a concrete follow-up
-plan in `docs/plans/archive/projection-aligned-api-contract-plan.md`. The operator audit
-trail remains excluded from this list because it has its own design brief.
+Status: Archived historical backlog. The principal projection, read-your-writes,
+audit-trail, and lifecycle-status work shipped through PRs #213, #224, and #225.
+Residual ideas remain recorded below for context but are no longer maintained
+as an active implementation plan.
 
 Date: 2026-07-06
 
@@ -28,7 +29,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 - **Problem:** mutation handlers historically composed the response from the projection, which could lag the just-mined receipt by up to one poll interval. The "mutations return the updated parent" contract was therefore not always true at response time, and the NB UI previously compensated with delayed reload behavior.
 - **Direction:** after `tx.wait()`, run one synchronous ingestion pass up to `receipt.blockNumber` (or block until the ingestion checkpoint reaches that block) before composing the response.
-- **Relation:** `docs/plans/cursor-reconcile-sync-plan.md` addresses the client-side half (cursor compare + refetch on divergence). This item is the complementary server-side half: mutation responses become fresh at the source, so the client-side reconcile fires only for genuinely external changes.
+- **Relation:** `docs/plans/archive/cursor-reconcile-sync-plan.md` addresses the client-side half (cursor compare + refetch on divergence). This item is the complementary server-side half: mutation responses become fresh at the source, so the client-side reconcile fires only for genuinely external changes.
 - Status: First increment shipped in the architecture work: bond/auction
   mutation responses use a bounded checkpoint wait through the mined receipt
   block. The complete ingestion-coordinator and honest `202` fallback are
@@ -50,7 +51,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 - **Problem:** the safety of drop-and-rebuild resync rests on an implicit invariant: projection tables contain only rows reproducible from chain logs. Nothing today warns a maintainer that locally-generated rows added to a projection table (e.g. `bond_events`) will be silently erased by the next resync or schema bump.
 - **Direction:** state the rule explicitly in `services/AGENTS.md` and `services/nb-bond-api/README.md`: anything not reproducible from chain goes in a preserved system-of-record table (the set exempted in `migrateToCurrentVersion()`), never in a projection table.
-- **Urgency note:** becomes load-bearing the moment the operator audit trail lands — its rows must not live in projection tables (`docs/plans/operator-audit-trail-design.md`).
+- **Urgency note:** becomes load-bearing the moment the operator audit trail lands — its rows must not live in projection tables (`docs/plans/archive/operator-audit-trail-design.md`).
 - Status: ✅ Shipped with the operator-audit-trail implementation — rule documented in `services/AGENTS.md` and `services/nb-bond-api/README.md` ("Projection-purity rule").
 
 ### 4. Migration path for preserved tables
@@ -75,7 +76,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
   node; `infra/besu/config/archive.toml` enables the ETH, DEBUG, and TRACE RPC
   namespaces. The validator's narrower RPC surface is deliberately not an
   application or simulation endpoint.
-- **Relation:** `docs/plans/operator-audit-trail-design.md` ("simulation predicts, the audit trail records"; includes the payout dry-run preview using the same mechanism) and `docs/KNOWN_ISSUES.md`, "Auction close timing is chain-enforced — no operator discretion".
+- **Relation:** `docs/plans/archive/operator-audit-trail-design.md` ("simulation predicts, the audit trail records"; includes the payout dry-run preview using the same mechanism) and `docs/KNOWN_ISSUES.md`, "Auction close timing is chain-enforced — no operator discretion".
 - Status: Planned.
 
 ### 7. Retire the "Bond Auction Service" naming
@@ -97,7 +98,7 @@ This shape — event-sourced disposable projection, preserved key tables, mutati
 
 ## Explicitly out of scope
 
-- **Operator audit trail** (persistent payout results incl. errors and partial successes): designed separately in `docs/plans/operator-audit-trail-design.md`.
+- **Operator audit trail** (persistent payout results incl. errors and partial successes): designed separately in `docs/plans/archive/operator-audit-trail-design.md`.
 
 ## Follow-up
 

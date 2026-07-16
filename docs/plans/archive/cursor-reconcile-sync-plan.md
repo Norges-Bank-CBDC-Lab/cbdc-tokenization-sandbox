@@ -1,6 +1,6 @@
 # `cursor-reconcile-sync` — Implementation Plan
 
-**Status:** Superseded by `docs/plans/archive/sse-live-updates-plan.md` (2026-07-13)
+**Status:** Archived — superseded by `docs/plans/archive/sse-live-updates-plan.md` (2026-07-13)
 **Date:** 2026-06-18
 **Owner:** operator (greaker)
 **Related:** rides on the merged Phase-0 health-poll hardening (#166); became a transport-upgrade target for `docs/plans/archive/sse-live-updates-plan.md`.
