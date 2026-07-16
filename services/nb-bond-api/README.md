@@ -103,7 +103,9 @@ host source mount is required and the chart no longer runs `npm ci` /
 
 ## Env
 
-- `RPC_URL` – JSON-RPC endpoint
+- `RPC_URL` – JSON-RPC endpoint. The local sandbox value is
+  `http://besu-archive.besu:8545`; do not point application traffic at
+  `besu-validator`.
 - `GLOBAL_REGISTRY_ADDRESS` – deployed GlobalRegistry used to resolve BondManager
 - `BOND_MANAGER_CONTRACT_NAME` – registry key for BondManager (default: "Bond Manager")
 - `WNOK_CONTRACT_NAME` – registry key for the WNOK contract (default: "Wholesale NOK")

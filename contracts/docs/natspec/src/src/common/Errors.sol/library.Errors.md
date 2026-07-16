@@ -1,5 +1,5 @@
 # Errors
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/common/Errors.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/common/Errors.sol)
 
 
 ## Errors
@@ -319,6 +319,24 @@ error AllCouponsPaid(string isin);
 
 ```solidity
 error CouponPaymentBalanceMismatch(string isin, uint256 processedBalance, uint256 totalSupply);
+```
+
+### BondAlreadyDisabled
+
+```solidity
+error BondAlreadyDisabled(string isin);
+```
+
+### BondNotEmpty
+
+```solidity
+error BondNotEmpty(string isin, uint256 supply);
+```
+
+### BondHasFinalisedAuction
+
+```solidity
+error BondHasFinalisedAuction(string isin, bytes32 auctionId);
 ```
 
 ### IncorrectAuctionPhase

@@ -1,9 +1,10 @@
-# Local overrides for the Besu chart.
-# Keep machine-specific or secret values here when you need to override the
-# tracked defaults in values.yaml.
+# Local overrides for the two-node Besu chart.
+# Private keys and derived public identities are injected by deployBesu().
 
-# Populated from contracts/.env at deploy time so this tracked file stays public-safe.
-signerKey: "set-from-contracts-env-at-deploy-time"
+validator:
+  key: "set-from-contracts-env-at-deploy-time"
 
-# Override this if your local sandbox uses a different DNS suffix.
+archive:
+  key: "set-from-contracts-env-at-deploy-time"
+
 rootDnsZone: "cbdc-sandbox.local"

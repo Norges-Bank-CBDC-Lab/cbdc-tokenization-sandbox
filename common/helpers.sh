@@ -33,6 +33,7 @@ CONTRACTS_ENV_EXAMPLE_FILE=$CONTRACTS_DIR/.env.example
 LOCAL_SANDBOX_FIXTURE_GENERATOR=$REPO_ROOT/scripts/generate-local-sandbox-fixtures.mjs
 
 BLOCKSCOUT_NAMESPACE=blockscout
+BLOCKSCOUT_CHAIN_IDENTITY_CONFIGMAP=blockscout-chain-identity
 BLOCKSCOUT_DIR=$REPO_ROOT/services/blockscout
 BLOCKSCOUT_TMPDIR=$BLOCKSCOUT_DIR/.tmp
 BLOCKSCOUT_CHART_VERSION=4.5.1
@@ -538,9 +539,77 @@ function getContractsDeploymentRegistryAddress() {
     echo $registry_contract_address
 }
 
+function getContractsDeploymentGenesisHash() {
+    set +e
+    genesis_hash=$(kubectl --context=kind-$CLUSTER_NAME -n $CONTRACTS_DEPLOYMENT_NAMESPACE get configmap $CONTRACTS_DEPLOYMENT_CONFIGMAP -o jsonpath='{.data.genesisHash}' 2> /dev/null)
+    set -e
+    echo $genesis_hash
+}
+
+function getChainGenesisHash() {
+    rpc_url=$1
+    cast block 0 --rpc-url "$rpc_url" --field hash 2>/dev/null
+}
+
+function assertNoLegacyBesuStorage() {
+    if kubectl --context=kind-$CLUSTER_NAME -n besu get pvc besu-pvc >/dev/null 2>&1; then
+        echo "❌ Legacy single-node Besu storage was detected (besu/besu-pvc)."
+        echo "   Clique data and the Blockscout/application databases cannot be reused by the QBFT genesis."
+        echo "   Run ./sandbox.sh delete, then start the sandbox again for the required clean replacement."
+        exit 1
+    fi
+}
+
+function assertBlockscoutChainIdentity() {
+    rpc_url=$1
+    chain_id=$(cast chain-id --rpc-url "$rpc_url" 2>/dev/null)
+    genesis_hash=$(getChainGenesisHash "$rpc_url")
+    if [ -z "$chain_id" ] || [ -z "$genesis_hash" ]; then
+        echo "❌ Could not read the Besu chain ID and genesis hash before starting Blockscout."
+        exit 1
+    fi
+
+    recorded_chain_id=$(kubectl --context=kind-$CLUSTER_NAME -n $BLOCKSCOUT_NAMESPACE \
+        get configmap $BLOCKSCOUT_CHAIN_IDENTITY_CONFIGMAP \
+        -o jsonpath='{.data.chainId}' 2>/dev/null || true)
+    recorded_genesis_hash=$(kubectl --context=kind-$CLUSTER_NAME -n $BLOCKSCOUT_NAMESPACE \
+        get configmap $BLOCKSCOUT_CHAIN_IDENTITY_CONFIGMAP \
+        -o jsonpath='{.data.genesisHash}' 2>/dev/null || true)
+
+    if [ -n "$recorded_genesis_hash" ]; then
+        if [ "$recorded_chain_id" != "$chain_id" ] || [ "$recorded_genesis_hash" != "$genesis_hash" ]; then
+            echo "❌ Blockscout database marker belongs to a different chain identity."
+            echo "   Recorded: ${recorded_chain_id:-missing} / $recorded_genesis_hash"
+            echo "   Current:  $chain_id / $genesis_hash"
+            echo "   Run ./sandbox.sh delete and recreate the sandbox; Blockscout cannot reuse the old database."
+            exit 1
+        fi
+        return 0
+    fi
+
+    if kubectl --context=kind-$CLUSTER_NAME -n $BLOCKSCOUT_NAMESPACE \
+        get pvc postgres-volume-claim >/dev/null 2>&1; then
+        echo "❌ Existing Blockscout PostgreSQL storage has no genesis identity marker."
+        echo "   Its contents cannot be trusted after a same-chain-ID genesis replacement."
+        echo "   Run ./sandbox.sh delete and recreate the sandbox."
+        exit 1
+    fi
+
+    kubectl --context=kind-$CLUSTER_NAME apply -n $BLOCKSCOUT_NAMESPACE -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: $BLOCKSCOUT_CHAIN_IDENTITY_CONFIGMAP
+data:
+  chainId: "$chain_id"
+  genesisHash: "$genesis_hash"
+EOF
+}
+
 function markContractsDeployed() {
     chain_id=$1
     registry_contract_address=$2
+    genesis_hash=$3
     deployed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     kubectl --context=kind-$CLUSTER_NAME apply -n $CONTRACTS_DEPLOYMENT_NAMESPACE -f - <<EOF
@@ -556,6 +625,7 @@ metadata:
 data:
   chainId: "$chain_id"
   registryAddress: "$registry_contract_address"
+  genesisHash: "$genesis_hash"
   deployedAt: "$deployed_at"
 EOF
 }
@@ -758,7 +828,8 @@ function waitMsg() {
 }
 
 function waitForBesu() {
-    waitForApp besu besu
+    waitForApp besu besu-validator
+    waitForApp besu besu-archive
 }
 
 function waitForApiGateway() {
@@ -1295,6 +1366,7 @@ function resetKindRegistry() {
 
 function deployBesu() {
     requireContractsEnv
+    assertNoLegacyBesuStorage
 
     # shellcheck source=/dev/null
     source "$CONTRACTS_ENV_FILE"
@@ -1303,7 +1375,36 @@ function deployBesu() {
         echo "   Re-run node scripts/generate-local-sandbox-fixtures.mjs or update the local file."
         exit 1
     fi
+    if [ -z "${BESU_ARCHIVE_KEY:-}" ] || [[ "${BESU_ARCHIVE_KEY}" == "<"* ]]; then
+        echo "❌ BESU_ARCHIVE_KEY is missing in $(pathRelativeToRepoRoot "$CONTRACTS_ENV_FILE")."
+        echo "   Re-run node scripts/generate-local-sandbox-fixtures.mjs or update the local file."
+        exit 1
+    fi
     BESU_SIGNER_KEY_HEX="${BESU_SIGNER_KEY#0x}"
+    BESU_ARCHIVE_KEY_HEX="${BESU_ARCHIVE_KEY#0x}"
+
+    BESU_VALIDATOR_ADDRESS=$(cast wallet address --private-key "$BESU_SIGNER_KEY" | tr '[:upper:]' '[:lower:]')
+    BESU_ARCHIVE_ADDRESS=$(cast wallet address --private-key "$BESU_ARCHIVE_KEY" | tr '[:upper:]' '[:lower:]')
+    BESU_VALIDATOR_PUBLIC_KEY=$(cast wallet public-key --private-key "$BESU_SIGNER_KEY")
+    BESU_ARCHIVE_PUBLIC_KEY=$(cast wallet public-key --private-key "$BESU_ARCHIVE_KEY")
+    BESU_VALIDATOR_PUBLIC_KEY="${BESU_VALIDATOR_PUBLIC_KEY#0x}"
+    BESU_ARCHIVE_PUBLIC_KEY="${BESU_ARCHIVE_PUBLIC_KEY#0x}"
+
+    if [ "$BESU_VALIDATOR_ADDRESS" == "$BESU_ARCHIVE_ADDRESS" ]; then
+        echo "❌ Validator and archive keys resolve to the same node identity."
+        exit 1
+    fi
+
+    QBFT_EXTRA_DATA=$(cast to-rlp \
+        "[\"0x0000000000000000000000000000000000000000000000000000000000000000\",[\"$BESU_VALIDATOR_ADDRESS\"],[],\"0x\",[]]")
+
+    if [[ ${#BESU_VALIDATOR_PUBLIC_KEY} -ne 128 || ${#BESU_ARCHIVE_PUBLIC_KEY} -ne 128 ]]; then
+        echo "❌ Could not derive valid Besu node public keys from the local fixture keys."
+        exit 1
+    fi
+
+    echo "🔐 QBFT validator address: $BESU_VALIDATOR_ADDRESS"
+    echo "📚 Archive node address: $BESU_ARCHIVE_ADDRESS"
 
     # Extract Besu image name from values file
     BESU_IMAGE=$(getBesuImage)
@@ -1319,7 +1420,13 @@ function deployBesu() {
          --namespace besu \
          --create-namespace \
          --values $REPO_ROOT/infra/besu/values.local.yaml \
-         --set-string signerKey="$BESU_SIGNER_KEY_HEX" \
+         --set-string validator.key="$BESU_SIGNER_KEY_HEX" \
+         --set-string validator.address="$BESU_VALIDATOR_ADDRESS" \
+         --set-string validator.nodePublicKey="$BESU_VALIDATOR_PUBLIC_KEY" \
+         --set-string archive.key="$BESU_ARCHIVE_KEY_HEX" \
+         --set-string archive.address="$BESU_ARCHIVE_ADDRESS" \
+         --set-string archive.nodePublicKey="$BESU_ARCHIVE_PUBLIC_KEY" \
+         --set-string qbftExtraData="$QBFT_EXTRA_DATA" \
          ${BESU_IMAGE_OVERRIDE:+--set image=$BESU_IMAGE_OVERRIDE}
 }
 
@@ -1546,7 +1653,12 @@ function deployContracts() {
     echo "setting up Bond contracts..."
     REGISTRY_ADDR="$registry_contract_address" $CONTRACTS_DIR/deploy.sh $network $CONTRACTS_DIR/script/norges-bank/11_BondSetup.s.sol:BondSetupScript $verify_contracts
 
-    markContractsDeployed "$chain_id" "$registry_contract_address"
+    genesis_hash=$(getChainGenesisHash "$network")
+    if [ -z "$genesis_hash" ]; then
+        echo "❌ Could not read the genesis hash after contract deployment."
+        exit 1
+    fi
+    markContractsDeployed "$chain_id" "$registry_contract_address" "$genesis_hash"
 }
 
 

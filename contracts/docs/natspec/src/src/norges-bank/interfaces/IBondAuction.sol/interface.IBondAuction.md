@@ -1,5 +1,5 @@
 # IBondAuction
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/norges-bank/interfaces/IBondAuction.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/interfaces/IBondAuction.sol)
 
 Interface for the Bond Auction contract.
 
@@ -25,6 +25,20 @@ function createAuction(
 
 ```solidity
 function getAuctionId(string memory _isin) external view returns (bytes32);
+```
+
+### getAuctionIdAt
+
+
+```solidity
+function getAuctionIdAt(string memory _isin, uint256 _index) external pure returns (bytes32);
+```
+
+### isinToAuctionCount
+
+
+```solidity
+function isinToAuctionCount(string memory _isin) external view returns (uint256);
 ```
 
 ### submitBid

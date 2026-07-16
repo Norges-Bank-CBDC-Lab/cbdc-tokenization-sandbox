@@ -33,12 +33,12 @@ const envSchema = z.object({
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
   NB_BOND_API_SSE_HEARTBEAT_MS: z.coerce.number().int().positive().default(15000),
-  // Fallback gas limit for closeAuction. The local Besu mints blocks only on
-  // transactions, so its clock lags wall-clock and ethers' eth_estimateGas can
-  // simulate the close against a stale block and false-revert with InBidPhase.
-  // When that happens after the wall-clock precheck has passed, the close is
-  // retried with this explicit limit to skip estimation. Override if the
-  // contract's gas profile changes (e.g. after a Besu/EVM upgrade).
+  // Defensive fallback gas limit for closeAuction. If the RPC head is briefly
+  // behind wall-clock, ethers' eth_estimateGas can simulate the close against
+  // an older timestamp and false-revert with InBidPhase. After the wall-clock
+  // precheck passes, the API may retry with this explicit limit. QBFT empty
+  // blocks make that unlikely, but retaining the fallback is harmless during
+  // the migration. Override if the contract's gas profile changes.
   NB_BOND_API_CLOSE_GAS_LIMIT: z.coerce.number().int().positive().default(3_000_000),
   // Comma-separated list of origins the CORS middleware accepts.
   // Default targets the local sandbox frontend at http://web.cbdc-sandbox.local.

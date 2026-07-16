@@ -1,0 +1,34 @@
+name: Besu QBFT Baseline
+
+on:
+  pull_request:
+    paths:
+      - "common/images.yaml"
+      - "common/helpers.sh"
+      - "contracts/foundry.toml"
+      - "contracts/remappings.txt"
+      - "contracts/soldeer.lock"
+      - "infra/besu/**"
+      - "services/blockscout/values.backend.env.yaml"
+      - "services/blockscout/blockscout.sh"
+      - "services/nb-bond-api/helm/values.local.example.yaml"
+      - "services/nb-bond-api/src/ingestion.ts"
+      - "services/nb-bond-api/src/ingestion-db.ts"
+      - "scripts/verification/check-besu-qbft-baseline.py"
+      - ".github/workflows/besu-qbft-baseline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python3 scripts/verification/check-besu-qbft-baseline.py
+      - run: helm lint infra/besu
+      - run: helm template besu infra/besu --namespace besu >/dev/null

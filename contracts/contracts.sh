@@ -136,28 +136,47 @@ NETWORK=besu-local
 CHAIN_ID=2018
 
 if [ "$CMD" == "start" ]; then
+    source "$CONTRACTS_ENV_FILE"
+
+    # Wait for the archive-facing route before evaluating deployment identity.
+    waitForBesu
+    waitForApiGateway
+    sleep 5
+
+    current_genesis_hash="$(getChainGenesisHash "$BESU_LOCAL_RPC_URL")"
+    if [ -z "$current_genesis_hash" ]; then
+        echo "❌ Could not read the current Besu genesis hash."
+        exit 1
+    fi
+
     if [ "$(contractsDeploymentExists)" == "true" ]; then
         deployed_chain_id="$(getContractsDeploymentChainId)"
         deployed_registry_address="$(getContractsDeploymentRegistryAddress)"
-        if [ -n "$deployed_chain_id" ] && [ "$deployed_chain_id" == "$CHAIN_ID" ]; then
+        deployed_genesis_hash="$(getContractsDeploymentGenesisHash)"
+        if [ -n "$deployed_chain_id" ] && [ "$deployed_chain_id" == "$CHAIN_ID" ] && \
+           [ -n "$deployed_genesis_hash" ] && [ "$deployed_genesis_hash" == "$current_genesis_hash" ]; then
+            registry_code=""
             if [ -n "$deployed_registry_address" ]; then
+                registry_code="$(cast code --rpc-url "$BESU_LOCAL_RPC_URL" "$deployed_registry_address" 2>/dev/null || true)"
+            fi
+            if [ -n "$deployed_registry_address" ] && [ -n "$registry_code" ] && [ "$registry_code" != "0x" ]; then
                 echo "✅ Contracts already deployed (chain $deployed_chain_id, registry $deployed_registry_address). Skipping deploy."
                 deployRegistryContractAddressToConfigmap "$deployed_registry_address"
                 exit 0
             fi
-            echo "ℹ️ Contracts marker found without registry address; proceeding with deploy."
-        else
-            echo "ℹ️ Contracts marker found for chain $deployed_chain_id (current $CHAIN_ID); proceeding with deploy."
+            echo "❌ Contract marker matches this chain, but the recorded registry has no bytecode."
+            echo "   Run ./sandbox.sh delete and recreate the sandbox rather than reusing inconsistent state."
+            exit 1
         fi
+        echo "❌ Contract marker belongs to a different chain identity."
+        echo "   Recorded chain/genesis: $deployed_chain_id / ${deployed_genesis_hash:-missing}"
+        echo "   Current chain/genesis:  $CHAIN_ID / $current_genesis_hash"
+        echo "   Run ./sandbox.sh delete and recreate the sandbox; same chain ID does not imply the same chain."
+        exit 1
     fi
 
     # remove build artifacts and cache directories
     forge clean
-
-    # wait for besu to be ready
-    waitForBesu
-    waitForApiGateway
-    sleep 5
 
     deployContracts $NETWORK $CHAIN_ID $VERIFY_CONTRACTS
 elif [ "$CMD" == "stop" ]; then

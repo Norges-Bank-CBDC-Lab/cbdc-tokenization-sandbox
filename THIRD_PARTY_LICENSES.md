@@ -144,8 +144,8 @@ output and does not declare third-party npm dependencies.
 | Package | Version | License |
 | --- | --- | --- |
 | `forge-std` | `1.16.1` | MIT |
-| `@openzeppelin-contracts` | `5.4.0` | MIT |
-| `@openzeppelin-contracts-upgradeable` | `5.4.0` | MIT |
+| `@openzeppelin-contracts` | `5.6.1` | MIT |
+| `@openzeppelin-contracts-upgradeable` | `5.6.1` | MIT |
 
 ## Deployment-Time Components
 

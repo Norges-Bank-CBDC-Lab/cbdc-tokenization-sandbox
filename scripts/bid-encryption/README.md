@@ -27,7 +27,7 @@ node scripts/generate-local-sandbox-fixtures.mjs
 # Encrypt a plaintext payload to file using the generated local sandbox input
 npm run encrypt ../../.tmp/bid-encryption/examples/basic/seal.example.json ../../.tmp/bid-encryption/examples/basic/sealed.json
 # Encrypt while overriding signing domain values for every entry
-npm run encrypt ../../.tmp/bid-encryption/examples/basic/seal.example.json ../../.tmp/bid-encryption/examples/basic/sealed.json --chainId 1 --verifyingContract 0x... --auctionId 0x...
+npm run encrypt ../../.tmp/bid-encryption/examples/basic/seal.example.json ../../.tmp/bid-encryption/examples/basic/sealed.json --chainId 2018 --verifyingContract 0x... --auctionId 0x...
 
 # Decrypt a ciphertext as auctioneer to file (verifies plaintextHash)
 npm run decrypt /path/to/unseal.auctioneer.json ./opened.json
@@ -59,7 +59,7 @@ Example payloads have been provided for each of the three auction types - RATE (
 
 ## Input formats
 
-- Encrypt: `{"payload": BidPlaintext, "auctioneerPublicKey": "0x...", "bidderPublicKey": "0x...", "version": 1, "signing": { "chainId": 1, "verifyingContract": "0x...", "auctionId": "0x...", "bidderPrivateKey": "0x...", "bidderNonce": "0" }}` or an array of those objects. If you omit `signing`, the payload must already include `bidderSig` and `bidderNonce`.
+- Encrypt: `{"payload": BidPlaintext, "auctioneerPublicKey": "0x...", "bidderPublicKey": "0x...", "version": 1, "signing": { "chainId": 2018, "verifyingContract": "0x...", "auctionId": "0x...", "bidderPrivateKey": "0x...", "bidderNonce": "0" }}` or an array of those objects. If you omit `signing`, the payload must already include `bidderSig` and `bidderNonce`.
 - Decrypt: `{"ciphertext": "0x...", "privateKey": "0x...", "preferredRole": "auctioneer" | "bidder", "plaintextHash": "0x..."}` (optional plaintextHash for unseal verification) or an array of those objects
 - Keygen: no input file; optionally provide an output path to write the generated keypair JSON.
 

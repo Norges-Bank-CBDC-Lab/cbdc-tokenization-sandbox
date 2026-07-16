@@ -13,7 +13,7 @@ Shows stack traces and which fetcher is failing (e.g., realtime block fetcher).
 
 2) **Besu logs (is RPC receiving calls)**
 ```sh
-kubectl logs -n besu besu-0 --tail=200
+kubectl logs -n besu besu-archive-0 --tail=200
 ```
 Confirms Besu is reachable and whether JSON-RPC / WebSocket calls are arriving.
 
@@ -23,15 +23,24 @@ Confirms Besu is reachable and whether JSON-RPC / WebSocket calls are arriving.
 ```sh
 kubectl exec -n blockscout deploy/blockscout-blockscout-stack-blockscout -- sh -c \
 'curl -s -X POST --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_blockNumber\",\"params\":[]}" \
-http://besu.besu.svc.cluster.local:8545'
+http://besu-archive.besu.svc.cluster.local:8545'
 ```
 If this fails, it's a network / RPC endpoint issue, not Blockscout logic.
+
+## Database chain-identity guard
+
+Before Helm deployment, `blockscout.sh start` binds the PostgreSQL volume to
+Besu's genesis hash in the `blockscout-chain-identity` ConfigMap. A database
+without a marker, or a marker for another genesis, is rejected with the
+required `./sandbox.sh delete` recovery. This is deliberate: chain ID 2018 is
+retained across the Clique-to-QBFT replacement and is not a sufficient database
+identity.
 
 4) **Trace method sanity check**
 ```sh
 kubectl exec -n blockscout deploy/blockscout-blockscout-stack-blockscout -- sh -c \
 'curl -s -X POST --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"trace_block\",\"params\":[\"0x1fa\"]}" \
-http://besu.besu.svc.cluster.local:8545'
+http://besu-archive.besu.svc.cluster.local:8545'
 ```
 If this fails, Besu trace support or permissions are the issue.
 
@@ -103,4 +112,3 @@ kubectl -n blockscout logs deploy/sc-verifier-deployment --tail=50
 
 The sc-verifier fetches solc compilers on first use (egress to
 `binaries.soliditylang.org`); a network/compiler error shows up in those logs.
-

@@ -1,5 +1,5 @@
 # BondAuction
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/norges-bank/BondAuction.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondAuction.sol)
 
 **Inherits:**
 [IBondAuction](../interfaces/IBondAuction.sol/interface.IBondAuction.md), AccessControl, EIP712
@@ -330,6 +330,28 @@ function getAuctionId(string memory _isin) public view override returns (bytes32
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`bytes32`|Current auction ID.|
+
+
+### getAuctionIdAt
+
+Return a specific auction ID in the ISIN's history.
+
+
+```solidity
+function getAuctionIdAt(string memory _isin, uint256 _index) external pure returns (bytes32);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isin`|`string`|ISIN for target bond.|
+|`_index`|`uint256`|1-based auction index (1 == first auction for this ISIN).|
+
+**Returns**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`<none>`|`bytes32`|Auction ID for the given index.|
 
 
 ### getAuction

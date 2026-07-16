@@ -13,8 +13,8 @@ describe('computeIngestionWindow', () => {
 
   it('processes the single-block case when latest === nextBlock', () => {
     // Regression: a previous `if (to === from) return;` skip caused the
-    // head block to be silently dropped on Clique PoA, where the chain
-    // produces blocks only on activity. The head must be processed.
+    // current head block to be silently dropped. The head must be processed
+    // regardless of consensus or empty-block policy.
     expect(computeIngestionWindow(75, 75)).toEqual({ from: 75, to: 75 });
     expect(computeIngestionWindow(0, 0)).toEqual({ from: 0, to: 0 });
   });

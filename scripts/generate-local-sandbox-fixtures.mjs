@@ -39,6 +39,7 @@ const tmpBidExamplesRoot = path.join(REPO_ROOT, '.tmp/bid-encryption/examples');
 
 const transactionRoles = [
   ['BESU_SIGNER_KEY', 'BESU_SIGNER'],
+  ['BESU_ARCHIVE_KEY', 'BESU_ARCHIVE'],
   ['PK_DEPLOYER', 'PK_DEPLOYER'],
   ['PK_BROKER1', 'PK_BROKER1'],
   ['PK_BROKER2', 'PK_BROKER2'],

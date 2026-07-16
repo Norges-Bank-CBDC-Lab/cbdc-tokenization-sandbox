@@ -175,12 +175,12 @@ async function assertProviderReady() {
 /**
  * Timestamp of the latest mined block, in unix seconds.
  *
- * The sandbox chain only mints blocks when transactions land, so the
- * chain clock LAGS wall clock — sometimes by a lot. Any time-based
- * eligibility the contracts enforce via `block.timestamp` (e.g. coupon
- * payability, auction close) must be derived from THIS value, never
- * from `Date.now()`, or the API will report actions as ready that the
- * chain still rejects.
+ * The QBFT sandbox waits up to five minutes between idle empty blocks, so the
+ * chain clock can lag wall clock until a transaction-bearing block lands. Any
+ * time-based eligibility the contracts enforce via `block.timestamp` (e.g.
+ * coupon payability, auction close) must be derived from THIS value, never
+ * from `Date.now()`, or the API can report actions as ready that the chain
+ * still rejects during that idle window.
  */
 export async function getLatestBlockTimestamp(): Promise<bigint | null> {
   try {
@@ -318,8 +318,8 @@ export async function resolveRegisteredAddress(name: string): Promise<string | n
  * ContractAdded / ContractUpdated events — the mapping itself is keyed by
  * hashed names and cannot be enumerated on-chain. The event `name` params
  * are not indexed, so the full strings sit in the log data. The local
- * chain is small (blocks mint only on transactions), so a from-genesis
- * scan per request is cheap. Failures degrade to an empty list so the
+ * sandbox chain is small, so a from-genesis scan per request is cheap.
+ * Failures degrade to an empty list so the
  * registry inventory can fall back to its canonical name set.
  */
 export async function listRegistryEventNames(): Promise<string[]> {

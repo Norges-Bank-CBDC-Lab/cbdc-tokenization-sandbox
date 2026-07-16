@@ -1,6 +1,6 @@
 # 0001. Local chain runs Hyperledger Besu on a Clique + London baseline
 
-- **Status:** Accepted
+- **Status:** Superseded by 0003
 - **Date:** 2026-06-19
 - **Deciders:** sandbox operator
 - **Tags:** besu, infra, contracts

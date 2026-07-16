@@ -4,4 +4,5 @@ metadata:
   name: besu-config
   namespace: {{ .Values.namespace }}
 data:
-  config.toml: {{- include "config-toml-tpl" . | toYaml | indent 4 }}
+  validator.toml: {{- include "validator-config-toml" . | toYaml | indent 4 }}
+  archive.toml: {{- include "archive-config-toml" . | toYaml | indent 4 }}

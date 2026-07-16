@@ -22,7 +22,7 @@ export const healthChainSchema = z
   .object({
     rpcUrl: z.string().meta({
       description: 'Sanitised RPC endpoint — protocol://host[:port] only, no credentials or path',
-      examples: ['http://besu-rpc.besu:8545'],
+      examples: ['http://besu-archive.besu:8545'],
     }),
     chainId: z.number().nullable().meta({
       description: 'EVM chainId reported by the provider, or null when unreachable',
