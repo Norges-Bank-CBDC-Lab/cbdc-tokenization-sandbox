@@ -58,7 +58,7 @@ order:
 2. **Explorer (`services/blockscout`)**
    - deploys Blockscout with local, sandbox-oriented values
    - deploys the Postgres dependency
-   - optionally deploys the BENS name service microservice
+   - deploys the BENS name service microservice
 3. **Contracts (`contracts/contracts.sh`)**
    - deploys the core contracts to Besu
    - optionally verifies them in Blockscout
@@ -76,29 +76,19 @@ entries:
 - `bond-api.cbdc-sandbox.local` for the NB Bond API
 - `web.cbdc-sandbox.local` for the NB UI operator frontend
 
-### Component Diagram
+### Architecture Diagrams
 
-```text
-                   (host / browser / curl)
-                            |
-                            |  *.cbdc-sandbox.local
-                            v
-                    [NGINX Gateway API]
-                      |  |     |      |
-                      |  |     |      +--> [NB Bond API] ----+
-                      |  |     |                             |
-                      |  |     +--> [Blockscout] -----------+
-                      |  |                                  | JSON-RPC
-                      |  +--> [Forest archive/RPC] <---------+
-                      |        |             ^
-                      |        |             | Besu P2P
-                      |        v             v
-                      |  [Deployed contracts] [QBFT validator]
-                      |
-                      +--> [NB UI (React, nginx)] -- /v1/* --> [NB Bond API]
+The maintained diagram set separates concerns so deployment detail does not
+obscure domain and trust relationships:
 
-  (optional) [scripts/* CLIs] ----------> submit on-chain bids via Besu JSON-RPC
-```
+- [system context](diagrams/architecture/system-context.md)
+- [runtime deployment](diagrams/architecture/runtime-deployment.md)
+- [contract topology](diagrams/architecture/contract-topology.md)
+- [NB Bond API internals](diagrams/architecture/nb-bond-api-components.md)
+- [trust boundaries](diagrams/security/trust-boundaries.md)
+
+See the [diagram catalog](diagrams/README.md) for data, lifecycle, sequence,
+and operational views.
 
 ## Current Local Chain Baseline
 
@@ -159,6 +149,12 @@ Simplified trust model:
 - bid unsealing and uniform-price allocation computation happen off-chain in
   the operator service; the operator selects the winning bids and the service
   recomputes the allocation over exactly that selection before finalising
+
+Each `BondDvP.settle` call is atomic, but auction finalisation is not atomic
+across all allocations. `BondManager` catches individual allocation failures,
+emits `BondAllocationFailed`, and continues. A RATE/PRICE finalisation may
+therefore leave failed-issuance units in `BondManager` for explicit withdrawal
+while the auction is already `FINALISED`.
 
 ## Off-Chain Architecture
 
@@ -242,7 +238,8 @@ this sandbox it is configured conservatively for local use:
   predictable
 - backend/frontend built from the pinned upstream source tags into the local
   registry because release-tagged images are no longer published
-- optional BENS microservice for name resolution
+- BENS microservice for name resolution, deployed whenever the Blockscout step
+  is enabled
 
 ### Dealer And Bidder CLIs (`scripts/`)
 
@@ -343,10 +340,16 @@ At a high level:
    issuer's expected clearing rate, and finalises the auction on-chain through
    `BondManager`, including DvP settlement.
 
-For concrete sequences, see:
+For concrete sequences and state/data flows, see:
 
-- `docs/diagrams/processes/auction-sequence.md`
-- `docs/diagrams/processes/coupon-redemption-sequence.md`
+- [auction lifecycle](diagrams/processes/auction-lifecycle.md)
+- [bond lifecycle](diagrams/processes/bond-lifecycle.md)
+- [auction sequence](diagrams/processes/auction-sequence.md)
+- [bid cryptography](diagrams/processes/bid-cryptography-flow.md)
+- [coupon and redemption](diagrams/processes/coupon-redemption-sequence.md)
+- [sandbox bank creation](diagrams/processes/bank-creation-sequence.md)
+- [mutation and projection catch-up](diagrams/processes/mutation-projection-sequence.md)
+- [live update flow](diagrams/processes/live-update-sequence.md)
 
 ## Configuration And Versioning
 
@@ -369,7 +372,8 @@ local development, including:
   WebSocket when accessed directly in-cluster or by port-forward
 - Blockscout HTTP endpoints
 - NB Bond API
-- NB UI (no sign-in chrome when `AUTH_MODE=none`, which is the default)
+- NB UI (no sign-in chrome when UI `runtimeConfig.authMode=none`, which is the
+  default and is published to browser `AUTH_MODE`)
 
 Treat the entire environment as trusted-local only. Do not reuse keys,
 credentials, or example values outside local development.
@@ -409,6 +413,7 @@ chain or API is down.
   operational notes
 - `contracts/README.md` for Foundry workflows
 - `scripts/README.md` for bidder-side CLIs and repository verification tools
+- `docs/diagrams/README.md` for the maintained architecture and process diagram catalog
 - `docs/KNOWN_ISSUES.md` for active sandbox limitations
 - `docs/DOCUMENTATION_INDEX.md` for the docs most likely to need follow-up when
   behavior changes

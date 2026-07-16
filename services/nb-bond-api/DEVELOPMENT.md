@@ -339,8 +339,9 @@ The local sandbox pod runs hardened by default:
   `USER node`, so the runtime process runs as the unprivileged `node` user
   (uid 1000) shipped by the upstream Node image, not as root;
 - the pod's `securityContext` sets `fsGroup: 1000` so the `/app/data`
-  emptyDir mount (the only writable runtime path; holds
-  `ingestion.sqlite` + its WAL sidecars) is group-writable for uid 1000;
+  volume (a PVC by default, with `emptyDir` fallback) is group-writable for
+  uid 1000; it is the only writable runtime path and holds
+  `ingestion.sqlite` plus its WAL sidecars;
 - the container's `securityContext` sets `runAsNonRoot: true`,
   `allowPrivilegeEscalation: false`, `capabilities.drop: ["ALL"]`, and
   `seccompProfile.type: RuntimeDefault`.
@@ -366,11 +367,13 @@ The service maintains an SQLite database (default `data/ingestion.sqlite`) which
 
 If `DB_PATH` is unwritable, or ingestion cannot reach `RPC_URL`, these endpoints may return empty data or become stale, even if the on-chain contracts are operating correctly.
 
-In the sandbox Helm deployment, the database lives on an `emptyDir` volume
-mounted at `/app/data`, so its contents are reset whenever the pod is
-recreated. The image entrypoint touches `/app/data/ingestion.sqlite` on
-start so the read-side connection (opened in readonly mode at module load)
-does not race the writer-side schema creation.
+In the sandbox Helm deployment, the database lives on the
+`nb-bond-api-data` PVC mounted at `/app/data`, so it survives pod recreation
+and Helm upgrades. It is removed with the Kind cluster. When
+`persistence.enabled=false`, the chart uses `emptyDir` and pod recreation
+resets the database. The image entrypoint touches
+`/app/data/ingestion.sqlite` on start so the read-side connection (opened in
+readonly mode at module load) does not race the writer-side schema creation.
 
 The ingestion loop polls every `POLL_INTERVAL_MS` (default 3 s) and
 processes blocks `[nextBlock, latest]` inclusive. The single-block case is
