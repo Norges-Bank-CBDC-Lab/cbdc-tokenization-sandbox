@@ -94,7 +94,7 @@ and operational views.
 
 The currently documented local chain baseline is:
 
-- Besu 26.7.0 with one QBFT validator and one non-validator archive/RPC node
+- Besu 26.7.1 with one QBFT validator and one non-validator archive/RPC node
 - Osaka active from genesis
 - Solidity 0.8.36 and OpenZeppelin 5.6.1
 - 1-second transaction blocks and a 5-minute idle empty-block period

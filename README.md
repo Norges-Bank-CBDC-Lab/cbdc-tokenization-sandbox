@@ -53,7 +53,7 @@ also help human contributors understand repo-specific workflow and guardrails:
 
 ## Current Local Chain
 
-The validated local baseline is Besu 26.7.0 with Osaka active from genesis,
+The validated local baseline is Besu 26.7.1 with Osaka active from genesis,
 one QBFT validator, and one separate non-validator archive/RPC node. Solidity
 0.8.36 and OpenZeppelin 5.6.1 are pinned to that execution baseline. All local
 application, Blockscout, Foundry, and gateway traffic uses the archive/RPC
