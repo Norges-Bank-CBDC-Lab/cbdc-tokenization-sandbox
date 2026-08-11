@@ -41,7 +41,7 @@ The currently documented local baseline is:
 
 - one Kind control-plane node hosting two separate Besu processes
 - one QBFT validator plus one non-validator archive/RPC node
-- Besu 26.7.0 with QBFT consensus
+- Besu 26.7.1 with QBFT consensus
 - Osaka EVM milestone from genesis
 - 1-second transaction blocks and a 5-minute idle empty-block period
 - `zeroBaseFee: true` in the Besu genesis
