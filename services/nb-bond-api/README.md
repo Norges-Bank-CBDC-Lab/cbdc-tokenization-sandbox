@@ -56,7 +56,7 @@ Two sandbox-only resource families sit alongside the bond tree:
   estimation and never reach the chain, so this trail is their only durable
   record. `GET /v1/operations` lists attempts newest-first (optional
   `?limit`, default 200); the NB UI renders it at System → Operations. See
-  [`docs/plans/operator-audit-trail-design.md`](../../docs/plans/operator-audit-trail-design.md).
+  [`docs/plans/archive/operator-audit-trail-design.md`](../../docs/plans/archive/operator-audit-trail-design.md).
 
 ### Projection-purity rule (SQLite tables)
 
@@ -97,13 +97,17 @@ local Kind registry at `localhost:5001/nb-bond-api:<hash>`, and the Helm
 chart is installed with `--set image=<that tag>`. Re-runs skip the build
 when the content hash matches an existing registry tag.
 
-The pod mounts an `emptyDir` at `/app/data` for the SQLite ingestion DB; no
-host source mount is required and the chart no longer runs `npm ci` /
-`npm run build` at container start.
+The chart mounts the `nb-bond-api-data` PVC at `/app/data` for the SQLite
+database by default (`256Mi`, `ReadWriteOnce`). Disabling
+`persistence.enabled` falls back to `emptyDir`. No host source mount is
+required and the chart no longer runs `npm ci` / `npm run build` at container
+start.
 
 ## Env
 
-- `RPC_URL` – JSON-RPC endpoint
+- `RPC_URL` – JSON-RPC endpoint. The local sandbox value is
+  `http://besu-archive.besu:8545`; do not point application traffic at
+  `besu-validator`.
 - `GLOBAL_REGISTRY_ADDRESS` – deployed GlobalRegistry used to resolve BondManager
 - `BOND_MANAGER_CONTRACT_NAME` – registry key for BondManager (default: "Bond Manager")
 - `WNOK_CONTRACT_NAME` – registry key for the WNOK contract (default: "Wholesale NOK")

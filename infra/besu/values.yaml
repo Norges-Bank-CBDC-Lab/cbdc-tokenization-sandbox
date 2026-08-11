@@ -1,17 +1,33 @@
-# Tracked defaults for the local Besu chart.
-# Keep the base image pin here so plain Helm renders and static scanners
-# resolve a concrete version instead of an unbounded template value.
+# Tracked defaults for the local two-node Besu chart.
+# Keep concrete image and public node-identity defaults so plain Helm renders
+# are deterministic. Private keys are injected from contracts/.env at deploy time.
 
 namespace: besu
 rootDnsZone: "cbdc-sandbox.local"
-# Pin to a specific Besu release to keep deploys reproducible.
-image: hyperledger/besu:26.1.0
+image: hyperledger/besu:26.7.1
 imagePullPolicy: IfNotPresent
-httpService: "besu"
 dataPath: /var/lib/besu
-# Set to DEBUG (or TRACE) temporarily when troubleshooting.
 logging: INFO
-# Populated from contracts/.env at deploy time so this tracked file stays public-safe.
-signerKey: "set-from-contracts-env-at-deploy-time"
-diskSize: "5Gi"
-p2pHost: "127.0.0.1"
+networkId: 2018
+
+# Generated with `cast to-rlp` from validator.address at deploy time.
+qbftExtraData: "0xf83aa00000000000000000000000000000000000000000000000000000000000000000d594c777bfe2c2398beb62cd6897f913f1b64ee57ea6c080c0"
+
+validator:
+  address: "0xc777bfe2c2398beb62cd6897f913f1b64ee57ea6"
+  nodePublicKey: "ff43f6b530a29f88fbdc878739ace728ae20acd785a45566ad36452ece390f8bd53fe6a0fa8ddcbfd4a0920f13f3124e743ba62f3c9f1627a7569aba070a231e"
+  key: "set-from-contracts-env-at-deploy-time"
+  diskSize: "5Gi"
+  # Stable static-enode endpoint. The process advertises its pod IP separately
+  # because Besu requires --p2p-host to be an IP address.
+  p2pHost: "besu-validator-0.besu-validator-p2p.besu.svc.cluster.local"
+
+archive:
+  address: "0xb28c6fe573386eaadd9bd8b39998bee5a67d108b"
+  nodePublicKey: "92fd2fe8ce35b0a203f36187b62cd63d4563e6fc9b305388ede4da656374ba518d63a37e1158f17225218aa5db315995c40b0205eff2d401367c603e84cc29ac"
+  key: "set-from-contracts-env-at-deploy-time"
+  diskSize: "10Gi"
+  p2pHost: "besu-archive-0.besu-archive-p2p.besu.svc.cluster.local"
+
+# HTTPRoute points only to this non-validator service.
+httpService: "besu-archive"

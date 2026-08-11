@@ -51,6 +51,24 @@ also help human contributors understand repo-specific workflow and guardrails:
 - `scripts/AGENTS.md`: script and CLI guidance
 - `services/AGENTS.md`: service-specific guidance
 
+## Current Local Chain
+
+The validated local baseline is Besu 26.7.1 with Osaka active from genesis,
+one QBFT validator, and one separate non-validator archive/RPC node. Solidity
+0.8.36 and OpenZeppelin 5.6.1 are pinned to that execution baseline. All local
+application, Blockscout, Foundry, and gateway traffic uses the archive/RPC
+node; the validator is not an application endpoint.
+
+Transaction-bearing blocks use a one-second period. When the transaction pool
+is empty, QBFT produces an empty block only every five minutes to keep this
+low-throughput sandbox from accumulating mostly empty history.
+
+This one-validator topology is deterministic but is not Byzantine fault
+tolerant. It has no beacon client or bootnode profile. See
+[ADR 0003](docs/decisions/0003-adopt-besu-qbft-osaka-with-archive-rpc.md) and
+the [archived implementation plan](docs/plans/archive/besu-qbft-osaka-upgrade-plan.md)
+for the decision, migration constraints, and acceptance evidence.
+
 ## Quick Setup
 
 Commands are expected to run on Linux or macOS. On Windows, use WSL.
@@ -112,6 +130,14 @@ The registry container persists across cluster lifecycles, so this is a
 one-time setup (and a no-op on subsequent runs). `./sandbox.sh start`
 pulls and pushes any missing images into this registry on demand via
 `loadImageToKind`.
+
+Current Blockscout backend/frontend release tags are not published as pullable
+images upstream. On a fresh machine or after `registry-reset`, build the pinned
+sources into the local registry before `registry-sync` or `start`:
+
+```console
+./sandbox.sh build-images
+```
 
 Optionally pre-warm the registry with every pinned third-party image so
 the first deploy doesn't pay the pull cost mid-flight:
@@ -176,11 +202,12 @@ Use `/etc/hosts` on Linux/macOS or
 | `./sandbox.sh image-report` | Read-only report: running pod images, local registry tags per service, and which tag is the current build / deployed |
 | `./sandbox.sh cleanup-images` | Prune old content-hash images for `nb-ui` / `nb-bond-api` / `bens-microservice` (keeps current + 2 newest and the deployed tag; never removes shared base images). `--keep N` changes retention; `--prune-build-cache` also clears the global Docker build cache |
 | `./sandbox.sh registry-reset` | Recreate the `kind-registry` container and re-sync base images, clearing accumulated registry tags. Repo-owned images rebuild on the next start |
+| `./sandbox.sh build-images` | Build the pinned Blockscout backend/frontend source tags and push them into the local registry; required once on a fresh machine or after `registry-reset` |
 
-If startup fails with missing content digest errors, run `registry-sync`
-first. This avoids on-demand image pulls racing the deploy steps on slow
-links and is the common fix when `kind` image imports look flaky on
-Docker Desktop.
+If startup fails with missing content digest errors, run `build-images` when
+the Blockscout backend/frontend tags are absent, then run `registry-sync`.
+This avoids image preparation racing the deploy steps on slow links and is the
+common fix when `kind` image imports look flaky on Docker Desktop.
 
 ## Makefile Shortcuts
 

@@ -13,7 +13,12 @@ app.listen(port, () => {
 // Start ingestion in-process (background). The retry wrapper handles
 // the case where Besu is briefly unreachable at boot (e.g. after a
 // PC/Docker restart) — the loop self-heals once the chain comes back.
-// The only "give up" path here is a module-load failure.
+// Chain-identity mismatches are also fatal: continuing would expose a
+// projection checkpoint produced by a different genesis.
 import('./ingestion')
   .then(({ startIngestionLoopWithRetry }) => startIngestionLoopWithRetry())
-  .catch((err) => logger.error(`ingestion module load failed: ${(err as Error).message}`));
+  .catch((err) => {
+    logger.error(`fatal ingestion startup failure: ${(err as Error).message}`);
+    process.exitCode = 1;
+    setImmediate(() => process.exit(1));
+  });

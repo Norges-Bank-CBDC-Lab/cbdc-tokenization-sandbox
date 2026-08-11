@@ -28,7 +28,7 @@ jobs:
           echo "version=${SANDBOX_NODE_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "${{ steps.node-version.outputs.version }}"
           cache: "npm"

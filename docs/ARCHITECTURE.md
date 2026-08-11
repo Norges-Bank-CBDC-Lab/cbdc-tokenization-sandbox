@@ -54,11 +54,11 @@ order:
 1. **Infra (`infra/infra.sh`)**
    - creates or reuses the Kind cluster (`cluster-cbdc-monoledger`)
    - deploys the gateway layer and routing resources
-   - deploys the Besu node and JSON-RPC/WS endpoints
+   - deploys a QBFT validator and a separate archive/RPC Besu node
 2. **Explorer (`services/blockscout`)**
    - deploys Blockscout with local, sandbox-oriented values
    - deploys the Postgres dependency
-   - optionally deploys the BENS name service microservice
+   - deploys the BENS name service microservice
 3. **Contracts (`contracts/contracts.sh`)**
    - deploys the core contracts to Besu
    - optionally verifies them in Blockscout
@@ -71,46 +71,47 @@ order:
 Ingress and routing are hostname-based through `*.cbdc-sandbox.local` host
 entries:
 
-- `besu.cbdc-sandbox.local` for JSON-RPC and WS
+- `besu.cbdc-sandbox.local:8545` for HTTP JSON-RPC to the archive/RPC node
 - `blockscout.cbdc-sandbox.local` for the explorer
 - `bond-api.cbdc-sandbox.local` for the NB Bond API
 - `web.cbdc-sandbox.local` for the NB UI operator frontend
 
-### Component Diagram
+### Architecture Diagrams
 
-```text
-                   (host / browser / curl)
-                            |
-                            |  *.cbdc-sandbox.local
-                            v
-                    [NGINX Gateway API]
-                      |  |     |      |
-                      |  |     |      +--> [NB Bond API] ----+
-                      |  |     |                             |
-                      |  |     +--> [Blockscout] ----+       | JSON-RPC
-                      |  |                           |       v
-                      |  +--> [Besu JSON-RPC/WS] <---+   [Besu node]
-                      |        |
-                      |        +--> [Deployed Solidity contracts]
-                      |
-                      +--> [NB UI (React, nginx)] -- /v1/* --> [NB Bond API]
+The maintained diagram set separates concerns so deployment detail does not
+obscure domain and trust relationships:
 
-  (optional) [scripts/* CLIs] ----------> submit on-chain bids via Besu JSON-RPC
-```
+- [system context](diagrams/architecture/system-context.md)
+- [runtime deployment](diagrams/architecture/runtime-deployment.md)
+- [contract topology](diagrams/architecture/contract-topology.md)
+- [NB Bond API internals](diagrams/architecture/nb-bond-api-components.md)
+- [trust boundaries](diagrams/security/trust-boundaries.md)
+
+See the [diagram catalog](diagrams/README.md) for data, lifecycle, sequence,
+and operational views.
 
 ## Current Local Chain Baseline
 
 The currently documented local chain baseline is:
 
-- single-node Besu deployment on Kind
-- Clique proof-of-authority consensus
-- London EVM milestone
+- Besu 26.7.1 with one QBFT validator and one non-validator archive/RPC node
+- Osaka active from genesis
+- Solidity 0.8.36 and OpenZeppelin 5.6.1
+- 1-second transaction blocks and a 5-minute idle empty-block period
 - `zeroBaseFee: true` in the genesis config
 - predeployed `GlobalRegistry` address baked into the local genesis
 
-This is the repo's current known-good baseline. It is not meant to imply that
-Clique and London are the long-term target architecture. Planned movement to a
-newer milestone and QBFT is tracked separately in `docs/KNOWN_ISSUES.md`.
+The validator produces blocks and exposes only minimal operator RPC. Blockscout,
+NB Bond API, Foundry, and the gateway use `besu-archive`, which runs FULL sync
+with Forest storage. The single validator is deterministic but not Byzantine
+fault tolerant; it is a local baseline, not a production validator topology.
+The longer idle period is intentional for this low-TPS sandbox. It limits
+empty history while allowing a transaction-bearing block on the normal
+one-second period; consumers must nevertheless treat the latest block
+timestamp—not wall clock—as authoritative for contract time gates.
+Besu WebSocket is enabled on the archive process but is not exposed through the
+gateway; maintainers must use a direct in-cluster connection or an explicit
+`kubectl port-forward` when WebSocket access is needed.
 
 ## On-Chain Architecture
 
@@ -149,6 +150,12 @@ Simplified trust model:
   the operator service; the operator selects the winning bids and the service
   recomputes the allocation over exactly that selection before finalising
 
+Each `BondDvP.settle` call is atomic, but auction finalisation is not atomic
+across all allocations. `BondManager` catches individual allocation failures,
+emits `BondAllocationFailed`, and continues. A RATE/PRICE finalisation may
+therefore leave failed-issuance units in `BondManager` for explicit withdrawal
+while the auction is already `FINALISED`.
+
 ## Off-Chain Architecture
 
 ### NB Bond API (`services/nb-bond-api`)
@@ -169,6 +176,9 @@ The NB Bond API is the privileged operator service. It:
   which records every operator-initiated on-chain operation with its
   outcome, including reverts that were rejected at gas estimation and
   never reached the chain
+- binds the SQLite database to the current chain ID and genesis hash before
+  accepting an ingestion checkpoint, preventing Clique-era projections from
+  being served after the same-chain-ID QBFT replacement
 - exposes a `/v1` HTTP/OpenAPI surface designed as a **bulky resource tree**: a single
   `GET /v1/bonds` returns every bond with its nested auctions, bids,
   allocations, and holders. Bond/Auction reads come from one atomic SQLite
@@ -226,7 +236,10 @@ this sandbox it is configured conservatively for local use:
 - sandbox-only values files and hostnames
 - several heavier indexer paths reduced or disabled to keep local behavior more
   predictable
-- optional BENS microservice for name resolution
+- backend/frontend built from the pinned upstream source tags into the local
+  registry because release-tagged images are no longer published
+- BENS microservice for name resolution, deployed whenever the Blockscout step
+  is enabled
 
 ### Dealer And Bidder CLIs (`scripts/`)
 
@@ -327,17 +340,23 @@ At a high level:
    issuer's expected clearing rate, and finalises the auction on-chain through
    `BondManager`, including DvP settlement.
 
-For concrete sequences, see:
+For concrete sequences and state/data flows, see:
 
-- `docs/diagrams/processes/auction-sequence.md`
-- `docs/diagrams/processes/coupon-redemption-sequence.md`
+- [auction lifecycle](diagrams/processes/auction-lifecycle.md)
+- [bond lifecycle](diagrams/processes/bond-lifecycle.md)
+- [auction sequence](diagrams/processes/auction-sequence.md)
+- [bid cryptography](diagrams/processes/bid-cryptography-flow.md)
+- [coupon and redemption](diagrams/processes/coupon-redemption-sequence.md)
+- [sandbox bank creation](diagrams/processes/bank-creation-sequence.md)
+- [mutation and projection catch-up](diagrams/processes/mutation-projection-sequence.md)
+- [live update flow](diagrams/processes/live-update-sequence.md)
 
 ## Configuration And Versioning
 
 - sandbox deploy/build image tags are pinned in `common/images.yaml`
 - Node.js toolchain and image tags are pinned in `common/node-version.env`
-- Blockscout backend/frontend fallback tags for direct Helm use live in
-  `services/blockscout/values.yaml`
+- Blockscout backend/frontend source tags are pinned in `common/images.yaml`;
+  fallback refs for direct Helm use live in `services/blockscout/values.yaml`
 - chart versions are centralized in `common/versions.yaml`
 - deploy toggles are generated into `.env.sandbox` by
   `./sandbox.sh generate-config` and consumed by `./sandbox.sh start`
@@ -349,10 +368,12 @@ For concrete sequences, see:
 This sandbox intentionally exposes several endpoints without authentication for
 local development, including:
 
-- Besu JSON-RPC and WS
+- Besu HTTP JSON-RPC through the gateway, plus unauthenticated archive-node
+  WebSocket when accessed directly in-cluster or by port-forward
 - Blockscout HTTP endpoints
 - NB Bond API
-- NB UI (no sign-in chrome when `AUTH_MODE=none`, which is the default)
+- NB UI (no sign-in chrome when UI `runtimeConfig.authMode=none`, which is the
+  default and is published to browser `AUTH_MODE`)
 
 Treat the entire environment as trusted-local only. Do not reuse keys,
 credentials, or example values outside local development.
@@ -392,6 +413,7 @@ chain or API is down.
   operational notes
 - `contracts/README.md` for Foundry workflows
 - `scripts/README.md` for bidder-side CLIs and repository verification tools
+- `docs/diagrams/README.md` for the maintained architecture and process diagram catalog
 - `docs/KNOWN_ISSUES.md` for active sandbox limitations
 - `docs/DOCUMENTATION_INDEX.md` for the docs most likely to need follow-up when
   behavior changes

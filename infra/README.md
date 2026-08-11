@@ -39,10 +39,11 @@ images.
 
 The currently documented local baseline is:
 
-- single-node Kind cluster
-- single-node Besu deployment
-- Clique proof-of-authority consensus
-- London EVM milestone
+- one Kind control-plane node hosting two separate Besu processes
+- one QBFT validator plus one non-validator archive/RPC node
+- Besu 26.7.1 with QBFT consensus
+- Osaka EVM milestone from genesis
+- 1-second transaction blocks and a 5-minute idle empty-block period
 - `zeroBaseFee: true` in the Besu genesis
 - predeployed `GlobalRegistry` at a stable local address
 
@@ -69,7 +70,7 @@ Important nuance:
 ## What Lives Here
 
 - `cluster/`: Kind cluster definition and registry mount wiring
-- `besu/`: Helm chart and config for the local Besu node
+- `besu/`: Helm chart and config for the validator and archive/RPC nodes
 - `gateway/`: Helm chart for the HTTP gateway and routing
 - `infra.sh`: infra entrypoint used by the root sandbox workflow
 

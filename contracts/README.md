@@ -52,6 +52,19 @@ Then install the contract dependencies:
 forge soldeer install
 ```
 
+## Toolchain Baseline
+
+The checked-in build targets the local Besu QBFT/Osaka chain:
+
+- Solidity 0.8.36 with `evm_version = "osaka"`;
+- OpenZeppelin Contracts and Contracts Upgradeable 5.6.1;
+- `via_ir = true`, optimizer enabled, and 200 optimizer runs; and
+- chain ID 2018 for local deployment records.
+
+Keep the compiler, EVM target, lockfile, remappings, genesis milestone, and
+Blockscout verifier inputs aligned. Osaka caps an individual transaction at
+16,777,216 gas even though the local block gas limit is higher.
+
 ## Common Foundry Commands
 
 From `contracts/`:

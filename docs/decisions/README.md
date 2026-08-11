@@ -30,5 +30,6 @@ ADRs **complement** the other docs, they do not replace them:
 
 | ADR | Title | Status |
 |---|---|---|
-| [0001](0001-local-chain-besu-clique-london-baseline.md) | Local chain runs Hyperledger Besu on a Clique + London baseline | Accepted |
+| [0001](0001-local-chain-besu-clique-london-baseline.md) | Local chain runs Hyperledger Besu on a Clique + London baseline | Superseded by 0003 |
 | [0002](0002-adopt-erc-3643-for-tokenized-securities.md) | Adopt ERC-3643 (T-REX) for tokenized securities, retiring the ERC-1410 model | Accepted |
+| [0003](0003-adopt-besu-qbft-osaka-with-archive-rpc.md) | Adopt Besu QBFT and Osaka with a separate archive/RPC node | Accepted |

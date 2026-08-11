@@ -18,6 +18,9 @@ integrators.
 - `check-node-version-consistency.py`: validates that the shared Node.js
   toolchain pin in `common/node-version.env` matches CI, Docker build inputs,
   and direct `@types/node` manifests
+- `check-besu-qbft-baseline.py`: validates Besu image pins, QBFT/Osaka genesis,
+  split validator/archive topology, archive-only consumers, Foundry/OZ versions,
+  and (when built) genesis `GlobalRegistry` bytecode
 - `check-image-hash-inputs.sh`: guards the content-hash cache keys for the
   repo-owned images (`nb-ui`, `nb-bond-api`, `bens-microservice`) — asserts each
   `*BundleHash` is sensitive to files inside its hashed input set and insensitive
@@ -34,5 +37,6 @@ python3 scripts/verification/check-third-party-licenses.py
 python3 scripts/verification/check-public-repo-hygiene.py
 python3 scripts/verification/check-markdown-links.py
 python3 scripts/verification/check-node-version-consistency.py
+python3 scripts/verification/check-besu-qbft-baseline.py
 bash scripts/verification/check-image-hash-inputs.sh
 ```

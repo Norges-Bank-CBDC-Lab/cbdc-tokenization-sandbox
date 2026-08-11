@@ -64,7 +64,7 @@ livenessProbe:
   failureThreshold: 3
 
 env:
-  RPC_URL: http://besu.besu:8545
+  RPC_URL: http://besu-archive.besu:8545
   BOND_MANAGER_CONTRACT_NAME: "Bond Manager"
   # Registry name for the WNOK contract, used by the Central Bank endpoints
   # (/v1/central-bank/*). Matches WNOK_CONTRACT_NAME in contracts/.env.

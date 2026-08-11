@@ -1,0 +1,29 @@
+data-path={{ .Values.dataPath | quote }}
+logging={{ .Values.logging | quote }}
+
+host-allowlist=["*"]
+min-gas-price=0
+min-priority-fee=0
+network-id={{ .Values.networkId }}
+
+# Operator-only RPC. Application traffic is routed to besu-archive.
+rpc-http-enabled=true
+rpc-http-api=["ETH","NET","WEB3","ADMIN","QBFT"]
+rpc-http-host="0.0.0.0"
+rpc-http-port=8545
+
+sync-mode="FULL"
+data-storage-format="BONSAI"
+bonsai-limit-trie-logs-enabled=false
+
+# Required by the sandbox's zero-fee, unfunded signing accounts. The layered
+# pool can leave otherwise valid transactions permanently non-executable.
+tx-pool="SEQUENCED"
+tx-pool-no-local-priority=true
+
+max-peers=25
+discovery-enabled=false
+p2p-enabled=true
+p2p-interface="0.0.0.0"
+p2p-port=30303
+static-nodes-file="/etc/besu-static/static-nodes.json"

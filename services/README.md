@@ -35,10 +35,13 @@ Blockscout is configured conservatively for local use. The values files under
 `services/blockscout/` are sandbox-only defaults and are not production or
 internet-facing deployment templates.
 
-The default sandbox path uses published GHCR Blockscout images pinned in
-`common/images.yaml`. The local source-build helper
-`services/blockscout/build-images.sh` uses those same pins, and is optional for
-deliberate local debugging of upstream Blockscout changes.
+The backend/frontend release refs are pinned in `common/images.yaml`, but those
+release images are no longer published upstream. On a fresh machine or after
+`registry-reset`, run `./sandbox.sh build-images` once to clone the pinned tags,
+build them, and push them into the local registry before starting Blockscout.
+Postgres and the smart-contract-verifier remain ordinary pinned upstream
+images. See `docs/KNOWN_ISSUES.md` for the publication limitation.
+
 ### NB Bond API
 
 The service controls issuer-side workflows, unseals bids, computes allocations

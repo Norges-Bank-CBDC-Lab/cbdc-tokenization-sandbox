@@ -36,7 +36,8 @@ The API is defined by the OpenAPI 3.1 document in `services/nb-bond-api/openapi.
 
 Create an environment file from `services/nb-bond-api/.env.example` and set at minimum:
 
-- `RPC_URL`: JSON-RPC endpoint.
+- `RPC_URL`: JSON-RPC endpoint. In the local sandbox this must be the
+  archive/RPC service (`http://besu-archive.besu:8545`), not the validator.
 - `GLOBAL_REGISTRY_ADDRESS`: deployed `GlobalRegistry` used to resolve `BondManager`.
 - `BOND_MANAGER_CONTRACT_NAME`: registry key for `BondManager` (default: "Bond Manager").
 - `BOND_ADMIN_PK`: private key for the API operator, this address must have the relevant on-chain admin role(s).
@@ -228,7 +229,7 @@ From `scripts/bid-encryption/`:
 ```bash
 npm install
 node ../generate-local-sandbox-fixtures.mjs
-npm run encrypt ../../.tmp/bid-encryption/examples/basic/seal.example.json ../../.tmp/bid-encryption/examples/basic/sealed.json --chainId 1 --verifyingContract 0x... --auctionId 0x...
+npm run encrypt ../../.tmp/bid-encryption/examples/basic/seal.example.json ../../.tmp/bid-encryption/examples/basic/sealed.json --chainId 2018 --verifyingContract 0x... --auctionId 0x...
 ```
 
 Notes:
@@ -244,7 +245,7 @@ From `scripts/bid-submitter/`:
 ```bash
 npm install
 node ../generate-local-sandbox-fixtures.mjs
-npm run submit --sealed-bids ../../.tmp/bid-encryption/examples/basic/sealed.json --keys ./examples/bids.keys.json --bond-auction 0x... --auction-id 0x... --rpc-url http://localhost:8545
+npm run submit --sealed-bids ../../.tmp/bid-encryption/examples/basic/sealed.json --keys ./examples/bids.keys.json --bond-auction 0x... --auction-id 0x... --rpc-url http://besu.cbdc-sandbox.local:8545
 ```
 
 `--bond-auction` is the deployed `BondAuction` address. `--auction-id` is the bytes32 auction ID.
@@ -338,8 +339,9 @@ The local sandbox pod runs hardened by default:
   `USER node`, so the runtime process runs as the unprivileged `node` user
   (uid 1000) shipped by the upstream Node image, not as root;
 - the pod's `securityContext` sets `fsGroup: 1000` so the `/app/data`
-  emptyDir mount (the only writable runtime path; holds
-  `ingestion.sqlite` + its WAL sidecars) is group-writable for uid 1000;
+  volume (a PVC by default, with `emptyDir` fallback) is group-writable for
+  uid 1000; it is the only writable runtime path and holds
+  `ingestion.sqlite` plus its WAL sidecars;
 - the container's `securityContext` sets `runAsNonRoot: true`,
   `allowPrivilegeEscalation: false`, `capabilities.drop: ["ALL"]`, and
   `seccompProfile.type: RuntimeDefault`.
@@ -365,23 +367,29 @@ The service maintains an SQLite database (default `data/ingestion.sqlite`) which
 
 If `DB_PATH` is unwritable, or ingestion cannot reach `RPC_URL`, these endpoints may return empty data or become stale, even if the on-chain contracts are operating correctly.
 
-In the sandbox Helm deployment, the database lives on an `emptyDir` volume
-mounted at `/app/data`, so its contents are reset whenever the pod is
-recreated. The image entrypoint touches `/app/data/ingestion.sqlite` on
-start so the read-side connection (opened in readonly mode at module load)
-does not race the writer-side schema creation.
+In the sandbox Helm deployment, the database lives on the
+`nb-bond-api-data` PVC mounted at `/app/data`, so it survives pod recreation
+and Helm upgrades. It is removed with the Kind cluster. When
+`persistence.enabled=false`, the chart uses `emptyDir` and pod recreation
+resets the database. The image entrypoint touches
+`/app/data/ingestion.sqlite` on start so the read-side connection (opened in
+readonly mode at module load) does not race the writer-side schema creation.
 
 The ingestion loop polls every `POLL_INTERVAL_MS` (default 3 s) and
-processes blocks `[nextBlock, latest]` inclusive — the local Besu node uses
-Clique PoA, which produces blocks only on transaction activity, so the head
-sits at `nextBlock - 1 + 1 === nextBlock` for arbitrarily long idle stretches.
-The single-block case is handled in `computeIngestionWindow` so the head is
-not silently dropped on idle chains. The live-update stream publishes bond
-and auction resource keys only after the projection transaction and
+processes blocks `[nextBlock, latest]` inclusive. The single-block case is
+handled in `computeIngestionWindow` so the current head is never silently
+dropped, independent of consensus or empty-block policy. The QBFT sandbox
+advances its idle head every five minutes; transaction-bearing blocks retain
+the one-second period. The live-update stream
+publishes bond and auction resource keys only after the projection transaction and
 checkpoint save complete, so clients no longer need a delayed second reload
 to race the ingestion tick.
 
 The schema is versioned via `PRAGMA user_version` (current version `6`).
+Before accepting an ingestion checkpoint, the writer also binds the database to
+the RPC chain ID and genesis hash in `chain_identity`. A legacy unbound
+checkpoint or a different genesis is fatal and requires deleting the database
+or recreating the sandbox; retaining chain ID 2018 is not sufficient identity.
 When the on-disk value is lower than the current `SCHEMA_VERSION` in
 `src/ingestion-db.ts`, `openDatabase` runs a one-shot migration that
 drops the full projection through the central `PROJECTION_TABLE_NAMES` list,
@@ -531,8 +539,8 @@ shape:
   "contracts": { "bondManager", "bondAuction", "bondToken", "wnok" },
   "sealingPubKey": "0x…",
   "chain": {
-    "rpcUrl": "http://besu-rpc.besu:8545",  // sanitised — protocol://host[:port] only
-    "chainId": 1337,
+    "rpcUrl": "http://besu-archive.besu:8545",  // sanitised — protocol://host[:port] only
+    "chainId": 2018,
     "head": 12345,
     "headReachable": true
   },

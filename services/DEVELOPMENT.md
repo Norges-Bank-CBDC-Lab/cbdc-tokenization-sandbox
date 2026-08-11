@@ -11,7 +11,8 @@ From the repository root:
 - start the full sandbox: `./sandbox.sh start`
 - stop services but keep the Kind cluster and image cache:
   `./sandbox.sh stop`
-- delete the cluster and cached images: `./sandbox.sh delete`
+- delete the Kind cluster while retaining the separate local-registry
+  container and its cached images: `./sandbox.sh delete`
 
 Use service-specific scripts only when you are working on one area in
 isolation and the infra layer is already available.
@@ -47,19 +48,20 @@ must not be treated as production defaults:
 Current local behavior:
 
 - the stack is tuned conservatively for local use;
-- the default deploy path uses published GHCR images pinned in `values.yaml`;
+- backend/frontend source tags are pinned in `common/images.yaml`, but their
+  release images are no longer published upstream;
 - several heavier indexer paths are reduced or disabled in
   `values.backend.env.yaml`;
 - migrations run as part of the local chart path and still assume a local-only
   Postgres-backed deployment.
 
-Optional local override:
+Required backend/frontend build on a fresh registry:
 
 - `./sandbox.sh build-images` or `services/blockscout/build-images.sh` clones
   the upstream Blockscout and Blockscout frontend repositories at the pinned
   tags, builds local images, and pushes them into the Kind registry;
-- this is not the normal sandbox path and should only be used when you are
-  intentionally testing upstream Blockscout source changes locally.
+- run it once on a fresh machine or after `./sandbox.sh registry-reset`, before
+  starting Blockscout. Subsequent starts reuse the local registry images.
 
 ### Blockscout Name Service
 

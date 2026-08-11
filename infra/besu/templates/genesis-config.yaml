@@ -4,4 +4,4 @@ metadata:
   name: besu-genesis
   namespace: {{ .Values.namespace }}
 data:
-  genesis.json: {{- .Files.Get "config/genesis.json" | toYaml | indent 2 }}
+  genesis.json: {{- tpl (.Files.Get "config/genesis.json") . | toYaml | indent 2 }}

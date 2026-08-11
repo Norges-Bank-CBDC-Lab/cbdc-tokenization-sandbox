@@ -1,5 +1,5 @@
 # Local sandbox values only.
-# These defaults target the CBDC sandbox's single-node Kind/Besu/Blockscout setup.
+# These defaults target the CBDC sandbox's two-node Kind/Besu/Blockscout setup.
 # Never reuse them as production, staging, or internet-facing deployment values.
 
 # Fallback image tags (standard sandbox scripts override from common/images.yaml)
@@ -44,7 +44,7 @@ blockscout:
     pullPolicy: IfNotPresent
     # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/blockscout
-    tag: "v11.2.1"
+    tag: "v11.2.6"
   ## Init container configuration (used to run DB migrations)
   ##
   init:
@@ -109,7 +109,7 @@ frontend:
     pullPolicy: IfNotPresent
     # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/frontend
-    tag: "v2.9.0"
+    tag: "v2.10.3"
 
   replicaCount: 1
 

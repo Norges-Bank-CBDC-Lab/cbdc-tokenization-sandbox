@@ -125,10 +125,29 @@ attaches to) rather than as a deployable input.
 
 ### Besu
 
-`infra/besu/` ships a single-node Clique PoA Besu for the local
-sandbox. If Azure runs a Besu node in cloud, expect to fork or wrap
+`infra/besu/` ships one QBFT validator and one Forest archive/RPC node for the
+local sandbox. It is intentionally not a production-resilient validator set.
+If Azure runs Besu in cloud, expect to fork or wrap
 this chart with Azure-specific storage classes, exposure (likely behind
 Application Gateway, not a NodePort), and network policy.
+
+The role split is a reusable architectural constraint even though the local
+chart is not a production template:
+
+- application, indexing, tracing, and deployment traffic belongs on dedicated
+  non-validator RPC/archive capacity, not on validator RPC;
+- every validator needs its own key, persistent volume, Kubernetes identity,
+  and advertised P2P address;
+- one validator provides no Byzantine fault tolerance; meaningful QBFT fault
+  tolerance starts with four independently operated validators;
+- peer discovery/bootnodes and validator membership are separate concerns and
+  must be designed explicitly for the target network; and
+- a beacon client is not part of a Besu QBFT topology.
+
+Any non-local genesis, validator set, chain-identity migration, backup/restore
+policy, archive retention policy, and RPC authentication/rate limiting belong
+to the deployment repository. Do not copy the local fixture keys, static peer
+identities, zero-fee policy, or destructive-reset workflow into cloud.
 
 The genesis under `infra/besu/config/` includes a predeployed
 `GlobalRegistry` at a stable local address. A non-local deployment may

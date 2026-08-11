@@ -1,73 +1,67 @@
+# Coupon and Redemption Sequence
+
+Coupon and redemption cash is the government-nominated TBD, paid from its
+configured government reserve. The API derives holders from the chain
+projection unless the operator supplies an explicit list.
+
 ```mermaid
 sequenceDiagram
     autonumber
+    actor Operator as Norges Bank operator
+    participant UI as NB UI
+    participant API as NB Bond API
+    participant DB as SQLite projection
+    participant BM as BondManager
+    participant BT as BondToken
+    participant DVP as BondDvP
+    participant TBD as Government-nominated TBD
+    actor Holder as Bond holder
 
-    actor NB as Norges Bank
-    participant API as Bond API
-    participant DVP
-    participant TBD as TBD
+    Note over Operator,BT: RATE auction has enabled the bond,<br/>set yield, and started its maturity timer
 
-    participant BM as Bond Manager
-    participant BT as Bond Token
+    loop Each due coupon interval
+        Operator->>UI: Approve coupon payment
+        UI->>API: POST /v1/bonds/{isin}/coupon-payments<br/>{holders?}
+        API->>DB: Resolve active holders when omitted
+        API->>BM: payCoupon(isin, holders)
+        BM->>BT: getCouponDetails(isin)
+        BM->>BM: Verify due time and calculate<br/>nominal × yield per unit
 
-    note over NB, BT: ... Bond has been created via auction ...
-
-    loop whilst bond maturing
-        NB ->> API: POST /v1/bonds/:isin/coupon-payments
-        activate API
-
-        API ->> BM: payCoupon()
-
-        note left of API: API indexes current <br> bond owners
-
-        note right of BT: Stores maturity date, payout <br> interval, payment tracker
-
-        BM -->> BT: getCouponDetails()
-
-        BM -->> BM: Calculate payment per unit
-
-        note right of BM: 1 Unit = (1000 NOK * yield) <br> secured at RATE auction close
-
-        loop per holder
-            BM -->> BT: Verify holder balance
-            BM -->> BM: Calculate payout
-            note left of TBD: 'gov' account designated <br> for payout
-            BM -->> TBD: transferFrom(gov, holder)
-        end
-        note left of DVP: Entire coupon flow is atomic (all-or-nothing)
-
-        BM -->> BT: Verify total tracked vs. supply
-
-        BM -->> BT: Increment payout counter
-
-        alt If final payout
-            BM -->> BT: setMatured()
+        loop Every supplied holder with balance
+            BM->>BT: balanceOfByPartition(partition, holder)
+            BM->>DVP: settle cash-only coupon
+            DVP->>TBD: transferFrom(government reserve, holder, amount)
+            TBD-->>Holder: Tokenized-deposit balance increases
         end
 
-        API ->> NB: 200 OK - { bond_status }
-        deactivate API
+        BM->>BT: Verify processed balance equals total supply
+        BM->>BT: updateCouponPayment(timestamp, count)
+        opt Final expected coupon
+            BM->>BT: setMatured(isin)
+        end
+        API->>DB: Wait for receipt block projection
+        API-->>UI: Updated bond or HTTP 202 if projection is pending
     end
 
-    NB ->> API: POST /v1/bonds/:isin/redemptions
-    activate API
+    Operator->>UI: Approve redemption
+    UI->>API: POST /v1/bonds/{isin}/redemptions {holders?}
+    API->>DB: Resolve active holders when omitted
+    API->>BM: redeem(isin, holders)
 
-    API ->> BM: redeem()
-
-    note right of BT: Stores isMature flag
-
-    BM -->> BT: getCouponDetails()
-
-    loop per holder
-        BM -->> BT: Verify holder balance
-        note right of DVP: Discount price of bond paid based on remaining payouts
-        BM -->> DVP: Settle
-        DVP -->> BT: redeemFor(holder, balance)
-        DVP -->> TBD: transferFrom(gov, holder)
+    loop Every supplied holder with balance
+        BM->>BT: balanceOfByPartition(partition, holder)
+        BM->>DVP: settle redemption<br/>nominal cash + bond burn
+        DVP->>BT: redeemFor(holder, isin, balance, operator)
+        DVP->>TBD: transferFrom(government reserve, holder, nominal)
+        TBD-->>Holder: Tokenized-deposit balance increases
     end
-    note left of DVP: Entire redemption flow is atomic (all-or-nothing)
 
-    BM -->> BT: Verify supply = 0
-
-    API ->> NB: 200 OK - { bond_status }
-    deactivate API
+    BM->>BT: Require partition totalSupply == 0
+    API->>DB: Wait for receipt block projection
+    API-->>UI: Redeemed bond or HTTP 202 if projection is pending
 ```
+
+Unlike auction allocation settlement, these loops do not catch DvP failures.
+Any failure reverts the entire coupon or redemption transaction. Coupon payout
+also reverts unless the supplied holders account for the full partition supply;
+redemption reverts unless no supply remains afterward.

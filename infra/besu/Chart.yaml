@@ -1,4 +1,4 @@
 apiVersion: v1
 name: besu
 version: 0.0.1
-description: Deploys a besu node
+description: Deploys a QBFT validator and a separate archive/RPC Besu node

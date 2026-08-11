@@ -5,7 +5,7 @@
 **Owner / operator:** sandbox operator (this repo)
 **Branch suggestion:** `imp/nb-application-architecture-improvements` — use separate PRs for the phases below rather than one large refactor PR.
 **Components touched:** `services/nb-bond-api/`, `services/nb-ui/`, generated NB Bond API OpenAPI, and relevant documentation.
-**Related:** `docs/plans/backend-design-improvements-backlog.md` owns the remaining backend backlog; `docs/plans/archive/sse-live-updates-plan.md` owns authenticated live-update transport and Azure streaming constraints.
+**Related:** `docs/plans/archive/backend-design-improvements-backlog.md` records the historical backend backlog; `docs/plans/archive/sse-live-updates-plan.md` owns authenticated live-update transport and Azure streaming constraints.
 
 ## Decision Summary
 
@@ -294,7 +294,7 @@ This naming is illustrative; preserve existing names where moving a focused modu
 
 ## Phase 5 — Read Consistency And Request-Level Composition
 
-This phase coordinates with items 1 and 2 in `backend-design-improvements-backlog.md`; it must not create a competing projection strategy.
+This phase coordinates with items 1 and 2 in `docs/plans/archive/backend-design-improvements-backlog.md`; it must not create a competing projection strategy.
 
 ### 5A. Read-Your-Writes
 
@@ -392,7 +392,7 @@ src/openapi/
 
 1. Update `docs/ARCHITECTURE.md` with the app/router/service/infrastructure boundary and frontend data-flow boundary.
 2. Update service READMEs/DEVELOPMENT docs for the testable app factory, error semantics, authorization matrix, and read consistency model.
-3. Reconcile completed items in `backend-design-improvements-backlog.md` rather than leaving duplicate active instructions.
+3. Reconcile completed items in `docs/plans/archive/backend-design-improvements-backlog.md` rather than leaving duplicate active instructions.
 4. Remove tracked compiled test artifacts only after confirming they are generated, unused by Jest, and covered by ignore rules. Keep this cleanup in its own mechanical commit.
 5. Run full API/UI test, lint, format, build/typecheck, OpenAPI regeneration, public-repository hygiene, and markdown-link verification.
 6. Run local end-to-end flows for:

@@ -1,5 +1,5 @@
 # BondManager
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/norges-bank/BondManager.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondManager.sol)
 
 **Inherits:**
 [IBondManager](../interfaces/IBondManager.sol/interface.IBondManager.md), AccessControl
@@ -147,15 +147,61 @@ constructor(
 |`_durationScalar`|`uint256`|Duration scalar for coupon intervals (31556926 for year, smaller for testing)|
 
 
+### deployBond
+
+Deploys a new bond without scheduling an auction.
+
+Creates a partition with offering 0; the first auction added via
+`deployAuctionForBond` bumps the offering to its size.
+
+Maturity duration is converted to seconds using DURATION_SCALAR.
+
+
+```solidity
+function deployBond(string calldata _isin, uint256 _maturityDuration)
+    external
+    onlyRole(Roles.BOND_MANAGER_ROLE)
+    isBondActive(_isin, false);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isin`|`string`|Human ISIN string for the issuance (used as partition identifier).|
+|`_maturityDuration`|`uint256`|Duration in years from bond distribution until maturity.|
+
+
+### deployAuctionForBond
+
+Schedules an auction for an existing bond partition.
+
+
+```solidity
+function deployAuctionForBond(
+    string calldata _isin,
+    uint64 _end,
+    bytes calldata _pubKey,
+    uint256 _offering,
+    IBondAuction.AuctionType _auctionType
+) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isin`|`string`|ISIN of an existing partition.|
+|`_end`|`uint64`|Timestamp when sealed bidding closes.|
+|`_pubKey`|`bytes`|Auctioneer public key that matches client-side sealing keys.|
+|`_offering`|`uint256`|Auction size. For RATE/PRICE: added to the partition offering ceiling. For BUYBACK: must not exceed current supply (and the offering ceiling is unchanged).|
+|`_auctionType`|`IBondAuction.AuctionType`|RATE, PRICE, or BUYBACK. The first auction for an ISIN must be RATE (enforced by BondAuction); subsequent auctions must be PRICE or BUYBACK.|
+
+
 ### deployBondWithAuction
 
-Deploys a new bond with a rate auction (initial bond issuance).
+Deploys a new bond and its initial RATE auction in one call.
 
-Always creates a RATE auction for initial bond issuance.
-
-Coupon yield is set from clearing rate when finalising the auction.
-
-Maturity duration is converted to seconds using DURATION_SCALAR (years * scalar = seconds).
+Back-compat composition of `deployBond` + `deployAuctionForBond(.., RATE)` so
+existing call sites and tests keep their semantics.
 
 
 ```solidity
@@ -167,24 +213,12 @@ function deployBondWithAuction(
     uint256 _maturityDuration
 ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false);
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|Human ISIN string for the issuance (used as partition identifier).|
-|`_end`|`uint64`|Timestamp when sealed bidding closes.|
-|`_pubKey`|`bytes`|Auctioneer public key that matches client-side sealing keys.|
-|`_offering`|`uint256`|Total supply ceiling (offering size) for this partition.|
-|`_maturityDuration`|`uint256`|Duration in years from bond distribution until maturity.|
-
 
 ### extendBondWithAuction
 
-Extends an existing bond with a price auction (bond extension).
+Schedule a PRICE auction (bond extension) for an existing bond.
 
-Always creates a PRICE auction for bond extensions.
-
-Extends the partition offering size before creating the auction.
+Back-compat wrapper for `deployAuctionForBond(.., PRICE)`.
 
 
 ```solidity
@@ -195,19 +229,12 @@ function extendBondWithAuction(
     uint256 _additionalOffering
 ) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false);
 ```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|Human ISIN string for the existing bond.|
-|`_end`|`uint64`|Timestamp when sealed bidding closes.|
-|`_pubKey`|`bytes`|Auctioneer public key that matches client-side sealing keys.|
-|`_additionalOffering`|`uint256`|Additional offering size to add to the partition.|
-
 
 ### buybackWithAuction
 
-Creates a buyback auction for an existing bond without changing the offering ceiling.
+Schedule a BUYBACK auction for an existing bond.
+
+Back-compat wrapper for `deployAuctionForBond(.., BUYBACK)`.
 
 
 ```solidity
@@ -216,15 +243,26 @@ function buybackWithAuction(string calldata _isin, uint64 _end, bytes calldata _
     onlyRole(Roles.BOND_MANAGER_ROLE)
     isBondActive(_isin, false);
 ```
-**Parameters**
 
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|Existing ISIN to buy back from.|
-|`_end`|`uint64`|Timestamp when sealed bidding closes.|
-|`_pubKey`|`bytes`|Auctioneer public key that matches client-side sealing keys.|
-|`_buybackSize`|`uint256`|Maximum units targeted for buyback (must not exceed current supply).|
+### _deployBond
 
+
+```solidity
+function _deployBond(string calldata _isin, uint256 _maturityDuration) internal;
+```
+
+### _deployAuctionForBond
+
+
+```solidity
+function _deployAuctionForBond(
+    string calldata _isin,
+    uint64 _end,
+    bytes calldata _pubKey,
+    uint256 _offering,
+    IBondAuction.AuctionType _auctionType
+) internal;
+```
 
 ### finaliseAuction
 
@@ -280,6 +318,29 @@ function _settleBuyback(
     uint256 _total
 ) internal returns (bool);
 ```
+
+### disableBond
+
+Disable a bond that has no minted units, no in-flight auction, and no FINALISED auction history.
+
+Gates: `bondActive[_isin] == false` (no in-flight auction — modifier), partition has zero
+supply (checked by BondToken.disablePartition), and no auction for this ISIN has reached
+FINALISED status (checked here).
+
+On success the partition is soft-deleted in BondToken: `activePartitions[partition]` flips
+to false and every per-partition mapping is cleared. The ISIN can be re-used with a fresh
+`deployBond` afterward.
+
+
+```solidity
+function disableBond(string calldata _isin) external onlyRole(Roles.BOND_MANAGER_ROLE) isBondActive(_isin, false);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isin`|`string`|Target ISIN to disable.|
+
 
 ### closeAuction
 

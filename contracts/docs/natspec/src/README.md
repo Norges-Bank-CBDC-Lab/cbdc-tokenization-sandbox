@@ -35,12 +35,35 @@ not production-ready.
 - Work from `contracts/` directly when infra and Besu are already running and
   you only want to build, test, deploy, or verify contracts.
 
-Before running Foundry commands, install the contract dependencies:
+Before running `./contracts.sh`, `./deploy.sh`, or any Foundry command that
+expects local deployment accounts, create the local env file:
 
 ```console
 cd contracts
+cp .env.example .env
+```
+
+Edit the placeholder `PK_*` values for your local sandbox. These values are
+local-only and must never be reused outside local development.
+
+Then install the contract dependencies:
+
+```console
 forge soldeer install
 ```
+
+## Toolchain Baseline
+
+The checked-in build targets the local Besu QBFT/Osaka chain:
+
+- Solidity 0.8.36 with `evm_version = "osaka"`;
+- OpenZeppelin Contracts and Contracts Upgradeable 5.6.1;
+- `via_ir = true`, optimizer enabled, and 200 optimizer runs; and
+- chain ID 2018 for local deployment records.
+
+Keep the compiler, EVM target, lockfile, remappings, genesis milestone, and
+Blockscout verifier inputs aligned. Osaka caps an individual transaction at
+16,777,216 gas even though the local block gas limit is higher.
 
 ## Common Foundry Commands
 
@@ -71,6 +94,36 @@ Recent coverage additions include:
   coupon distribution, and redemption flow in
   `test/norges-bank/BondAuction.t.sol` and
   `test/norges-bank/BondManager.t.sol`
+
+## Diagrams
+
+Generate contract relationship diagrams for local review with one command from
+the repository root:
+
+```console
+make diagrams
+```
+
+This writes the following into git-ignored `generated/` folders under both
+`contracts/diagrams/` and `docs/diagrams/`:
+
+- **Slither** — per-contract call graphs and a whole-project inheritance graph
+- **sol2uml** — a cleaned UML class diagram
+
+The output is never committed (the `generated/` folders are git-ignored); re-run
+the command whenever the contracts change. For accurate storage layouts (e.g.
+for upgrade-safety review of the upgradeable CSD tokens) use the solc-based
+`forge inspect <Contract> storageLayout` instead.
+
+Prerequisites (local developer tools, installed once):
+
+```console
+pipx install slither-analyzer   # Slither
+brew install graphviz           # dot (renders the Slither graphs)
+npm install -g sol2uml          # sol2uml (UML class diagram)
+```
+
+The command resolves these tools and prints install hints if any are missing.
 
 ## Deploy And Verify
 
@@ -152,6 +205,14 @@ directly after loading `.env`.
 | `BondAuction` | EIP-712 signatures and a standard sealed-bid concept | Bid decryption and allocation calculation happen off-chain, and the finalisation model is specific to this project. |
 | `BondDvP` and `csd/DvP` | DvP as a financial settlement concept | Settlement payloads, failure mapping, and contract-to-contract coupling are specific to this repo's runtime stack. |
 | `BaseSecurityToken` | OpenZeppelin upgradeable ERC20 and AccessControl foundations | `custodialTransfer`, role conventions, and allowlist-driven transfer constraints are project-specific. |
+
+> **Planned — decided, not yet implemented:** the security tokens above — the
+> ERC1410-inspired partitioned `BondToken` and the upgradeable ERC-20
+> `BaseSecurityToken` / `StockToken` — are slated to be retired in favour of canonical
+> **ERC-3643 (T-REX)** tokens on a shared identity registry plus modular compliance. Cash
+> (`Wnok`) keeps its own allowlist. See
+> [ADR 0002](../../../../docs/decisions/0002-adopt-erc-3643-for-tokenized-securities.md). The tables
+> above describe the current contract set until that migration lands.
 
 ## Read Next
 

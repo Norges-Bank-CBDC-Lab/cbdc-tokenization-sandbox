@@ -1,38 +1,68 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: besu
+  name: besu-archive
   namespace: {{ .Values.namespace }}
 spec:
   ports:
-    - port: 8545
+    - name: rpc-json-http
+      port: 8545
       targetPort: 8545
-      protocol: TCP
-      name: rpc-json-http
-    - port: 8546
+    - name: rpc-json-ws
+      port: 8546
       targetPort: 8546
-      protocol: TCP
-      name: rpc-json-ws
   selector:
-    app: besu
+    app: besu-archive
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: consensus-ports
+  name: besu-validator
   namespace: {{ .Values.namespace }}
 spec:
-  type: LoadBalancer
-  loadBalancerIP: {{ .Values.p2pHost | quote | default "127.0.0.1" }}
+  ports:
+    - name: operator-rpc
+      port: 8545
+      targetPort: 8545
+  selector:
+    app: besu-validator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: besu-validator-p2p
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
   ports:
     - name: p2p-tcp
       port: 30303
-      protocol: TCP
       targetPort: 30303
+      protocol: TCP
     - name: p2p-udp
       port: 30303
-      protocol: UDP
       targetPort: 30303
+      protocol: UDP
   selector:
-    app: besu
+    app: besu-validator
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: besu-archive-p2p
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: p2p-tcp
+      port: 30303
+      targetPort: 30303
+      protocol: TCP
+    - name: p2p-udp
+      port: 30303
+      targetPort: 30303
+      protocol: UDP
+  selector:
+    app: besu-archive

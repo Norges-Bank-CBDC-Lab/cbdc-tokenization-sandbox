@@ -13,8 +13,9 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
   - Stop: `./blockscout.sh stop`
   - Name service: `cd services/blockscout/bens-microservice && ./bens-microservice.sh start`
   - BENS OpenAPI regen: `cd services/blockscout/bens-microservice && ./regen-openapi.sh`
-  - Default images: published GHCR images pinned in `services/blockscout/values.yaml`
-  - Optional local override: `cd services/blockscout && ./build-images.sh`
+  - Backend/frontend source tags: pinned in `common/images.yaml`; current
+    release images must be built locally because upstream does not publish them
+  - Required on a fresh registry: `cd services/blockscout && ./build-images.sh`
   - URLs: `http://blockscout.cbdc-sandbox.local/`
 - `services/nb-bond-api/`:
   - Start: `./nb-bond-api.sh start`
@@ -33,7 +34,9 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 - Keep config changes explicit and documented.
 - Avoid committing secrets; use local env or configmaps as documented.
 - Treat the values files under `services/blockscout/` as sandbox-only. Do not present them as production deployment templates.
-- Keep Blockscout on published pinned images by default. Use `build-images.sh` only when intentionally testing upstream source changes locally.
+- Keep Blockscout source tags pinned. Because current backend/frontend release
+  images are not published upstream, use `build-images.sh` to populate a fresh
+  local registry; do not replace the pins with rolling upstream tags.
 
 ### Flag documentation (services)
 - For service scripts that define environment flags (e.g., `DEPLOY_*`), keep a banner comment block directly above the exports.

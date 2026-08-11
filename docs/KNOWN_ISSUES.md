@@ -26,26 +26,26 @@
   finalisation, or skip self-held units in `payCoupon` / `redeem`
   on-chain.
 
-## Current Besu baseline is intentionally conservative
-- The local sandbox is still pinned to Clique proof-of-authority consensus and
-  the London EVM milestone.
-- This is intentional: newer EVM milestones and QBFT have not yet been
-  re-validated end-to-end across contract deployment, fee handling, and
-  Blockscout behavior in this repo.
-- Planned follow-up: move the sandbox to QBFT and a newer milestone after the
-  full local workflow has been retested.
+## Local QBFT topology has one validator
+- The default sandbox has one QBFT validator, so it has immediate deterministic
+  finality but no Byzantine fault tolerance.
+- Use at least four independently keyed validators for meaningful QBFT fault
+  testing. Do not scale the StatefulSet while sharing its key.
 
-## Besu + Solidity `PUSH0` opcode
-- Contract deployment on the local Besu network can fail with
-  `Invalid opcode: 0x5f` if the chain or compiler configuration drifts away
-  from the current London baseline.
-- See `infra/DEVELOPMENT.md` for the current genesis settings and the
-  supported local chain baseline.
+## Legacy Clique installations require a clean QBFT reset
+- Clique data, Blockscout data, and application projections cannot be reused by
+  the QBFT genesis even though chain ID 2018 is retained.
+- The repository migration has completed, but a working copy that still owns
+  the legacy `besu-pvc` must run `./sandbox.sh delete` before its first upgraded
+  start. The deploy helper intentionally rejects that PVC instead of risking a
+  mixed chain identity.
 
 ## Foundry + Besu fee settings
 - Some deployments require explicit gas settings to avoid
   `upfront cost exceeds account balance`.
 - Example working flags are documented in `infra/DEVELOPMENT.md`.
+- Both Besu roles must retain the sequenced transaction pool; the layered pool
+  can strand zero-fee transactions from the sandbox's unfunded signing roles.
 
 ## Foundry signature cache warning (sandbox)
 - In constrained environments, Foundry may warn about failing to write
@@ -156,17 +156,19 @@ visible at a glance.
   workflows need to be exercised end-to-end without waiting on
   wall-clock time.
 - Update (shipped): closing an auction *after* its scheduled end now
-  works reliably. The local Besu mints blocks only on transactions
-  (`createemptyblocks: false`), so its clock lags wall-clock and
-  `eth_estimateGas` would simulate the close against a stale block and
-  false-revert `InBidPhase()` before broadcast. The API now retries the
-  close once with an explicit gas-limit fallback
+  works reliably. The former Clique chain could leave its clock stale
+  indefinitely because it minted blocks only on transactions. QBFT bounds the
+  idle lag with a five-minute empty-block period, but `eth_estimateGas` can
+  still simulate a close against a latest block from before the scheduled end.
+  The API therefore retries the close once with an explicit gas-limit fallback
   (`NB_BOND_API_CLOSE_GAS_LIMIT`) to skip that stale estimation; the mined
   block is stamped at wall-clock > end and the contract accepts it. A
   genuine before-end close (e.g. Test-mode) now returns a clear `409`
   (the `InBidPhase` revert is decoded). This does **not** relax the chain
   rule above — closing *before* `metadata.end` is still rejected on-chain;
-  that remains the asymmetric-timing follow-up below.
+  that remains the asymmetric-timing follow-up below. The fallback is required
+  by the accepted five-minute idle policy; remove it only together with a
+  deliberate timing-policy or contract change and focused timing tests.
 - Planned follow-up — asymmetric timing model:
   - Keep the chain check on `submitBid` (`block.timestamp <=
     metadata.end`) so bidders retain a hard-enforced submit deadline.

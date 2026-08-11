@@ -1,5 +1,5 @@
 # BondToken
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/norges-bank/BondToken.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondToken.sol)
 
 **Inherits:**
 [IBondToken](../interfaces/IBondToken.sol/interface.IBondToken.md), ERC1410, AccessControl
@@ -214,7 +214,7 @@ function createPartition(string memory _isin, uint256 _offering, uint256 _maturi
 |Name|Type|Description|
 |----|----|-----------|
 |`_isin`|`string`|ISIN string|
-|`_offering`|`uint256`|Total supply ceiling (offering size) for this partition|
+|`_offering`|`uint256`|Initial total supply ceiling (offering size) for this partition. Pass 0 to stage a bond ahead of any auction; the offering is then added later via `extendPartitionOffering` when an auction is scheduled. Mint-time safety (`mintByIsin`) still enforces `supply + value <= offering`, so a 0-offering partition cannot be minted into until the offering is bumped.|
 |`_maturityDuration`|`uint256`|Duration in seconds from bond distribution until maturity|
 
 
@@ -347,6 +347,33 @@ function _updatePartitionOffering(bytes32 partition, string memory _isin, uint25
 |Name|Type|Description|
 |----|----|-----------|
 |`newOffering`|`uint256`|Updated offering amount for the partition|
+
+
+### disablePartition
+
+Disable a partition that has no outstanding supply.
+
+Soft-delete: flips `activePartitions[partition]` to false, clears every
+per-partition mapping back to its zero value, and untracks the partition
+from the ERC1410 index. The reverse-lookup `_partitionIsin[partition]` is
+intentionally retained so historical events can still be decoded to a
+human-readable ISIN.
+
+Reverts if the partition is not currently active (BondAlreadyDisabled)
+or if the partition has any outstanding supply (BondNotEmpty).
+
+After this call, `createPartition(_isin, ...)` can be invoked again to
+re-use the ISIN with fresh parameters.
+
+
+```solidity
+function disablePartition(string memory _isin) external onlyRole(Roles.BOND_CONTROLLER_ROLE);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_isin`|`string`|ISIN string identifying the partition.|
 
 
 ### mintByIsin

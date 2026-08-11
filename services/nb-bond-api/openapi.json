@@ -3075,7 +3075,7 @@
             "type": "string",
             "description": "Sanitised RPC endpoint — protocol://host[:port] only, no credentials or path",
             "examples": [
-              "http://besu-rpc.besu:8545"
+              "http://besu-archive.besu:8545"
             ]
           },
           "chainId": {

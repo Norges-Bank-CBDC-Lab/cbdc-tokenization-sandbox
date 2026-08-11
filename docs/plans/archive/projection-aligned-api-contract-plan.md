@@ -4,7 +4,7 @@
 **Date:** 2026-07-13
 **Updated:** 2026-07-14
 **Scope:** `services/nb-bond-api/`, `services/nb-ui/`, generated OpenAPI, and supporting documentation
-**Builds on:** PR #224, `docs/plans/archive/nb-application-architecture-improvements-plan.md`, and items 1, 2, and 8 in `docs/plans/backend-design-improvements-backlog.md`
+**Builds on:** PR #224, `docs/plans/archive/nb-application-architecture-improvements-plan.md`, and items 1, 2, and 8 in `docs/plans/archive/backend-design-improvements-backlog.md`
 
 **Implementation result:** Phases 1–8 are complete. Bond and Auction reads come
 from one atomic SQLite checkpoint, mutations actively advance the same

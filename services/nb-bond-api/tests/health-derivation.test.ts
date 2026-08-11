@@ -22,7 +22,7 @@ describe('sanitiseRpcUrl', () => {
   });
 
   it('preserves the protocol + host on a clean url', () => {
-    expect(sanitiseRpcUrl('http://besu-rpc.besu:8545')).toBe('http://besu-rpc.besu:8545');
+    expect(sanitiseRpcUrl('http://besu-archive.besu:8545')).toBe('http://besu-archive.besu:8545');
   });
 
   it('falls back to the literal input on parse failure', () => {

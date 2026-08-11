@@ -55,7 +55,12 @@ if [[ $(clusterExists) == "false" ]]; then
 fi
 
 if [ "$CMD" == "start" ]; then
+    assertNoLegacyBesuStorage
     deployEvmEnvironmentSecret $BLOCKSCOUT_NAMESPACE
+    source "$CONTRACTS_ENV_FILE"
+    waitForBesu
+    waitForApiGateway
+    assertBlockscoutChainIdentity "$BESU_LOCAL_RPC_URL"
     composeBlockscoutChart
     deployBlockscout
 elif [ "$CMD" == "stop" ]; then

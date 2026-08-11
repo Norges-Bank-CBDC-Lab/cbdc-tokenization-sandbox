@@ -1,5 +1,5 @@
 # IBondToken
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e5dd7d7e99990db27d5acf5ec43a6d906d577e7d/src/norges-bank/interfaces/IBondToken.sol)
+[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/interfaces/IBondToken.sol)
 
 **Inherits:**
 [IERC1410](../../ERC1410/IERC1410.sol/interface.IERC1410.md)
@@ -8,6 +8,13 @@ Interface for the ERC1410-partitioned bond token keyed by ISIN.
 
 
 ## Functions
+### disablePartition
+
+
+```solidity
+function disablePartition(string memory _isin) external;
+```
+
 ### UNIT_NOMINAL
 
 
@@ -213,5 +220,11 @@ event IsinMinted(string isin, address dst, uint256 value);
 
 ```solidity
 event IsinRedeemed(string isin, address indexed holder, uint256 value, address operator);
+```
+
+### IsinDisabled
+
+```solidity
+event IsinDisabled(string isin);
 ```
 

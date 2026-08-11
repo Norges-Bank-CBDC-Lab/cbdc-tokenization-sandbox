@@ -1,52 +1,81 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: besu
+  name: besu-validator
   namespace: {{ .Values.namespace }}
   labels:
-    app: besu
-    chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
-    release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}
+    app: besu-validator
+    role: validator
 spec:
   replicas: 1
-  serviceName: "besu"
+  serviceName: besu-validator-p2p
   selector:
     matchLabels:
-      app: besu
+      app: besu-validator
   template:
     metadata:
       labels:
-        app: besu
+        app: besu-validator
+        role: validator
     spec:
-      # Run as the image's non-root 'besu' user (uid 1000). The image's config
-      # defaults to root and this chart bypasses besu-entry.sh, so the uid must
-      # be forced here; fsGroup + OnRootMismatch chowns the data PVC on mount
-      # (a one-time migration for pre-existing local volumes).
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: resolve-static-peer
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until PEER_IP="$(getent ahostsv4 "$PEER_HOST" | awk 'NR == 1 { print $1 }')" && [ -n "$PEER_IP" ]; do
+                echo "Waiting for peer DNS: $PEER_HOST"
+                sleep 1
+              done
+              printf '["enode://%s@%s:30303"]\n' "$PEER_PUBLIC_KEY" "$PEER_IP" > /etc/besu-static/static-nodes.json
+          env:
+            - name: PEER_HOST
+              value: {{ .Values.archive.p2pHost | quote }}
+            - name: PEER_PUBLIC_KEY
+              value: {{ .Values.archive.nodePublicKey | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: besu-static-peer
+              mountPath: /etc/besu-static
       containers:
         - name: besu
           image: {{ .Values.image }}
           imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
-              drop:
-                - ALL
+              drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
           ports:
-            - name: json-rpc
+            - name: operator-rpc
               containerPort: 8545
-            - name: json-rpc-ws
-              containerPort: 8546
+            - name: p2p-tcp
+              containerPort: 30303
+              protocol: TCP
+            - name: p2p-udp
+              containerPort: 30303
+              protocol: UDP
           volumeMounts:
-            - name: besu-data
+            - name: besu-validator-data
               mountPath: {{ .Values.dataPath }}
             - name: besu-genesis
               mountPath: /etc/genesis
@@ -54,37 +83,167 @@ spec:
             - name: besu-config
               mountPath: /etc/besu
               readOnly: true
-            - name: besu-key
-              mountPath: {{ .Values.dataPath }}/key
-              subPath: signer.key
+            - name: besu-static-peer
+              mountPath: /etc/besu-static
               readOnly: true
-          command:
-            - /opt/besu/bin/besu
+            - name: besu-validator-key
+              mountPath: {{ .Values.dataPath }}/key
+              subPath: key
+              readOnly: true
+          command: ["/opt/besu/bin/besu"]
           args:
-            - --config-file=/etc/besu/config.toml
+            - --config-file=/etc/besu/validator.toml
             - --genesis-file=/etc/genesis/genesis.json
-          livenessProbe:
-            httpGet:
-              path: /liveness
+            - --p2p-host=$(POD_IP)
+          readinessProbe:
+            tcpSocket:
               port: 8545
-            initialDelaySeconds: 180
-            periodSeconds: 60
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8545
+            initialDelaySeconds: 60
+            periodSeconds: 30
       volumes:
-        - name: besu-data
+        - name: besu-validator-data
           persistentVolumeClaim:
-            claimName: besu-pvc
+            claimName: besu-validator-pvc
         - name: besu-genesis
           configMap:
             name: besu-genesis
-            items:
-              - key: genesis.json
-                path: genesis.json
         - name: besu-config
           configMap:
             name: besu-config
-        - name: besu-key
+        - name: besu-static-peer
+          emptyDir: {}
+        - name: besu-validator-key
+          secret:
+            secretName: besu-validator-key
+            defaultMode: 0440
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: besu-archive
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: besu-archive
+    role: archive-rpc
+spec:
+  replicas: 1
+  serviceName: besu-archive-p2p
+  selector:
+    matchLabels:
+      app: besu-archive
+  template:
+    metadata:
+      labels:
+        app: besu-archive
+        role: archive-rpc
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      initContainers:
+        - name: resolve-static-peer
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              until PEER_IP="$(getent ahostsv4 "$PEER_HOST" | awk 'NR == 1 { print $1 }')" && [ -n "$PEER_IP" ]; do
+                echo "Waiting for peer DNS: $PEER_HOST"
+                sleep 1
+              done
+              printf '["enode://%s@%s:30303"]\n' "$PEER_PUBLIC_KEY" "$PEER_IP" > /etc/besu-static/static-nodes.json
+          env:
+            - name: PEER_HOST
+              value: {{ .Values.validator.p2pHost | quote }}
+            - name: PEER_PUBLIC_KEY
+              value: {{ .Values.validator.nodePublicKey | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: besu-static-peer
+              mountPath: /etc/besu-static
+      containers:
+        - name: besu
+          image: {{ .Values.image }}
+          imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: json-rpc
+              containerPort: 8545
+            - name: json-rpc-ws
+              containerPort: 8546
+            - name: p2p-tcp
+              containerPort: 30303
+              protocol: TCP
+            - name: p2p-udp
+              containerPort: 30303
+              protocol: UDP
+          volumeMounts:
+            - name: besu-archive-data
+              mountPath: {{ .Values.dataPath }}
+            - name: besu-genesis
+              mountPath: /etc/genesis
+              readOnly: true
+            - name: besu-config
+              mountPath: /etc/besu
+              readOnly: true
+            - name: besu-static-peer
+              mountPath: /etc/besu-static
+              readOnly: true
+            - name: besu-archive-key
+              mountPath: {{ .Values.dataPath }}/key
+              subPath: key
+              readOnly: true
+          command: ["/opt/besu/bin/besu"]
+          args:
+            - --config-file=/etc/besu/archive.toml
+            - --genesis-file=/etc/genesis/genesis.json
+            - --p2p-host=$(POD_IP)
+          readinessProbe:
+            tcpSocket:
+              port: 8545
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8545
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: besu-archive-data
+          persistentVolumeClaim:
+            claimName: besu-archive-pvc
+        - name: besu-genesis
           configMap:
-            name: besu-key
-            items:
-              - key: signer.key
-                path: signer.key
+            name: besu-genesis
+        - name: besu-config
+          configMap:
+            name: besu-config
+        - name: besu-static-peer
+          emptyDir: {}
+        - name: besu-archive-key
+          secret:
+            secretName: besu-archive-key
+            defaultMode: 0440
