@@ -91,7 +91,7 @@ def main() -> int:
     common_image = value(r"^besu:\s*(\S+)$", images, "common Besu image")
     chart_image = value(r"^image:\s*(\S+)$", values, "chart Besu image")
     require(common_image == chart_image, "Besu image pins differ", errors)
-    require(common_image == "hyperledger/besu:26.7.0", "unexpected Besu version", errors)
+    require(common_image == "hyperledger/besu:26.7.1", "unexpected Besu version", errors)
 
     extra_data = value(r'^qbftExtraData:\s*"(0x[0-9a-f]+)"$', values, "QBFT extraData")
     decoded_extra, decoded_end = decode_rlp(bytes.fromhex(extra_data[2:]))

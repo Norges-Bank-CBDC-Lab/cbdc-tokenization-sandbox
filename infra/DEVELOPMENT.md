@@ -80,7 +80,7 @@ curl -X POST \
 
 The currently supported local Besu baseline is:
 
-- Besu 26.7.0 with QBFT consensus
+- Besu 26.7.1 with QBFT consensus
 - one validator using Bonsai and one non-validator archive/RPC node using
   `FULL` sync with Forest storage
 - 1-second transaction blocks and a 300-second idle empty-block period

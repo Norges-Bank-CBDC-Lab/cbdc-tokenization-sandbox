@@ -35,14 +35,14 @@ metadata change.
 This source repository does not relicense software that is only referenced or
 pulled at build/deploy time. Current examples include:
 
-- Hyperledger Besu 26.7.0 (Apache-2.0), pinned in `common/images.yaml`
+- Hyperledger Besu 26.7.1 (Apache-2.0), pinned in `common/images.yaml`
 - NGINX Gateway Fabric
 - Docker Distribution Registry
 - Node.js runtime images
 - Python runtime images
 - PostgreSQL images
 - Blockscout charts and images, including the GPL-3.0 smart-contract-verifier
-  v1.10.3 image explicitly enabled for source verification
+  v1.10.6 image explicitly enabled for source verification
 - BusyBox image references in Helm templates
 - `nginxinc/nginx-unprivileged` (BSD-2-Clause), used as the runtime stage
   of the `services/nb-ui/Dockerfile` multi-stage build (and pinned in

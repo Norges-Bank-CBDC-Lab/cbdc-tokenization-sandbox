@@ -4,7 +4,7 @@
 
 namespace: besu
 rootDnsZone: "cbdc-sandbox.local"
-image: hyperledger/besu:26.7.0
+image: hyperledger/besu:26.7.1
 imagePullPolicy: IfNotPresent
 dataPath: /var/lib/besu
 logging: INFO
