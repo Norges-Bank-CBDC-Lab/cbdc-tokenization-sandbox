@@ -57,7 +57,7 @@ License labels and deployment-time notes remain curated review items.
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.17.0` | MIT |
 | `express` | `5.2.1` | MIT |
-| `express-rate-limit` | `8.6.0` | MIT |
+| `express-rate-limit` | `8.6.2` | MIT |
 | `helmet` | `8.2.0` | MIT |
 | `jose` | `6.2.3` | MIT |
 | `winston` | `3.19.0` | MIT |
@@ -77,7 +77,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.7.0` | MIT |
 | `jest` | `30.4.2` | MIT |
 | `prettier` | `3.9.5` | MIT |
-| `tsx` | `4.23.1` | MIT |
+| `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 | `typescript-eslint` | `8.64.0` | MIT |
 
@@ -88,7 +88,7 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
-| `tsx` | `4.23.1` | MIT |
+| `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
@@ -98,14 +98,14 @@ License labels and deployment-time notes remain curated review items.
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.1.1` | MIT |
-| `tsx` | `4.23.1` | MIT |
+| `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 
 ### `services/nb-ui`
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@azure/msal-browser` | `5.17.1` | MIT |
+| `@azure/msal-browser` | `5.18.0` | MIT |
 | `react` | `19.2.7` | MIT |
 | `react-dom` | `19.2.7` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |
@@ -119,7 +119,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.7.0` | MIT |
 | `jsdom` | `29.1.1` | MIT |
 | `prettier` | `3.9.5` | MIT |
-| `vite` | `8.1.5` | MIT |
+| `vite` | `8.2.1` | MIT |
 | `vitest` | `4.1.10` | MIT |
 
 ### `services/blockscout/bens-microservice`
