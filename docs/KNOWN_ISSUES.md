@@ -10,7 +10,7 @@
   override-bump task: update the pin in the `overrides` block and
   regenerate the affected lockfile entries via a scratch full-resolve
   with a surgical transplant (see
-  `docs/plans/dependency-security-pin-refresh-plan.md`).
+  `docs/plans/archive/dependency-security-pin-refresh-plan.md`).
 - Never rely on a plain incremental `npm install` after changing an
   override: npm does not reliably re-apply changed overrides to an
   existing lockfile, and incremental installs have been observed to

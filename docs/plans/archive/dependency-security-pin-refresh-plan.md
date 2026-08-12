@@ -1,6 +1,6 @@
 # Dependency Security Pin Refresh — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped via #247; released in v0.7.1
 **Created:** 2026-08-12
 **Scope:** root `package.json` (`overrides` block), `package-lock.json`, patch release v0.7.1
 **Builds on:** v0.7.0 release (PR #246); Dependabot rollups #243/#244; the override pin discipline established for `ws`/`undici`/`js-yaml`
