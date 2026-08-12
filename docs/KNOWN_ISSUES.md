@@ -1,5 +1,23 @@
 # Known Issues
 
+## Root `overrides` security pins go stale silently
+- The root `package.json` `overrides` block pins transitive packages
+  (currently `ws`, `undici`, `js-yaml`, and two scoped `brace-expansion`
+  pins) as security floors. Nothing in CI flags when a newer patched
+  version supersedes a pin, so the floors themselves become the reason
+  Dependabot alerts stay open.
+- Treat every Dependabot alert against an overridden package as an
+  override-bump task: update the pin in the `overrides` block and
+  regenerate the affected lockfile entries via a scratch full-resolve
+  with a surgical transplant (see
+  `docs/plans/dependency-security-pin-refresh-plan.md`).
+- Never rely on a plain incremental `npm install` after changing an
+  override: npm does not reliably re-apply changed overrides to an
+  existing lockfile, and incremental installs have been observed to
+  silently *un-apply* existing overrides. Verify with a structural
+  lockfile diff (parse both lockfiles and compare entries) — the changed
+  entry set must be exactly the intended packages.
+
 ## Partially allocated bonds deadlock coupon payment and redemption on-chain
 - When an auction is finalised with less than full allocation (or a
   buyback repurchases units), the remainder stays on the BondManager's
