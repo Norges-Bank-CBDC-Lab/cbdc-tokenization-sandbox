@@ -84,11 +84,20 @@ export function BankingPage() {
 
   const tokens = tbdQ.data ?? [];
   const banks = banksQ.data ?? [];
-  // Drive the selector from the configured banks; fall back to the tokens'
-  // banks if /banks is unavailable.
-  const options = banks.length ? banks : tokens.map((t) => t.bank);
+  // Chain truth drives both windows: the selector offers exactly the banks
+  // the token listing renders, so the two can never disagree. /banks
+  // contributes the act-as capability — whether the API holds the signing
+  // key for a bank (it may not in an environment whose TBDs were deployed
+  // with keys this API doesn't know).
+  const actAsByAddress = new Map(
+    banks.map((b) => [b.address.toLowerCase(), b.actAsAvailable !== false]),
+  );
+  const options = tokens.length ? tokens.map((t) => t.bank) : banks;
   const activeBank = (selectedBank || options[0]?.address || '').toLowerCase();
   const token = tokens.find((t) => t.bank.address.toLowerCase() === activeBank) ?? null;
+  // Unknown capability (/banks unavailable) stays actionable — the server
+  // still guards every mutation and returns a readable error.
+  const canActAsActive = actAsByAddress.has(activeBank) ? actAsByAddress.get(activeBank) : true;
   const pageCount = Math.max(1, Math.ceil(tokens.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedTokens = tokens.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -239,6 +248,9 @@ export function BankingPage() {
                   {options.map((b) => (
                     <option key={b.address} value={b.address.toLowerCase()}>
                       {b.name}
+                      {actAsByAddress.get(b.address.toLowerCase()) === false
+                        ? ' — no signing key'
+                        : ''}
                     </option>
                   ))}
                 </Select>
@@ -326,18 +338,39 @@ export function BankingPage() {
                   </div>
 
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                    <Button variant="primary" onClick={() => setModal('mint')}>
+                    <Button
+                      variant="primary"
+                      onClick={() => setModal('mint')}
+                      disabled={!canActAsActive}
+                    >
                       Mint
                     </Button>
-                    <Button variant="danger" onClick={() => setModal('burn')}>
+                    <Button
+                      variant="danger"
+                      onClick={() => setModal('burn')}
+                      disabled={!canActAsActive}
+                    >
                       Burn
                     </Button>
-                    <Button variant="ghost" onClick={() => setModal('transfer')}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setModal('transfer')}
+                      disabled={!canActAsActive}
+                    >
                       Transfer
                     </Button>
-                    <Button variant="ghost" onClick={() => setModal('add')}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setModal('add')}
+                      disabled={!canActAsActive}
+                    >
                       + Add to allowlist
                     </Button>
+                    {!canActAsActive && (
+                      <span className="muted" style={{ alignSelf: 'center' }}>
+                        This API holds no signing key for {token.bank.name} — read-only view.
+                      </span>
+                    )}
                   </div>
 
                   {token.holders.length === 0 ? (
@@ -364,7 +397,7 @@ export function BankingPage() {
                                 size="sm"
                                 variant="danger"
                                 onClick={() => onRemoveHolder(h.address)}
-                                disabled={removeMut.loading}
+                                disabled={removeMut.loading || !canActAsActive}
                               >
                                 Remove
                               </Button>

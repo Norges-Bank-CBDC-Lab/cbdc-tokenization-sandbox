@@ -103,7 +103,15 @@ export const bankInfoSchema = z
   .object({
     name: z.string().meta({ description: 'Bank label, e.g. "Nordea Bank"' }),
     address: addressSchema.meta({
-      description: "The bank's EVM address — the signer for its own TBD operations",
+      description:
+        "The bank's on-chain EVM address as recorded by its TBD contract (getBankAddress) — " +
+        'always chain truth, never derived from server-side key material',
+    }),
+    actAsAvailable: z.boolean().meta({
+      description:
+        'Whether the API holds a signing key matching this bank address, i.e. whether ' +
+        '"act as bank" mutations (mint / burn / transfer / allowlist) can succeed. False when ' +
+        "the environment's on-chain bank was not created with a key this API knows",
     }),
     md5: md5Schema,
   })

@@ -181,13 +181,48 @@ describe('banks', () => {
   });
 
   describe('listBanks merge', () => {
-    it('merges configured banks with created banks once the DB is injected', async () => {
+    it('merges configured + created banks, reporting chain addresses and act-as capability', async () => {
+      const pk = generateBidderPrivateKey();
+      const createdBankAddress = deriveBidderAddress(pk);
+      // Distinct fake TBD contracts per roster entry, plus the bank address
+      // each "contract" records on-chain. The configured banks' contracts
+      // report addresses that do NOT match the fixture-derived keys — the
+      // deployed-environment scenario — while the created bank's contract
+      // reports exactly the created key's address.
+      const TBD_NORDEA = getAddress(`0x${'dd'.repeat(20)}`);
+      const TBD_DNB = getAddress(`0x${'ee'.repeat(20)}`);
+      const FOREIGN_NORDEA = getAddress(`0x${'12'.repeat(20)}`);
+      const FOREIGN_DNB = getAddress(`0x${'34'.repeat(20)}`);
+      const tbdByName: Record<string, string> = {
+        'TBD Nordea': TBD_NORDEA,
+        'TBD DNB': TBD_DNB,
+        'TBD Testbanken': FAKE_TBD,
+      };
+      const bankByTbd: Record<string, string> = {
+        [TBD_NORDEA]: FOREIGN_NORDEA,
+        [TBD_DNB]: FOREIGN_DNB,
+        [FAKE_TBD]: createdBankAddress,
+      };
+
       jest.resetModules();
+      jest.doMock('../src/chain', () => ({
+        ...jest.requireActual('../src/chain'),
+        resolveRegisteredAddress: jest.fn(async (name: string) => tbdByName[name] ?? null),
+      }));
+      jest.doMock('ethers', () => {
+        const actual = jest.requireActual('ethers');
+        class FakeContract {
+          getBankAddress: () => Promise<string>;
+          constructor(address: string) {
+            this.getBankAddress = async () => bankByTbd[actual.getAddress(address)];
+          }
+        }
+        return { ...actual, Contract: FakeContract };
+      });
       const bankingTbd = await import('../src/banking-tbd');
 
-      const pk = generateBidderPrivateKey();
       insertBankRow(db, {
-        address: deriveBidderAddress(pk),
+        address: createdBankAddress,
         name: 'Testbanken',
         private_key: pk,
         contract_name: 'TBD Testbanken',
@@ -195,13 +230,20 @@ describe('banks', () => {
         created_at: Date.now(),
       });
 
-      const banks = bankingTbd.createBankingService(db).listBanks();
+      const banks = await bankingTbd.createBankingService(db).listBanks();
 
       expect(banks.map((b) => b.name)).toEqual(['Nordea Bank', 'DNB Bank', 'Testbanken']);
-      expect(banks[2].address).toBe(deriveBidderAddress(pk));
+      // Chain truth: addresses are what the contracts record, so the
+      // configured banks surface the foreign addresses with no act-as
+      // capability, while the created bank matches its own key.
+      expect(banks[0]).toMatchObject({ address: FOREIGN_NORDEA, actAsAvailable: false });
+      expect(banks[1]).toMatchObject({ address: FOREIGN_DNB, actAsAvailable: false });
+      expect(banks[2]).toMatchObject({ address: createdBankAddress, actAsAvailable: true });
       for (const bank of banks) {
         expect(bank).not.toHaveProperty('privateKey');
       }
+      jest.dontMock('../src/chain');
+      jest.dontMock('ethers');
     });
   });
 });

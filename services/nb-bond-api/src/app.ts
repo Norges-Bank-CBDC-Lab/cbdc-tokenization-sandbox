@@ -1267,7 +1267,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       okResponse(
         req,
         res,
-        banking.listBanks().map((b) => withMd5(b)),
+        (await banking.listBanks()).map((b) => withMd5(b)),
       );
     } catch (err) {
       next(err);
@@ -1313,7 +1313,12 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         mapCentralBankError(err);
         return;
       }
-      okResponse(req, res, withMd5({ name: record.name, address: record.address }));
+      // A just-created bank's key deployed its own TBD, so it can always act.
+      okResponse(
+        req,
+        res,
+        withMd5({ name: record.name, address: record.address, actAsAvailable: true }),
+      );
     } catch (err) {
       next(err);
     }
