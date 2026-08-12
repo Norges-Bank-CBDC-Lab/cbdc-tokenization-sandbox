@@ -299,16 +299,46 @@ export function transferTbd(
 }
 
 /**
- * The banks the operator can act as (configured + created). Addresses
- * only — keys stay server-side.
+ * Compose one bank listing entry from chain truth. The address is always the
+ * bank address the TBD contract itself records (`getBankAddress()`), never
+ * the address derived from the roster key — the two only coincide when the
+ * roster's key deployed that TBD (always true for the local fixtures, not
+ * necessarily true in other environments). `actAsAvailable` is the
+ * command-side capability: whether the roster's signing key IS that bank,
+ * i.e. whether mutations signed with it can succeed on-chain.
  */
-export function listBanks(
+export function composeBankInfo(
+  bankName: string,
+  privateKey: string,
+  onChainBankAddress: string,
+): { name: string; address: string; actAsAvailable: boolean } {
+  const bankAddress = getAddress(onChainBankAddress);
+  return {
+    name: bankName,
+    address: bankAddress,
+    actAsAvailable: deriveBidderAddress(privateKey).toLowerCase() === bankAddress.toLowerCase(),
+  };
+}
+
+/**
+ * The banks the operator can select and — when `actAsAvailable` — act as.
+ * Chain truth first: each roster entry (configured + created) resolves its
+ * TBD by registry name and reports the contract-recorded bank address, so
+ * the selector always agrees with the token listing; entries whose TBD is
+ * not registered drop out, mirroring `listTbdTokens`. Addresses only —
+ * keys stay server-side.
+ */
+export async function listBanks(
   createdBanksDb: IngestionDatabase | null = null,
-): { name: string; address: string }[] {
-  return bankRoster(createdBanksDb).map((b) => ({
-    name: b.bankName,
-    address: deriveBidderAddress(b.privateKey),
-  }));
+): Promise<{ name: string; address: string; actAsAvailable: boolean }[]> {
+  const present = await resolveRosterTbds(createdBanksDb);
+  return Promise.all(
+    present.map(async (r) => {
+      const tbd = new Contract(r.address, tbdAbi, provider);
+      const bankAddrRaw = (await tbd.getBankAddress()) as string;
+      return composeBankInfo(r.bankName, r.privateKey, bankAddrRaw);
+    }),
+  );
 }
 
 /**
