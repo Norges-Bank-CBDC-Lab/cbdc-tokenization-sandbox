@@ -54,8 +54,8 @@ function renderPage() {
 beforeEach(() => {
   BankingApi.listTbd.mockResolvedValue([nordea, dnb]);
   BankingApi.listBanks.mockResolvedValue([
-    { name: 'Nordea Bank', address: nordea.bank.address, md5: 'x' },
-    { name: 'DNB Bank', address: dnb.bank.address, md5: 'x' },
+    { name: 'Nordea Bank', address: nordea.bank.address, actAsAvailable: true, md5: 'x' },
+    { name: 'DNB Bank', address: dnb.bank.address, actAsAvailable: true, md5: 'x' },
   ]);
 });
 
@@ -72,6 +72,52 @@ describe('BankingPage', () => {
     expect(screen.getByRole('button', { name: 'Transfer' })).toBeInTheDocument();
     // The WNOK-settlement indicator reflects the bank's WNOK allowlist status.
     expect(screen.getByText('Allowlisted')).toBeInTheDocument();
+  });
+
+  it('disables act-as mutations and labels the option when the API holds no signing key', async () => {
+    // The deployed-environment scenario: the on-chain bank exists but was
+    // not created with a key this API knows — reads stay available,
+    // mutations are gated off.
+    BankingApi.listBanks.mockResolvedValue([
+      { name: 'Nordea Bank', address: nordea.bank.address, actAsAvailable: false, md5: 'x' },
+      { name: 'DNB Bank', address: dnb.bank.address, actAsAvailable: true, md5: 'x' },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Banking' });
+    // Default selection is Nordea (first token): all four act-as actions gated.
+    expect(screen.getByRole('button', { name: 'Mint' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Burn' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Transfer' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '+ Add to allowlist' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    expect(screen.getByText(/holds no signing key for Nordea Bank/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: 'Nordea Bank — no signing key' }),
+    ).toBeInTheDocument();
+
+    // Switching to a bank whose key the API holds re-enables the actions.
+    await user.selectOptions(screen.getByRole('combobox'), dnb.bank.address.toLowerCase());
+    expect(screen.getByRole('button', { name: 'Mint' })).toBeEnabled();
+  });
+
+  it('drives the selector from the token listing even when /banks disagrees', async () => {
+    // Regression for the deployed dropdown bug: /banks used to publish
+    // key-derived addresses that matched no on-chain bank, leaving the
+    // selector unable to follow the table. The selector must offer exactly
+    // the banks the token listing renders.
+    BankingApi.listBanks.mockResolvedValue([
+      { name: 'Ghost Bank', address: `0x${'f'.repeat(40)}`, actAsAvailable: true, md5: 'x' },
+    ]);
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Banking' });
+    const select = screen.getByRole('combobox');
+    const optionNames = Array.from(select.querySelectorAll('option')).map((o) => o.textContent);
+    expect(optionNames).toEqual(['Nordea Bank', 'DNB Bank']);
+    // Unknown capability (no /banks row for these addresses) stays actionable.
+    expect(screen.getByRole('button', { name: 'Mint' })).toBeEnabled();
   });
 
   it('renders an empty state when no TBDs are registered', async () => {

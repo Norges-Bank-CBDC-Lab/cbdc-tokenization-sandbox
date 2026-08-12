@@ -7,7 +7,8 @@
  * Round-trip reads against a real chain are covered by the live curl
  * verification, not here — jest boots the module against a no-op provider.
  */
-import { TBD_BANKS, getTbdToken, listBanks } from '../src/banking-tbd';
+import { TBD_BANKS, composeBankInfo, getTbdToken } from '../src/banking-tbd';
+import { deriveBidderAddress, deriveFixturePrivateKey } from '../src/bidders';
 
 describe('banking-tbd config', () => {
   it('configures the two local-sandbox banks with their fixture roles and registry names', () => {
@@ -25,15 +26,32 @@ describe('getTbdToken', () => {
   });
 });
 
-describe('listBanks', () => {
-  it('lists the configured banks with derived addresses and no key material', () => {
-    // No created-banks DB injected in this suite → configured roster only.
-    const banks = listBanks();
-    expect(banks.map((b) => b.name)).toEqual(['Nordea Bank', 'DNB Bank']);
-    for (const bank of banks) {
-      expect(bank.address).toMatch(/^0x[a-fA-F0-9]{40}$/);
-      expect(bank).not.toHaveProperty('role');
-      expect(bank).not.toHaveProperty('privateKey');
-    }
+describe('composeBankInfo', () => {
+  // The bank listing must publish chain truth: the address the TBD contract
+  // records, with the roster key reduced to an act-as capability flag. This
+  // pins the environment-mismatch scenario that broke the deployed Banking
+  // page: a chain whose TBDs were NOT deployed with this API's keys.
+  const nordeaKey = deriveFixturePrivateKey('PK_NORDEA');
+  const nordeaAddress = deriveBidderAddress(nordeaKey);
+
+  it('reports actAsAvailable=true when the roster key IS the on-chain bank', () => {
+    const info = composeBankInfo('Nordea Bank', nordeaKey, nordeaAddress);
+    expect(info).toEqual({ name: 'Nordea Bank', address: nordeaAddress, actAsAvailable: true });
+    expect(info).not.toHaveProperty('privateKey');
+  });
+
+  it('publishes the on-chain address, not the derived one, when they differ', () => {
+    // A different environment's bank address — the contract's answer wins.
+    const onChain = deriveBidderAddress(deriveFixturePrivateKey('PK_DNB'));
+    const info = composeBankInfo('Nordea Bank', nordeaKey, onChain);
+    expect(info.address).toBe(onChain);
+    expect(info.address).not.toBe(nordeaAddress);
+    expect(info.actAsAvailable).toBe(false);
+  });
+
+  it('compares addresses case-insensitively and returns checksummed output', () => {
+    const info = composeBankInfo('Nordea Bank', nordeaKey, nordeaAddress.toLowerCase());
+    expect(info.address).toBe(nordeaAddress); // checksummed
+    expect(info.actAsAvailable).toBe(true);
   });
 });
