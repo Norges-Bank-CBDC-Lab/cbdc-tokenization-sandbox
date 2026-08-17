@@ -120,6 +120,20 @@ start.
   maps this to `PK_NORGES_BANK`. When unset, every `/v1/central-bank/*` endpoint
   responds `503 Service Unavailable`. Sandbox-only — never deploy this key path
   against real funds.
+- `PK_NORDEA` / `PK_DNB` / `PK_ALICE_TBD` – optional; signing-key overrides
+  for the fixture roles: the two configured roster banks (Nordea Bank, DNB
+  Bank) and the three seeded fixture bidders (Nordea, DNB, Alice.tbd). Names
+  match `contracts/.env`. When unset (the local-sandbox default) each key is
+  derived with the local-fixture scheme, which matches the locally deployed
+  contracts. Set them in an environment whose fixture contracts were deployed
+  with externally held keys. A bank key that does not match the on-chain
+  `getBankAddress()` leaves that bank read-only (`actAsAvailable: false`, with
+  a warning logged on the first listing); a malformed value fails startup. A
+  seeded fixture bidder still holding its derived key is migrated to the
+  override at boot (deleted or operator-managed bidders are left alone; bids
+  already recorded against the old address, and sealed bids encrypted to the
+  old public key, stay with the old identity). Sandbox-only — never deploy
+  these key paths against real funds.
 - `LOG_LEVEL` – defaults to `info`
 - `EXPRESS_PORT` – defaults to `8080`
 - `NB_BOND_API_SSE_HEARTBEAT_MS` – SSE comment-heartbeat interval in

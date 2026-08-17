@@ -10,9 +10,10 @@
  * simply drops out of the listing.
  *
  * Reads are live chain calls (no projection), mirroring central-bank.ts.
- * Mutations sign with the owning bank's key — derived deterministically the
- * same way as the bidder roster (bidders.ts) for configured banks, stored
- * in SQLite for created banks.
+ * Mutations sign with the owning bank's key — for configured banks the
+ * optional PK_NORDEA / PK_DNB env override when set, else derived
+ * deterministically the same way as the bidder roster (bidders.ts);
+ * stored in SQLite for created banks.
  *
  * Sandbox-only.
  */
@@ -25,19 +26,21 @@ import {
 } from 'ethers';
 
 import { tbdAbi } from './abi';
-import { deriveBidderAddress, deriveFixturePrivateKey } from './bidders';
+import { deriveBidderAddress, fixtureRoleKey, fixtureRoleKeyOverride } from './bidders';
 import { getBondManager, getWnok, provider, resolveRegisteredAddress } from './chain';
 import { envVariables } from './env-vars';
 import { withMd5 } from './http';
 import { type IngestionDatabase, listBankRows } from './ingestion-db';
+import { logger } from './logger';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 /**
  * The local-sandbox bank roster. `role` is the fixture key role used by
  * `scripts/generate-local-sandbox-fixtures.mjs` and bidders.ts — it drives
- * per-bank signing for the (later) mutation surface. `contractName` is the
- * GlobalRegistry key the TBD is registered under.
+ * per-bank signing for the (later) mutation surface, and doubles as the
+ * name of the optional env var that overrides the derived key.
+ * `contractName` is the GlobalRegistry key the TBD is registered under.
  */
 export const TBD_BANKS: ReadonlyArray<{ bankName: string; role: string; contractName: string }> = [
   {
@@ -48,11 +51,23 @@ export const TBD_BANKS: ReadonlyArray<{ bankName: string; role: string; contract
   { bankName: 'DNB Bank', role: 'PK_DNB', contractName: envVariables.TBD_DNB_CONTRACT_NAME },
 ];
 
+/**
+ * Signing key for a configured roster bank: the env override when set (for
+ * environments whose fixture TBDs were deployed with externally held keys),
+ * else the local-fixture derivation that matches the local deploy. The
+ * same override also drives the seeded bidder of that role (bidders.ts).
+ */
+export function configuredBankSigningKey(role: string): string {
+  return fixtureRoleKey(role);
+}
+
 /** One bank the operator can act as: label, registry key, and signing key. */
 interface BankRosterEntry {
   bankName: string;
   contractName: string;
   privateKey: string;
+  /** Env var that supplied the key, when overridden (configured banks only). */
+  overrideEnv?: string;
 }
 
 /** The full roster: configured fixture banks + banks created from the UI. */
@@ -60,7 +75,8 @@ function bankRoster(createdBanksDb: IngestionDatabase | null): BankRosterEntry[]
   const configured = TBD_BANKS.map((b) => ({
     bankName: b.bankName,
     contractName: b.contractName,
-    privateKey: deriveFixturePrivateKey(b.role),
+    privateKey: configuredBankSigningKey(b.role),
+    overrideEnv: fixtureRoleKeyOverride(b.role) ? b.role : undefined,
   }));
   const created = createdBanksDb
     ? listBankRows(createdBanksDb).map((r) => ({
@@ -132,21 +148,32 @@ async function composeToken(bankName: string, address: string) {
   });
 }
 
+/** A roster bank whose TBD is registered, with its resolved contract address. */
+interface ResolvedRosterTbd {
+  bankName: string;
+  privateKey: string;
+  address: string;
+  overrideEnv?: string;
+}
+
 /** Resolve each roster bank's TBD address; skips any not registered. */
 async function resolveRosterTbds(
   createdBanksDb: IngestionDatabase | null,
-): Promise<{ bankName: string; privateKey: string; address: string }[]> {
+): Promise<ResolvedRosterTbd[]> {
   const resolved = await Promise.all(
-    bankRoster(createdBanksDb).map(async (b) => {
+    bankRoster(createdBanksDb).map(async (b): Promise<ResolvedRosterTbd | null> => {
       const address = await resolveRegisteredAddress(b.contractName);
       return address
-        ? { bankName: b.bankName, privateKey: b.privateKey, address: getAddress(address) }
+        ? {
+            bankName: b.bankName,
+            privateKey: b.privateKey,
+            address: getAddress(address),
+            overrideEnv: b.overrideEnv,
+          }
         : null;
     }),
   );
-  return resolved.filter(
-    (r): r is { bankName: string; privateKey: string; address: string } => r !== null,
-  );
+  return resolved.filter((r): r is ResolvedRosterTbd => r !== null);
 }
 
 /** Read every roster TBD token (configured + created). */
@@ -328,6 +355,8 @@ export function composeBankInfo(
  * not registered drop out, mirroring `listTbdTokens`. Addresses only —
  * keys stay server-side.
  */
+const warnedOverrideMismatches = new Set<string>();
+
 export async function listBanks(
   createdBanksDb: IngestionDatabase | null = null,
 ): Promise<{ name: string; address: string; actAsAvailable: boolean }[]> {
@@ -336,7 +365,17 @@ export async function listBanks(
     present.map(async (r) => {
       const tbd = new Contract(r.address, tbdAbi, provider);
       const bankAddrRaw = (await tbd.getBankAddress()) as string;
-      return composeBankInfo(r.bankName, r.privateKey, bankAddrRaw);
+      const info = composeBankInfo(r.bankName, r.privateKey, bankAddrRaw);
+      // In the listing a set-but-wrong override is indistinguishable from a
+      // missing key (both read-only), so name the env var once in the logs.
+      if (!info.actAsAvailable && r.overrideEnv && !warnedOverrideMismatches.has(r.overrideEnv)) {
+        warnedOverrideMismatches.add(r.overrideEnv);
+        logger.warn(
+          `${r.overrideEnv} is set but its address is not the on-chain bank of ` +
+            `"${r.bankName}" (${info.address}) — the bank stays read-only`,
+        );
+      }
+      return info;
     }),
   );
 }

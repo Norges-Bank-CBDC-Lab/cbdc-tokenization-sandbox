@@ -26,6 +26,66 @@ describe('getTbdToken', () => {
   });
 });
 
+describe('configured bank key overrides', () => {
+  // Any well-formed secp256k1 key that is NOT a fixture derivation.
+  const OVERRIDE = `0x${'11'.repeat(32)}`;
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    jest.resetModules();
+  });
+
+  // Fresh module instance so banking-tbd (and env-vars) re-read process.env.
+  const loadModule = () =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('../src/banking-tbd') as typeof import('../src/banking-tbd');
+
+  it('uses the env override for the matching role and only that role', () => {
+    process.env.PK_NORDEA = OVERRIDE;
+    jest.resetModules();
+    const { configuredBankSigningKey } = loadModule();
+
+    expect(configuredBankSigningKey('PK_NORDEA')).toBe(OVERRIDE);
+    expect(configuredBankSigningKey('PK_DNB')).toBe(deriveFixturePrivateKey('PK_DNB'));
+  });
+
+  it('derives the fixture key when no override is set', () => {
+    delete process.env.PK_NORDEA;
+    delete process.env.PK_DNB;
+    jest.resetModules();
+    const { configuredBankSigningKey } = loadModule();
+
+    expect(configuredBankSigningKey('PK_NORDEA')).toBe(deriveFixturePrivateKey('PK_NORDEA'));
+    expect(configuredBankSigningKey('PK_DNB')).toBe(deriveFixturePrivateKey('PK_DNB'));
+  });
+
+  it('accepts an un-prefixed override and normalizes it to 0x-lowercase', () => {
+    process.env.PK_NORDEA = OVERRIDE.slice(2).toUpperCase();
+    jest.resetModules();
+    const { configuredBankSigningKey } = loadModule();
+
+    expect(configuredBankSigningKey('PK_NORDEA')).toBe(OVERRIDE);
+  });
+
+  it('stays honest about chain truth when the override does not match', () => {
+    process.env.PK_NORDEA = OVERRIDE;
+    jest.resetModules();
+    const mod = loadModule();
+    const key = mod.configuredBankSigningKey('PK_NORDEA');
+
+    // The chain's bank is the fixture-deployed address, not the override's.
+    const onChain = deriveBidderAddress(deriveFixturePrivateKey('PK_NORDEA'));
+    const mismatch = mod.composeBankInfo('Nordea Bank', key, onChain);
+    expect(mismatch.address).toBe(onChain);
+    expect(mismatch.actAsAvailable).toBe(false);
+
+    // The chain's bank IS the override's address — act-as becomes available.
+    const match = mod.composeBankInfo('Nordea Bank', key, deriveBidderAddress(key));
+    expect(match.actAsAvailable).toBe(true);
+  });
+});
+
 describe('composeBankInfo', () => {
   // The bank listing must publish chain truth: the address the TBD contract
   // records, with the roster key reduced to an act-as capability flag. This

@@ -94,3 +94,11 @@ secret:
   # which `contracts/script/norges-bank/03_Wnok.s.sol` grants at deploy.
   # When unset, /v1/central-bank/* endpoints respond 503 (Service Unavailable).
   CENTRAL_BANK_PK: "<base64-encoded-local-central-bank-private-key>"
+  # Optional fixture-role key overrides (names match contracts/.env). When
+  # unset — the local default — the API derives these keys with the
+  # local-fixture scheme, which matches the locally deployed contracts.
+  # Set them only in an environment whose fixture contracts were deployed
+  # with externally held keys; see the Env section in the service README.
+  # PK_NORDEA: "<base64-encoded-bank-private-key>"
+  # PK_DNB: "<base64-encoded-bank-private-key>"
+  # PK_ALICE_TBD: "<base64-encoded-bidder-private-key>"

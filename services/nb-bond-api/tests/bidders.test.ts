@@ -15,6 +15,7 @@ import {
   getBidderByAddress,
   getBidderByName,
   listBidders,
+  reconcileFixtureBidderOverrides,
   seedFixtureBiddersIfEmpty,
 } from '../src/bidders';
 import { type IngestionDatabase, openDatabase } from '../src/ingestion-db';
@@ -79,6 +80,72 @@ describe('bidders', () => {
       const result = seedFixtureBiddersIfEmpty(db);
       expect(result).toEqual({ seeded: false, count: FIXTURE_ROSTER.length });
       expect(listBidders(db)).toHaveLength(FIXTURE_ROSTER.length);
+    });
+  });
+
+  describe('fixture role key overrides', () => {
+    // Any well-formed secp256k1 key that is NOT a fixture derivation.
+    const OVERRIDE = `0x${'22'.repeat(32)}`;
+    const originalEnv = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+      jest.resetModules();
+    });
+
+    // Fresh module instance so bidders (and env-vars) re-read process.env.
+    // The db handle from the outer beforeEach stays valid across instances.
+    const loadModule = () =>
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('../src/bidders') as typeof import('../src/bidders');
+
+    it('seeds an empty DB with the override for the matching role only', () => {
+      process.env.PK_NORDEA = OVERRIDE;
+      jest.resetModules();
+      const mod = loadModule();
+
+      mod.seedFixtureBiddersIfEmpty(db);
+      const nordea = mod.getBidderByName(db, 'Nordea');
+      const dnb = mod.getBidderByName(db, 'DNB');
+      expect(nordea?.privateKey).toBe(OVERRIDE);
+      expect(nordea?.address).toBe(deriveBidderAddress(OVERRIDE));
+      expect(dnb?.privateKey).toBe(deriveFixturePrivateKey('PK_DNB'));
+    });
+
+    it('reconcile migrates a previously seeded derived row to the override', () => {
+      seedFixtureBiddersIfEmpty(db); // no override set — derived keys
+      const before = getBidderByName(db, 'Nordea');
+
+      process.env.PK_NORDEA = OVERRIDE;
+      jest.resetModules();
+      const mod = loadModule();
+
+      const result = mod.reconcileFixtureBidderOverrides(db);
+      expect(result).toEqual({ migrated: 1 });
+      const after = mod.getBidderByName(db, 'Nordea');
+      expect(after?.privateKey).toBe(OVERRIDE);
+      expect(after?.address).toBe(deriveBidderAddress(OVERRIDE));
+      expect(after?.publicKey).toBe(derivePublicKey(OVERRIDE));
+      expect(after?.createdAt).toBe(before?.createdAt);
+      expect(mod.getBidderByAddress(db, before!.address)).toBeNull();
+
+      // Second boot with the same override: nothing left to migrate.
+      expect(mod.reconcileFixtureBidderOverrides(db)).toEqual({ migrated: 0 });
+    });
+
+    it('reconcile is a no-op without an override and respects deletion', () => {
+      seedFixtureBiddersIfEmpty(db);
+      expect(reconcileFixtureBidderOverrides(db)).toEqual({ migrated: 0 });
+
+      const nordea = getBidderByName(db, 'Nordea');
+      deleteBidder(db, nordea!.address);
+      process.env.PK_NORDEA = OVERRIDE;
+      jest.resetModules();
+      const mod = loadModule();
+
+      // A deliberately deleted fixture bidder is not resurrected.
+      expect(mod.reconcileFixtureBidderOverrides(db)).toEqual({ migrated: 0 });
+      expect(mod.getBidderByName(db, 'Nordea')).toBeNull();
     });
   });
 
