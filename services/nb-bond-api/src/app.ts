@@ -102,6 +102,7 @@ import {
   deleteBidder,
   getBidderByAddress,
   listBidders,
+  reconcileFixtureBidderOverrides,
   seedFixtureBiddersIfEmpty,
 } from './bidders';
 import { BidderBidError, submitImpersonatedBid } from './bidder-bid';
@@ -181,6 +182,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   try {
     const seed = seedFixtureBiddersIfEmpty(biddersDb);
     logger.debug(`bidders seed: ${JSON.stringify(seed)}`);
+    // Seeding is only-if-empty, so apply any fixture-role env overrides to
+    // rows seeded before the override was set.
+    const reconciled = reconcileFixtureBidderOverrides(biddersDb);
+    logger.debug(`bidders override reconcile: ${JSON.stringify(reconciled)}`);
   } catch (err) {
     logger.warn(`bidders seed failed: ${(err as Error).message}`);
   }

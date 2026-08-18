@@ -10,7 +10,13 @@
  * derived fixtures (Nordea, DNB, Alice.tbd) so addresses align with
  * `scripts/generate-local-sandbox-fixtures.mjs` output without
  * requiring a file mount into the container. The derivation algorithm
- * MUST match `deriveFixturePrivateKey` in the fixture script.
+ * MUST match `deriveFixturePrivateKey` in the fixture script. Each
+ * fixture role's key can be overridden by an env var of the same name
+ * (PK_NORDEA / PK_DNB / PK_ALICE_TBD, validated in env-vars.ts) for
+ * environments whose fixture contracts were deployed with externally
+ * held keys; an already-seeded row that still holds the derived key is
+ * migrated to the override at boot (see
+ * `reconcileFixtureBidderOverrides`).
  *
  * Sandbox-only: private keys are stored in plaintext. Never deploy
  * this configuration against real funds.
@@ -19,6 +25,7 @@ import { createHash } from 'node:crypto';
 import * as secp256k1 from '@noble/secp256k1';
 import { computeAddress, getAddress } from 'ethers';
 
+import { envVariables } from './env-vars';
 import {
   type BidderRow,
   type IngestionDatabase,
@@ -84,6 +91,33 @@ export function deriveFixturePrivateKey(role: string): string {
   const hashHex = createHash('sha256').update(`${FIXTURE_PREFIX}${role}`).digest('hex');
   const value = (BigInt(`0x${hashHex}`) % (SECP256K1_ORDER - 1n)) + 1n;
   return `0x${value.toString(16).padStart(64, '0')}`;
+}
+
+/** Env-supplied key overrides per fixture role (validated in env-vars.ts). */
+const FIXTURE_KEY_OVERRIDES: Readonly<Record<string, string | undefined>> = {
+  PK_NORDEA: envVariables.PK_NORDEA,
+  PK_DNB: envVariables.PK_DNB,
+  PK_ALICE_TBD: envVariables.PK_ALICE_TBD,
+};
+
+for (const [role, value] of Object.entries(FIXTURE_KEY_OVERRIDES)) {
+  if (value) {
+    logger.info(`${role} is set — the env-supplied key overrides the derived fixture key`);
+  }
+}
+
+/** The env override for a fixture role, or undefined when the role derives. */
+export function fixtureRoleKeyOverride(role: string): string | undefined {
+  return FIXTURE_KEY_OVERRIDES[role];
+}
+
+/**
+ * Signing key for a fixture role: the env override when set (for
+ * environments whose fixture contracts were deployed with externally held
+ * keys), else the local-fixture derivation that matches the local deploy.
+ */
+export function fixtureRoleKey(role: string): string {
+  return FIXTURE_KEY_OVERRIDES[role] ?? deriveFixturePrivateKey(role);
 }
 
 export function derivePublicKey(privateKeyHex: string): string {
@@ -155,7 +189,7 @@ export function seedFixtureBiddersIfEmpty(db: IngestionDatabase): {
 
   const now = Date.now();
   for (const entry of FIXTURE_ROSTER) {
-    const privateKey = deriveFixturePrivateKey(entry.role);
+    const privateKey = fixtureRoleKey(entry.role);
     const row = buildRow({ name: entry.name, privateKey, createdAt: now });
     insertBidderRow(db, row);
   }
@@ -163,6 +197,50 @@ export function seedFixtureBiddersIfEmpty(db: IngestionDatabase): {
     `seeded ${FIXTURE_ROSTER.length} fixture bidders: ${FIXTURE_ROSTER.map((b) => b.name).join(', ')}`,
   );
   return { seeded: true, count: FIXTURE_ROSTER.length };
+}
+
+/**
+ * Migrate already-seeded fixture bidders to their env key overrides.
+ * Seeding is only-if-empty, so a database seeded before an override was
+ * set (or before overrides existed) would otherwise keep the derived key
+ * forever. Only rows still holding the exact derived fixture key are
+ * touched — a bidder the operator deleted stays deleted, and any other
+ * key is treated as operator-managed and left alone. Migration replaces
+ * the row (the address IS the key), so bids already recorded against the
+ * old address keep referring to it; sealed bids encrypted to the old
+ * public key can no longer be unsealed by this roster entry. Idempotent;
+ * safe to call at every boot after `seedFixtureBiddersIfEmpty`.
+ */
+export function reconcileFixtureBidderOverrides(db: IngestionDatabase): { migrated: number } {
+  let migrated = 0;
+  for (const entry of FIXTURE_ROSTER) {
+    const override = fixtureRoleKeyOverride(entry.role);
+    if (!override) continue;
+    const row = getBidderRowByName(db, entry.name);
+    if (!row || row.private_key !== deriveFixturePrivateKey(entry.role)) continue;
+    const replacement = buildRow({
+      name: entry.name,
+      privateKey: override,
+      createdAt: row.created_at,
+    });
+    if (replacement.address === row.address) continue;
+    const occupant = getBidderRowByAddress(db, replacement.address);
+    if (occupant) {
+      logger.warn(
+        `${entry.role} override not applied to bidder "${entry.name}": ` +
+          `address ${replacement.address} already belongs to bidder "${occupant.name}"`,
+      );
+      continue;
+    }
+    deleteBidderRow(db, row.address);
+    insertBidderRow(db, replacement);
+    migrated += 1;
+    logger.info(
+      `migrated fixture bidder "${entry.name}" to the ${entry.role} override ` +
+        `(${row.address} → ${replacement.address})`,
+    );
+  }
+  return { migrated };
 }
 
 export function listBidders(db: IngestionDatabase): BidderRecord[] {

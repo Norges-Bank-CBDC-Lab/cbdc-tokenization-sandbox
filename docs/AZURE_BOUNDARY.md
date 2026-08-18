@@ -39,6 +39,19 @@ its own values:
 - Secrets are env-driven. The local values examples have `<placeholder>`
   rows that are obviously not real keys; ArgoCD supplies real key
   material from Key Vault or equivalent.
+- Fixture-role signing keys are env-driven with a derived local
+  default. nb-bond-api derives the configured roster banks' and seeded
+  fixture bidders' keys from the local-fixture scheme unless the
+  optional `PK_NORDEA` / `PK_DNB` / `PK_ALICE_TBD` env vars are set
+  (names match `contracts/.env`). A non-local environment that deploys
+  the fixture contracts with its own keys must supply these secrets for
+  the Banking page's act-as mutations and the impersonated-bidder flows
+  to work; without them (or with keys that do not match the chain) the
+  banks list as read-only and the seeded bidders keep derived keys.
+  Fixture bidders seeded before an override was set are migrated to it
+  at boot when they still hold the derived key. Malformed values fail
+  startup. No new *required* env: leaving all unset preserves the local
+  behavior exactly.
 - Hardening defaults (`podSecurityContext`, `securityContext`, probes)
   are surfaced as overridable values in `values.local.example.yaml`.
   ArgoCD can tighten further (e.g. `readOnlyRootFilesystem: true` is

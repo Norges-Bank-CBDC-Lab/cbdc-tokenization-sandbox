@@ -29,6 +29,27 @@ const envSchema = z.object({
   // Registry name for the DvP contract (every TBD constructor takes its
   // address). Matches DVP_CONTRACT_NAME in contracts/.env.
   DVP_CONTRACT_NAME: z.string().min(1).default('Delivery vs Payment'),
+  // Optional signing-key overrides for the fixture roles: the two
+  // configured roster banks (TBD_BANKS in banking-tbd.ts) and the seeded
+  // bidder roster (FIXTURE_ROSTER in bidders.ts). Names match
+  // contracts/.env. When unset — the local-sandbox default — each key is
+  // derived with the local-fixture scheme in bidders.ts. Set these in an
+  // environment whose fixture contracts were deployed with externally held
+  // keys. Malformed values fail startup (validated below); a well-formed
+  // key that does not match the chain just leaves that bank read-only
+  // (actAsAvailable=false).
+  PK_NORDEA: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
+  PK_DNB: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
+  PK_ALICE_TBD: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim().length > 0 ? v.trim() : undefined)),
   DB_PATH: z.string().default('data/ingestion.sqlite'),
   START_BLOCK: z.coerce.number().int().nonnegative().default(0),
   POLL_INTERVAL_MS: z.coerce.number().int().positive().default(3000),
@@ -99,6 +120,30 @@ if (parsedEnv.data.NB_BOND_API_AUTH_MODE === 'entra') {
         'Mode and config must be kept in sync by ArgoCD.',
     );
   }
+}
+
+// secp256k1 group order — a valid private-key scalar is in [1, order-1].
+// Same constant as bidders.ts; not imported because env-vars must stay a
+// leaf module (everything else imports it).
+const SECP256K1_ORDER = BigInt(
+  '0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141',
+);
+
+// Fail fast on a malformed fixture-role key override: a typo should stop
+// startup with the env var named, not surface later as an opaque signing
+// failure. Valid values are normalized to 0x-prefixed lowercase.
+for (const name of ['PK_NORDEA', 'PK_DNB', 'PK_ALICE_TBD'] as const) {
+  const value = parsedEnv.data[name];
+  if (value === undefined) continue;
+  const hex = value.startsWith('0x') ? value.slice(2) : value;
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(`${name} must be a 32-byte hex private key (64 hex chars, 0x prefix optional)`);
+  }
+  const scalar = BigInt(`0x${hex}`);
+  if (scalar === 0n || scalar >= SECP256K1_ORDER) {
+    throw new Error(`${name} is not a valid secp256k1 private key (scalar out of range)`);
+  }
+  parsedEnv.data[name] = `0x${hex.toLowerCase()}`;
 }
 
 export const envVariables = parsedEnv.data;
