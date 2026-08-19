@@ -708,30 +708,6 @@ function getContractAddressFromScriptRunfile() {
     echo $contract_address
 }
 
-function getComponentPodName() {
-    namespace=$1
-    app_label=$2
-    component_label=$3
-
-    separator=","
-
-    pods_joint=$(kubectl --context=kind-$CLUSTER_NAME -n $namespace get pods -o json | jq -r '[.items[] | select((.metadata.labels.app == "'$app_label'") and (.metadata.labels."app.kubernetes.io/component" == "'$component_label'")) | .metadata.name] | join("'$separator'")')
-
-    if [[ "x$pods_joint" == "x" ]]; then
-        echo ""
-        return
-    fi
-
-    IFS=$separator read -ra pods_split <<< "$pods_joint"
-    num_pods="${#pods_split[@]}"
-
-    if (( $num_pods > 1 )); then
-        echo ""
-    else
-        echo $pods_split
-    fi
-}
-
 function dumpAppDiagnostics() {
     namespace=$1
     app_label=$2
@@ -1462,36 +1438,6 @@ function createOrResetTmpdir() {
         rm -r "$path"
     fi
     mkdir "$path" && touch "$path/${TMPDIR_FLAGFILE}"
-}
-
-function base64NoWrap() {
-    if [ "$OS_NAME" == "Darwin" ]; then
-        base64 -b 0
-    else
-        base64 -w 0
-    fi
-}
-
-function deployDirectoryToConfigmap() {
-    path=$1
-    dir=$2
-    namespace=$3
-
-    # store the target directory as a base64-encoded tar archive
-    # note that it will be stored in a configmap, so its size cannot exceed 1MB
-    kubectl --context=kind-$CLUSTER_NAME apply -n $namespace -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: $namespace
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: $dir
-binaryData:
-  $dir.tar.gz: $(tar -C "$path" -czf - "$dir" | base64NoWrap)
-EOF
 }
 
 # Compute a short content hash over the inputs that influence the built
