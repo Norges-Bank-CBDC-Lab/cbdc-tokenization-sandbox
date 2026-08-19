@@ -400,9 +400,22 @@ function ensureKindRegistry() {
         fi
     fi
 
+    # The `kind` docker network only exists once the first `kind create
+    # cluster` has run. When the registry container is created before that
+    # (the fresh-machine path: `registry-start` before any cluster), this
+    # block is skipped — createKindCluster re-runs ensureKindRegistry after
+    # cluster creation so the attach happens exactly once. Without it,
+    # in-cluster pulls of localhost:5001 images fail with ImagePullBackOff
+    # because `kind-registry` does not resolve on the kind network.
     if docker network inspect kind >/dev/null 2>&1; then
         if ! docker network inspect kind --format '{{json .Containers}}' | grep -q "\"${KIND_REGISTRY_NAME}\""; then
-            docker network connect kind "${KIND_REGISTRY_NAME}" 2>/dev/null || true
+            if ! docker network connect kind "${KIND_REGISTRY_NAME}"; then
+                echo "❌ Could not attach '${KIND_REGISTRY_NAME}' to the 'kind' docker network."
+                echo "   In-cluster pulls from the local registry will fail (ImagePullBackOff)."
+                echo "   Try manually: docker network connect kind ${KIND_REGISTRY_NAME}"
+                exit 1
+            fi
+            echo "🔗 Attached '${KIND_REGISTRY_NAME}' to the 'kind' docker network."
         fi
     fi
 
@@ -905,6 +918,15 @@ function createKindCluster() {
         echo "   Try: ./sandbox.sh delete && ./sandbox.sh start"
         exit 1
     fi
+
+    # The `kind` docker network is created by the first `kind create cluster`,
+    # so a registry container created before that was never attached to it and
+    # every in-cluster pull of a localhost:5001 image would ImagePullBackOff.
+    # Re-run ensureKindRegistry now that the network is guaranteed to exist:
+    # it attaches the registry (once) and applies the local-registry-hosting
+    # ConfigMap that also needs a live cluster.
+    ensureKindRegistry
+
     popd >/dev/null
 }
 
