@@ -187,10 +187,12 @@ without authentication for local development:
 Treat the infra layer as local-only. Do not expose it outside a trusted local
 development environment.
 
-Besu WebSocket (`ws://...:8546`) is not currently routed through the
-gateway: `infra/gateway/templates/gateway.yaml` defines no listener for
-port 8546, and the NodePort exposed by `infra/gateway/templates/nodeport-config.yaml`
-on host port 8546 maps to a gateway pod port the nginx-gateway pod does
-not bind. If WebSocket access is needed, either add a Gateway listener +
-HTTPRoute pair for port 8546, or use `kubectl port-forward` against the
-Besu service directly.
+Besu WebSocket (`ws://...:8546`) is not exposed through the gateway:
+`infra/gateway/templates/gateway.yaml` defines no listener for port
+8546 (the in-cluster Besu Service still serves it). If WebSocket access
+is needed, use `kubectl port-forward` against the Besu service
+directly, or wire the full path deliberately: a Gateway listener +
+HTTPRoute pair, a nodePort entry in
+`infra/gateway/templates/nodeport-config.yaml`, and a matching
+`extraPortMappings` entry in `infra/cluster/cluster-config.yaml`
+(applied only on cluster recreation).
