@@ -13,21 +13,18 @@ containerdConfigPatches:
 nodes:
   - role: control-plane
     image: kindest/node:v1.32.11@sha256:5fc52d52a7b9574015299724bd68f183702956aa4a2116ae75a63cb574b35af8
+    # Each published port pairs a fixed nodePort in the gateway chart's
+    # NodePort Service (infra/gateway/templates/nodeport-config.yaml) with
+    # the host port that scripts, docs, and browser URLs assume (80 for the
+    # *.cbdc-sandbox.local hostnames, 8545 for Besu JSON-RPC). On a local
+    # port conflict, free the port on the host — remapping here breaks
+    # those consumers, which do not discover ports dynamically.
     extraPortMappings:
       - containerPort: 31437
         hostPort: 80
         protocol: TCP
-      - containerPort: 31438
-        hostPort: 443
-        protocol: TCP
       - containerPort: 31439
         hostPort: 8545
-        protocol: TCP
-      - containerPort: 31440
-        hostPort: 8546
-        protocol: TCP
-      - containerPort: 31441
-        hostPort: 8080
         protocol: TCP
     extraMounts:
     # `hostPath` is resolved from the directory where `kind create cluster`
