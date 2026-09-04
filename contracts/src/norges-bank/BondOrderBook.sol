@@ -350,6 +350,11 @@ contract BondOrderBook is AccessControl, ReentrancyGuard {
                 }
                 orderId = nextOrder;
             }
+            // The whole level has been walked. If it still sits at the best
+            // price, every order left on it failed settlement for a reason that
+            // neither fills nor evicts it; walking it again cannot make progress,
+            // so stop here and let the remainder rest in the book.
+            if (bestAskPrice == currentPrice) break;
         }
         settled = remaining == 0;
         if (settled) emit DVPSuccess(matchedOrderId);
@@ -406,6 +411,11 @@ contract BondOrderBook is AccessControl, ReentrancyGuard {
                 }
                 orderId = nextOrder;
             }
+            // The whole level has been walked. If it still sits at the best
+            // price, every order left on it failed settlement for a reason that
+            // neither fills nor evicts it; walking it again cannot make progress,
+            // so stop here and let the remainder rest in the book.
+            if (bestBidPrice == currentPrice) break;
         }
         settled = remaining == 0;
         if (settled) emit DVPSuccess(matchedOrderId);
