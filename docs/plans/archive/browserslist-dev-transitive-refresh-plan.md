@@ -1,9 +1,9 @@
 # Browserslist Dev-Transitive Refresh — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped via #263
 **Created:** 2026-09-04
 **Scope:** `package-lock.json` only (six development-scoped transitive entries under `nb-bond-api`'s Babel toolchain)
-**Builds on:** Dependabot rollup #262; the override and lockfile-transplant discipline recorded in `docs/KNOWN_ISSUES.md` and `docs/plans/archive/dependency-security-pin-refresh-plan.md`
+**Builds on:** Dependabot rollup #262; the override and lockfile-transplant discipline recorded in `docs/KNOWN_ISSUES.md` and `dependency-security-pin-refresh-plan.md` in this directory
 
 ## Decision Summary
 
@@ -109,7 +109,7 @@ Phase 2  Cross-layer proof and PR
 
 ### Exit Criteria
 
-- [ ] Pristine lockfile captured; versions match the table.
+- [x] Pristine lockfile captured; versions match the table.
 
 ## Phase 1: Lockfile refresh with structural gate
 
@@ -128,9 +128,9 @@ Phase 2  Cross-layer proof and PR
 
 ### Exit Criteria
 
-- [ ] Structural diff = exactly the six entries.
-- [ ] Override audit unchanged.
-- [ ] Clean `npm ci`.
+- [x] Structural diff = exactly the six entries.
+- [x] Override audit unchanged.
+- [x] Clean `npm ci`.
 
 ## Phase 2: Cross-layer proof and PR
 
@@ -144,8 +144,8 @@ Phase 2  Cross-layer proof and PR
 
 ### Exit Criteria
 
-- [ ] All gates green at baseline counts.
-- [ ] PR merged; alert #76 closed.
+- [x] All gates green at baseline counts.
+- [ ] PR merged; alert #76 closed (confirmed after the default-branch scan).
 
 ## Test Matrix
 
@@ -190,7 +190,23 @@ python3 scripts/verification/check-third-party-licenses.py
 
 ## Done Criteria
 
-- [ ] Every acceptance criterion has evidence.
-- [ ] Relevant tests and public-repo checks pass.
-- [ ] Documentation matches the implemented behavior.
-- [ ] PR evidence contains no private environment information.
+- [x] Every acceptance criterion has evidence.
+- [x] Relevant tests and public-repo checks pass.
+- [x] Documentation matches the implemented behavior.
+- [x] PR evidence contains no private environment information.
+
+## Implementation Evidence (2026-09-04, #263)
+
+Structural diff of `package-lock.json` against the pristine `development` lockfile:
+
+```text
+CHANGED node_modules/baseline-browser-mapping 2.10.31 -> 2.11.21
+CHANGED node_modules/browserslist 4.28.2 -> 4.28.8
+CHANGED node_modules/caniuse-lite 1.0.30001793 -> 1.0.30001810
+CHANGED node_modules/electron-to-chromium 1.5.360 -> 1.5.422
+CHANGED node_modules/node-releases 2.0.44 -> 2.0.54
+CHANGED node_modules/update-browserslist-db 1.2.3 -> 1.3.2
+-- 0 added, 0 removed, 6 changed
+```
+
+Override audit at every lockfile path: `ws` 8.21.0, `undici` 8.10.1, `js-yaml` 4.3.1, `qs` 6.16.0, scoped `brace-expansion` 1.1.18 / 5.0.9 / 2.1.4, all unchanged. `npm ci` clean; jest 244/244, vitest 121/121, both builds green; inventory, hygiene, link and node-version checks pass.
