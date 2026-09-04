@@ -382,6 +382,10 @@ Important notes:
 - The order book is tightly coupled to the settlement model in `DvP`.
 - Unknown settlement errors are intentionally treated differently from
   buyer-side or seller-side faults so matching can continue where appropriate.
+  A maker that fails with an unknown reason stays in the book; once a price
+  level has been walked in full without being cleared, matching stops and the
+  taker's remainder rests, so a stuck maker can never make `buy()` / `sell()`
+  loop until the transaction runs out of gas.
 - The contract uses `nonReentrant` because it sits on top of a multi-contract
   settlement stack.
 
