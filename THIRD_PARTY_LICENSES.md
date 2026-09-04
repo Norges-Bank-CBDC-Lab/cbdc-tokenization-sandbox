@@ -58,11 +58,11 @@ License labels and deployment-time notes remain curated review items.
 | `ethers` | `6.17.0` | MIT |
 | `express` | `5.2.1` | MIT |
 | `express-rate-limit` | `8.6.2` | MIT |
-| `helmet` | `8.2.0` | MIT |
-| `jose` | `6.2.3` | MIT |
+| `helmet` | `8.3.0` | MIT |
+| `jose` | `6.2.8` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.4.3` | MIT |
-| `zod-openapi` | `6.0.0` | MIT |
+| `zod-openapi` | `6.0.1` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
@@ -106,8 +106,8 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@azure/msal-browser` | `5.18.0` | MIT |
-| `react` | `19.2.7` | MIT |
-| `react-dom` | `19.2.7` | MIT |
+| `react` | `19.2.8` | MIT |
+| `react-dom` | `19.2.8` | MIT |
 | `@testing-library/jest-dom` | `6.9.1` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
@@ -117,7 +117,7 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-plugin-react` | `7.37.5` | MIT |
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
 | `globals` | `17.7.0` | MIT |
-| `jsdom` | `29.1.1` | MIT |
+| `jsdom` | `30.0.1` | MIT |
 | `prettier` | `3.9.5` | MIT |
 | `vite` | `8.2.1` | MIT |
 | `vitest` | `4.1.10` | MIT |
