@@ -317,7 +317,7 @@ visible at a glance.
   `nb-bond-api` suite stays green: jest, lint, build), but it was held.
 - Why deferred — a correct upgrade is more than a version bump:
   - Babel 8 requires Node `^22.18.0 || >=24.11.0`. That is satisfied (the repo
-    pins Node 25 via `common/node-version.env`), but `@babel/core` 8 hoisted to
+    pins Node 26 via `common/node-version.env`), but `@babel/core` 8 hoisted to
     the workspace root breaks `nb-ui`'s `@vitejs/plugin-react`, which
     peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
     keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
