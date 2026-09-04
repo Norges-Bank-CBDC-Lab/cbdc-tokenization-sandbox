@@ -2,8 +2,8 @@
 
 ## Root `overrides` security pins go stale silently
 - The root `package.json` `overrides` block pins transitive packages
-  (currently `ws`, `undici`, `js-yaml`, and two scoped `brace-expansion`
-  pins) as security floors. Nothing in CI flags when a newer patched
+  (currently `ws`, `undici`, `js-yaml`, `qs`, and two scoped
+  `brace-expansion` pins) as security floors. Nothing in CI flags when a newer patched
   version supersedes a pin, so the floors themselves become the reason
   Dependabot alerts stay open.
 - Treat every Dependabot alert against an overridden package as an
