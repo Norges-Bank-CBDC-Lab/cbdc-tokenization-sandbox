@@ -22,6 +22,7 @@ inherits these rules and only adds what is specific to that folder.
 - Store post-mortem reports in `docs/post-mortems/` and add a link from the root README when created.
 - Keep a `docs/KNOWN_ISSUES.md` file for tracking known issues and follow-ups (create/update only when requested).
 - When making changes, check whether documentation needs an update and make it if required (see `docs/DOCUMENTATION_INDEX.md` for the key docs).
+- Implementation plans live under `docs/plans/`; new plans use the folder layout described in `docs/plans/README.md` (`intent.md`, `design.md`, `plan.md`, committed `progress.md`) so later work resumes from the folder.
 - Store local-only AI handoff notes as `docs/Handoff-AI-<NNN>.md`, starting at `001`.
 - AI handoff notes are local artifacts only: keep them ignored, do not add them to `docs/DOCUMENTATION_INDEX.md`, and never commit them.
 - If you change dependency manifests, copied third-party material, or runtime image pins, update `docs/THIRD_PARTY_NOTES.md` and `THIRD_PARTY_LICENSES.md` as needed and run `python3 scripts/verification/check-third-party-licenses.py`.
