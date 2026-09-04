@@ -18,6 +18,22 @@
   lockfile diff (parse both lockfiles and compare entries) — the changed
   entry set must be exactly the intended packages.
 
+## Order-book makers that fail settlement with an unknown reason stay resting
+- `OrderBook` keeps a resting maker in place when `DvP.settle` fails with
+  `FailureReason.Unknown` (a revert the settlement contract cannot attribute
+  to the buyer or the seller, e.g. an allowlist change on the wNOK side).
+  Matching now stops after a price level has been walked in full and the
+  taker's remainder rests, so a stuck maker no longer makes crossing orders
+  revert out of gas.
+- The stuck maker itself is not evicted: the book can sit crossed (a bid at
+  or above the best ask that never trades) until the maker's broker revokes
+  it or the underlying condition clears. Issuance orders created by
+  `initializeSellOrders` carry `broker == address(0)` and cannot be revoked
+  by anyone, so such an order stays at its price level until it becomes
+  settleable again. Follow-up: an `ORDER_ADMIN_ROLE` purge for
+  broker-less issuance orders, and a decision on whether repeated unknown
+  failures should evict the maker.
+
 ## Partially allocated bonds deadlock coupon payment and redemption on-chain
 - When an auction is finalised with less than full allocation (or a
   buyback repurchases units), the remainder stays on the BondManager's
