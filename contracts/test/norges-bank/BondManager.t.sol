@@ -258,6 +258,9 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256[] memory nonces = new uint256[](1);
         IBondAuction.BidVerification[] memory proofs = _proofs(auctionId, bidders, nonces);
 
+        uint256 bidderWnokBefore = wnok.balanceOf(bidder1);
+        uint256 reserveWnokBefore = wnok.balanceOf(govReserve);
+
         vm.prank(bondAdmin);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
 
@@ -265,6 +268,10 @@ contract BondManagerTest is Test, AuctionHelper {
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         assertEq(bondToken.balanceOfByPartition(partition, bidder1), OFFERING);
+
+        // Issuance cash leg: bidder pays face value in WNOK to the government reserve
+        assertEq(bidderWnokBefore - wnok.balanceOf(bidder1), OFFERING * UNIT_NOMINAL);
+        assertEq(wnok.balanceOf(govReserve) - reserveWnokBefore, OFFERING * UNIT_NOMINAL);
 
         // Check coupon parameters were set
         assertEq(bondToken.couponYield(partition), COUPON_YIELD);
@@ -305,11 +312,18 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256[] memory nonces = new uint256[](1);
         IBondAuction.BidVerification[] memory proofs = _proofs(auctionId, bidders, nonces);
 
+        uint256 bidderWnokBefore = wnok.balanceOf(bidder2);
+        uint256 reserveWnokBefore = wnok.balanceOf(govReserve);
+
         vm.prank(bondAdmin);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         assertEq(bondToken.balanceOfByPartition(partition, bidder2), additionalOffering);
+
+        // Issuance cash leg: bidder pays the discounted price in WNOK to the government reserve
+        assertEq(bidderWnokBefore - wnok.balanceOf(bidder2), paymentDue);
+        assertEq(wnok.balanceOf(govReserve) - reserveWnokBefore, paymentDue);
     }
 
     function test_FinaliseAuction_Buyback() public {
@@ -451,6 +465,7 @@ contract BondManagerTest is Test, AuctionHelper {
         holders[0] = bidder1; // Use bidder1 who actually owns the bonds
 
         uint256 balanceBefore = govTbd.balanceOf(bidder1);
+        uint256 wnokSupplyBefore = wnok.totalSupply();
 
         vm.prank(bondAdmin);
         bondManager.payCoupon(ISIN, holders);
@@ -461,6 +476,9 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
         uint256 expectedPayment = OFFERING * paymentPerBond;
         assertEq(balanceAfter - balanceBefore, expectedPayment);
+
+        // A coupon moves existing central-bank money; it never mints WNOK
+        assertEq(wnok.totalSupply(), wnokSupplyBefore);
     }
 
     function test_PayCoupon_RevertIf_NotReady() public {
@@ -537,6 +555,7 @@ contract BondManagerTest is Test, AuctionHelper {
         holders[0] = bidder1;
 
         uint256 balanceBefore = govTbd.balanceOf(bidder1);
+        uint256 wnokSupplyBefore = wnok.totalSupply();
 
         vm.prank(bondAdmin);
         bondManager.payCoupon(ISIN, holders);
@@ -547,6 +566,9 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
         uint256 expectedPayment = OFFERING * paymentPerBond;
         assertEq(balanceAfter - balanceBefore, expectedPayment);
+
+        // A coupon moves existing central-bank money; it never mints WNOK
+        assertEq(wnok.totalSupply(), wnokSupplyBefore);
     }
 
     function testFuzz_PayCoupon_DistributesAcrossCurrentHolders(uint16 transferUnitsSeed) public {
@@ -599,6 +621,7 @@ contract BondManagerTest is Test, AuctionHelper {
 
         uint256 tbdBalanceBefore = govTbd.balanceOf(bidder1);
         uint256 bondBalanceBefore = bondToken.balanceOfByPartition(partition, bidder1);
+        uint256 wnokSupplyBefore = wnok.totalSupply();
 
         vm.prank(bondAdmin);
         bondManager.redeem(ISIN, holders);
@@ -608,6 +631,9 @@ contract BondManagerTest is Test, AuctionHelper {
 
         assertEq(bondBalanceBefore - bondBalanceAfter, OFFERING);
         assertEq(tbdBalanceAfter - tbdBalanceBefore, OFFERING * REDEMPTION_RATE);
+
+        // Redemption moves existing central-bank money; it never mints WNOK
+        assertEq(wnok.totalSupply(), wnokSupplyBefore);
     }
 
     function test_Redeem_RevertIf_NotMatured() public {
