@@ -206,7 +206,7 @@ PrimaryDealerRegistry (Phase 2), any custody/broker change (Phase 3+), coupon/re
 
 **Phase 5 — Secondary venue refactor.** Replace the holder-level `BondOrderBook` (which presumes segregated on-chain balances, incompatible with omnibus) with a **broker-level venue**: same-broker fills = off-chain book entries; cross-broker fills = on-chain DvP with **EIP-712 signed orders + open-loop cash authorization** (the legitimately-open-loop leg that *does* use signatures/allowances).
 
-**Phase 6 — Coupon & redemption.** _Note (2026-09-08): coupon, buyback, and redemption already settle in wNOK from the government reserve account (ADR 0004, `docs/plans/bond-cash-leg-wnok/`), so this phase starts from a single token; the TBD leg described below is superseded._ Coupon: CB debits the gov reserve (authority) → the gov's designated bank mints **backed** TBD (`Tbd._mintFromGovReserve` already backs it) → distributes **per broker** (fan-out scales) → brokers credit clients off-chain. Redemption at maturity: reverse DvP via `redeemFor`/`buybackRedeemFor` (burn bond ↔ return principal in wNOK by authority).
+**Phase 6 — Coupon & redemption.** _Note (2026-09-08): coupon, buyback, and redemption already settle in wNOK from the government reserve account (ADR 0004, `docs/plans/archive/bond-cash-leg-wnok/`), so this phase starts from a single token; the TBD leg described below is superseded._ Coupon: CB debits the gov reserve (authority) → the gov's designated bank mints **backed** TBD (`Tbd._mintFromGovReserve` already backs it) → distributes **per broker** (fan-out scales) → brokers credit clients off-chain. Redemption at maturity: reverse DvP via `redeemFor`/`buybackRedeemFor` (burn bond ↔ return principal in wNOK by authority).
 
 ---
 

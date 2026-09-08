@@ -43,7 +43,8 @@ ADR 0002 but is not drawn as deployed software.
 - [Bid cryptography](processes/bid-cryptography-flow.md): bidder intent,
   encryption, plaintext commitment, and finalisation proof verification.
 - [Coupon and redemption](processes/coupon-redemption-sequence.md):
-  government TBD cash payments and bond maturity/redemption.
+  WNOK payments from the government reserve account and bond
+  maturity/redemption.
 - [TBD cross-bank transfer](processes/tbd-cross-bank-transfer.md): deposit-token
   burn, WNOK reserve movement, callback, and destination mint.
 - [Sandbox bank creation](processes/bank-creation-sequence.md): bank-key-signed

@@ -1,6 +1,6 @@
 # Bond cash leg in wNOK — Implementation Plan
 
-**Status:** In progress
+**Status:** Implemented — shipped via #272 (contracts, deploy wiring, ADR 0004) and #273 (API, UI, docs); archived 2026-09-08
 **Created:** 2026-09-07
 **Scope:** `contracts/src/norges-bank/BondManager.sol`, `contracts/script/norges-bank/10_Bond.s.sol`, `contracts/script/norges-bank/11_BondSetup.s.sol`, `contracts/test/norges-bank/BondManager.t.sol`, `contracts/test/integration/BondLifecycle.t.sol`, `services/nb-bond-api` (ABI, Central Bank resource, revert decoding), `services/nb-ui` (Central Bank page, pay-coupon modal), contract and architecture docs, `docs/KNOWN_ISSUES.md`, ADR 0004
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -339,8 +339,8 @@ python3 scripts/verification/check-markdown-links.py
 
 ## Done Criteria
 
-- [ ] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
-- [ ] No temporary compatibility path remains.
-- [ ] `forge test`, both package gates, and the public-repo checks pass.
-- [ ] Documentation matches the implemented behaviour.
-- [ ] PR evidence contains no private environment information.
+- [x] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
+- [x] No temporary compatibility path remains.
+- [x] `forge test`, both package gates, and the public-repo checks pass.
+- [x] Documentation matches the implemented behaviour.
+- [x] PR evidence contains no private environment information.
