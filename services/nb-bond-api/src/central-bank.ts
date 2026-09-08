@@ -23,7 +23,7 @@ import {
 } from 'ethers';
 
 import { wnokAbi } from './abi';
-import { getWnokAddress, provider } from './chain';
+import { getBondManager, getWnokAddress, provider } from './chain';
 import { envVariables } from './env-vars';
 
 export class CentralBankNotConfiguredError extends Error {
@@ -100,6 +100,20 @@ export async function getCbWnokBalance(): Promise<bigint> {
   const wnok = await getWnokContract();
   const bal = (await wnok.balanceOf(getCbAddress())) as bigint;
   return bal;
+}
+
+/**
+ * The government reserve account that every bond cash leg settles against:
+ * `BondManager.GOV_RESERVE`, with its live WNOK balance. Issuance credits it;
+ * buyback, coupon, and redemption debit it, so the balance is what an
+ * operator checks before approving a payout.
+ */
+export async function getGovReserve(): Promise<{ address: string; wnokBalance: string }> {
+  const manager = await getBondManager();
+  const address = getAddress((await manager.GOV_RESERVE()) as string);
+  const wnok = await getWnokContract();
+  const balance = (await wnok.balanceOf(address)) as bigint;
+  return { address, wnokBalance: balance.toString() };
 }
 
 /** Read total WNOK supply (minted minus burned) via the bound contract. */

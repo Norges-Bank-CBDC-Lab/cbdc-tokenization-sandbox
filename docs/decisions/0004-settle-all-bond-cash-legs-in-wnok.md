@@ -1,6 +1,6 @@
 # 0004. Settle every bond cash leg in wNOK from a government reserve account
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-07
 - **Deciders:** sandbox operator
 - **Tags:** contracts, cash-settlement, wnok, bonds

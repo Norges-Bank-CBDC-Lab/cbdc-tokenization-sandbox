@@ -1,8 +1,9 @@
 # Coupon and Redemption Sequence
 
-Coupon and redemption cash is the government-nominated TBD, paid from its
-configured government reserve. The API derives holders from the chain
-projection unless the operator supplies an explicit list.
+Coupon and redemption cash is WNOK, paid from the government reserve account
+fixed on `BondManager` at deployment (`GOV_RESERVE`). Payouts move existing
+WNOK; nothing is minted. The API derives holders from the chain projection
+unless the operator supplies an explicit list.
 
 ```mermaid
 sequenceDiagram
@@ -14,7 +15,7 @@ sequenceDiagram
     participant BM as BondManager
     participant BT as BondToken
     participant DVP as BondDvP
-    participant TBD as Government-nominated TBD
+    participant WNOK as Wnok
     actor Holder as Bond holder
 
     Note over Operator,BT: RATE auction has enabled the bond,<br/>set yield, and started its maturity timer
@@ -30,8 +31,8 @@ sequenceDiagram
         loop Every supplied holder with balance
             BM->>BT: balanceOfByPartition(partition, holder)
             BM->>DVP: settle cash-only coupon
-            DVP->>TBD: transferFrom(government reserve, holder, amount)
-            TBD-->>Holder: Tokenized-deposit balance increases
+            DVP->>WNOK: transferFrom(government reserve, holder, amount)
+            WNOK-->>Holder: WNOK balance increases
         end
 
         BM->>BT: Verify processed balance equals total supply
@@ -52,8 +53,8 @@ sequenceDiagram
         BM->>BT: balanceOfByPartition(partition, holder)
         BM->>DVP: settle redemption<br/>nominal cash + bond burn
         DVP->>BT: redeemFor(holder, isin, balance, operator)
-        DVP->>TBD: transferFrom(government reserve, holder, nominal)
-        TBD-->>Holder: Tokenized-deposit balance increases
+        DVP->>WNOK: transferFrom(government reserve, holder, nominal)
+        WNOK-->>Holder: WNOK balance increases
     end
 
     BM->>BT: Require partition totalSupply == 0

@@ -16,7 +16,7 @@ sequenceDiagram
     participant BT as BondToken
     actor Bidder as Primary dealer
     participant DVP as BondDvP
-    participant Cash as WNOK or government TBD
+    participant Cash as WNOK
 
     Operator->>UI: Create bond or schedule auction
     UI->>API: POST /v1/bonds or POST /v1/bonds/{isin}/auctions
@@ -81,7 +81,7 @@ sequenceDiagram
         end
     else BUYBACK
         loop Each allocation
-            BM->>DVP: settle bond burn + government TBD payment
+            BM->>DVP: settle bond burn + government reserve WNOK payment
             DVP->>BT: buybackRedeemFor(bidder)
             DVP->>Cash: transferFrom(government reserve, bidder)
         end

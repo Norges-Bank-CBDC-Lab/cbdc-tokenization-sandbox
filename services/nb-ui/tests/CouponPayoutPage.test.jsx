@@ -234,7 +234,7 @@ describe('CouponPayoutPage', () => {
     // A partial allocation leaves unsold units on the BondManager itself.
     // The contract requires covering EVERY holder, so the preview keeps
     // the manager row (labelled) and warns that the payout will fail on
-    // the government TBD allowlist. Mixed casing proves the address
+    // the WNOK allowlist. Mixed casing proves the address
     // match is case-insensitive.
     const MANAGER = '0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc';
     const bond = {
@@ -253,9 +253,7 @@ describe('CouponPayoutPage', () => {
     expect(screen.getAllByRole('row')).toHaveLength(4);
     expect(screen.getByText('(treasury)')).toBeInTheDocument();
     expect(screen.getByText(/treasury-held units/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/will fail unless the manager is explicitly allowlisted/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/will fail unless the manager is allowlisted/)).toBeInTheDocument();
     // Total covers ALL holders — the full cash leg the contract demands:
     // (600 + 400) units × 4.25% of face = 42.50 K NOK.
     expect(screen.getByText('42.50 K NOK')).toBeInTheDocument();
