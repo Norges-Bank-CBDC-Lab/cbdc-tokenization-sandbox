@@ -1,6 +1,6 @@
 # Redeem with the final coupon — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped via #275 (contracts, ADR 0005) and #276 (API, UI, docs); archived 2026-09-09
 **Created:** 2026-09-09
 **Scope:** `contracts/src/norges-bank/BondManager.sol`, `contracts/src/norges-bank/interfaces/IBondManager.sol`, `contracts/src/common/Errors.sol`, contract tests and docs; `services/nb-bond-api` (ingestion, bond-state reducer, composer status, `contracts/bonds.ts`, `contracts/operations.ts`, `app.ts`, `openapi.json`, ABI artifact, tests); `services/nb-ui` (`PayCouponModal.jsx`, `CouponPayoutPage.jsx`, `BondsPage.jsx`, `BondDetailPage.jsx`, `bondsApi.js`, tests); `docs/` (architecture, lifecycle and coupon diagrams, known issues, index), ADR 0005
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -249,8 +249,8 @@ python3 scripts/verification/check-markdown-links.py
 
 ## Done Criteria
 
-- [ ] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
-- [ ] No temporary compatibility path remains.
-- [ ] `forge test`, both package gates, and the public-repo checks pass.
-- [ ] Documentation matches the implemented behaviour.
-- [ ] PR evidence contains no private environment information.
+- [x] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
+- [x] No temporary compatibility path remains.
+- [x] `forge test`, both package gates, and the public-repo checks pass.
+- [x] Documentation matches the implemented behaviour.
+- [x] PR evidence contains no private environment information.
