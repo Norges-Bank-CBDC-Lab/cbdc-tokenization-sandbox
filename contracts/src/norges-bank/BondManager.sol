@@ -484,68 +484,18 @@ contract BondManager is IBondManager, AccessControl {
     }
 
     /**
-     * @notice Redeem bonds on behalf of holders
+     * @notice Pay the next coupon to every holder; the final coupon also repays principal and closes the bond.
      * @param _isin ISIN string
-     * @param _holders Array of addresses holding the bonds to be redeemed and receiving WNOK payment
-     * @dev Restricted to BOND_MANAGER_ROLE
-     * @dev Passes msg.sender (BOND_MANAGER_ROLE holder) as operator
-     * @dev Payment is atomic for all holders
-     */
-    function redeem(string calldata _isin, address[] calldata _holders) external onlyRole(Roles.BOND_MANAGER_ROLE) {
-        bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
-        // Process each holder's redemption
-        for (uint256 i = 0; i < _holders.length; i++) {
-            address holder = _holders[i];
-            uint256 balance = BOND_TOKEN.balanceOfByPartition(partition, holder);
-
-            if (balance == 0) {
-                continue; // Skip zero-value redemptions
-            }
-
-            // Calculate WNOK amount to pay (1 BOND = 1000 WNOK)
-            uint256 wnokAmount = balance * UNIT_NOMINAL;
-
-            IBondDvP.Settlement memory params = IBondDvP.Settlement({
-                bond: address(BOND_TOKEN),
-                partition: partition,
-                bondFrom: holder,
-                bondTo: address(0),
-                bondAmount: balance,
-                cashToken: WNOK,
-                cashFrom: GOV_RESERVE,
-                cashTo: holder,
-                cashAmount: wnokAmount,
-                operator: msg.sender,
-                op: IBondDvP.Operation.Redeem
-            });
-
-            bool ok = BOND_DVP.settle(params);
-            if (!ok) {
-                revert Errors.SettlementFailure(uint8(IBondDvP.FailureReason.Unknown), "redeem settle returned false");
-            }
-            emit BondRedeemed(_isin, holder, balance, wnokAmount);
-        }
-
-        uint256 totalSupply = BOND_TOKEN.totalSupplyByPartition(partition);
-        if (totalSupply != 0) {
-            revert Errors.RedemptionIncomplete(_isin, totalSupply);
-        }
-
-        emit BondRedemptionComplete(_isin);
-    }
-
-    /**
-     * @notice Pay coupon to bond holders for a specific ISIN
-     * @param _isin ISIN string
-     * @param _holders Array of holder addresses to receive coupon payments
-     * @dev Restricted to BOND_MANAGER_ROLE
-     * @dev Payment is atomic for all holders
-     * @dev Flags bond as matured after final coupon payment
+     * @param _holders Every current holder of the partition, including this contract when it holds unsold units
+     * @dev Restricted to BOND_MANAGER_ROLE. Atomic: any failed leg reverts the whole payment.
+     * @dev Units held by this contract were never sold: they earn no coupon and are burned at maturity
+     *      without any cash movement.
+     * @dev On the final period each holder is settled once for coupon plus nominal, every unit is burned,
+     *      partition supply must reach zero, and BondMatured is emitted exactly once.
      */
     function payCoupon(string calldata _isin, address[] calldata _holders) external onlyRole(Roles.BOND_MANAGER_ROLE) {
         bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
 
-        // Get all coupon parameters in a single call
         (
             uint256 couponDuration, // Interval between payments in seconds (e.g., 1 year = DURATION_SCALAR)
             uint256 couponYield,
@@ -554,75 +504,147 @@ contract BondManager is IBondManager, AccessControl {
             uint256 paymentCount
         ) = BOND_TOKEN.getCouponDetails(_isin);
 
-        // Calculate expected number of coupon payments based on maturity and interval
         uint256 expectedPayments = maturityDuration / couponDuration;
-
-        // Check if all coupons have been paid
         if (paymentCount >= expectedPayments) {
             revert Errors.AllCouponsPaid(_isin);
         }
 
-        // Check if enough time has passed since last payment
         uint256 nextPaymentTime = lastPayment + couponDuration;
         if (block.timestamp < nextPaymentTime) {
             revert Errors.CouponNotReady(_isin, nextPaymentTime, block.timestamp);
         }
 
-        // Calculate payment per bond: (face value * yield) / PERCENTAGE_PRECISION
-        // couponYield is stored in bps (1e4 precision), e.g., 425 = 4.25%, 400 = 4.00%
-        // e.g., 1000 NOK face value * 4.25% (425) = 42.5 NOK per bond per interval
-        // Coupon is based on bond's face value (nominal), not purchase price
+        uint256 paymentNumber = paymentCount + 1;
+        bool finalPeriod = paymentNumber == expectedPayments;
+
+        // Coupon per unit: nominal * yield (bps) / PERCENTAGE_PRECISION, e.g. 1000 * 425 / 10000 = 42
         uint256 paymentPerBond = (UNIT_NOMINAL * couponYield) / PERCENTAGE_PRECISION;
-        // Pay each holder proportionally to their balance
-        uint256 totalProcessedBalance = 0;
-        for (uint256 i = 0; i < _holders.length; i++) {
-            address holder = _holders[i];
-            uint256 balance = BOND_TOKEN.balanceOfByPartition(partition, holder);
+        uint256 supplyBefore = BOND_TOKEN.totalSupplyByPartition(partition);
 
-            if (balance == 0) {
-                continue; // Skip holders with no balance
-            }
-
-            // Calculate payment for this holder: balance * payment per bond
-            uint256 paymentAmount = balance * paymentPerBond;
-
-            IBondDvP.Settlement memory params = IBondDvP.Settlement({
-                bond: address(BOND_TOKEN),
-                partition: partition,
-                bondFrom: holder,
-                bondTo: holder,
-                bondAmount: 0, // cash-only coupon payment
-                cashToken: WNOK,
-                cashFrom: GOV_RESERVE,
-                cashTo: holder,
-                cashAmount: paymentAmount,
-                operator: address(0),
-                op: IBondDvP.Operation.None
-            });
-
-            bool ok = BOND_DVP.settle(params);
-            if (!ok) {
-                revert Errors.SettlementFailure(uint8(IBondDvP.FailureReason.Unknown), "coupon settle returned false");
-            }
-            totalProcessedBalance += balance;
-
-            emit CouponPaid(_isin, holder, paymentAmount, paymentCount + 1);
-        }
-
-        // Verify that all bonds in the partition have been accounted for
-        uint256 totalSupply = BOND_TOKEN.totalSupplyByPartition(partition);
-        if (totalProcessedBalance != totalSupply) {
-            revert Errors.CouponPaymentBalanceMismatch(_isin, totalProcessedBalance, totalSupply);
-        }
-
-        // Update payment tracking
-        uint256 newPaymentCount = paymentCount + 1;
-        BOND_TOKEN.updateCouponPayment(_isin, block.timestamp, newPaymentCount);
-
-        // Check if this was the final payment
-        if (newPaymentCount == expectedPayments) {
+        if (finalPeriod) {
+            // BondToken.redeemFor requires the partition to be matured before any burn.
             BOND_TOKEN.setMatured(_isin);
-            emit AllCouponsPaid(_isin);
+        }
+
+        PayoutTotals memory totals = _payHolders(
+            _isin,
+            _holders,
+            Period({
+                partition: partition,
+                paymentPerBond: paymentPerBond,
+                paymentNumber: paymentNumber,
+                finalPeriod: finalPeriod
+            })
+        );
+
+        // Every unit in the partition must be accounted for, paid or unsold.
+        if (totals.processed + totals.unsold != supplyBefore) {
+            revert Errors.CouponPaymentBalanceMismatch(_isin, totals.processed + totals.unsold, supplyBefore);
+        }
+
+        BOND_TOKEN.updateCouponPayment(_isin, block.timestamp, paymentNumber);
+
+        if (finalPeriod) {
+            if (totals.unsold > 0) {
+                BOND_TOKEN.redeemFor(address(this), _isin, totals.unsold, msg.sender);
+            }
+            uint256 remaining = BOND_TOKEN.totalSupplyByPartition(partition);
+            if (remaining != 0) {
+                revert Errors.RedemptionIncomplete(_isin, remaining);
+            }
+            emit BondMatured(_isin, paymentNumber, totals.principal, totals.coupon, totals.unsold);
+        }
+    }
+
+    /**
+     * @dev Running totals of one coupon period, in units (processed, unsold) and WNOK (coupon, principal).
+     */
+    struct PayoutTotals {
+        uint256 processed;
+        uint256 unsold;
+        uint256 coupon;
+        uint256 principal;
+    }
+
+    /**
+     * @dev Parameters of the coupon period being paid.
+     */
+    struct Period {
+        bytes32 partition;
+        uint256 paymentPerBond;
+        uint256 paymentNumber;
+        bool finalPeriod;
+    }
+
+    /**
+     * @dev Pays every listed holder for one period. Units held by this contract were never sold:
+     *      they are counted as unsold and receive nothing.
+     */
+    function _payHolders(string calldata _isin, address[] calldata _holders, Period memory _p)
+        internal
+        returns (PayoutTotals memory totals)
+    {
+        for (uint256 i = 0; i < _holders.length; i++) {
+            uint256 balance = BOND_TOKEN.balanceOfByPartition(_p.partition, _holders[i]);
+            if (balance == 0) {
+                continue;
+            }
+            if (_holders[i] == address(this)) {
+                totals.unsold += balance;
+                continue;
+            }
+            (uint256 couponAmount, uint256 principal) = _payHolder(_isin, _holders[i], balance, _p);
+            totals.processed += balance;
+            totals.coupon += couponAmount;
+            totals.principal += principal;
+        }
+    }
+
+    /**
+     * @dev Settles one holder for one period and emits the per-holder events.
+     */
+    function _payHolder(string calldata _isin, address _holder, uint256 _balance, Period memory _p)
+        internal
+        returns (uint256 couponAmount, uint256 principal)
+    {
+        couponAmount = _balance * _p.paymentPerBond;
+        principal = _p.finalPeriod ? _balance * UNIT_NOMINAL : 0;
+        _settleHolderPayout(_p.partition, _holder, _balance, couponAmount + principal, _p.finalPeriod);
+
+        emit CouponPaid(_isin, _holder, couponAmount, _p.paymentNumber);
+        if (_p.finalPeriod) {
+            emit BondRedeemed(_isin, _holder, _balance, principal);
+        }
+    }
+
+    /**
+     * @dev One DvP settlement per holder per period: cash-only on interim periods, coupon plus
+     *      principal with the holder's units burned on the final period.
+     */
+    function _settleHolderPayout(
+        bytes32 _partition,
+        address _holder,
+        uint256 _balance,
+        uint256 _cashAmount,
+        bool _final
+    ) internal {
+        IBondDvP.Settlement memory params = IBondDvP.Settlement({
+            bond: address(BOND_TOKEN),
+            partition: _partition,
+            bondFrom: _holder,
+            bondTo: _final ? address(0) : _holder,
+            bondAmount: _final ? _balance : 0,
+            cashToken: WNOK,
+            cashFrom: GOV_RESERVE,
+            cashTo: _holder,
+            cashAmount: _cashAmount,
+            operator: _final ? msg.sender : address(0),
+            op: _final ? IBondDvP.Operation.Redeem : IBondDvP.Operation.None
+        });
+
+        bool ok = BOND_DVP.settle(params);
+        if (!ok) {
+            revert Errors.SettlementFailure(uint8(IBondDvP.FailureReason.Unknown), "coupon settle returned false");
         }
     }
 

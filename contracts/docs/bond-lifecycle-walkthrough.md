@@ -4,7 +4,7 @@ This is a minimal external integration walkthrough for the primary bond flow in
 the sandbox:
 
 deploy -> create auction -> encrypt and submit bids -> close and finalise ->
-pay coupons -> redeem
+pay coupons (the final one repays principal and closes the bond)
 
 The recommended integration surface is
 [`BondManager`](../src/norges-bank/BondManager.sol). The other contracts in the
@@ -222,38 +222,29 @@ BondManager.payCoupon(isin, holders);
 
 Important requirement:
 
-- `holders` must cover the full current holder set for the ISIN partition.
+- `holders` must cover the full current holder set for the ISIN partition,
+  including `BondManager` itself when a failed allocation left unsold units on it.
 
 The contract verifies that the processed balances match total supply before it
 updates coupon state. If your holder list is incomplete, the payment flow
-reverts instead of silently underpaying.
+reverts instead of silently underpaying. Unsold units held by the manager earn
+no coupon.
 
-Repeat this step once per coupon period until the final coupon has been paid.
-On the last payment, `BondToken` marks the partition as matured.
+Repeat this step once per coupon period. The final period closes the bond in
+the same transaction:
+
+- each holder receives the final coupon plus the nominal value of their units,
+  in WNOK from the government reserve account, and their units are burned
+- unsold units held by the manager are burned without payment
+- partition supply must reach zero, `BondToken` marks the partition matured,
+  and `BondMatured(isin, paymentCount, principalPaid, couponPaid, unsoldBurned)`
+  is emitted once
+
+There is no separate redemption call.
 
 NB Bond API equivalent:
 
 - `POST /v1/bonds/{isin}/coupon-payments`
-
-## 6. Redeem the remaining supply
-
-After maturity and final coupon completion, call:
-
-```solidity
-BondManager.redeem(isin, holders);
-```
-
-Again, `holders` must cover the full remaining holder set for that ISIN.
-
-The redemption flow:
-
-- redeems each holder's remaining bond balance
-- settles the cash leg in WNOK from the government reserve account
-- verifies that the partition supply is fully reduced to zero
-
-NB Bond API equivalent:
-
-- `POST /v1/bonds/{isin}/redemptions`
 
 ## Common variants
 
@@ -285,11 +276,11 @@ This creates a BUYBACK auction and settles through the buyback path in
 - The off-chain auction operator is responsible for decrypting bids and
   computing allocations. The chain does not derive the clearing result on its
   own.
-- `payCoupon()` and `redeem()` depend on a complete holder list. That holder
-  discovery is currently an off-chain integration concern.
+- `payCoupon()` depends on a complete holder list. That holder discovery is
+  currently an off-chain integration concern.
 - The local setup scripts also prepare cash-side allowlists and approvals. If
-  those are missing, finalisation, coupon payment, or redemption can fail at
-  settlement time.
+  those are missing, finalisation or coupon payment (including the closing
+  payment) can fail at settlement time.
 
 ## Where to go deeper
 

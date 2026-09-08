@@ -417,37 +417,17 @@ function withdrawFailedIssuance(string calldata _isin) external onlyRole(Roles.B
 |`_isin`|`string`|Target ISIN with failed issuance.|
 
 
-### redeem
-
-Redeem bonds on behalf of holders
-
-Restricted to BOND_MANAGER_ROLE
-
-Passes msg.sender (BOND_MANAGER_ROLE holder) as operator
-
-Payment is atomic for all holders
-
-
-```solidity
-function redeem(string calldata _isin, address[] calldata _holders) external onlyRole(Roles.BOND_MANAGER_ROLE);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|ISIN string|
-|`_holders`|`address[]`|Array of addresses holding the bonds to be redeemed and receiving WNOK payment|
-
-
 ### payCoupon
 
-Pay coupon to bond holders for a specific ISIN
+Pay the next coupon to every holder; the final coupon also repays principal and closes the bond.
 
-Restricted to BOND_MANAGER_ROLE
+Restricted to BOND_MANAGER_ROLE. Atomic: any failed leg reverts the whole payment.
 
-Payment is atomic for all holders
+Units held by this contract were never sold: they earn no coupon and are burned at maturity
+without any cash movement.
 
-Flags bond as matured after final coupon payment
+On the final period each holder is settled once for coupon plus nominal, every unit is burned,
+partition supply must reach zero, and BondMatured is emitted exactly once.
 
 
 ```solidity
@@ -458,7 +438,7 @@ function payCoupon(string calldata _isin, address[] calldata _holders) external 
 |Name|Type|Description|
 |----|----|-----------|
 |`_isin`|`string`|ISIN string|
-|`_holders`|`address[]`|Array of holder addresses to receive coupon payments|
+|`_holders`|`address[]`|Every current holder of the partition, including this contract when it holds unsold units|
 
 
 ### _handleAllocationFailure

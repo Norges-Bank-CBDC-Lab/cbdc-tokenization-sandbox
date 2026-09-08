@@ -75,27 +75,37 @@ event BondIssuanceComplete(bytes32 indexed id, string isin, uint256 total);
 event BondBuybackComplete(bytes32 indexed id, string isin, uint256 total);
 ```
 
-### BondRedeemed
-
-```solidity
-event BondRedeemed(string indexed isin, address indexed holder, uint256 value, uint256 wnokAmount);
-```
-
-### BondRedemptionComplete
-
-```solidity
-event BondRedemptionComplete(string indexed isin);
-```
-
 ### CouponPaid
 
 ```solidity
 event CouponPaid(string indexed isin, address indexed holder, uint256 paymentAmount, uint256 paymentNumber);
 ```
 
-### AllCouponsPaid
+### BondRedeemed
 
 ```solidity
-event AllCouponsPaid(string indexed isin);
+event BondRedeemed(string indexed isin, address indexed holder, uint256 value, uint256 wnokAmount);
 ```
+
+### BondMatured
+
+Emitted once when the final coupon closes the bond: every unit is burned, holders
+were paid coupon plus principal, and unsold units held by the manager were burned
+without payment.
+
+```solidity
+event BondMatured(
+    string indexed isin, uint256 paymentCount, uint256 principalPaid, uint256 couponPaid, uint256 unsoldBurned
+);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isin`|`string`|ISIN of the closed bond.|
+|`paymentCount`|`uint256`|Number of coupon periods paid over the bond's life.|
+|`principalPaid`|`uint256`|Total nominal repaid to holders in WNOK.|
+|`couponPaid`|`uint256`|Total coupon paid in the final period in WNOK.|
+|`unsoldBurned`|`uint256`|Units held by the manager that were burned without payment.|
 
