@@ -7,7 +7,6 @@ import {IBondManager} from "@norges-bank/interfaces/IBondManager.sol";
 import {IBondAuction} from "@norges-bank/interfaces/IBondAuction.sol";
 import {IBondToken} from "@norges-bank/interfaces/IBondToken.sol";
 import {IBondDvP} from "@norges-bank/interfaces/IBondDvP.sol";
-import {ITbd} from "@private-bank/ITbd.sol";
 
 import {Errors} from "@common/Errors.sol";
 import {Roles} from "@common/Roles.sol";
@@ -41,10 +40,10 @@ contract BondManager is IBondManager, AccessControl {
     IBondDvP public immutable BOND_DVP;
 
     /**
-     * @notice Store target TBD for bond payments (cash leg)
+     * @notice Government reserve account: receives issuance proceeds and pays buyback,
+     *         coupon, and redemption cash. Every cash leg settles in WNOK.
      */
-    address public immutable GOV_TBD;
-    address private immutable _GOV_RESERVE;
+    address public immutable GOV_RESERVE;
 
     /**
      * @notice Assert bond active state to prevent parallel auctions on the same ISIN
@@ -62,11 +61,11 @@ contract BondManager is IBondManager, AccessControl {
 
     /**
      * @param _name Name of the BondManager instance.
-     * @param _wNok Address of the mock WNOK token used for the cash leg.
+     * @param _wNok Address of the WNOK token used for every cash leg.
      * @param _controller Bond issuer address granted BOND_MANAGER_ROLE.
      * @param _bondAuction Address of the BondAuction instance coordinating sealed bids.
      * @param _bondToken Address of the BondToken contract (single deployment for all bonds).
-     * @param _govTbd Government nominated TBD.
+     * @param _govReserve Government reserve account holding WNOK.
      * @param _durationScalar Duration scalar for coupon intervals (31556926 for year, smaller for testing)
      */
     constructor(
@@ -76,7 +75,7 @@ contract BondManager is IBondManager, AccessControl {
         address _bondAuction,
         address _bondToken,
         address _bondDvp,
-        address _govTbd,
+        address _govReserve,
         uint256 _durationScalar
     ) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -88,10 +87,8 @@ contract BondManager is IBondManager, AccessControl {
         BOND_AUCTION = IBondAuction(_bondAuction);
         BOND_TOKEN = IBondToken(_bondToken);
         BOND_DVP = IBondDvP(_bondDvp);
-        GOV_TBD = _govTbd;
-
-        _GOV_RESERVE = ITbd(GOV_TBD).govReserve();
-        if (_GOV_RESERVE == address(0)) revert Errors.InvalidGovTbd();
+        if (_govReserve == address(0)) revert Errors.GovReserveAddressZero();
+        GOV_RESERVE = _govReserve;
 
         if (_durationScalar == 0) revert Errors.DurationScalarZero();
         DURATION_SCALAR = _durationScalar;
@@ -331,7 +328,7 @@ contract BondManager is IBondManager, AccessControl {
                 bondAmount: _alloc[i].units,
                 cashToken: WNOK,
                 cashFrom: _alloc[i].bidder,
-                cashTo: _GOV_RESERVE,
+                cashTo: GOV_RESERVE,
                 cashAmount: paymentDue,
                 operator: address(0),
                 op: IBondDvP.Operation.TransferPartition
@@ -376,8 +373,8 @@ contract BondManager is IBondManager, AccessControl {
                 bondFrom: _alloc[i].bidder,
                 bondTo: address(0),
                 bondAmount: _alloc[i].units,
-                cashToken: GOV_TBD,
-                cashFrom: _GOV_RESERVE,
+                cashToken: WNOK,
+                cashFrom: GOV_RESERVE,
                 cashTo: _alloc[i].bidder,
                 cashAmount: paymentDue,
                 operator: msg.sender,
@@ -506,7 +503,7 @@ contract BondManager is IBondManager, AccessControl {
             }
 
             // Calculate WNOK amount to pay (1 BOND = 1000 WNOK)
-            uint256 tbdAmount = balance * UNIT_NOMINAL;
+            uint256 wnokAmount = balance * UNIT_NOMINAL;
 
             IBondDvP.Settlement memory params = IBondDvP.Settlement({
                 bond: address(BOND_TOKEN),
@@ -514,10 +511,10 @@ contract BondManager is IBondManager, AccessControl {
                 bondFrom: holder,
                 bondTo: address(0),
                 bondAmount: balance,
-                cashToken: GOV_TBD,
-                cashFrom: _GOV_RESERVE,
+                cashToken: WNOK,
+                cashFrom: GOV_RESERVE,
                 cashTo: holder,
-                cashAmount: tbdAmount,
+                cashAmount: wnokAmount,
                 operator: msg.sender,
                 op: IBondDvP.Operation.Redeem
             });
@@ -526,7 +523,7 @@ contract BondManager is IBondManager, AccessControl {
             if (!ok) {
                 revert Errors.SettlementFailure(uint8(IBondDvP.FailureReason.Unknown), "redeem settle returned false");
             }
-            emit BondRedeemed(_isin, holder, balance, tbdAmount);
+            emit BondRedeemed(_isin, holder, balance, wnokAmount);
         }
 
         uint256 totalSupply = BOND_TOKEN.totalSupplyByPartition(partition);
@@ -595,8 +592,8 @@ contract BondManager is IBondManager, AccessControl {
                 bondFrom: holder,
                 bondTo: holder,
                 bondAmount: 0, // cash-only coupon payment
-                cashToken: GOV_TBD,
-                cashFrom: _GOV_RESERVE,
+                cashToken: WNOK,
+                cashFrom: GOV_RESERVE,
                 cashTo: holder,
                 cashAmount: paymentAmount,
                 operator: address(0),

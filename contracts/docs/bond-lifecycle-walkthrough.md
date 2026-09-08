@@ -69,7 +69,9 @@ deployment scripts register at least the core bond stack:
 - `BondToken`
 - `BondDvP`
 - `Wnok`
-- `Tbd` for the government reserve side
+
+`BondManager` is deployed with the government reserve account, a WNOK holder
+that receives issuance proceeds and pays buyback, coupon, and redemption cash.
 
 ## 2. Create the initial bond auction
 
@@ -246,7 +248,7 @@ Again, `holders` must cover the full remaining holder set for that ISIN.
 The redemption flow:
 
 - redeems each holder's remaining bond balance
-- settles the cash leg through the configured government-side `Tbd`
+- settles the cash leg in WNOK from the government reserve account
 - verifies that the partition supply is fully reduced to zero
 
 NB Bond API equivalent:

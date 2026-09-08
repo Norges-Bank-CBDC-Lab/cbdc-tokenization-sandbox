@@ -45,7 +45,7 @@ in [`contracts/src/common/Roles.sol`](../src/common/Roles.sol).
 | `BOND_AUCTION_ADMIN_ROLE` | `BondAuction` | Can create, close, cancel, and finalise auctions. In practice this should align with the `BondManager` control path. |
 | `BOND_CONTROLLER_ROLE` | `BondToken` | Can create partitions, extend or reduce offering, mint by ISIN, update coupon state, and mark bonds matured. |
 | `SETTLE_ROLE` | `BondDvP` | Can execute settlement, including bond-leg and cash-leg transfers. Misconfiguration here directly affects issuance, buyback, coupon, and redemption flows. |
-| `MINTER_ROLE` / `BURNER_ROLE` / `TRANSFER_FROM_ROLE` | `Wnok` and related cash flows | Control the tokenized cash leg and the ability to move cash during settlement. |
+| `MINTER_ROLE` / `BURNER_ROLE` / `TRANSFER_FROM_ROLE` | `Wnok` and related cash flows | Control the tokenized cash leg and the ability to move cash during settlement. `BondDvP` holds `TRANSFER_FROM_ROLE` and moves WNOK for every bond cash leg, bounded by the payer's allowance: the bidder's for issuance and the government reserve account's for buyback, coupon, and redemption. |
 
 ## Critical workflow boundaries
 
@@ -63,15 +63,17 @@ in [`contracts/src/common/Roles.sol`](../src/common/Roles.sol).
 ### Buyback
 
 - Buyback uses the same manager and auction pattern, but the settlement path is
-  reversed: the government-side reserve pays holders and the security leg
-  redeems the bought-back bonds.
+  reversed: the government reserve account pays holders in WNOK and the
+  security leg redeems the bought-back bonds.
 - The buyback amount is checked against current partition supply, but correct
   operational behavior still depends on accurate role and allowance setup.
 
 ### Coupon and redemption
 
 - Coupon and redemption flows are initiated by `BondManager`, but depend on
-  `BondDvP` having the right operator permissions and cash-transfer rights.
+  `BondDvP` having the right operator permissions and cash-transfer rights, and
+  on the government reserve account holding enough WNOK with an allowance for
+  `BondDvP`. Payouts move existing WNOK; they never mint.
 - Coupon payment correctness depends on the holder list passed in from
   off-chain. The contract checks that the processed balances match total supply
   before updating coupon state.

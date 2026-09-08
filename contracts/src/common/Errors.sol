@@ -63,7 +63,7 @@ library Errors {
     error BondDoesNotExist(string isin);
     error IncorrectBondState(string isin, bool expected);
     error NoFailedIssuance();
-    error InvalidGovTbd();
+    error GovReserveAddressZero();
     error RedemptionIncomplete(string _isin, uint256 remaining);
     error BuybackExceedsSupply(string isin, uint256 buybackSize, uint256 currentSupply);
     error BuybackOfferingZero(string isin);

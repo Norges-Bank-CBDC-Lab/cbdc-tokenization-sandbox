@@ -7,7 +7,6 @@ import {GlobalRegistry} from "@common/GlobalRegistry.sol";
 import {BondAuction} from "@norges-bank/BondAuction.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
 import {BondDvP} from "@norges-bank/BondDvP.sol";
-import {Tbd} from "@private-bank/Tbd.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 
 import {Roles} from "@common/Roles.sol";
@@ -29,7 +28,6 @@ contract BondSetupScript is RegistryScript {
         _ensureRegistry(registryAddr, owner);
         GlobalRegistry registry = GlobalRegistry(registryAddr);
 
-        string memory govReserveName = vm.envString("TBD_NORDEA_CONTRACT_NAME");
         string memory bondAuctionName = vm.envString("BOND_AUCTION_CONTRACT_NAME");
         string memory bondManagerName = vm.envString("BOND_MANAGER_CONTRACT_NAME");
         string memory bondTokenName = vm.envString("BOND_TOKEN_CONTRACT_NAME");
@@ -43,7 +41,6 @@ contract BondSetupScript is RegistryScript {
         BondDvP bondDvp = BondDvP(registry.getContract(bondDvpName));
 
         Wnok wnok = Wnok(registry.getContract(wnokName));
-        Tbd govTbd = Tbd(registry.getContract(govReserveName));
 
         vm.startBroadcast(deployerKey);
 
@@ -69,15 +66,9 @@ contract BondSetupScript is RegistryScript {
         wnok.mint(nordeaAddr, 1_000_000);
         vm.stopBroadcast();
 
-        // Add bidders to TBD allowlist
-        vm.startBroadcast(nordeaKey);
-        govTbd.add(dnbAddr);
-        govTbd.add(nordeaAddr);
-        vm.stopBroadcast();
-
-        // TBD approval for BM
+        // Government reserve lets BondDvP debit its WNOK for buyback, coupon, and redemption
         vm.startBroadcast(govReserveKey);
-        govTbd.approve(address(bondDvp), type(uint256).max);
+        wnok.approve(address(bondDvp), type(uint256).max);
         vm.stopBroadcast();
 
         // Wnok approvals for bidders

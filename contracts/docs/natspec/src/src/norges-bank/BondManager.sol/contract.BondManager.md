@@ -70,23 +70,16 @@ IBondDvP public immutable BOND_DVP
 ```
 
 
-### GOV_TBD
-Store target TBD for bond payments (cash leg)
+### GOV_RESERVE
+Government reserve account: receives issuance proceeds and pays buyback,
+coupon, and redemption cash. Every cash leg settles in WNOK.
 
 
 ```solidity
-address public immutable GOV_TBD
+address public immutable GOV_RESERVE
 ```
 
 
-### _GOV_RESERVE
-
-```solidity
-address private immutable _GOV_RESERVE
-```
-
-
-## State Variables
 ### name
 
 ```solidity
@@ -129,7 +122,7 @@ constructor(
     address _bondAuction,
     address _bondToken,
     address _bondDvp,
-    address _govTbd,
+    address _govReserve,
     uint256 _durationScalar
 ) ;
 ```
@@ -138,12 +131,12 @@ constructor(
 |Name|Type|Description|
 |----|----|-----------|
 |`_name`|`string`|Name of the BondManager instance.|
-|`_wNok`|`address`|Address of the mock WNOK token used for the cash leg.|
+|`_wNok`|`address`|Address of the WNOK token used for every cash leg.|
 |`_controller`|`address`|Bond issuer address granted BOND_MANAGER_ROLE.|
 |`_bondAuction`|`address`|Address of the BondAuction instance coordinating sealed bids.|
 |`_bondToken`|`address`|Address of the BondToken contract (single deployment for all bonds).|
 |`_bondDvp`|`address`||
-|`_govTbd`|`address`|Government nominated TBD.|
+|`_govReserve`|`address`|Government reserve account holding WNOK.|
 |`_durationScalar`|`uint256`|Duration scalar for coupon intervals (31556926 for year, smaller for testing)|
 
 

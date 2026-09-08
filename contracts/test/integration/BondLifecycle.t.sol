@@ -8,7 +8,6 @@ import {IBondAuction} from "@norges-bank/interfaces/IBondAuction.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
 import {BondDvP} from "@norges-bank/BondDvP.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
-import {Tbd} from "@private-bank/Tbd.sol";
 import {Roles} from "@common/Roles.sol";
 import {AuctionHelper} from "../utils/AuctionHelper.sol";
 
@@ -17,11 +16,9 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
     BondAuction bondAuction;
     BondToken bondToken;
     BondDvP bondDvp;
-    Tbd govTbd;
 
     address deployer = address(this);
     address govReserve = address(0x6);
-    address govBank = address(0x7);
     address bidder1;
     uint256 bidder1Pk;
     address bidder2;
@@ -52,7 +49,6 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         wnok.add(bidder1);
         wnok.add(bidder2);
         wnok.add(govReserve);
-        wnok.add(govBank);
 
         initGlobals(PLAINTEXT_HASH, CIPHERTEXT, UNIT_NOMINAL, PERCENTAGE_PRECISION);
         initActors(bondAdmin);
@@ -62,9 +58,6 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         bondAuction = new BondAuction("Bond Auction");
         bondToken = new BondToken("Bond Token", "BOND");
         bondDvp = new BondDvP("Bond DvP", deployer);
-        govTbd = new Tbd(deployer, govBank, address(wnok), address(bondDvp), "Gov TBD", "GTBD", govReserve);
-
-        wnok.add(address(govTbd));
 
         bondManager = new BondManager(
             "Bond Manager",
@@ -73,7 +66,7 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
             address(bondAuction),
             address(bondToken),
             address(bondDvp),
-            address(govTbd),
+            govReserve,
             DURATION_SCALAR
         );
 
@@ -84,7 +77,6 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         wnok.add(address(bondDvp));
         bytes32 transferFromRole = keccak256("TRANSFER_FROM_ROLE");
         wnok.grantRole(transferFromRole, address(bondDvp));
-        wnok.grantRole(transferFromRole, address(govTbd));
         wnok.grantRole(keccak256("MINTER_ROLE"), bondAdmin);
 
         bondAuction.grantRole(Roles.BOND_AUCTION_ADMIN_ROLE, address(bondManager));
@@ -98,18 +90,10 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         vm.prank(deployer);
         bondDvp.grantRole(Roles.SETTLE_ROLE, address(bondManager));
 
-        govTbd.add(govReserve);
-        govTbd.add(bidder1);
-        govTbd.add(bidder2);
-
         uint256 largeAmount = 1_000_000_000 * 10 ** 18;
         wnok.mint(govReserve, largeAmount);
-        vm.prank(deployer);
-        govTbd.mint(govReserve, largeAmount);
         vm.prank(govReserve);
-        wnok.approve(address(govTbd), type(uint256).max);
-        vm.prank(govReserve);
-        govTbd.approve(address(bondDvp), type(uint256).max);
+        wnok.approve(address(bondDvp), type(uint256).max);
 
         vm.startPrank(bidder1);
         wnok.approve(address(bondDvp), type(uint256).max);
@@ -230,7 +214,7 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
             auctionType: IBondAuction.AuctionType.BUYBACK
         });
 
-        uint256 bidder1BeforeBuyback = govTbd.balanceOf(bidder1);
+        uint256 bidder1BeforeBuyback = wnok.balanceOf(bidder1);
         vm.prank(bondAdmin);
         uint256[] memory buybackNonces = new uint256[](2);
         buybackNonces[0] = 0;
@@ -241,7 +225,7 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         uint256 expectedBuybackPayment = (allocBuyback[0].rate * (allocBuyback[0].units * UNIT_NOMINAL))
             / PERCENTAGE_PRECISION + (allocBuyback[1].rate * (allocBuyback[1].units * UNIT_NOMINAL))
             / PERCENTAGE_PRECISION;
-        assertEq(govTbd.balanceOf(bidder1) - bidder1BeforeBuyback, expectedBuybackPayment);
+        assertEq(wnok.balanceOf(bidder1) - bidder1BeforeBuyback, expectedBuybackPayment);
 
         uint256 remainingSupply = OFFERING + ADDITIONAL_OFFERING - BUYBACK_SIZE;
         assertEq(bondToken.totalSupplyByPartition(partition), remainingSupply);
@@ -257,14 +241,14 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         for (uint256 i = 0; i < MATURITY_YEARS; i++) {
             t += DURATION_SCALAR + 1;
             vm.warp(t);
-            uint256 before1 = govTbd.balanceOf(bidder1);
-            uint256 before2 = govTbd.balanceOf(bidder2);
+            uint256 before1 = wnok.balanceOf(bidder1);
+            uint256 before2 = wnok.balanceOf(bidder2);
 
             vm.prank(bondAdmin);
             bondManager.payCoupon(ISIN, holders);
 
             uint256 expectedPayment = remainingSupply * paymentPerBond;
-            uint256 delta = (govTbd.balanceOf(bidder1) - before1) + (govTbd.balanceOf(bidder2) - before2);
+            uint256 delta = (wnok.balanceOf(bidder1) - before1) + (wnok.balanceOf(bidder2) - before2);
             assertEq(delta, expectedPayment);
         }
 
@@ -280,18 +264,18 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         redeemValues[0] = OFFERING - BUYBACK_SIZE;
         redeemValues[1] = ADDITIONAL_OFFERING;
 
-        uint256 tbdBefore = govTbd.balanceOf(bidder1) + govTbd.balanceOf(bidder2);
+        uint256 wnokBefore = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
         uint256 bondBefore =
             bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
 
         vm.prank(bondAdmin);
         bondManager.redeem(ISIN, redeemHolders);
 
-        uint256 tbdAfter = govTbd.balanceOf(bidder1) + govTbd.balanceOf(bidder2);
+        uint256 wnokAfter = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
         uint256 bondAfter =
             bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
 
         assertEq(bondBefore - bondAfter, remainingSupply);
-        assertEq(tbdAfter - tbdBefore, remainingSupply * REDEMPTION_RATE);
+        assertEq(wnokAfter - wnokBefore, remainingSupply * REDEMPTION_RATE);
     }
 }

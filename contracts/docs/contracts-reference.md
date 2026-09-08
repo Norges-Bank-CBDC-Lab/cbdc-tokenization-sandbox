@@ -135,7 +135,12 @@ Key functions:
 Important notes:
 
 - `BondManager` depends on privileged role setup across `BondAuction`,
-  `BondToken`, `BondDvP`, and the cash-side contracts.
+  `BondToken`, `BondDvP`, and `Wnok`.
+- Every cash leg settles in `Wnok` against one government reserve account
+  (`GOV_RESERVE`, fixed at deployment): issuance credits the reserve, while
+  buyback, coupon, and redemption debit it. The reserve must hold enough WNOK
+  and must have approved `BondDvP` to spend it; a shortfall reverts the whole
+  coupon or redemption.
 - Auction allocation is not calculated on-chain. Finalisation assumes the
   off-chain auction operator provides correct allocations and matching proofs.
 - Coupon and redemption flows depend on the caller providing a complete and
@@ -250,8 +255,9 @@ Source:
 [`contracts/src/norges-bank/Wnok.sol`](../src/norges-bank/Wnok.sol)
 
 Role in system:
-Tokenized central-bank-style cash leg used by local settlement flows and by
-cross-bank movements into `Tbd`.
+Tokenized central-bank-style cash leg used by every bond cash leg (issuance,
+buyback, coupon, redemption), by local settlement flows, and by cross-bank
+movements into `Tbd`.
 
 Key functions:
 
