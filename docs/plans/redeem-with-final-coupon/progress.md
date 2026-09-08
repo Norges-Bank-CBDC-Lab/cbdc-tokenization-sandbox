@@ -1,15 +1,15 @@
 # Redeem with the final coupon — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-09 — plan folder and ADR 0005 drafted; no code changed
-**Current phase:** Not started (plan awaiting operator approval)
-**Next action:** Operator reviews `intent.md` and `design.md`; on approval, start Phase 0 on a `feature/` branch from `development`
+**Last updated:** 2026-09-09 — Phase 0 done: ingestion ordering verified, explicit interim coupon amount asserted
+**Current phase:** Phase 1: Contracts — closure in payCoupon, BondMatured, remove redeem
+**Next action:** Phase 1 step 1 — events in `IBondManager.sol`, then `payCoupon` closure in `BondManager.sol` on branch `feature/redeem-with-final-coupon`
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
-| 0 — Baseline, ingestion-order check, characterization | Not started | baseline `forge test`: 25 suites, 393 passed (2026-09-08) | |
+| 0 — Baseline, ingestion-order check, characterization | Done | baseline `forge test`: 25 suites, 393 passed; `BondManager.t.sol` asserts `paymentPerBond == 42` (49 passed); ingestion order verified, see below (2026-09-09) | PR 1 |
 | 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Not started | | |
 | 2 — API: ingestion, status, route removal, OpenAPI | Not started | | |
 | 3 — UI | Not started | | |
@@ -22,6 +22,11 @@ None yet.
 
 ## Verified So Far
 
+- Ingestion applies a block batch as all manager events, then all token actions, inside one
+  `db.transaction` (`services/nb-bond-api/src/ingestion.ts`), so ordering is per contract, not by
+  global log index, and no reader sees a half-applied block. The bond-state reducer only sets
+  flags, monotonic counts, and supply deltas, so `BondMatured` before or after the token burns
+  projects the same final state — verified 2026-09-09.
 - The final coupon only sets `isMatured`; principal is paid by a separate `redeem` that no UI
   page calls — verified in `BondManager.sol` and `services/nb-ui/src` on 2026-09-09.
 - `BondDvP.settle` always runs the cash leg, so manager-held units must be burned by
@@ -29,7 +34,6 @@ None yet.
 
 ## Blocked / Waiting On
 
-- Plan approval — sandbox operator.
 - Phase 4 needs an explicit go-ahead to delete and recreate the local sandbox.
 
 ## Follow-ups Found Along the Way

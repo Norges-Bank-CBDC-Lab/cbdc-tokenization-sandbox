@@ -457,6 +457,7 @@ contract BondManagerTest is Test, AuctionHelper {
         // Match contract calculation: paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION
         // Then paymentAmount = balance * paymentPerBond
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+        assertEq(paymentPerBond, 42); // 1000 nominal at 4.25%, integer-truncated
         uint256 expectedPayment = OFFERING * paymentPerBond;
         assertEq(balanceAfter - balanceBefore, expectedPayment);
 
