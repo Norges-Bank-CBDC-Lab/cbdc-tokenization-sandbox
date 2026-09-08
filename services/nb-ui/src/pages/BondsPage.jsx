@@ -147,7 +147,6 @@ export function BondsPage({ navigate }) {
           <option value="auctioning">Auctioning</option>
           <option value="outstanding">Outstanding</option>
           <option value="matured">Matured</option>
-          <option value="redeemed">Redeemed</option>
         </select>
         <label
           style={{

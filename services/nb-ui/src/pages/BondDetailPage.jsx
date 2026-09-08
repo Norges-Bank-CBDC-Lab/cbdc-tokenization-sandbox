@@ -171,8 +171,8 @@ export function BondDetailPage({ isin, navigate }) {
               </dd>
               <dt
                 title={
-                  'Time from bond issuance until principal is redeemed to holders. After ' +
-                  'maturity, the bond stops paying coupons and the issuer redeems the units.'
+                  'Time from bond issuance until maturity. The final coupon payment also ' +
+                  'repays principal, burns every unit, and closes the bond.'
                 }
               >
                 Maturity duration
@@ -183,7 +183,7 @@ export function BondDetailPage({ isin, navigate }) {
               <dt
                 title={
                   'Time between coupon payments. Coupons are paid out periodically until ' +
-                  'maturity (or early redemption); the issuer’s next coupon payment is due ' +
+                  'maturity (or a full buyback); the issuer’s next coupon payment is due ' +
                   'one coupon-duration after the previous one.'
                 }
               >

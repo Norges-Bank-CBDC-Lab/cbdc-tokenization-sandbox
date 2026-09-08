@@ -1,9 +1,9 @@
 # Redeem with the final coupon — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-09 — Phase 2 done on `feature/redeem-with-final-coupon-api` (stacked on PR #275): `BondMatured` ingested, `matured` is terminal, redemption route removed
-**Current phase:** Phase 3: UI
-**Next action:** Phase 3 step 1 — final payout preview in `services/nb-ui/src/pages/PayCouponModal.jsx`
+**Last updated:** 2026-09-09 — Phases 2 and 3 done on `feature/redeem-with-final-coupon-api` (stacked on PR #275); UI previews coupon plus principal and warns on a short reserve
+**Current phase:** Phase 4: Fresh local sandbox validation (needs operator go-ahead to delete the local sandbox)
+**Next action:** Phase 5 docs (no sandbox needed), then Phase 4 on a fresh sandbox after the operator's go-ahead; rebase onto `development` once PR #275 merges and open PR 2
 
 ## Phase Log
 
@@ -12,7 +12,7 @@
 | 0 — Baseline, ingestion-order check, characterization | Done | baseline `forge test`: 25 suites, 393 passed; `BondManager.t.sol` asserts `paymentPerBond == 42` (49 passed); ingestion order verified, see below (2026-09-09) | PR 1 |
 | 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Done (PR #275 open) | `forge test`: 25 suites, 394 passed incl. closure, incomplete-holders, underfunded-closure, unsold-units, and fuzz cases; fmt and verify-mapping clean; ABI artifact refreshed (`BondMatured` present, `redeem` absent) (2026-09-09) | PR 1 |
 | 2 — API: ingestion, status, route removal, OpenAPI | Done | `BondMatured` → `MATURED` history entry with totals and the `matured` transition (sets both flags); `bondStatus` terminal `matured`, `redeemed` dropped from `BondStatus`; redemption route, handler, and OpenAPI path removed; `REDEMPTION` op type kept as legacy; reducer order-independence test; nb-bond-api lint, format, build, 245 jest tests green (2026-09-09) | PR 2 |
-| 3 — UI | Not started | | |
+| 3 — UI | Done | Pay-coupon modal: final period shows coupon, principal, and total per holder, unsold manager-held units as burned without payment, and a reserve-shortfall warning from the Central Bank resource; payout page hint and empty state; Bonds filter drops `redeemed`; Bond detail tooltips; `BondsApi.redeem` and the `redeemed` badge style removed; nb-ui format, lint, build, 123 vitest tests green (2026-09-09) | PR 2 |
 | 4 — Fresh local sandbox validation | Not started | | |
 | 5 — Docs and archive | Not started | | |
 
