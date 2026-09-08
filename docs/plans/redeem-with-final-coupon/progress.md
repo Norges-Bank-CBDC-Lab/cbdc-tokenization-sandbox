@@ -1,16 +1,16 @@
 # Redeem with the final coupon — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-09 — Phase 0 done: ingestion ordering verified, explicit interim coupon amount asserted
-**Current phase:** Phase 1: Contracts — closure in payCoupon, BondMatured, remove redeem
-**Next action:** Phase 1 step 1 — events in `IBondManager.sol`, then `payCoupon` closure in `BondManager.sol` on branch `feature/redeem-with-final-coupon`
+**Last updated:** 2026-09-09 — Phase 1 done: final `payCoupon` closes the bond, `BondMatured` added, `redeem` removed; contract docs, NatSpec pages, and the API ABI artifact updated
+**Current phase:** Phase 2: API ingestion, status, route removal, OpenAPI
+**Next action:** Open PR 1 from `feature/redeem-with-final-coupon` (Phases 0 and 1; not operator-safe alone, see plan); then Phase 2 step 1 — ingest `BondMatured` in `services/nb-bond-api/src/ingestion.ts`
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
 | 0 — Baseline, ingestion-order check, characterization | Done | baseline `forge test`: 25 suites, 393 passed; `BondManager.t.sol` asserts `paymentPerBond == 42` (49 passed); ingestion order verified, see below (2026-09-09) | PR 1 |
-| 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Not started | | |
+| 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Done | `forge test`: 25 suites, 394 passed incl. closure, incomplete-holders, underfunded-closure, unsold-units, and fuzz cases; fmt and verify-mapping clean; ABI artifact refreshed (`BondMatured` present, `redeem` absent) (2026-09-09) | PR 1 |
 | 2 — API: ingestion, status, route removal, OpenAPI | Not started | | |
 | 3 — UI | Not started | | |
 | 4 — Fresh local sandbox validation | Not started | | |
@@ -18,7 +18,15 @@
 
 ## Deviations From the Plan
 
-None yet.
+- Phase 1: the per-holder loop lives in `_payHolders` / `_payHolder` with `Period` and
+  `PayoutTotals` memory structs. Keeping the loop inline in `payCoupon` hit solc's
+  stack-too-deep limit even under via-IR (two attempts); the split is also easier to read.
+- Phase 1: "unsold units on the manager" arise from a failed allocation (a bidder's cash leg
+  fails at finalisation), not from an under-subscribed auction, which mints only the allocated
+  total. The test forces the failure by removing the bidder from the WNOK allowlist. The
+  known-issue wording ("partially allocated") is corrected in Phase 5.
+- Phase 1: `Errors.AllCouponsPaid` keeps its name; it still guards a `payCoupon` on a closed
+  bond, and `RedemptionIncomplete` still guards the zero-supply check.
 
 ## Verified So Far
 

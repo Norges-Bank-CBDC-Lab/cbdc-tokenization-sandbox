@@ -231,7 +231,7 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         assertEq(bondToken.totalSupplyByPartition(partition), remainingSupply);
         assertEq(bondToken.balanceOfByPartition(partition, bidder1), OFFERING - BUYBACK_SIZE);
 
-        // --- Pay all coupons across both holders ---
+        // --- Pay every coupon; the final one also repays principal and closes the bond ---
         address[] memory holders = new address[](2);
         holders[0] = bidder1;
         holders[1] = bidder2;
@@ -243,39 +243,21 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
             vm.warp(t);
             uint256 before1 = wnok.balanceOf(bidder1);
             uint256 before2 = wnok.balanceOf(bidder2);
+            bool finalPeriod = i == MATURITY_YEARS - 1;
 
             vm.prank(bondAdmin);
             bondManager.payCoupon(ISIN, holders);
 
             uint256 expectedPayment = remainingSupply * paymentPerBond;
+            if (finalPeriod) expectedPayment += remainingSupply * REDEMPTION_RATE;
             uint256 delta = (wnok.balanceOf(bidder1) - before1) + (wnok.balanceOf(bidder2) - before2);
             assertEq(delta, expectedPayment);
         }
 
         assertTrue(bondToken.isMatured(partition));
-
-        // --- Redeem both holders ---
-        vm.warp(block.timestamp + DURATION_SCALAR + 1);
-
-        address[] memory redeemHolders = new address[](2);
-        uint256[] memory redeemValues = new uint256[](2);
-        redeemHolders[0] = bidder1;
-        redeemHolders[1] = bidder2;
-        redeemValues[0] = OFFERING - BUYBACK_SIZE;
-        redeemValues[1] = ADDITIONAL_OFFERING;
-
-        uint256 wnokBefore = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
-        uint256 bondBefore =
-            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
-
-        vm.prank(bondAdmin);
-        bondManager.redeem(ISIN, redeemHolders);
-
-        uint256 wnokAfter = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
-        uint256 bondAfter =
-            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
-
-        assertEq(bondBefore - bondAfter, remainingSupply);
-        assertEq(wnokAfter - wnokBefore, remainingSupply * REDEMPTION_RATE);
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+        assertEq(
+            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2), 0
+        );
     }
 }

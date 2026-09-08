@@ -128,9 +128,9 @@ Key functions:
   recovers unsold or failed-to-settle bonds still held by the manager contract.
 - `payCoupon(isin, holders)`:
   pays the next coupon to the provided holder list and advances coupon state.
-- `redeem(isin, holders)`:
-  redeems the remaining supply for the provided holder list and checks that the
-  partition is fully redeemed.
+  On the final period it also repays principal, burns every unit (unsold units
+  held by the manager without payment), requires zero supply, and emits
+  `BondMatured` once. There is no separate redemption entry point.
 
 Important notes:
 
@@ -138,13 +138,14 @@ Important notes:
   `BondToken`, `BondDvP`, and `Wnok`.
 - Every cash leg settles in `Wnok` against one government reserve account
   (`GOV_RESERVE`, fixed at deployment): issuance credits the reserve, while
-  buyback, coupon, and redemption debit it. The reserve must hold enough WNOK
-  and must have approved `BondDvP` to spend it; a shortfall reverts the whole
-  coupon or redemption.
+  buyback and coupon payments debit it. The reserve must hold enough WNOK and
+  must have approved `BondDvP` to spend it; a shortfall reverts the whole
+  payment, and the closing payment (coupon plus principal for every holder) is
+  the largest single movement.
 - Auction allocation is not calculated on-chain. Finalisation assumes the
   off-chain auction operator provides correct allocations and matching proofs.
-- Coupon and redemption flows depend on the caller providing a complete and
-  correct holder list.
+- Coupon payments depend on the caller providing a complete and correct holder
+  list, including the manager itself when it holds unsold units.
 - This contract is powerful and already owns many lifecycle responsibilities,
   so new features should be added carefully to avoid turning it into a catch-all
   orchestrator.

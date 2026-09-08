@@ -68,17 +68,19 @@ in [`contracts/src/common/Roles.sol`](../src/common/Roles.sol).
 - The buyback amount is checked against current partition supply, but correct
   operational behavior still depends on accurate role and allowance setup.
 
-### Coupon and redemption
+### Coupon and maturity
 
-- Coupon and redemption flows are initiated by `BondManager`, but depend on
-  `BondDvP` having the right operator permissions and cash-transfer rights, and
-  on the government reserve account holding enough WNOK with an allowance for
+- Coupon payments are initiated by `BondManager`, but depend on `BondDvP`
+  having the right operator permissions and cash-transfer rights, and on the
+  government reserve account holding enough WNOK with an allowance for
   `BondDvP`. Payouts move existing WNOK; they never mint.
 - Coupon payment correctness depends on the holder list passed in from
-  off-chain. The contract checks that the processed balances match total supply
-  before updating coupon state.
-- Redemption correctness depends on the provided holder list covering the full
-  remaining supply for the ISIN.
+  off-chain. The contract checks that the processed balances, plus any unsold
+  units the manager holds, match total supply before updating coupon state.
+- The final coupon closes the bond: every holder is paid coupon plus principal
+  and burned in one settlement each, unsold manager-held units are burned
+  without payment, and the transaction reverts unless supply reaches zero. A
+  reserve shortfall therefore blocks closure entirely rather than one coupon.
 
 ## Known sandbox limitations
 
