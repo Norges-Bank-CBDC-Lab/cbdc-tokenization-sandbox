@@ -68,10 +68,41 @@ describe('bond state projection reducer', () => {
     );
   });
 
-  it('tracks maturity, redemption, disable, and re-create transitions', () => {
+  it('projects the same closed state whether BondMatured lands before or after the burns', () => {
+    // Ingestion applies manager events before token events within a block, so
+    // the maturity flag can arrive before the supply deltas; the result must match.
+    const minted = 100n;
+    const base = apply(
+      emptyBondState(ISIN, PARTITION),
+      { type: 'supply-delta', delta: minted },
+      10,
+    );
+    const maturedFirst = apply(
+      apply(base, { type: 'matured' }, 20),
+      { type: 'supply-delta', delta: -minted },
+      21,
+    );
+    const burnsFirst = apply(
+      apply(base, { type: 'supply-delta', delta: -minted }, 20),
+      { type: 'matured' },
+      21,
+    );
+    expect(maturedFirst).toMatchObject({
+      isMatured: true,
+      redemptionComplete: true,
+      totalSupply: '0',
+    });
+    expect(burnsFirst).toMatchObject({
+      isMatured: true,
+      redemptionComplete: true,
+      totalSupply: '0',
+    });
+  });
+
+  it('tracks maturity, disable, and re-create transitions', () => {
     let state = emptyBondState(ISIN, PARTITION);
     state = apply(state, { type: 'matured' }, 60);
-    state = apply(state, { type: 'redemption-complete' }, 61);
+    expect(state).toMatchObject({ isMatured: true, redemptionComplete: true });
     state = apply(state, { type: 'disabled', disabled: true }, 62);
     state = apply(
       state,

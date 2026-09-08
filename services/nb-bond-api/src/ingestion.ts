@@ -844,16 +844,22 @@ async function processBlockRange(
             Number(log.index ?? 0),
           );
         }
-      } else if (name === 'AllCouponsPaid') {
+      } else if (name === 'BondMatured') {
+        // Final coupon closed the bond: coupon + principal paid, every unit burned.
         changedResources.add('bonds');
         const isin = resolveIsin(db, args.isin, resolvedPartitions);
         insertBondEvent(db, {
           isin: isin ?? '',
-          type: 'COUPON_COMPLETE',
+          type: 'MATURED',
           block: Number(log.blockNumber ?? 0),
           logIndex: Number(log.index ?? 0),
           txHash: log.transactionHash,
-          payload: {},
+          payload: {
+            paymentCount: args.paymentCount?.toString?.() ?? args.paymentCount,
+            principalPaid: args.principalPaid?.toString?.() ?? args.principalPaid,
+            couponPaid: args.couponPaid?.toString?.() ?? args.couponPaid,
+            unsoldBurned: args.unsoldBurned?.toString?.() ?? args.unsoldBurned,
+          },
         });
         if (isin) {
           applyBondStateEvent(
@@ -896,26 +902,6 @@ async function processBlockRange(
             value: args.value?.toString?.() ?? args.value,
             wnokAmount: args.wnokAmount?.toString?.() ?? args.wnokAmount,
           },
-        });
-      } else if (name === 'BondRedemptionComplete') {
-        changedResources.add('bonds');
-        const isin = resolveIsin(db, args.isin, resolvedPartitions);
-        if (isin) {
-          applyBondStateEvent(
-            db,
-            isin,
-            { type: 'redemption-complete' },
-            Number(log.blockNumber ?? 0),
-            Number(log.index ?? 0),
-          );
-        }
-        insertBondEvent(db, {
-          isin: isin ?? '',
-          type: 'REDEMPTION_COMPLETE',
-          block: Number(log.blockNumber ?? 0),
-          logIndex: Number(log.index ?? 0),
-          txHash: log.transactionHash,
-          payload: {},
         });
       } else if (name === 'BondCreated') {
         changedResources.add('bonds');

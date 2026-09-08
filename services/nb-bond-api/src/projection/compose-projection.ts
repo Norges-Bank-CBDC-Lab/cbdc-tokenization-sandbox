@@ -188,7 +188,7 @@ function holder(row: BondSnapshot['balances'][number]): HolderBalance {
 function bondStatus(snapshot: BondSnapshot): BondStatus {
   const state = snapshot.state;
   const supply = BigInt(state.total_supply);
-  if (state.ever_issued && state.redemption_complete && supply === 0n) return 'redeemed';
+  // Terminal: the final coupon paid principal and burned every unit (BondMatured).
   if (state.is_matured) return 'matured';
 
   const latestAuction = snapshot.auctions[snapshot.auctions.length - 1]?.row;

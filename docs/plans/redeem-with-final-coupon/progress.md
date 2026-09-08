@@ -1,17 +1,17 @@
 # Redeem with the final coupon — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-09 — Phase 1 done: final `payCoupon` closes the bond, `BondMatured` added, `redeem` removed; contract docs, NatSpec pages, and the API ABI artifact updated
-**Current phase:** Phase 2: API ingestion, status, route removal, OpenAPI
-**Next action:** Open PR 1 from `feature/redeem-with-final-coupon` (Phases 0 and 1; not operator-safe alone, see plan); then Phase 2 step 1 — ingest `BondMatured` in `services/nb-bond-api/src/ingestion.ts`
+**Last updated:** 2026-09-09 — Phase 2 done on `feature/redeem-with-final-coupon-api` (stacked on PR #275): `BondMatured` ingested, `matured` is terminal, redemption route removed
+**Current phase:** Phase 3: UI
+**Next action:** Phase 3 step 1 — final payout preview in `services/nb-ui/src/pages/PayCouponModal.jsx`
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
 | 0 — Baseline, ingestion-order check, characterization | Done | baseline `forge test`: 25 suites, 393 passed; `BondManager.t.sol` asserts `paymentPerBond == 42` (49 passed); ingestion order verified, see below (2026-09-09) | PR 1 |
-| 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Done | `forge test`: 25 suites, 394 passed incl. closure, incomplete-holders, underfunded-closure, unsold-units, and fuzz cases; fmt and verify-mapping clean; ABI artifact refreshed (`BondMatured` present, `redeem` absent) (2026-09-09) | PR 1 |
-| 2 — API: ingestion, status, route removal, OpenAPI | Not started | | |
+| 1 — Contracts: closure in payCoupon, BondMatured, remove redeem | Done (PR #275 open) | `forge test`: 25 suites, 394 passed incl. closure, incomplete-holders, underfunded-closure, unsold-units, and fuzz cases; fmt and verify-mapping clean; ABI artifact refreshed (`BondMatured` present, `redeem` absent) (2026-09-09) | PR 1 |
+| 2 — API: ingestion, status, route removal, OpenAPI | Done | `BondMatured` → `MATURED` history entry with totals and the `matured` transition (sets both flags); `bondStatus` terminal `matured`, `redeemed` dropped from `BondStatus`; redemption route, handler, and OpenAPI path removed; `REDEMPTION` op type kept as legacy; reducer order-independence test; nb-bond-api lint, format, build, 245 jest tests green (2026-09-09) | PR 2 |
 | 3 — UI | Not started | | |
 | 4 — Fresh local sandbox validation | Not started | | |
 | 5 — Docs and archive | Not started | | |
