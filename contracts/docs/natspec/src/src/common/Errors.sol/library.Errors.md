@@ -279,10 +279,10 @@ error IncorrectBondState(string isin, bool expected);
 error NoFailedIssuance();
 ```
 
-### InvalidGovTbd
+### GovReserveAddressZero
 
 ```solidity
-error InvalidGovTbd();
+error GovReserveAddressZero();
 ```
 
 ### RedemptionIncomplete

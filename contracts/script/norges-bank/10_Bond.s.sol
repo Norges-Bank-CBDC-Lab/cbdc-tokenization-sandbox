@@ -19,11 +19,11 @@ contract BondScript is RegistryScript {
         uint256 deployerKey = vm.envUint("PK_DEPLOYER");
         uint256 ownerKey = vm.envUint("PK_NORGES_BANK");
         uint256 bondAdminKey = vm.envUint("PK_BOND_ADMIN");
+        uint256 govReserveKey = vm.envUint("PK_GOV_RESERVE");
 
         address registryAddr = vm.envAddress("REGISTRY_ADDR");
         address owner = vm.addr(ownerKey);
 
-        string memory govReserveName = vm.envString("TBD_NORDEA_CONTRACT_NAME");
         string memory bondAuctionName = vm.envString("BOND_AUCTION_CONTRACT_NAME");
         string memory bondManagerName = vm.envString("BOND_MANAGER_CONTRACT_NAME");
         string memory bondTokenName = vm.envString("BOND_TOKEN_CONTRACT_NAME");
@@ -35,10 +35,10 @@ contract BondScript is RegistryScript {
         _ensureRegistry(registryAddr, owner);
 
         GlobalRegistry registry = GlobalRegistry(registryAddr);
-        address govTbd = registry.getContract(govReserveName);
         address wnok = registry.getContract(vm.envString("WNOK_CONTRACT_NAME"));
 
         address bondAdminAddr = vm.addr(bondAdminKey);
+        address govReserveAddr = vm.addr(govReserveKey);
         address deployerAddr = vm.addr(deployerKey);
 
         vm.startBroadcast(deployerKey);
@@ -55,7 +55,7 @@ contract BondScript is RegistryScript {
             address(bondAuction),
             address(bondToken),
             address(bondDvp),
-            govTbd,
+            govReserveAddr,
             durationScalar
         );
 
