@@ -2,8 +2,8 @@
 
 **Plan:** [`plan.md`](plan.md)
 **Last updated:** 2026-09-08 — Phases 2 to 5 done on `feature/bond-cash-leg-wnok-api`; fresh-sandbox lifecycle run recorded
-**Current phase:** All phases done; waiting on PR #272 to merge before PR 2
-**Next action:** After PR #272 merges, rebase `feature/bond-cash-leg-wnok-api` onto `development`, rerun both package gates, open PR 2; archive this folder with `Status: Implemented` once PR 2 merges
+**Current phase:** Complete — #272 and #273 merged; folder archived 2026-09-08
+**Next action:** None; follow-ups are listed below and, where accepted, in `docs/KNOWN_ISSUES.md`
 
 ## Phase Log
 
@@ -72,7 +72,7 @@ step and the Banking page's TBD listing was unaffected.
 
 ## Blocked / Waiting On
 
-- PR #272 merge (operator), then rebase and open PR 2.
+- Nothing.
 
 ## Follow-ups Found Along the Way
 
