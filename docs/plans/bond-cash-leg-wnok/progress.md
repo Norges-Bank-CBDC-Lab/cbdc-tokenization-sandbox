@@ -1,18 +1,18 @@
 # Bond cash leg in wNOK — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-08 — Phase 1 done: `BondManager` settles every cash leg in WNOK from `GOV_RESERVE`; deploy scripts, tests, contract docs, and the API ABI artifact updated
-**Current phase:** Phase 2: API contract and revert decoding
-**Next action:** Open PR 1 from `feature/bond-cash-leg-wnok` (Phases 0 and 1); then Phase 2 step 1 — replace `getGovSettlementBank` with `getGovReserve` in `services/nb-bond-api/src/banking-tbd.ts`
+**Last updated:** 2026-09-08 — Phases 2 and 3 done on `feature/bond-cash-leg-wnok-api` (stacked on PR #272): Central Bank resource exposes `govReserve`, payouts and finalisation push live changes, UI updated
+**Current phase:** Phase 4: Fresh local sandbox validation (needs operator go-ahead to delete the local sandbox)
+**Next action:** After PR #272 merges, rebase `feature/bond-cash-leg-wnok-api` onto `development`; run Phase 4 on a fresh sandbox; then Phase 5 docs and open PR 2
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
 | 0 — Baseline and characterization | Done | baseline `forge test`: 24 suites, 390 passed; after adding assertions `BondManager.t.sol`: 47 passed (2026-09-07) | PR 1 |
-| 1 — BondManager cutover, deploy wiring, contract docs, ADR | Done | `forge build`, `forge test`: 25 suites, 393 passed (3 new cases); verify-mapping check passed; `grep private-bank` on `BondManager.sol` empty; nb-bond-api lint, format, and 244 jest tests green with the refreshed ABI (2026-09-08) | PR 1 |
-| 2 — API contract and revert decoding | Not started | | |
-| 3 — UI alignment | Not started | | |
+| 1 — BondManager cutover, deploy wiring, contract docs, ADR | Done (PR #272 open, all checks green) | `forge build`, `forge test`: 25 suites, 393 passed (3 new cases); verify-mapping check passed; `grep private-bank` on `BondManager.sol` empty; nb-bond-api lint, format, and 244 jest tests green with the refreshed ABI (2026-09-08) | PR 1 |
+| 2 — API contract and revert decoding | Done | `govReserve {address, wnokBalance}` replaces `govSettlementBank`; `openapi.json` regenerated (one resource changed); coupon, redemption, and finalisation decode with the WNOK ABI and publish `bidders` + `central-bank`; nb-bond-api lint, format, build, 245 jest tests green (2026-09-08) | PR 2 |
+| 3 — UI alignment | Done | Central Bank KPI shows the reserve's WNOK balance and address; coupon warning names the WNOK allowlist; nb-ui format, lint, build, 121 vitest tests green (2026-09-08) | PR 2 |
 | 4 — Fresh local sandbox validation | Not started | | |
 | 5 — Architecture docs, known issues, index | Not started | | |
 
@@ -68,8 +68,10 @@
 ## Session Handoff
 
 - Slither did not run locally (arm64); the Contracts CI job runs it on the PR.
-- The API still calls `BondManager.GOV_TBD()` in `banking-tbd.ts`; with the refreshed ABI the
-  call rejects and the Central Bank route degrades the field to `null` until Phase 2 lands.
+- `feature/bond-cash-leg-wnok-api` branches from `feature/bond-cash-leg-wnok` because PR #272
+  was not yet merged; rebase onto `development` once it is.
+- The new `getGovReserve` lives in `services/nb-bond-api/src/central-bank.ts` (a WNOK read),
+  not in the TBD roster module the old lookup came from.
 - The working tree on `development` carried unrelated uncommitted work when this plan was
   written: `ITbd` gained `mint`/`burn` declarations and an ERC-165 registration, and a new
   `contracts/src/settlement/` interbank-settlement set with its test. This plan does not touch

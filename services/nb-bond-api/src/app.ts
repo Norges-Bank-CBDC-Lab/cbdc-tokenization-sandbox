@@ -107,12 +107,12 @@ import {
 } from './bidders';
 import { BidderBidError, submitImpersonatedBid } from './bidder-bid';
 import {
-  CentralBankNotConfiguredError,
-  WnokUnavailableError,
   addToAllowlist,
   burnWnok,
+  CentralBankNotConfiguredError,
   getCbAddress,
   getCbWnokBalance,
+  getGovReserve,
   getWnokTotalSupply,
   isCentralBankReady,
   listAllowlist,
@@ -120,6 +120,7 @@ import {
   mintWnok,
   removeFromAllowlist,
   transferWnokFromCb,
+  WnokUnavailableError,
 } from './central-bank';
 import { withMd5 } from './http';
 import { provider } from './chain';
@@ -581,9 +582,9 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         // partition supply (CouponPaymentBalanceMismatch otherwise), so
         // treasury-held units — the unsold remainder the BondManager itself
         // keeps after a partial allocation — cannot be excluded here. When
-        // present they deadlock the payout on-chain: the government TBD's
-        // allowlist (correctly) refuses the manager contract, unless the
-        // operator explicitly allowlists it. See docs/KNOWN_ISSUES.md.
+        // present they deadlock the payout on-chain: the WNOK allowlist
+        // (correctly) refuses the manager contract, unless the operator
+        // explicitly allowlists it. See docs/KNOWN_ISSUES.md.
         const bondManager = await getBondManager();
         const managerAddress = bondManager.target.toString().toLowerCase();
 
@@ -594,8 +595,11 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
               opType: 'COUPON_PAYMENT',
               target: isin,
               detail: { holders: requested.length },
-              interfaces: [bondManager.interface, new Interface(tbdAbi)],
+              interfaces: [bondManager.interface, new Interface(wnokAbi)],
               txHashOf: (sent) => sent.tx.hash,
+              // Coupon cash moves WNOK from the reserve to the holders: the
+              // Bidders and Central Bank pages show those balances live.
+              changedResources: ['bidders', 'central-bank'],
             },
             () =>
               sendWithManagedNonce(async (nonce) => {
@@ -606,14 +610,14 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         } catch (err) {
           // Surface on-chain reverts readably; settlement failures wrap the
           // refusing token's own error in their lowLevelData bytes.
-          const description = describeRevert(err, [bondManager.interface, new Interface(tbdAbi)]);
+          const description = describeRevert(err, [bondManager.interface, new Interface(wnokAbi)]);
           if (description) {
             const treasuryHint =
               description.includes('AllowlistViolation') &&
               description.toLowerCase().includes(managerAddress)
                 ? ' — the BondManager holds unsold units from a partial allocation and is not ' +
-                  'allowlisted on the government settlement TBD; see docs/KNOWN_ISSUES.md for ' +
-                  'the workaround and the planned contract-side fix'
+                  'on the WNOK allowlist; allowlist it from the Central Bank page or see ' +
+                  'docs/KNOWN_ISSUES.md for the planned contract-side fix'
                 : '';
             throw conflict(`coupon payment reverted on-chain: ${description}${treasuryHint}`);
           }
@@ -650,8 +654,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
             opType: 'REDEMPTION',
             target: isin,
             detail: { holders: targetHolders.length },
-            interfaces: [bondManager.interface, new Interface(tbdAbi)],
+            interfaces: [bondManager.interface, new Interface(wnokAbi)],
             txHashOf: (sent) => sent.tx.hash,
+            // Redemption cash moves WNOK from the reserve to the holders.
+            changedResources: ['bidders', 'central-bank'],
           },
           () =>
             sendWithManagedNonce(async (nonce) => {
@@ -1006,7 +1012,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
               : '0x0000000000000000000000000000000000000000',
             available: false,
             wnok: null,
-            govSettlementBank: null,
+            govReserve: null,
           }),
         );
         return;
@@ -1020,16 +1026,16 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
             address: getCbAddress(),
             available: false,
             wnok: null,
-            govSettlementBank: null,
+            govReserve: null,
           }),
         );
         return;
       }
-      const [balance, allowlist, totalSupply, govSettlementBank] = await Promise.all([
+      const [balance, allowlist, totalSupply, govReserve] = await Promise.all([
         getCbWnokBalance().catch(() => 0n),
         listAllowlist().catch(() => [] as string[]),
         getWnokTotalSupply().catch(() => 0n),
-        banking.getGovSettlementBank().catch(() => null),
+        getGovReserve().catch(() => null),
       ]);
       okResponse(
         req,
@@ -1043,7 +1049,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
             totalSupply: totalSupply.toString(),
             allowlistSize: allowlist.length,
           },
-          govSettlementBank,
+          govReserve,
         }),
       );
     } catch (err) {

@@ -27,9 +27,9 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
 
   // The on-chain payCoupon requires covering EVERY holder — including the
   // BondManager itself when a partial allocation left it holding unsold
-  // units. Such treasury-held units deadlock the payout (the government
-  // TBD's allowlist refuses the manager contract), so flag them loudly
-  // before the operator fires a doomed transaction.
+  // units. Such treasury-held units deadlock the payout (the WNOK
+  // allowlist refuses the manager contract), so flag them loudly before
+  // the operator fires a doomed transaction.
   const managerAddress = (bond.contracts?.manager ?? '').toLowerCase();
   const holders = bond.holders ?? [];
   const isTreasury = (h) => (h.holder ?? '').toLowerCase() === managerAddress;
@@ -111,9 +111,9 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
       {treasuryHeld && (
         <div className="error" style={{ marginTop: 8 }}>
           This bond has treasury-held units — the unsold remainder sits on the bond manager after a
-          partial allocation. On-chain payout must cover every holder, and the government TBD&apos;s
-          allowlist blocks the manager, so this payment will fail unless the manager is explicitly
-          allowlisted there. See docs/KNOWN_ISSUES.md.
+          partial allocation. On-chain payout must cover every holder, and the WNOK allowlist blocks
+          the manager, so this payment will fail unless the manager is allowlisted from the Central
+          Bank page. See docs/KNOWN_ISSUES.md.
         </div>
       )}
 
