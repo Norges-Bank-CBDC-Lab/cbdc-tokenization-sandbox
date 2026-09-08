@@ -124,8 +124,9 @@ Foundry. Key components include:
     sandbox
 - bond lifecycle contracts under `contracts/src/norges-bank/`
   - `BondManager`: issuer-controlled entrypoint for creating bonds and auctions,
-    finalising auctions with DvP settlement, and paying coupons, buybacks, and
-    redemptions; every cash leg settles in `Wnok` against one government
+    finalising auctions with DvP settlement, and paying coupons and buybacks;
+    the final coupon also repays principal, burns every unit, and closes the
+    bond (ADR 0005); every cash leg settles in `Wnok` against one government
     reserve account fixed at deployment (`GOV_RESERVE`), see ADR 0004
   - `BondAuction`: sealed-bid auction contract that accepts encrypted bids and
     publishes allocations during finalisation
@@ -348,7 +349,7 @@ For concrete sequences and state/data flows, see:
 - [bond lifecycle](diagrams/processes/bond-lifecycle.md)
 - [auction sequence](diagrams/processes/auction-sequence.md)
 - [bid cryptography](diagrams/processes/bid-cryptography-flow.md)
-- [coupon and redemption](diagrams/processes/coupon-redemption-sequence.md)
+- [coupon and maturity](diagrams/processes/coupon-redemption-sequence.md)
 - [sandbox bank creation](diagrams/processes/bank-creation-sequence.md)
 - [mutation and projection catch-up](diagrams/processes/mutation-projection-sequence.md)
 - [live update flow](diagrams/processes/live-update-sequence.md)

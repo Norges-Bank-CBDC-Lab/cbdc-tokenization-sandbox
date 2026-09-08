@@ -151,11 +151,10 @@ describe('composeBond projection checkpoint coupon semantics', () => {
     [{ everIssued: 0, totalSupply: '0' }, undefined, 'staged'],
     [{ everIssued: 0, totalSupply: '0' }, 'open', 'auctioning'],
     [{ everIssued: 1, totalSupply: '100' }, 'finalised', 'outstanding'],
-    [{ everIssued: 1, totalSupply: '100', isMatured: 1 }, 'finalised', 'matured'],
     [
       { everIssued: 1, totalSupply: '0', isMatured: 1, redemptionComplete: 1 },
       'finalised',
-      'redeemed',
+      'matured',
     ],
   ] as const)('derives the durable %s lifecycle status', async (state, auction, expected) => {
     seedContext(db, 1060);

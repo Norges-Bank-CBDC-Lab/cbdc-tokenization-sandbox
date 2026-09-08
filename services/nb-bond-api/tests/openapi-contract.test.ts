@@ -40,7 +40,6 @@ describe('generated OpenAPI integrity', () => {
     const operations = [
       paths['/v1/bonds'].post,
       paths['/v1/bonds/{isin}/coupon-payments'].post,
-      paths['/v1/bonds/{isin}/redemptions'].post,
       paths['/v1/bonds/{isin}/auctions'].post,
       paths['/v1/auctions/{auctionId}'].patch,
       paths['/v1/auctions/{auctionId}'].delete,
@@ -57,13 +56,7 @@ describe('generated OpenAPI integrity', () => {
   it('advertises only durable lifecycle states', () => {
     const schemas = (document.components as JsonObject).schemas as Record<string, JsonObject>;
     expect(schemas.AuctionStatus.enum).toEqual(['open', 'closed', 'finalised', 'cancelled']);
-    expect(schemas.BondStatus.enum).toEqual([
-      'staged',
-      'auctioning',
-      'outstanding',
-      'matured',
-      'redeemed',
-    ]);
+    expect(schemas.BondStatus.enum).toEqual(['staged', 'auctioning', 'outstanding', 'matured']);
     expect((schemas.FinaliseBody.properties as JsonObject).approve).toMatchObject({ const: true });
   });
 });

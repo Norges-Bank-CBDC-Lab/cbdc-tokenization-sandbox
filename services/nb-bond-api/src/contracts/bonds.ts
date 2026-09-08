@@ -14,9 +14,11 @@ import {
   unixSecondsSchema,
 } from './common';
 
-export const bondStatusSchema = z
-  .enum(['staged', 'auctioning', 'outstanding', 'matured', 'redeemed'])
-  .meta({ id: 'BondStatus', description: 'Bond lifecycle status' });
+export const bondStatusSchema = z.enum(['staged', 'auctioning', 'outstanding', 'matured']).meta({
+  id: 'BondStatus',
+  description:
+    'Bond lifecycle status. `matured` is terminal: the final coupon paid principal and every unit was burned.',
+});
 
 export const holderBalanceSchema = z
   .object({ holder: addressSchema, balance: bigIntStringSchema, md5: md5Schema })
@@ -218,7 +220,8 @@ export const bondPaths: ZodOpenApiPathsObject = {
       tags: ['bonds'],
       operationId: 'payCoupon',
       summary:
-        'Pay coupon to bond holders. Operator-only — the cash leg is paid from the government ' +
+        'Pay the next coupon to bond holders; the final payment also repays principal, burns every ' +
+        'unit, and closes the bond. Operator-only — the cash leg is paid in WNOK from the government ' +
         'reserve (entra mode requires an operator App Role; 403 otherwise).',
       parameters: [isinPathParam],
       requestBody: {
@@ -227,23 +230,6 @@ export const bondPaths: ZodOpenApiPathsObject = {
       },
       responses: {
         200: successJson('Updated bond after submitting the coupon-payment tx', bondSchema, true),
-        202: mutationAcceptedJson,
-        ...errorRefs.mutate,
-      },
-    },
-  },
-  '/v1/bonds/{isin}/redemptions': {
-    post: {
-      tags: ['bonds'],
-      operationId: 'redeem',
-      summary: 'Redeem bond tokens for holders',
-      parameters: [isinPathParam],
-      requestBody: {
-        required: true,
-        content: { 'application/json': { schema: holdersBodySchema } },
-      },
-      responses: {
-        200: successJson('Updated bond after submitting the redemption tx', bondSchema, true),
         202: mutationAcceptedJson,
         ...errorRefs.mutate,
       },

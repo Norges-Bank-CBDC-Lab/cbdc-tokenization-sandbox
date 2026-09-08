@@ -62,12 +62,13 @@ const NOT_DUE_BOND = {
   md5: 'b2',
 };
 
-// All paid: matured, no next payout.
+// Closed: the final coupon paid principal and burned every unit, so the
+// bond is matured with zero supply and must NOT be listed.
 const ALL_PAID_BOND = {
   isin: 'NO0000000003',
   status: 'matured',
   disabled: false,
-  totalSupply: '200',
+  totalSupply: '0',
   contracts: { token: '0xa', auction: '0xb', manager: '0xc' },
   maturity: { duration: '300', durationYears: '5', date: '900', remaining: '0' },
   coupon: {
@@ -79,7 +80,7 @@ const ALL_PAID_BOND = {
     payable: false,
     payments: { total: '5', made: '5', remaining: '0' },
   },
-  holders: [{ holder: HOLDER_B, balance: '200', md5: 'h4' }],
+  holders: [],
   auctions: [],
   md5: 'b3',
 };
@@ -100,6 +101,18 @@ const UNISSUED_BOND = {
 
 const FIXTURE_BONDS = [PAYABLE_BOND, NOT_DUE_BOND, ALL_PAID_BOND, UNISSUED_BOND];
 
+vi.mock('../src/api/centralBankApi.js', () => ({
+  CentralBankApi: {
+    getCentralBank: vi.fn().mockResolvedValue({
+      available: true,
+      govReserve: {
+        address: '0x3333333333333333333333333333333333333333',
+        wnokBalance: '10000000',
+      },
+    }),
+  },
+}));
+
 vi.mock('../src/api/bondsApi.js', () => ({
   BondsApi: {
     listBonds: vi.fn().mockResolvedValue([]),
@@ -108,7 +121,6 @@ vi.mock('../src/api/bondsApi.js', () => ({
     disableBond: vi.fn(),
     listBondHistory: vi.fn(),
     payCoupon: vi.fn(),
-    redeem: vi.fn(),
   },
 }));
 
@@ -139,7 +151,7 @@ describe('CouponPayoutPage', () => {
     const dueNow = screen.getByText('Due now').closest('.kpi');
     expect(within(dueNow).getByText('1')).toBeInTheDocument();
 
-    // 4 + 5 + 0 remaining across the three listed bonds.
+    // 4 + 5 remaining across the two listed bonds.
     const outstanding = screen.getByText('Coupons outstanding').closest('.kpi');
     expect(within(outstanding).getByText('9')).toBeInTheDocument();
 
@@ -152,7 +164,8 @@ describe('CouponPayoutPage', () => {
     await renderPage();
 
     expect(screen.getByText('NO0000000002')).toBeInTheDocument();
-    expect(screen.getByText('NO0000000003')).toBeInTheDocument();
+    // Closed by its final coupon (matured, zero supply): no longer a work item.
+    expect(screen.queryByText('NO0000000003')).not.toBeInTheDocument();
     expect(screen.queryByText('NO0000000009')).not.toBeInTheDocument();
   });
 
@@ -170,9 +183,8 @@ describe('CouponPayoutPage', () => {
       `Not due yet — next payout ${Fmt.formatUnixDate('2060')}`,
     );
 
-    const allPaidBtn = within(rowFor('NO0000000003')).getByRole('button', { name: 'Pay coupon' });
-    expect(allPaidBtn).toBeDisabled();
-    expect(allPaidBtn).toHaveAttribute('title', 'All coupons paid');
+    // A closed bond (matured, zero supply) has left the work queue.
+    expect(screen.queryByText('NO0000000003')).not.toBeInTheDocument();
   });
 
   it('renders "Issued <date>" as the previous payout until the first coupon lands', async () => {
@@ -185,8 +197,6 @@ describe('CouponPayoutPage', () => {
     expect(
       within(rowFor('NO0000000001')).getByText(Fmt.formatUnixDate('1000')),
     ).toBeInTheDocument();
-    // All coupons paid → no next payout.
-    expect(within(rowFor('NO0000000003')).getByText('—')).toBeInTheDocument();
   });
 
   it('opens the confirmation modal with per-holder amounts and pays on confirm', async () => {
@@ -230,12 +240,11 @@ describe('CouponPayoutPage', () => {
     expect(screen.getByRole('heading', { name: 'Pay coupon on NO0000000001' })).toBeInTheDocument();
   });
 
-  it('flags treasury-held units (the bond manager) in the payment preview', async () => {
-    // A partial allocation leaves unsold units on the BondManager itself.
+  it('shows unsold manager-held units as earning no coupon in the payment preview', async () => {
+    // A failed allocation leaves unsold units on the BondManager itself.
     // The contract requires covering EVERY holder, so the preview keeps
-    // the manager row (labelled) and warns that the payout will fail on
-    // the WNOK allowlist. Mixed casing proves the address
-    // match is case-insensitive.
+    // the manager row (labelled) but pays it nothing. Mixed casing proves
+    // the address match is case-insensitive.
     const MANAGER = '0xCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCcCc';
     const bond = {
       ...PAYABLE_BOND,
@@ -248,14 +257,64 @@ describe('CouponPayoutPage', () => {
     const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
     render(<PayCouponModal bond={bond} onClose={() => {}} onPaid={() => {}} />);
 
-    // Both rows render (header + 2 holders + total), the manager row is
-    // labelled, and the warning is shown before any transaction fires.
     expect(screen.getAllByRole('row')).toHaveLength(4);
-    expect(screen.getByText('(treasury)')).toBeInTheDocument();
-    expect(screen.getByText(/treasury-held units/i)).toBeInTheDocument();
-    expect(screen.getByText(/will fail unless the manager is allowlisted/)).toBeInTheDocument();
-    // Total covers ALL holders — the full cash leg the contract demands:
-    // (600 + 400) units × 4.25% of face = 42.50 K NOK.
-    expect(screen.getByText('42.50 K NOK')).toBeInTheDocument();
+    expect(screen.getByText('(unsold, held by manager)')).toBeInTheDocument();
+    expect(screen.getByText('no coupon')).toBeInTheDocument();
+    expect(
+      screen.getByText(/400 unsold units held by the bond manager earn no coupon/),
+    ).toBeInTheDocument();
+    // Holder row and total both show 600 × 4.25% of face = 25.50 K NOK (the manager adds nothing).
+    expect(screen.getAllByText('25.50 K NOK')).toHaveLength(2);
+    expect(screen.queryByText(/will fail/)).not.toBeInTheDocument();
+  });
+
+  it('previews coupon plus principal and the burn of unsold units on the final coupon', async () => {
+    const MANAGER = '0xcccccccccccccccccccccccccccccccccccccccc';
+    const bond = {
+      ...PAYABLE_BOND,
+      contracts: { ...PAYABLE_BOND.contracts, manager: MANAGER },
+      coupon: { ...PAYABLE_BOND.coupon, payments: { total: '5', made: '4', remaining: '1' } },
+      holders: [
+        { holder: HOLDER_A, balance: '600', md5: 'h1' },
+        { holder: MANAGER, balance: '400', md5: 'hm' },
+      ],
+    };
+    const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
+    render(<PayCouponModal bond={bond} onClose={() => {}} onPaid={() => {}} />);
+
+    expect(
+      screen.getByRole('heading', { name: 'Pay final coupon on NO0000000001' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Pay final coupon and close bond' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Principal')).toBeInTheDocument();
+    expect(screen.getByText('burned, no payment')).toBeInTheDocument();
+    // Holder A: coupon 600 × 4.25% = 25.5 units, principal 600 units, total 625.5 units × 1000 NOK.
+    expect(screen.getAllByText('600.00 K NOK').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('625.50 K NOK').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/400 unsold units held by the bond manager are burned without payment/),
+    ).toBeInTheDocument();
+    // Reserve (10,000,000 NOK) covers 625,500 NOK: no warning.
+    expect(screen.queryByText(/reserve holds/)).not.toBeInTheDocument();
+  });
+
+  it('warns when the government reserve cannot cover the final payout', async () => {
+    const { CentralBankApi } = await import('../src/api/centralBankApi.js');
+    CentralBankApi.getCentralBank.mockResolvedValueOnce({
+      available: true,
+      govReserve: { address: '0x3333333333333333333333333333333333333333', wnokBalance: '500000' },
+    });
+    const bond = {
+      ...PAYABLE_BOND,
+      coupon: { ...PAYABLE_BOND.coupon, payments: { total: '5', made: '4', remaining: '1' } },
+    };
+    const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
+    render(<PayCouponModal bond={bond} onClose={() => {}} onPaid={() => {}} />);
+
+    // 1000 units: coupon 42.5 + principal 1000 = 1,042,500 NOK > 500,000 NOK reserve.
+    expect(await screen.findByText(/reserve holds 500,000 WNOK/)).toBeInTheDocument();
+    expect(screen.getByText(/whole transaction will revert/)).toBeInTheDocument();
   });
 });

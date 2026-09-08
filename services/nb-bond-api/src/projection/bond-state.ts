@@ -37,7 +37,6 @@ export type BondProjectionEvent =
   | { type: 'issuance-complete' }
   | { type: 'coupon-paid'; paymentNumber: bigint; blockTimestamp: bigint }
   | { type: 'matured' }
-  | { type: 'redemption-complete' }
   | { type: 'supply-delta'; delta: bigint };
 
 export function emptyBondState(isin: string, partition: string): BondState {
@@ -105,9 +104,9 @@ export function reduceBondState(
       }
       break;
     case 'matured':
+      // BondMatured: the final coupon paid principal and burned every unit,
+      // so maturity and redemption complete together.
       next.isMatured = true;
-      break;
-    case 'redemption-complete':
       next.redemptionComplete = true;
       break;
     case 'supply-delta': {

@@ -42,8 +42,6 @@
   --status-outstanding-fg: #345016;
   --status-matured-bg: #c8cfb0;
   --status-matured-fg: #3f4d24;
-  --status-redeemed-bg: #ddd4ba;
-  --status-redeemed-fg: #5f5a4e;
 
   /* type */
   --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -550,10 +548,6 @@ footer.app-footer {
 .badge-matured {
   background: var(--status-matured-bg);
   color: var(--status-matured-fg);
-}
-.badge-redeemed {
-  background: var(--status-redeemed-bg);
-  color: var(--status-redeemed-fg);
 }
 .badge-unknown {
   background: var(--surface-2);

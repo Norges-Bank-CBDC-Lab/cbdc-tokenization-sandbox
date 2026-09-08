@@ -1,9 +1,11 @@
-# Coupon and Redemption Sequence
+# Coupon and Maturity Sequence
 
-Coupon and redemption cash is WNOK, paid from the government reserve account
-fixed on `BondManager` at deployment (`GOV_RESERVE`). Payouts move existing
-WNOK; nothing is minted. The API derives holders from the chain projection
-unless the operator supplies an explicit list.
+Coupon cash is WNOK, paid from the government reserve account fixed on
+`BondManager` at deployment (`GOV_RESERVE`). Payouts move existing WNOK; nothing
+is minted. The final coupon also repays principal, burns every unit, and closes
+the bond in the same transaction; there is no separate redemption step. The API
+derives holders from the chain projection unless the operator supplies an
+explicit list.
 
 ```mermaid
 sequenceDiagram
@@ -26,43 +28,43 @@ sequenceDiagram
         API->>DB: Resolve active holders when omitted
         API->>BM: payCoupon(isin, holders)
         BM->>BT: getCouponDetails(isin)
-        BM->>BM: Verify due time and calculate<br/>nominal × yield per unit
+        BM->>BM: Verify due time; compute nominal × yield per unit;<br/>final period = last expected payment
+
+        opt Final period
+            BM->>BT: setMatured(isin)
+        end
 
         loop Every supplied holder with balance
             BM->>BT: balanceOfByPartition(partition, holder)
-            BM->>DVP: settle cash-only coupon
-            DVP->>WNOK: transferFrom(government reserve, holder, amount)
-            WNOK-->>Holder: WNOK balance increases
+            alt Holder is BondManager itself (unsold units)
+                BM->>BM: Count as unsold, pay nothing
+            else Interim period
+                BM->>DVP: settle cash-only coupon
+                DVP->>WNOK: transferFrom(government reserve, holder, coupon)
+                WNOK-->>Holder: WNOK balance increases
+            else Final period
+                BM->>DVP: settle Redeem: burn units + coupon plus principal
+                DVP->>BT: redeemFor(holder, isin, balance)
+                DVP->>WNOK: transferFrom(government reserve, holder, coupon + nominal)
+                WNOK-->>Holder: WNOK balance increases, units gone
+            end
         end
 
-        BM->>BT: Verify processed balance equals total supply
+        BM->>BT: Verify paid + unsold balances equal total supply
         BM->>BT: updateCouponPayment(timestamp, count)
-        opt Final expected coupon
-            BM->>BT: setMatured(isin)
+        opt Final period
+            BM->>BT: redeemFor(BondManager, isin, unsold) — burn without payment
+            BM->>BT: Require partition totalSupply == 0
+            BM-->>API: BondMatured(isin, paymentCount, principalPaid, couponPaid, unsoldBurned)
         end
         API->>DB: Wait for receipt block projection
-        API-->>UI: Updated bond or HTTP 202 if projection is pending
+        API-->>UI: Updated bond (status matured after the final period) or HTTP 202 if pending
     end
-
-    Operator->>UI: Approve redemption
-    UI->>API: POST /v1/bonds/{isin}/redemptions {holders?}
-    API->>DB: Resolve active holders when omitted
-    API->>BM: redeem(isin, holders)
-
-    loop Every supplied holder with balance
-        BM->>BT: balanceOfByPartition(partition, holder)
-        BM->>DVP: settle redemption<br/>nominal cash + bond burn
-        DVP->>BT: redeemFor(holder, isin, balance, operator)
-        DVP->>WNOK: transferFrom(government reserve, holder, nominal)
-        WNOK-->>Holder: WNOK balance increases
-    end
-
-    BM->>BT: Require partition totalSupply == 0
-    API->>DB: Wait for receipt block projection
-    API-->>UI: Redeemed bond or HTTP 202 if projection is pending
 ```
 
-Unlike auction allocation settlement, these loops do not catch DvP failures.
-Any failure reverts the entire coupon or redemption transaction. Coupon payout
-also reverts unless the supplied holders account for the full partition supply;
-redemption reverts unless no supply remains afterward.
+Unlike auction allocation settlement, this loop does not catch DvP failures.
+Any failure reverts the entire coupon transaction, including the closing one,
+so a reserve shortfall on the final period blocks closure rather than paying
+some holders. Coupon payout also reverts unless the supplied holders (plus any
+unsold units the manager holds) account for the full partition supply, and the
+final period reverts unless no supply remains afterward.

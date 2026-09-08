@@ -11,7 +11,7 @@
  *     by the error middleware
  *
  * Mutations always return the *updated parent* (Bond after coupon /
- * redeem / createAuction; Auction after close / cancel / finalise) so
+ * createAuction; Auction after close / cancel / finalise) so
  * the UI can atomically swap its cache.
  */
 import cors from 'cors';
@@ -579,14 +579,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         }
 
         // BondManager.payCoupon requires the holder set to cover the ENTIRE
-        // partition supply (CouponPaymentBalanceMismatch otherwise), so
-        // treasury-held units — the unsold remainder the BondManager itself
-        // keeps after a partial allocation — cannot be excluded here. When
-        // present they deadlock the payout on-chain: the WNOK allowlist
-        // (correctly) refuses the manager contract, unless the operator
-        // explicitly allowlists it. See docs/KNOWN_ISSUES.md.
+        // partition supply (CouponPaymentBalanceMismatch otherwise), so unsold
+        // units the BondManager itself keeps after a failed allocation stay in
+        // the list; on-chain they earn no coupon and are burned at maturity.
         const bondManager = await getBondManager();
-        const managerAddress = bondManager.target.toString().toLowerCase();
 
         try {
           const sent = await withOperationRecording(
@@ -612,59 +608,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
           // refusing token's own error in their lowLevelData bytes.
           const description = describeRevert(err, [bondManager.interface, new Interface(wnokAbi)]);
           if (description) {
-            const treasuryHint =
-              description.includes('AllowlistViolation') &&
-              description.toLowerCase().includes(managerAddress)
-                ? ' — the BondManager holds unsold units from a partial allocation and is not ' +
-                  'on the WNOK allowlist; allowlist it from the Central Bank page or see ' +
-                  'docs/KNOWN_ISSUES.md for the planned contract-side fix'
-                : '';
-            throw conflict(`coupon payment reverted on-chain: ${description}${treasuryHint}`);
+            throw conflict(`coupon payment reverted on-chain: ${description}`);
           }
           throw err;
         }
-
-        const bond = await composeBond(historyDb, isin);
-        if (!bond) throw notFound(`bond ${isin} not found`);
-        okResponse(req, res, bond);
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
-
-  app.post(
-    '/v1/bonds/:isin/redemptions',
-    validateRequest(isinParamSchema, 'params'),
-    validateRequest(holdersBodySchema),
-    async (req, res, next) => {
-      try {
-        const { isin } = req.params as { isin: string };
-        const { holders } = req.body as HoldersBody;
-        const targetHolders =
-          holders && holders.length > 0 ? holders : await getActiveHolders(isin);
-        if (!targetHolders.length) {
-          throw notFound('no holders found for redemption');
-        }
-
-        const bondManager = await getBondManager();
-        const sent = await withOperationRecording(
-          {
-            db: biddersDb,
-            opType: 'REDEMPTION',
-            target: isin,
-            detail: { holders: targetHolders.length },
-            interfaces: [bondManager.interface, new Interface(wnokAbi)],
-            txHashOf: (sent) => sent.tx.hash,
-            // Redemption cash moves WNOK from the reserve to the holders.
-            changedResources: ['bidders', 'central-bank'],
-          },
-          () =>
-            sendWithManagedNonce(async (nonce) => {
-              return bondManager.redeem(isin, targetHolders, { nonce });
-            }),
-        );
-        await awaitMutationProjection(sent, { type: 'bond', id: isin });
 
         const bond = await composeBond(historyDb, isin);
         if (!bond) throw notFound(`bond ${isin} not found`);
