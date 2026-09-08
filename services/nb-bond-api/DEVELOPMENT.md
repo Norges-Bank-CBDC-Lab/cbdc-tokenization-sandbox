@@ -146,7 +146,7 @@ Two architectural rules apply across the surface:
   and `holders[]`. Single-resource GETs (`GET /v1/bonds/{isin}`,
   `GET /v1/auctions/{id}`) return the same DTO sub-shape so the UI
   can deep-link without first fetching the parent.
-- **Mutations return the updated parent.** Coupon / redeem /
+- **Mutations return the updated parent.** Coupon /
   createAuction respond with the new `Bond`. Close / cancel /
   finalise respond with the new `Auction`. The caller swaps its
   cache atomically — no follow-up GET needed.
@@ -176,8 +176,6 @@ failures populate `errors[]` with `{ field, message }` entries.
 - `POST /v1/bonds/{isin}/coupon-payments` (`operationId: payCoupon`)
   - Body: `HoldersBody` (`{ holders: Address[] | null }`); `null` defaults to all current holders.
   - Returns the updated `Bond` (response replaces the cached parent).
-- `POST /v1/bonds/{isin}/redemptions` (`operationId: redeem`)
-  - Body: `HoldersBody`. Returns the updated `Bond`.
 - `GET /v1/bonds/{isin}/history` (`operationId: listBondHistory`)
   - Returns `HistoryEvent[]` directly (no wrapper). Combines auction and bond events for the ISIN.
   - Query: `before` (cursor block, exclusive), `limit` (default 100, max 500).
@@ -286,21 +284,20 @@ Buyback-specific notes:
 - Bids represent offers from holders to sell back to the issuer at a quoted price per 100, represented in `rate` (bps precision).
 - Allocation is computed by taking the cheapest offers first until the target is filled. The allocation is pay-as-bid (each accepted offer can have its own price).
 
-### 6.4 Scenario 5, coupon payments and redemption
+### 6.4 Scenario 5, coupon payments and maturity
 
 Coupon payment:
 
 1. Determine holders:
    - Option A: let the API resolve holders, call `POST /v1/bonds/{isin}/coupon-payments` with `{ "holders": null }`.
-   - Option B: call `GET /v1/bonds/{isin}` and submit a subset from `bond.holders[].holder` explicitly.
+   - Option B: call `GET /v1/bonds/{isin}` and submit the full holder set from `bond.holders[].holder` explicitly (it must cover every unit, including any the BondManager holds after a failed allocation).
 2. Submit: `POST /v1/bonds/{isin}/coupon-payments`. The response is the updated `Bond` — its `coupon.payments.{made,remaining}` counters reflect the new payment.
-3. Verify via `GET /v1/bonds/{isin}/history` for the `COUPON_PAID` event.
+3. Verify via `GET /v1/bonds/{isin}/history` for the `COUPON_PAID` events.
 
-Redemption:
+Maturity: the final coupon payment (`coupon.payments.remaining == 1` before the call) also repays principal to every holder, burns every unit (unsold manager-held units without payment), and closes the bond.
 
-1. Determine holders as above.
-2. Submit: `POST /v1/bonds/{isin}/redemptions`. The response is the updated `Bond`.
-3. Verify: `GET /v1/bonds/{isin}` should report `status: "redeemed"` once total supply reaches zero.
+1. Submit the same `POST /v1/bonds/{isin}/coupon-payments`.
+2. Verify: `GET /v1/bonds/{isin}` reports `status: "matured"` with `totalSupply: "0"`, and the history holds `COUPON_PAID` and `REDEEMED` per holder plus one `MATURED` event carrying `paymentCount`, `principalPaid`, `couponPaid`, and `unsoldBurned`.
 
 ### 6.5 Scenario 3, secondary trading (note)
 

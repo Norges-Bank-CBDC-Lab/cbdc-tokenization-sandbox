@@ -91,7 +91,7 @@ Recent coverage additions include:
   coupon configuration, and maturity state in
   `test/invariant/BondToken.invariant.t.sol`
 - property-style tests for auction finalisation, issuance cash-leg failure,
-  coupon distribution, and redemption flow in
+  coupon distribution, and maturity closure in
   `test/norges-bank/BondAuction.t.sol` and
   `test/norges-bank/BondManager.t.sol`
 

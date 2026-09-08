@@ -34,31 +34,6 @@
   broker-less issuance orders, and a decision on whether repeated unknown
   failures should evict the maker.
 
-## Partially allocated bonds deadlock coupon payment and redemption on-chain
-- When an auction is finalised with less than full allocation (or a
-  buyback repurchases units), the remainder stays on the BondManager's
-  own balance — the manager contract is a "holder" of its own bond.
-- Such bonds cannot pay coupons or redeem on-chain today, in both
-  directions of the pincer:
-  - `BondManager.payCoupon` and `redeem` require the processed holder
-    set to cover the **entire** partition supply
-    (`CouponPaymentBalanceMismatch` / the redeem zero-supply check), so
-    the manager cannot be skipped;
-  - including the manager fails the cash leg with
-    `SettlementFailure(AllowlistViolation)` because the WNOK allowlist
-    (correctly) does not include the manager contract.
-- The API surfaces these reverts as readable 409 details (nested custom
-  errors decoded, with a treasury-specific hint), and the payout modal
-  flags treasury-held units with a warning before the transaction is
-  attempted.
-- Sandbox workarounds: allowlist the BondManager on WNOK via the Central
-  Bank page (the payment then succeeds; the treasury's own coupon cash
-  accrues to the manager contract), or use fully-allocated auctions when
-  coupon/redemption flows are being tested.
-- Planned follow-up (contract-side decision): burn unsold units at
-  finalisation, or skip self-held units in `payCoupon` / `redeem`
-  on-chain.
-
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
   finality but no Byzantine fault tolerance.

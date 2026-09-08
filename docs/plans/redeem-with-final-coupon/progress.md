@@ -1,9 +1,9 @@
 # Redeem with the final coupon — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-09 — Phases 2 and 3 done on `feature/redeem-with-final-coupon-api` (stacked on PR #275); UI previews coupon plus principal and warns on a short reserve
+**Last updated:** 2026-09-09 — Phases 2, 3, and 5 done on `feature/redeem-with-final-coupon-api` (stacked on PR #275); Phase 4 (fresh sandbox) pending the operator's go-ahead
 **Current phase:** Phase 4: Fresh local sandbox validation (needs operator go-ahead to delete the local sandbox)
-**Next action:** Phase 5 docs (no sandbox needed), then Phase 4 on a fresh sandbox after the operator's go-ahead; rebase onto `development` once PR #275 merges and open PR 2
+**Next action:** Phase 4 on a fresh sandbox after the operator's go-ahead (`./sandbox.sh delete` then `start`); rebase onto `development` once PR #275 merges and open PR 2
 
 ## Phase Log
 
@@ -14,7 +14,7 @@
 | 2 — API: ingestion, status, route removal, OpenAPI | Done | `BondMatured` → `MATURED` history entry with totals and the `matured` transition (sets both flags); `bondStatus` terminal `matured`, `redeemed` dropped from `BondStatus`; redemption route, handler, and OpenAPI path removed; `REDEMPTION` op type kept as legacy; reducer order-independence test; nb-bond-api lint, format, build, 245 jest tests green (2026-09-09) | PR 2 |
 | 3 — UI | Done | Pay-coupon modal: final period shows coupon, principal, and total per holder, unsold manager-held units as burned without payment, and a reserve-shortfall warning from the Central Bank resource; payout page hint and empty state; Bonds filter drops `redeemed`; Bond detail tooltips; `BondsApi.redeem` and the `redeemed` badge style removed; nb-ui format, lint, build, 123 vitest tests green (2026-09-09) | PR 2 |
 | 4 — Fresh local sandbox validation | Not started | | |
-| 5 — Docs and archive | Not started | | |
+| 5 — Docs | Done | coupon/maturity sequence diagram rewritten; lifecycle classifier and state diagram drop `redeemed`; architecture, diagrams index, contracts README, API DEVELOPMENT scenario 6.4 and route list updated; treasury-held-units known issue removed (resolved by construction); closed-loop plan Phase 6 note extended; stale treasury hint removed from the coupon route; hygiene and link checks green (2026-09-09). ADR status flip and archive follow PR 2's merge | PR 2 |
 
 ## Deviations From the Plan
 
