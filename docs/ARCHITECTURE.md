@@ -123,16 +123,18 @@ Foundry. Key components include:
   - predeployed in the Besu genesis so its address stays stable in the local
     sandbox
 - bond lifecycle contracts under `contracts/src/norges-bank/`
-  - `BondManager`: issuer-controlled entrypoint for creating bonds and auctions
-    and for finalising auctions with DvP settlement
+  - `BondManager`: issuer-controlled entrypoint for creating bonds and auctions,
+    finalising auctions with DvP settlement, and paying coupons, buybacks, and
+    redemptions; every cash leg settles in `Wnok` against one government
+    reserve account fixed at deployment (`GOV_RESERVE`), see ADR 0004
   - `BondAuction`: sealed-bid auction contract that accepts encrypted bids and
     publishes allocations during finalisation
   - `BondToken`: partitioned bond token keyed by ISIN
   - `BondDvP`: settlement component that coordinates the cash leg against the
     bond leg
 - cash-side token
-  - `Wnok` (`contracts/src/norges-bank/Wnok.sol`): mock cash token used for
-    local settlement flows
+  - `Wnok` (`contracts/src/norges-bank/Wnok.sol`): mock central-bank cash token
+    used for every bond cash leg and for local settlement flows
 
 > **Planned — decided, not yet implemented:** this ERC-1410-based security-token
 > design is slated to migrate to canonical **ERC-3643 (T-REX)** — a shared on-chain

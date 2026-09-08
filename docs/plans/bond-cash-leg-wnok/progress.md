@@ -1,9 +1,9 @@
 # Bond cash leg in wNOK — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-08 — Phases 2 and 3 done on `feature/bond-cash-leg-wnok-api` (stacked on PR #272): Central Bank resource exposes `govReserve`, payouts and finalisation push live changes, UI updated
-**Current phase:** Phase 4: Fresh local sandbox validation (needs operator go-ahead to delete the local sandbox)
-**Next action:** After PR #272 merges, rebase `feature/bond-cash-leg-wnok-api` onto `development`; run Phase 4 on a fresh sandbox; then Phase 5 docs and open PR 2
+**Last updated:** 2026-09-08 — Phases 2, 3, and 5 done on `feature/bond-cash-leg-wnok-api`; Phase 4 (fresh local sandbox run) in progress
+**Current phase:** Phase 4: Fresh local sandbox validation (operator approved `./sandbox.sh start` on 2026-09-08; no existing sandbox to delete)
+**Next action:** Finish the Phase 4 lifecycle run and record its evidence here; after PR #272 merges, rebase onto `development` and open PR 2; archive this folder once PR 2 merges
 
 ## Phase Log
 
@@ -14,7 +14,7 @@
 | 2 — API contract and revert decoding | Done | `govReserve {address, wnokBalance}` replaces `govSettlementBank`; `openapi.json` regenerated (one resource changed); coupon, redemption, and finalisation decode with the WNOK ABI and publish `bidders` + `central-bank`; nb-bond-api lint, format, build, 245 jest tests green (2026-09-08) | PR 2 |
 | 3 — UI alignment | Done | Central Bank KPI shows the reserve's WNOK balance and address; coupon warning names the WNOK allowlist; nb-ui format, lint, build, 121 vitest tests green (2026-09-08) | PR 2 |
 | 4 — Fresh local sandbox validation | Not started | | |
-| 5 — Architecture docs, known issues, index | Not started | | |
+| 5 — Architecture docs, known issues, index | Done | `ARCHITECTURE.md`, both process diagrams, two known-issue entries rewritten, closed-loop plan Phase 6 note, ADR 0004 set to Accepted in the ADR index and documentation index; hygiene and link checks green (2026-09-08) | PR 2 |
 
 ## Deviations From the Plan
 

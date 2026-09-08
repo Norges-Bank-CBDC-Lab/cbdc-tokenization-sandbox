@@ -45,17 +45,16 @@
     (`CouponPaymentBalanceMismatch` / the redeem zero-supply check), so
     the manager cannot be skipped;
   - including the manager fails the cash leg with
-    `SettlementFailure(AllowlistViolation)` because the government
-    settlement TBD's allowlist (correctly) does not include the manager
-    contract.
+    `SettlementFailure(AllowlistViolation)` because the WNOK allowlist
+    (correctly) does not include the manager contract.
 - The API surfaces these reverts as readable 409 details (nested custom
   errors decoded, with a treasury-specific hint), and the payout modal
   flags treasury-held units with a warning before the transaction is
   attempted.
-- Sandbox workarounds: allowlist the BondManager on the government TBD
-  via the Banking page (the payment then succeeds; the treasury's own
-  coupon cash accrues to the manager contract), or use fully-allocated
-  auctions when coupon/redemption flows are being tested.
+- Sandbox workarounds: allowlist the BondManager on WNOK via the Central
+  Bank page (the payment then succeeds; the treasury's own coupon cash
+  accrues to the manager contract), or use fully-allocated auctions when
+  coupon/redemption flows are being tested.
 - Planned follow-up (contract-side decision): burn unsold units at
   finalisation, or skip self-held units in `payCoupon` / `redeem`
   on-chain.
@@ -336,23 +335,18 @@ visible at a glance.
   verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
   (not merged) with this rationale.
 
-## BondManager hard-codes the government settlement bank (`GOV_TBD`)
-- `BondManager` stores the government's cash-leg settlement bank as an `immutable`
-  — `GOV_TBD`, with `_GOV_RESERVE` derived from `ITbd(GOV_TBD).govReserve()`
-  (`contracts/src/norges-bank/BondManager.sol:46-94`). It is the TBD (tokenized
-  bank deposit) whose tokens settle bond coupon and redemption payments
-  (`payCoupon`, `redeem`); in the local sandbox it is wired to Nordea
-  (`TBD_NORDEA_CONTRACT_NAME`, resolved from GlobalRegistry at deploy —
-  `contracts/script/norges-bank/10_Bond.s.sol:26`, `11_BondSetup.s.sol:32`).
-- Because it is `immutable`, switching the government's agent bank requires
-  redeploying `BondManager` and re-wiring the bond stack. The source of truth is
-  also split: the deploy resolves the bank from a GlobalRegistry name, then freezes
-  it on `BondManager`. This is fine for the single-bank sandbox but is the wrong
-  long-term home — "who settles government cash" is a settlement / governance
-  concern, not a bond-contract detail.
-- Planned follow-up: move the designation to mutable, well-modelled state — either a
-  stable, resolvable GlobalRegistry entry (e.g. a `Gov TBD` name) or the settlement
-  layer / `PrimaryDealerRegistry` introduced by
-  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md),
-  so the agent bank can change without a redeploy. The operator Central Bank page
-  surfaces the current value by reading `BondManager.GOV_TBD()`.
+## BondManager fixes the government reserve account at deployment (`GOV_RESERVE`)
+- `BondManager` stores the government reserve account as an `immutable`,
+  `GOV_RESERVE` (`contracts/src/norges-bank/BondManager.sol`). It is the WNOK
+  account that receives issuance proceeds and pays buyback, coupon, and
+  redemption cash (ADR 0004). In the local sandbox it is the fixture reserve
+  key (`PK_GOV_RESERVE`), passed by `contracts/script/norges-bank/10_Bond.s.sol`.
+- Because it is `immutable`, changing the reserve account requires redeploying
+  `BondManager` and re-wiring the bond stack. This is fine for the sandbox, but
+  "which account pays the state's obligations" is a governance concern that may
+  deserve mutable, role-gated state.
+- Planned follow-up: decide whether the designation becomes mutable (admin
+  setter with its own ADR) or moves to the settlement layer introduced by
+  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md).
+  The operator Central Bank page surfaces the current account and its WNOK
+  balance by reading `BondManager.GOV_RESERVE()`.
