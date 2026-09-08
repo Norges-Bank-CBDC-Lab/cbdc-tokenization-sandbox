@@ -1,6 +1,6 @@
 # 0005. Redeem principal with the final coupon and close the bond in one transaction
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-09
 - **Deciders:** sandbox operator
 - **Tags:** contracts, bonds, coupon, redemption, lifecycle

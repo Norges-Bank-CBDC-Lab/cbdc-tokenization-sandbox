@@ -78,8 +78,9 @@ validation logic, so consumers should still pin to a known revision.
 Some compatibility concerns are behavioral, not just ABI-level:
 
 - `BondAuction` assumes off-chain unsealing and allocation calculation;
-- `BondManager.payCoupon()` and `BondManager.redeem()` depend on a complete
-  holder list supplied by the caller or resolved by the NB Bond API;
+- `BondManager.payCoupon()` depends on a complete holder list supplied by the
+  caller or resolved by the NB Bond API, and its final call also repays
+  principal and closes the bond;
 - `BondDvP` and `csd/DvP` are different settlement models and should not be
   treated as interchangeable even if they both express a DvP concept;
 - `Wnok` and `Tbd` embed allowlist and role assumptions that affect runtime

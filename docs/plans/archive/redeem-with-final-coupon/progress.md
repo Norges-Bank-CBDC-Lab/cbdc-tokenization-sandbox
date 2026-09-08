@@ -2,8 +2,8 @@
 
 **Plan:** [`plan.md`](plan.md)
 **Last updated:** 2026-09-09 — all phases done on `feature/redeem-with-final-coupon-api`; fresh-sandbox evidence recorded
-**Current phase:** All phases done; waiting on PR #275 to merge before PR 2
-**Next action:** After PR #275 merges, rebase onto `development`, rerun both package gates, open PR 2; flip ADR 0005 to Accepted and archive this folder after PR 2 merges
+**Current phase:** Complete — #275 and #276 merged; folder archived 2026-09-09
+**Next action:** None; follow-ups are listed below
 
 ## Phase Log
 
@@ -76,7 +76,7 @@ couponPaid 2520, unsoldBurned 40}`. WNOK total supply never changed in either ru
 
 ## Blocked / Waiting On
 
-- PR #275 merge (operator), then rebase and open PR 2.
+- Nothing.
 
 ## Follow-ups Found Along the Way
 
