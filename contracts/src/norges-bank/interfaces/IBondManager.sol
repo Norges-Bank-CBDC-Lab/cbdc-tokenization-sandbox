@@ -26,6 +26,16 @@ interface IBondManager {
     // Coupon payment event (one per holder per period)
     event CouponPaid(string indexed isin, address indexed holder, uint256 paymentAmount, uint256 paymentNumber);
 
+    /**
+     * @notice Emitted once per coupon period after the payment count advances, whether or not any
+     *         holder received cash (units held by the manager earn nothing).
+     * @param isin ISIN of the bond.
+     * @param paymentNumber 1-based period that was just paid.
+     * @param holdersPaid Number of holders that received a coupon this period.
+     * @param couponPaid Total coupon paid this period in WNOK.
+     */
+    event CouponPeriodPaid(string indexed isin, uint256 paymentNumber, uint256 holdersPaid, uint256 couponPaid);
+
     // Principal repayment event (one per holder, final period only)
     event BondRedeemed(string indexed isin, address indexed holder, uint256 value, uint256 wnokAmount);
 

@@ -253,12 +253,24 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       let bondAuctionAddress = ZERO_ADDR;
       let bondTokenAddress = ZERO_ADDR;
       let wnokAddr: string | null = null;
+      let bondManagerCompatible: boolean | null = null;
       try {
         const bondManager = await getBondManager();
         bondManagerAddress = bondManager.target.toString();
         bondAuctionAddress = await getBondAuctionAddress();
         bondTokenAddress = await bondManager.BOND_TOKEN();
         wnokAddr = await getWnokAddress().catch(() => null);
+        // The API's ABI expects the reserve-account BondManager (GOV_RESERVE, BondMatured).
+        // An older deployment reverts here; say so instead of degrading silently.
+        bondManagerCompatible = await bondManager
+          .GOV_RESERVE()
+          .then(() => true)
+          .catch(() => false);
+        if (!bondManagerCompatible) {
+          logger.error(
+            `BondManager at ${bondManagerAddress} does not expose GOV_RESERVE(); the deployed contract predates this API's ABI`,
+          );
+        }
       } catch {
         // Chain unreachable at boot — contract addresses unknown. The
         // status derivation handles this via headReachable=false.
@@ -276,6 +288,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
           bondAuction: bondAuctionAddress,
           bondToken: bondTokenAddress,
           wnok: wnokAddr,
+          bondManagerCompatible,
         },
         sealingPubKey: sealingKeys.publicKey,
         chain: {
@@ -575,7 +588,14 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         const { holders } = req.body as HoldersBody;
         const requested = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
         if (!requested.length) {
-          throw notFound('no holders found for coupon payment');
+          // A bond bought back to zero supply has nobody to pay but still owes its
+          // remaining periods; the contract accepts an empty list then and the final
+          // period closes the bond. Anything else with no holders is a real miss.
+          const current = await composeBond(historyDb, isin);
+          if (!current) throw notFound(`bond ${isin} not found`);
+          if (current.totalSupply !== '0') {
+            throw notFound('no holders found for coupon payment');
+          }
         }
 
         // BondManager.payCoupon requires the holder set to cover the ENTIRE

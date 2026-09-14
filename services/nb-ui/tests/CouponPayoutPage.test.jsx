@@ -210,9 +210,9 @@ describe('CouponPayoutPage', () => {
     ).closest('.modal');
 
     // balance × 1000 NOK face × 425 bps / 10000: 600 → 25,500 NOK; 400 → 17,000 NOK.
-    expect(within(modal).getByText('25.50 K NOK')).toBeInTheDocument();
-    expect(within(modal).getByText('17.00 K NOK')).toBeInTheDocument();
-    expect(within(modal).getByText('42.50 K NOK')).toBeInTheDocument();
+    expect(within(modal).getByText('25.20 K NOK')).toBeInTheDocument();
+    expect(within(modal).getByText('16.80 K NOK')).toBeInTheDocument();
+    expect(within(modal).getByText('42.00 K NOK')).toBeInTheDocument();
 
     await user.click(within(modal).getByRole('button', { name: 'Pay coupon' }));
 
@@ -263,8 +263,8 @@ describe('CouponPayoutPage', () => {
     expect(
       screen.getByText(/400 unsold units held by the bond manager earn no coupon/),
     ).toBeInTheDocument();
-    // Holder row and total both show 600 × 4.25% of face = 25.50 K NOK (the manager adds nothing).
-    expect(screen.getAllByText('25.50 K NOK')).toHaveLength(2);
+    // Holder row and total both show 600 × 42 WNOK (1000 × 425 / 10000, truncated) = 25.20 K NOK.
+    expect(screen.getAllByText('25.20 K NOK')).toHaveLength(2);
     expect(screen.queryByText(/will fail/)).not.toBeInTheDocument();
   });
 
@@ -290,14 +290,55 @@ describe('CouponPayoutPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Principal')).toBeInTheDocument();
     expect(screen.getByText('burned, no payment')).toBeInTheDocument();
-    // Holder A: coupon 600 × 4.25% = 25.5 units, principal 600 units, total 625.5 units × 1000 NOK.
+    // Holder A: coupon 600 × 42 = 25,200; principal 600 × 1000 = 600,000; total 625,200 WNOK.
     expect(screen.getAllByText('600.00 K NOK').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('625.50 K NOK').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('625.20 K NOK').length).toBeGreaterThan(0);
     expect(
       screen.getByText(/400 unsold units held by the bond manager are burned without payment/),
     ).toBeInTheDocument();
     // Reserve (10,000,000 NOK) covers 625,500 NOK: no warning.
     expect(screen.queryByText(/reserve holds/)).not.toBeInTheDocument();
+  });
+
+  it('does not warn when the reserve covers the payout exactly', async () => {
+    const { CentralBankApi } = await import('../src/api/centralBankApi.js');
+    // Interim coupon on 1000 units = 1000 × 42 = 42,000 WNOK; reserve holds exactly that.
+    CentralBankApi.getCentralBank.mockResolvedValueOnce({
+      available: true,
+      govReserve: { address: '0x3333333333333333333333333333333333333333', wnokBalance: '42000' },
+    });
+    const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
+    render(<PayCouponModal bond={PAYABLE_BOND} onClose={() => {}} onPaid={() => {}} />);
+    expect(await screen.findAllByText('42.00 K NOK')).not.toHaveLength(0);
+    expect(screen.queryByText(/reserve holds/)).not.toBeInTheDocument();
+  });
+
+  it('keeps a bond bought back to zero supply in the queue until its final payment', async () => {
+    const boughtBack = {
+      ...PAYABLE_BOND,
+      isin: 'NO0000000004',
+      status: 'outstanding',
+      totalSupply: '0',
+      holders: [],
+      coupon: { ...PAYABLE_BOND.coupon, payments: { total: '5', made: '4', remaining: '1' } },
+      md5: 'b4',
+    };
+    const { BondsApi } = await import('../src/api/bondsApi.js');
+    BondsApi.listBonds.mockResolvedValue([...FIXTURE_BONDS, boughtBack]);
+    const { CouponPayoutPage } = await import('../src/pages/CouponPayoutPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    render(
+      <ToastProvider>
+        <CouponPayoutPage navigate={vi.fn()} />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('NO0000000004')).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.click(within(rowFor('NO0000000004')).getByRole('button', { name: 'Pay coupon' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Pay final coupon on NO0000000004' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Every unit has been bought back/)).toBeInTheDocument();
   });
 
   it('warns when the government reserve cannot cover the final payout', async () => {
@@ -313,7 +354,7 @@ describe('CouponPayoutPage', () => {
     const { PayCouponModal } = await import('../src/pages/PayCouponModal.jsx');
     render(<PayCouponModal bond={bond} onClose={() => {}} onPaid={() => {}} />);
 
-    // 1000 units: coupon 42.5 + principal 1000 = 1,042,500 NOK > 500,000 NOK reserve.
+    // 1000 units: coupon 42 + principal 1000 per unit = 1,042,000 WNOK > 500,000 WNOK reserve.
     expect(await screen.findByText(/reserve holds 500,000 WNOK/)).toBeInTheDocument();
     expect(screen.getByText(/whole transaction will revert/)).toBeInTheDocument();
   });

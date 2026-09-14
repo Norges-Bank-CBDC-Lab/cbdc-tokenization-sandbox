@@ -13,7 +13,6 @@ export type BondState = {
   totalSupply: string;
   offering: string;
   everIssued: boolean;
-  redemptionComplete: boolean;
   updatedBlock: number;
   updatedLogIndex: number;
 };
@@ -55,7 +54,6 @@ export function emptyBondState(isin: string, partition: string): BondState {
     totalSupply: '0',
     offering: '0',
     everIssued: false,
-    redemptionComplete: false,
     updatedBlock: 0,
     updatedLogIndex: 0,
   };
@@ -104,10 +102,8 @@ export function reduceBondState(
       }
       break;
     case 'matured':
-      // BondMatured: the final coupon paid principal and burned every unit,
-      // so maturity and redemption complete together.
+      // BondMatured: the final coupon paid principal and burned every unit.
       next.isMatured = true;
-      next.redemptionComplete = true;
       break;
     case 'supply-delta': {
       const supply = BigInt(next.totalSupply) + event.delta;

@@ -34,7 +34,6 @@ function seedBond(
     isMatured?: number;
     totalSupply?: string;
     everIssued?: number;
-    redemptionComplete?: number;
   } = {},
 ): void {
   const isin = overrides.isin ?? ISIN;
@@ -47,9 +46,9 @@ function seedBond(
     `INSERT INTO bond_state (
       isin, partition, bond_address, disabled, maturity_duration, maturity_date,
       coupon_duration, coupon_yield, last_coupon_payment, coupon_payment_count,
-      is_matured, total_supply, offering, ever_issued, redemption_complete,
+      is_matured, total_supply, offering, ever_issued,
       updated_block, updated_log_index
-    ) VALUES (?, ?, ?, 0, '300', '1300', ?, ?, ?, ?, ?, ?, '100', ?, ?, 100, 0)`,
+    ) VALUES (?, ?, ?, 0, '300', '1300', ?, ?, ?, ?, ?, ?, '100', ?, 100, 0)`,
   ).run(
     isin,
     partition,
@@ -61,7 +60,6 @@ function seedBond(
     overrides.isMatured ?? 0,
     overrides.totalSupply ?? '100',
     overrides.everIssued ?? 1,
-    overrides.redemptionComplete ?? 0,
   );
 }
 
@@ -151,11 +149,10 @@ describe('composeBond projection checkpoint coupon semantics', () => {
     [{ everIssued: 0, totalSupply: '0' }, undefined, 'staged'],
     [{ everIssued: 0, totalSupply: '0' }, 'open', 'auctioning'],
     [{ everIssued: 1, totalSupply: '100' }, 'finalised', 'outstanding'],
-    [
-      { everIssued: 1, totalSupply: '0', isMatured: 1, redemptionComplete: 1 },
-      'finalised',
-      'matured',
-    ],
+    // Full buyback emptied the supply but coupon periods remain: still outstanding,
+    // so the payout queue can close it with an empty holder set.
+    [{ everIssued: 1, totalSupply: '0', couponPaymentCount: '2' }, 'finalised', 'outstanding'],
+    [{ everIssued: 1, totalSupply: '0', isMatured: 1 }, 'finalised', 'matured'],
   ] as const)('derives the durable %s lifecycle status', async (state, auction, expected) => {
     seedContext(db, 1060);
     seedBond(db, state);

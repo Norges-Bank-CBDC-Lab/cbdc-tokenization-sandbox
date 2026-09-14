@@ -94,6 +94,6 @@ sequenceDiagram
 
 Each `BondDvP.settle` call is atomic. Auction settlement as a whole is not:
 `BondManager` catches a failed allocation, emits `BondAllocationFailed`, and
-continues. A RATE/PRICE failure can therefore leave minted units in
-`BondManager` for `withdrawFailedIssuance` while the auction remains
-`FINALISED`.
+continues. A RATE/PRICE failure can therefore leave minted units on
+`BondManager` while the auction remains `FINALISED`; those units earn no coupon
+and are burned without payment when the final coupon closes the bond.

@@ -89,12 +89,10 @@ describe('bond state projection reducer', () => {
     );
     expect(maturedFirst).toMatchObject({
       isMatured: true,
-      redemptionComplete: true,
       totalSupply: '0',
     });
     expect(burnsFirst).toMatchObject({
       isMatured: true,
-      redemptionComplete: true,
       totalSupply: '0',
     });
   });
@@ -102,7 +100,7 @@ describe('bond state projection reducer', () => {
   it('tracks maturity, disable, and re-create transitions', () => {
     let state = emptyBondState(ISIN, PARTITION);
     state = apply(state, { type: 'matured' }, 60);
-    expect(state).toMatchObject({ isMatured: true, redemptionComplete: true });
+    expect(state).toMatchObject({ isMatured: true });
     state = apply(state, { type: 'disabled', disabled: true }, 62);
     state = apply(
       state,
@@ -111,7 +109,6 @@ describe('bond state projection reducer', () => {
     );
     expect(state).toMatchObject({
       isMatured: false,
-      redemptionComplete: false,
       disabled: false,
     });
   });

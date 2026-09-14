@@ -2548,13 +2548,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Explicit holder set, or null to let the API resolve every current holder. Must cover the whole partition supply; duplicates are rejected."
           }
         },
         "required": [
           "holders"
         ],
-        "description": "Body for coupon-payment and redemption operations"
+        "description": "Body for the coupon-payment operation"
       },
       "Address": {
         "type": "string",
@@ -2953,13 +2954,25 @@
               }
             ],
             "description": "WNOK contract address; null when WNOK is not registered in GlobalRegistry"
+          },
+          "bondManagerCompatible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "True when the deployed BondManager exposes GOV_RESERVE() (the ABI this service is built against); false when the call reverts, meaning the contract predates this API; null when the chain is unreachable"
           }
         },
         "required": [
           "bondManager",
           "bondAuction",
           "bondToken",
-          "wnok"
+          "wnok",
+          "bondManagerCompatible"
         ],
         "additionalProperties": false,
         "description": "Contract addresses the service is bound to"

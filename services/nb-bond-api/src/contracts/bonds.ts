@@ -104,8 +104,28 @@ export const createBondBodySchema = z
   .meta({ id: 'CreateBondRequest', description: 'Request body for POST /v1/bonds' });
 
 export const holdersBodySchema = z
-  .object({ holders: z.array(addressSchema).nullable() })
-  .meta({ id: 'HoldersBody', description: 'Body for coupon-payment and redemption operations' });
+  .object({
+    holders: z
+      .array(addressSchema)
+      .nullable()
+      .superRefine((holders, ctx) => {
+        // A repeated holder would be settled twice on-chain; BondManager rejects it too.
+        const seen = new Set<string>();
+        for (const holder of holders ?? []) {
+          const key = holder.toLowerCase();
+          if (seen.has(key)) {
+            ctx.addIssue({ code: 'custom', message: `duplicate holder ${holder}` });
+            return;
+          }
+          seen.add(key);
+        }
+      })
+      .meta({
+        description:
+          'Explicit holder set, or null to let the API resolve every current holder. Must cover the whole partition supply; duplicates are rejected.',
+      }),
+  })
+  .meta({ id: 'HoldersBody', description: 'Body for the coupon-payment operation' });
 
 export const isinParamSchema = z
   .object({ isin: isinSchema })

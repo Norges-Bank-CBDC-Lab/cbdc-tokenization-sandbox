@@ -57,6 +57,7 @@ describe('generated OpenAPI integrity', () => {
     const schemas = (document.components as JsonObject).schemas as Record<string, JsonObject>;
     expect(schemas.AuctionStatus.enum).toEqual(['open', 'closed', 'finalised', 'cancelled']);
     expect(schemas.BondStatus.enum).toEqual(['staged', 'auctioning', 'outstanding', 'matured']);
+    expect((schemas.HealthContracts.properties as JsonObject).bondManagerCompatible).toBeDefined();
     expect((schemas.FinaliseBody.properties as JsonObject).approve).toMatchObject({ const: true });
   });
 });

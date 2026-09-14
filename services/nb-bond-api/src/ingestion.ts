@@ -438,7 +438,6 @@ function loadBondState(db: IngestionDatabase, isin: string, partition: string): 
     totalSupply: String(row.total_supply),
     offering: String(row.offering),
     everIssued: Boolean(row.ever_issued),
-    redemptionComplete: Boolean(row.redemption_complete),
     updatedBlock: Number(row.updated_block),
     updatedLogIndex: Number(row.updated_log_index),
   };
@@ -449,9 +448,9 @@ function saveBondState(db: IngestionDatabase, state: BondState): void {
     `INSERT INTO bond_state (
       isin, partition, bond_address, disabled, maturity_duration, maturity_date,
       coupon_duration, coupon_yield, last_coupon_payment, coupon_payment_count,
-      is_matured, total_supply, offering, ever_issued, redemption_complete,
+      is_matured, total_supply, offering, ever_issued,
       updated_block, updated_log_index
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(isin) DO UPDATE SET
       partition=excluded.partition, bond_address=excluded.bond_address,
       disabled=excluded.disabled, maturity_duration=excluded.maturity_duration,
@@ -459,7 +458,7 @@ function saveBondState(db: IngestionDatabase, state: BondState): void {
       coupon_yield=excluded.coupon_yield, last_coupon_payment=excluded.last_coupon_payment,
       coupon_payment_count=excluded.coupon_payment_count, is_matured=excluded.is_matured,
       total_supply=excluded.total_supply, offering=excluded.offering,
-      ever_issued=excluded.ever_issued, redemption_complete=excluded.redemption_complete,
+      ever_issued=excluded.ever_issued,
       updated_block=excluded.updated_block, updated_log_index=excluded.updated_log_index`,
   ).run(
     state.isin,
@@ -476,7 +475,6 @@ function saveBondState(db: IngestionDatabase, state: BondState): void {
     state.totalSupply,
     state.offering,
     state.everIssued ? 1 : 0,
-    state.redemptionComplete ? 1 : 0,
     state.updatedBlock,
     state.updatedLogIndex,
   );
@@ -832,6 +830,37 @@ async function processBlockRange(
         });
         if (isin) {
           const block = Number(log.blockNumber ?? 0);
+          applyBondStateEvent(
+            db,
+            isin,
+            {
+              type: 'coupon-paid',
+              paymentNumber: BigInt(String(args.paymentNumber)),
+              blockTimestamp: blockTimestamps.get(block) ?? 0n,
+            },
+            block,
+            Number(log.index ?? 0),
+          );
+        }
+      } else if (name === 'CouponPeriodPaid') {
+        // One per period regardless of who was paid: drives the projected payment
+        // count even when the only holder is the manager (no CouponPaid emitted).
+        changedResources.add('bonds');
+        const isin = resolveIsin(db, args.isin, resolvedPartitions);
+        const block = Number(log.blockNumber ?? 0);
+        insertBondEvent(db, {
+          isin: isin ?? '',
+          type: 'COUPON_PERIOD_PAID',
+          block,
+          logIndex: Number(log.index ?? 0),
+          txHash: log.transactionHash,
+          payload: {
+            paymentNumber: args.paymentNumber?.toString?.() ?? args.paymentNumber,
+            holdersPaid: args.holdersPaid?.toString?.() ?? args.holdersPaid,
+            couponPaid: args.couponPaid?.toString?.() ?? args.couponPaid,
+          },
+        });
+        if (isin) {
           applyBondStateEvent(
             db,
             isin,
