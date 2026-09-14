@@ -659,6 +659,7 @@ async function processBlockRange(
   for (const { log, parsed } of [...parsedManager, ...parsedToken, ...parsedAuction]) {
     if (
       parsed?.name === 'CouponPaid' ||
+      parsed?.name === 'CouponPeriodPaid' ||
       parsed?.name === 'IsinEnabled' ||
       parsed?.name === 'BondAuctionClosed' ||
       parsed?.name === 'BondAuctionFinalised' ||
