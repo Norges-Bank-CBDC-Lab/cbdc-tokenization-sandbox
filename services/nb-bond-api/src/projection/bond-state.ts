@@ -87,7 +87,12 @@ export function reduceBondState(
     case 'enabled': {
       next.couponDuration = event.couponDuration.toString();
       next.couponYield = event.couponYield.toString();
-      next.lastCouponPayment = event.blockTimestamp.toString();
+      // The enable timestamp seeds the schedule only until the first coupon lands.
+      // On a full replay a batch applies manager events (coupon periods) before
+      // token events (this one), so never clobber a payment already reduced.
+      if (BigInt(next.couponPaymentCount) === 0n) {
+        next.lastCouponPayment = event.blockTimestamp.toString();
+      }
       const duration = BigInt(next.maturityDuration ?? '0');
       next.maturityDate = (event.blockTimestamp + duration).toString();
       break;

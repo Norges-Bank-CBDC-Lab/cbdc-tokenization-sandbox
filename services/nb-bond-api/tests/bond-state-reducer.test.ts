@@ -68,6 +68,27 @@ describe('bond state projection reducer', () => {
     );
   });
 
+  it('keeps a reduced coupon timestamp when the enable event replays after it', () => {
+    // Full-replay batches apply manager events before token events, so IsinEnabled
+    // (block 79) can arrive after CouponPeriodPaid (block 88): the later payment wins.
+    let state = emptyBondState(ISIN, PARTITION);
+    state = apply(state, { type: 'coupon-paid', paymentNumber: 1n, blockTimestamp: 2000n }, 88);
+    state = apply(
+      state,
+      { type: 'enabled', couponDuration: 60n, couponYield: 425n, blockTimestamp: 1000n },
+      79,
+    );
+    expect(state.lastCouponPayment).toBe('2000');
+    expect(state.couponPaymentCount).toBe('1');
+    // A genuinely fresh schedule still takes the enable timestamp.
+    const fresh = apply(
+      emptyBondState(ISIN, PARTITION),
+      { type: 'enabled', couponDuration: 60n, couponYield: 425n, blockTimestamp: 1000n },
+      79,
+    );
+    expect(fresh.lastCouponPayment).toBe('1000');
+  });
+
   it('projects the same closed state whether BondMatured lands before or after the burns', () => {
     // Ingestion applies manager events before token events within a block, so
     // the maturity flag can arrive before the supply deltas; the result must match.
