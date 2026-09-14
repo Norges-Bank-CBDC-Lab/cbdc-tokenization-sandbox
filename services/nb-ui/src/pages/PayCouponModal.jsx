@@ -19,12 +19,21 @@ import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
 import { Button, Modal } from '../components/ui.jsx';
 
-// Per-holder amounts mirror BondManager.payCoupon on-chain, in bond units
-// (Fmt.formatNok multiplies by the 1000 NOK face value itself):
-//   coupon    = balance × rateBps / 10000
-//   principal = balance                    (final period only)
-function couponUnits(balance, rateBps) {
-  return (Number(balance ?? 0) * Number(rateBps ?? 0)) / 10000;
+// Per-holder amounts mirror BondManager.payCoupon on-chain, in WNOK (BigInt):
+//   couponPerUnit = floor(UNIT_NOMINAL × rateBps / 10000)   integer-truncated per unit
+//   coupon        = balance × couponPerUnit
+//   principal     = balance × UNIT_NOMINAL                   (final period only)
+const UNIT_NOMINAL = 1000n;
+const BPS = 10000n;
+const toBig = (v) => {
+  try {
+    return BigInt(v ?? 0);
+  } catch {
+    return 0n;
+  }
+};
+function couponPerUnit(rateBps) {
+  return (UNIT_NOMINAL * toBig(rateBps)) / BPS;
 }
 
 export function PayCouponModal({ bond, onClose, onPaid }) {
@@ -42,18 +51,24 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
   const rateBps = bond.coupon?.rateBps;
   const isFinal = Number(bond.coupon?.payments?.remaining ?? 0) === 1;
 
-  const paid = holders.filter((h) => !isTreasury(h));
-  const unsoldUnits = holders
-    .filter(isTreasury)
-    .reduce((sum, h) => sum + Number(h.balance ?? 0), 0);
-  const totalBalance = holders.reduce((sum, h) => sum + Number(h.balance ?? 0), 0);
-  const couponTotal = paid.reduce((sum, h) => sum + couponUnits(h.balance, rateBps), 0);
-  const principalTotal = isFinal ? paid.reduce((sum, h) => sum + Number(h.balance ?? 0), 0) : 0;
-  const cashTotalUnits = couponTotal + principalTotal;
+  // One pass yields the rows and the totals from the same per-holder arithmetic.
+  const perUnit = couponPerUnit(rateBps);
+  const rows = holders.map((h) => {
+    const treasury = isTreasury(h);
+    const balance = toBig(h.balance);
+    const coupon = treasury ? 0n : balance * perUnit;
+    const principal = treasury || !isFinal ? 0n : balance * UNIT_NOMINAL;
+    return { holder: h.holder, balance, treasury, coupon, principal };
+  });
+  const unsoldUnits = rows.filter((r) => r.treasury).reduce((sum, r) => sum + r.balance, 0n);
+  const totalBalance = rows.reduce((sum, r) => sum + r.balance, 0n);
+  const couponTotal = rows.reduce((sum, r) => sum + r.coupon, 0n);
+  const principalTotal = rows.reduce((sum, r) => sum + r.principal, 0n);
+  const cashTotal = couponTotal + principalTotal;
 
-  // Reserve balance is in 1-NOK units; the preview totals are in bond units.
+  // Reserve balance and the totals are both WNOK (1-NOK units); compare as BigInt.
   const reserveNok = cbQ.data?.govReserve?.wnokBalance;
-  const reserveShort = reserveNok != null && Number(reserveNok) < cashTotalUnits * 1000;
+  const reserveShort = reserveNok != null && toBig(reserveNok) < cashTotal;
 
   async function submit() {
     try {
@@ -97,7 +112,13 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
         </p>
       )}
 
-      {holders.length === 0 && (
+      {holders.length === 0 && Number(bond.totalSupply ?? 0) === 0 && (
+        <p className="muted">
+          Every unit has been bought back, so nobody is paid this period. The payment still advances
+          the coupon schedule{isFinal ? ' and closes the bond' : ''}.
+        </p>
+      )}
+      {holders.length === 0 && Number(bond.totalSupply ?? 0) > 0 && (
         <p className="muted">
           No holders are known to the UI cache — the backend resolves the active holder set on-chain
           when the payment is submitted.
@@ -116,37 +137,36 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
             </tr>
           </thead>
           <tbody>
-            {holders.map((h) => {
-              const treasury = isTreasury(h);
-              const coupon = treasury ? 0 : couponUnits(h.balance, rateBps);
-              const principal = treasury || !isFinal ? 0 : Number(h.balance ?? 0);
-              return (
-                <tr key={h.holder}>
-                  <td className="mono" title={h.holder}>
-                    {Fmt.shortHex(h.holder, 8, 6)}
-                    {treasury && <span className="muted"> (unsold, held by manager)</span>}
-                  </td>
-                  <td className="num mono">{Fmt.formatUnits(h.balance)}</td>
+            {rows.map((r) => (
+              <tr key={r.holder}>
+                <td className="mono" title={r.holder}>
+                  {Fmt.shortHex(r.holder, 8, 6)}
+                  {r.treasury && <span className="muted"> (unsold, held by manager)</span>}
+                </td>
+                <td className="num mono">{Fmt.formatUnits(String(r.balance))}</td>
+                <td className="num mono">
+                  {r.treasury ? (
+                    <span className="muted">no coupon</span>
+                  ) : (
+                    Fmt.formatWnok(String(r.coupon))
+                  )}
+                </td>
+                {isFinal && (
                   <td className="num mono">
-                    {treasury ? <span className="muted">no coupon</span> : Fmt.formatNok(coupon)}
+                    {r.treasury ? (
+                      <span className="muted">burned, no payment</span>
+                    ) : (
+                      Fmt.formatWnok(String(r.principal))
+                    )}
                   </td>
-                  {isFinal && (
-                    <td className="num mono">
-                      {treasury ? (
-                        <span className="muted">burned, no payment</span>
-                      ) : (
-                        Fmt.formatNok(principal)
-                      )}
-                    </td>
-                  )}
-                  {isFinal && (
-                    <td className="num mono">
-                      {treasury ? '—' : Fmt.formatNok(coupon + principal)}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
+                )}
+                {isFinal && (
+                  <td className="num mono">
+                    {r.treasury ? '—' : Fmt.formatWnok(String(r.coupon + r.principal))}
+                  </td>
+                )}
+              </tr>
+            ))}
           </tbody>
           <tfoot>
             <tr>
@@ -155,16 +175,16 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
               </td>
               <td className="num mono">{Fmt.formatUnits(String(totalBalance))}</td>
               <td className="num mono">
-                <strong>{Fmt.formatNok(couponTotal)}</strong>
+                <strong>{Fmt.formatWnok(String(couponTotal))}</strong>
               </td>
               {isFinal && (
                 <td className="num mono">
-                  <strong>{Fmt.formatNok(principalTotal)}</strong>
+                  <strong>{Fmt.formatWnok(String(principalTotal))}</strong>
                 </td>
               )}
               {isFinal && (
                 <td className="num mono">
-                  <strong>{Fmt.formatNok(cashTotalUnits)}</strong>
+                  <strong>{Fmt.formatWnok(String(cashTotal))}</strong>
                 </td>
               )}
             </tr>
@@ -183,8 +203,8 @@ export function PayCouponModal({ bond, onClose, onPaid }) {
       {reserveShort && (
         <div className="error" style={{ marginTop: 8 }}>
           The government reserve holds {Fmt.formatUnits(reserveNok)} WNOK, less than the{' '}
-          {Fmt.formatNok(cashTotalUnits)} this payment moves. The whole transaction will revert; top
-          up the reserve from the Central Bank page first.
+          {Fmt.formatWnok(String(cashTotal))} this payment moves. The whole transaction will revert;
+          top up the reserve from the Central Bank page first.
         </div>
       )}
 

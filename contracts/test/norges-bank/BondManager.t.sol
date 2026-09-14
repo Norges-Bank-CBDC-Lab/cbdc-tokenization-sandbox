@@ -493,10 +493,66 @@ contract BondManagerTest is Test, AuctionHelper {
         holders[1] = bidder1; // Duplicate
 
         vm.prank(bondAdmin);
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.CouponPaymentBalanceMismatch.selector, ISIN, OFFERING * 2, OFFERING)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Errors.DuplicateHolder.selector, ISIN, bidder1));
         bondManager.payCoupon(ISIN, holders);
+    }
+
+    function test_PayCoupon_RevertIf_DuplicateHolder_WithAnotherHolderOmitted() public {
+        // Two holders of 5 units each: [A, A] would sum to the full supply and pass the
+        // coverage check while paying A twice and B never; the duplicate scan must catch it.
+        _createAndFinalizeBond();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        vm.prank(bidder1);
+        bondToken.transferByPartition(partition, bidder2, OFFERING / 2, "");
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+
+        address[] memory holders = new address[](2);
+        holders[0] = bidder1;
+        holders[1] = bidder1;
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.DuplicateHolder.selector, ISIN, bidder1));
+        bondManager.payCoupon(ISIN, holders);
+        assertEq(wnok.balanceOf(govReserve), reserveBefore);
+    }
+
+    function test_PayCoupon_EmitsCouponPeriodPaid() public {
+        _createAndFinalizeBond();
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        address[] memory holders = new address[](1);
+        holders[0] = bidder1;
+        uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+
+        vm.expectEmit();
+        emit IBondManager.CouponPeriodPaid(ISIN, 1, 1, OFFERING * paymentPerBond);
+        vm.prank(bondAdmin);
+        bondManager.payCoupon(ISIN, holders);
+    }
+
+    function test_PayCoupon_EmptyHolders_ClosesZeroSupplyBond() public {
+        // A full buyback leaves no holders; the remaining periods are paid with an empty list
+        // and the final one still closes the bond and emits BondMatured with zero totals.
+        _createAndFinalizeBond();
+        _buyBackAllUnits();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+
+        address[] memory nobody = new address[](0);
+        _payCoupons(nobody, MATURITY_YEARS - 1);
+        assertEq(bondToken.couponPaymentCount(partition), MATURITY_YEARS - 1);
+
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        vm.expectEmit();
+        emit IBondManager.CouponPeriodPaid(ISIN, MATURITY_YEARS, 0, 0);
+        vm.expectEmit();
+        emit IBondManager.BondMatured(ISIN, MATURITY_YEARS, 0, 0, 0);
+        vm.prank(bondAdmin);
+        bondManager.payCoupon(ISIN, nobody);
+
+        assertTrue(bondToken.isMatured(partition));
+        assertEq(wnok.balanceOf(govReserve), reserveBefore);
     }
 
     function test_PayCoupon_RevertIf_AllCouponsPaid() public {
@@ -792,49 +848,6 @@ contract BondManagerTest is Test, AuctionHelper {
         assertEq(bondToken.totalSupplyByPartition(partition), 0);
     }
 
-    // ============ withdrawFailedIssuance Tests ============
-
-    function test_WithdrawFailedIssuance() public {
-        vm.prank(bondAdmin);
-        bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
-
-        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
-        _submitBid(auctionId, bidder1);
-
-        vm.warp(_getEndTime() + 1);
-        vm.prank(bondAdmin);
-        bondManager.closeAuction(ISIN);
-
-        IBondAuction.Allocation[] memory allocations = new IBondAuction.Allocation[](1);
-        allocations[0] = IBondAuction.Allocation({
-            isin: ISIN, bidder: bidder1, units: OFFERING, rate: COUPON_YIELD, auctionType: IBondAuction.AuctionType.RATE
-        });
-
-        wnok.mint(bidder1, OFFERING * UNIT_NOMINAL);
-        vm.stopPrank();
-
-        // Remove bidder1 approval, so DVP will fail
-        vm.prank(bidder1);
-        wnok.approve(address(bondDvp), 0);
-
-        vm.prank(bondAdmin);
-        IBondAuction.BidVerification[] memory proofs = new IBondAuction.BidVerification[](1);
-        proofs[0] = _proof(auctionId, 0, bidder1, 0);
-        bondManager.finaliseAuction(ISIN, allocations, proofs);
-
-        // Bonds should remain in BondManager
-        bytes32 partition = bondToken.isinToPartition(ISIN);
-        uint256 failedIssuance = bondToken.balanceOfByPartition(partition, address(bondManager));
-        assertGt(failedIssuance, 0);
-
-        // Withdraw failed issuance
-        vm.prank(bondAdmin);
-        bondManager.withdrawFailedIssuance(ISIN);
-
-        uint256 failedIssuanceAfter = bondToken.balanceOfByPartition(partition, address(bondManager));
-        assertEq(failedIssuanceAfter, 0);
-    }
-
     function test_FinaliseAuction_IssuanceCashLegFailure() public {
         vm.prank(bondAdmin);
         bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
@@ -940,14 +953,6 @@ contract BondManagerTest is Test, AuctionHelper {
         proofs[0] = _proof(auctionId, 0, bidder1, 0);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
     }
-
-    function test_WithdrawFailedIssuance_RevertIf_None() public {
-        vm.prank(bondAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NoFailedIssuance.selector));
-        bondManager.withdrawFailedIssuance(ISIN);
-    }
-
-    // ============ closeAuction Tests ============
 
     function test_CloseAuction() public {
         vm.prank(bondAdmin);
@@ -1175,6 +1180,28 @@ contract BondManagerTest is Test, AuctionHelper {
         address[] memory holders = new address[](1);
         holders[0] = bidder1;
         _payAllCoupons(holders);
+    }
+
+    /// Buys back every issued unit from bidder1 through a BUYBACK auction (supply to zero).
+    function _buyBackAllUnits() internal {
+        vm.prank(bondAdmin);
+        bondManager.buybackWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING);
+        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
+        address[] memory bidders = new address[](1);
+        bidders[0] = bidder1;
+        _submitBids(auctionId, bidders);
+        vm.warp(_getEndTime() + 1);
+        vm.prank(bondAdmin);
+        bondManager.closeAuction(ISIN);
+
+        IBondAuction.Allocation[] memory allocations = new IBondAuction.Allocation[](1);
+        allocations[0] = IBondAuction.Allocation({
+            isin: ISIN, bidder: bidder1, units: OFFERING, rate: 9800, auctionType: IBondAuction.AuctionType.BUYBACK
+        });
+        IBondAuction.BidVerification[] memory proofs = new IBondAuction.BidVerification[](1);
+        proofs[0] = _proof(auctionId, 0, bidder1, 0);
+        vm.prank(bondAdmin);
+        bondManager.finaliseAuction(ISIN, allocations, proofs);
     }
 
     /// Pays every coupon period; the last one closes the bond (matured, supply zero).

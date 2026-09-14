@@ -19,6 +19,27 @@ import {Roles} from "@common/Roles.sol";
 contract BondManager is IBondManager, AccessControl {
     uint256 private constant PERCENTAGE_PRECISION = 10000; // bps precision (e.g., 425 = 4.25%)
 
+    /**
+     * @dev Running totals of one coupon period, in units (processed, unsold) and WNOK (coupon, principal).
+     */
+    struct PayoutTotals {
+        uint256 processed;
+        uint256 unsold;
+        uint256 holdersPaid;
+        uint256 coupon;
+        uint256 principal;
+    }
+
+    /**
+     * @dev Parameters of the coupon period being paid.
+     */
+    struct Period {
+        bytes32 partition;
+        uint256 paymentPerBond;
+        uint256 paymentNumber;
+        bool finalPeriod;
+    }
+
     string public name;
 
     /**
@@ -468,22 +489,6 @@ contract BondManager is IBondManager, AccessControl {
     }
 
     /**
-     * @notice Allows the issuer to recover bonds that failed to settle during DVP.
-     * @param _isin Target ISIN with failed issuance.
-     */
-    function withdrawFailedIssuance(string calldata _isin) external onlyRole(Roles.BOND_MANAGER_ROLE) {
-        bytes32 partition = BOND_TOKEN.isinToPartition(_isin);
-        uint256 failedIssuance = BOND_TOKEN.balanceOfByPartition(partition, address(this));
-
-        if (failedIssuance == 0) revert Errors.NoFailedIssuance();
-
-        bytes32 returnedPartition = BOND_TOKEN.transferByPartition(partition, msg.sender, failedIssuance, "");
-        if (returnedPartition != partition) {
-            revert Errors.SettlementFailure(uint8(IBondDvP.FailureReason.Security), "partition mismatch");
-        }
-    }
-
-    /**
      * @notice Pay the next coupon to every holder; the final coupon also repays principal and closes the bond.
      * @param _isin ISIN string
      * @param _holders Every current holder of the partition, including this contract when it holds unsold units
@@ -543,6 +548,7 @@ contract BondManager is IBondManager, AccessControl {
         }
 
         BOND_TOKEN.updateCouponPayment(_isin, block.timestamp, paymentNumber);
+        emit CouponPeriodPaid(_isin, paymentNumber, totals.holdersPaid, totals.coupon);
 
         if (finalPeriod) {
             if (totals.unsold > 0) {
@@ -557,26 +563,6 @@ contract BondManager is IBondManager, AccessControl {
     }
 
     /**
-     * @dev Running totals of one coupon period, in units (processed, unsold) and WNOK (coupon, principal).
-     */
-    struct PayoutTotals {
-        uint256 processed;
-        uint256 unsold;
-        uint256 coupon;
-        uint256 principal;
-    }
-
-    /**
-     * @dev Parameters of the coupon period being paid.
-     */
-    struct Period {
-        bytes32 partition;
-        uint256 paymentPerBond;
-        uint256 paymentNumber;
-        bool finalPeriod;
-    }
-
-    /**
      * @dev Pays every listed holder for one period. Units held by this contract were never sold:
      *      they are counted as unsold and receive nothing.
      */
@@ -585,6 +571,13 @@ contract BondManager is IBondManager, AccessControl {
         returns (PayoutTotals memory totals)
     {
         for (uint256 i = 0; i < _holders.length; i++) {
+            // A repeated address would be paid twice while the coverage check still passes
+            // if another holder were omitted, so reject duplicates outright.
+            for (uint256 j = 0; j < i; j++) {
+                if (_holders[j] == _holders[i]) {
+                    revert Errors.DuplicateHolder(_isin, _holders[i]);
+                }
+            }
             uint256 balance = BOND_TOKEN.balanceOfByPartition(_p.partition, _holders[i]);
             if (balance == 0) {
                 continue;
@@ -595,6 +588,7 @@ contract BondManager is IBondManager, AccessControl {
             }
             (uint256 couponAmount, uint256 principal) = _payHolder(_isin, _holders[i], balance, _p);
             totals.processed += balance;
+            totals.holdersPaid += 1;
             totals.coupon += couponAmount;
             totals.principal += principal;
         }

@@ -37,6 +37,17 @@ export function formatNok(units) {
   return n.toLocaleString('en-US') + ' NOK';
 }
 
+/** Format a WNOK amount (1 WNOK = 1 NOK, decimals = 0) the same way formatNok formats face value. */
+export function formatWnok(amount) {
+  if (amount == null || amount === '') return '—';
+  const n = Number(amount);
+  if (!isFinite(n)) return String(amount);
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + ' B NOK';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + ' M NOK';
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + ' K NOK';
+  return n.toLocaleString('en-US') + ' NOK';
+}
+
 export function formatUnixDate(secs) {
   if (secs == null || secs === '') return '—';
   const ms = Number(secs) * 1000;
@@ -135,6 +146,7 @@ export const Fmt = {
   bpsToPct,
   formatUnits,
   formatNok,
+  formatWnok,
   formatUnixDate,
   formatRelative,
   durationToYears,

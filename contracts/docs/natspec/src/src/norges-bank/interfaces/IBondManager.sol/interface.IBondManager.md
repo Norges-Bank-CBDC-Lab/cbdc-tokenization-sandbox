@@ -81,6 +81,24 @@ event BondBuybackComplete(bytes32 indexed id, string isin, uint256 total);
 event CouponPaid(string indexed isin, address indexed holder, uint256 paymentAmount, uint256 paymentNumber);
 ```
 
+### CouponPeriodPaid
+
+Emitted once per coupon period after the payment count advances, whether or not any
+holder received cash (units held by the manager earn nothing).
+
+```solidity
+event CouponPeriodPaid(string indexed isin, uint256 paymentNumber, uint256 holdersPaid, uint256 couponPaid);
+```
+
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`isin`|`string`|ISIN of the bond.|
+|`paymentNumber`|`uint256`|1-based period that was just paid.|
+|`holdersPaid`|`uint256`|Number of holders that received a coupon this period.|
+|`couponPaid`|`uint256`|Total coupon paid this period in WNOK.|
+
 ### BondRedeemed
 
 ```solidity

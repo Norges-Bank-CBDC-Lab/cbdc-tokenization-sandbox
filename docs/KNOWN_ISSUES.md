@@ -310,6 +310,20 @@ visible at a glance.
   verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
   (not merged) with this rationale.
 
+## Every bond holder must be on the WNOK allowlist or the whole coupon payment reverts
+- `BondManager.payCoupon` settles every holder in one transaction and does not
+  catch cash-leg failures. A single holder that is not on the WNOK allowlist
+  (removed after bidding, or an address that received units by transfer)
+  makes every coupon payment, including the closing one, revert with
+  `SettlementFailure(AllowlistViolation)`; the bond stays `outstanding`.
+- Units held by `BondManager` itself (a failed allocation) are exempt: they
+  earn no coupon and are burned at maturity without payment.
+- Sandbox workaround: add the holder to the WNOK allowlist from the Central
+  Bank page, then retry the payment. The 409 detail names the refused address.
+- Planned follow-up: decide whether the auction and transfer paths should
+  refuse to deliver units to an address that cannot receive WNOK, so this
+  state cannot arise.
+
 ## BondManager fixes the government reserve account at deployment (`GOV_RESERVE`)
 - `BondManager` stores the government reserve account as an `immutable`,
   `GOV_RESERVE` (`contracts/src/norges-bank/BondManager.sol`). It is the WNOK

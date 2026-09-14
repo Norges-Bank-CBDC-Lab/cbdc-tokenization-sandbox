@@ -124,8 +124,6 @@ Key functions:
   then runs DvP settlement for each allocation.
 - `cancelAuction(isin)`:
   cancels an active auction and reduces the reserved offering accordingly.
-- `withdrawFailedIssuance(isin)`:
-  recovers unsold or failed-to-settle bonds still held by the manager contract.
 - `payCoupon(isin, holders)`:
   pays the next coupon to the provided holder list and advances coupon state.
   On the final period it also repays principal, burns every unit (unsold units

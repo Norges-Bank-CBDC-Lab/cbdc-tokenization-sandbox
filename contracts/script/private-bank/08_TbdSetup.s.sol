@@ -62,6 +62,12 @@ contract TbdSetupScript is RegistryScript {
 
         /// @notice Add CSD to DNB allowlist
         _csdSetup(tbdDnb, dnb.key, vm.addr(vm.envUint("PK_CSD")));
+
+        /// @notice Allow both dealer accounts to hold TBD Nordea (Banking page demos)
+        vm.startBroadcast(nordea.key);
+        tbdNordea.add(nordea.addr);
+        tbdNordea.add(dnb.addr);
+        vm.stopBroadcast();
     }
 
     // internal function to set up investors

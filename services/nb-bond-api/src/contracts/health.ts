@@ -12,6 +12,10 @@ export const healthContractsSchema = z
     wnok: addressSchema.nullable().meta({
       description: 'WNOK contract address; null when WNOK is not registered in GlobalRegistry',
     }),
+    bondManagerCompatible: z.boolean().nullable().meta({
+      description:
+        'True when the deployed BondManager exposes GOV_RESERVE() (the ABI this service is built against); false when the call reverts, meaning the contract predates this API; null when the chain is unreachable',
+    }),
   })
   .meta({
     id: 'HealthContracts',

@@ -48,11 +48,17 @@ export function CouponPayoutPage({ navigate }) {
   const [payTarget, setPayTarget] = useState(null);
   const toast = useToast();
 
-  // Only bonds that can ever receive a coupon: issued supply, not
-  // soft-deleted, and carrying an on-chain coupon schedule.
+  // Work queue: issued bonds that still owe coupon periods. A bond bought back
+  // to zero supply stays listed until its final (empty) payment closes it.
   const bonds = useMemo(
     () =>
-      (data ?? []).filter((b) => Number(b.totalSupply ?? 0) > 0 && !b.disabled && b.coupon != null),
+      (data ?? []).filter(
+        (b) =>
+          !b.disabled &&
+          b.coupon != null &&
+          b.status !== 'matured' &&
+          (Number(b.totalSupply ?? 0) > 0 || Number(b.coupon.payments?.remaining ?? 0) > 0),
+      ),
     [data],
   );
 
@@ -102,10 +108,10 @@ export function CouponPayoutPage({ navigate }) {
             repays principal, burns every unit, and closes the bond.
           </div>
           <div className="hint">
-            This page is a work queue: it lists only bonds with issued supply above zero that are
-            not disabled and carry a coupon schedule. A bond leaves the list when its final coupon
-            closes it (status matured, supply zero) or when it is disabled; closed bonds keep their
-            full coupon history on the Bonds page.
+            This page is a work queue: it lists issued bonds that still owe coupon periods and are
+            not disabled, including a bond bought back to zero supply until its final payment closes
+            it. A bond leaves the list when its final coupon closes it (status matured) or when it
+            is disabled; closed bonds keep their full coupon history on the Bonds page.
           </div>
         </div>
         <div className="actions">

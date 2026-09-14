@@ -402,21 +402,6 @@ function getSealedBids(string calldata _isin) external view returns (IBondAuctio
 |`<none>`|`IBondAuction.Bid[]`|bids Array of sealed bids.|
 
 
-### withdrawFailedIssuance
-
-Allows the issuer to recover bonds that failed to settle during DVP.
-
-
-```solidity
-function withdrawFailedIssuance(string calldata _isin) external onlyRole(Roles.BOND_MANAGER_ROLE);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|Target ISIN with failed issuance.|
-
-
 ### payCoupon
 
 Pay the next coupon to every holder; the final coupon also repays principal and closes the bond.
