@@ -2,8 +2,8 @@
 
 **Plan:** [`plan.md`](plan.md)
 **Last updated:** 2026-09-14 — Phase 5 fresh-sandbox run done; two replay defects it exposed are fixed on the branch
-**Current phase:** Complete; PR #278 open
-**Next action:** Merge PR #278; archive this folder afterwards
+**Current phase:** Complete — #278 merged; folder archived 2026-09-14
+**Next action:** None
 
 ## Phase Log
 
