@@ -1,6 +1,6 @@
 # Coupon closure review fixes — Implementation Plan
 
-**Status:** In progress
+**Status:** Implemented — shipped via #278; archived 2026-09-14
 **Created:** 2026-09-14
 **Scope:** `contracts/src/norges-bank/BondManager.sol`, `IBondManager.sol`, `Errors.sol`, `contracts/script/private-bank/08_TbdSetup.s.sol`, contract tests and docs; `services/nb-bond-api` (coupon route, `contracts/bonds.ts`, `contracts/health.ts`, ingestion, reducer, composer, health probe, ABI artifact, openapi); `services/nb-ui` (`PayCouponModal.jsx`, `CouponPayoutPage.jsx`, `format.js`, tests); `docs/KNOWN_ISSUES.md`
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -77,5 +77,5 @@ Full buyback to zero then close with empty holders; manager-only bond interim co
 
 ## Done Criteria
 
-- [ ] All ten reported findings fixed or explicitly skipped with a reason in `progress.md`.
-- [ ] `forge test`, both package gates, hygiene and link checks pass.
+- [x] All ten reported findings fixed or explicitly skipped with a reason in `progress.md`.
+- [x] `forge test`, both package gates, hygiene and link checks pass.
