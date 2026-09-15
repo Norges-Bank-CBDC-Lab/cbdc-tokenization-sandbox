@@ -13,7 +13,6 @@ export type BondState = {
   totalSupply: string;
   offering: string;
   everIssued: boolean;
-  redemptionComplete: boolean;
   updatedBlock: number;
   updatedLogIndex: number;
 };
@@ -37,7 +36,6 @@ export type BondProjectionEvent =
   | { type: 'issuance-complete' }
   | { type: 'coupon-paid'; paymentNumber: bigint; blockTimestamp: bigint }
   | { type: 'matured' }
-  | { type: 'redemption-complete' }
   | { type: 'supply-delta'; delta: bigint };
 
 export function emptyBondState(isin: string, partition: string): BondState {
@@ -56,7 +54,6 @@ export function emptyBondState(isin: string, partition: string): BondState {
     totalSupply: '0',
     offering: '0',
     everIssued: false,
-    redemptionComplete: false,
     updatedBlock: 0,
     updatedLogIndex: 0,
   };
@@ -90,7 +87,12 @@ export function reduceBondState(
     case 'enabled': {
       next.couponDuration = event.couponDuration.toString();
       next.couponYield = event.couponYield.toString();
-      next.lastCouponPayment = event.blockTimestamp.toString();
+      // The enable timestamp seeds the schedule only until the first coupon lands.
+      // On a full replay a batch applies manager events (coupon periods) before
+      // token events (this one), so never clobber a payment already reduced.
+      if (BigInt(next.couponPaymentCount) === 0n) {
+        next.lastCouponPayment = event.blockTimestamp.toString();
+      }
       const duration = BigInt(next.maturityDuration ?? '0');
       next.maturityDate = (event.blockTimestamp + duration).toString();
       break;
@@ -105,10 +107,8 @@ export function reduceBondState(
       }
       break;
     case 'matured':
+      // BondMatured: the final coupon paid principal and burned every unit.
       next.isMatured = true;
-      break;
-    case 'redemption-complete':
-      next.redemptionComplete = true;
       break;
     case 'supply-delta': {
       const supply = BigInt(next.totalSupply) + event.delta;

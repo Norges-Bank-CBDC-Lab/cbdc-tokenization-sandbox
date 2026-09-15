@@ -62,14 +62,14 @@ library Errors {
     error BondUnitNominalZero();
     error BondDoesNotExist(string isin);
     error IncorrectBondState(string isin, bool expected);
-    error NoFailedIssuance();
-    error InvalidGovTbd();
+    error GovReserveAddressZero();
     error RedemptionIncomplete(string _isin, uint256 remaining);
     error BuybackExceedsSupply(string isin, uint256 buybackSize, uint256 currentSupply);
     error BuybackOfferingZero(string isin);
     error CouponNotReady(string isin, uint256 nextPaymentTime, uint256 currentTime);
     error AllCouponsPaid(string isin);
     error CouponPaymentBalanceMismatch(string isin, uint256 processedBalance, uint256 totalSupply);
+    error DuplicateHolder(string isin, address holder);
     error BondAlreadyDisabled(string isin);
     error BondNotEmpty(string isin, uint256 supply);
     error BondHasFinalisedAuction(string isin, bytes32 auctionId);

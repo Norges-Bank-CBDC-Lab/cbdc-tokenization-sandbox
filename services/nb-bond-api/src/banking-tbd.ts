@@ -27,7 +27,7 @@ import {
 
 import { tbdAbi } from './abi';
 import { deriveBidderAddress, fixtureRoleKey, fixtureRoleKeyOverride } from './bidders';
-import { getBondManager, getWnok, provider, resolveRegisteredAddress } from './chain';
+import { getWnok, provider, resolveRegisteredAddress } from './chain';
 import { envVariables } from './env-vars';
 import { withMd5 } from './http';
 import { type IngestionDatabase, listBankRows } from './ingestion-db';
@@ -380,21 +380,6 @@ export async function listBanks(
   );
 }
 
-/**
- * The bank whose tokenized deposit (TBD) settles government bond payments —
- * `BondManager.GOV_TBD` resolved against the roster. Name is `'Unknown'`
- * when GOV_TBD points at a TBD that is not in the roster.
- */
-export async function getGovSettlementBank(
-  createdBanksDb: IngestionDatabase | null = null,
-): Promise<{ name: string; address: string }> {
-  const manager = await getBondManager();
-  const govTbd = getAddress((await manager.GOV_TBD()) as string);
-  const tbds = await resolveRosterTbds(createdBanksDb);
-  const match = tbds.find((t) => t.address === govTbd);
-  return { name: match?.bankName ?? 'Unknown', address: govTbd };
-}
-
 /** Explicitly bound banking operations for one application/database instance. */
 export function createBankingService(createdBanksDb: IngestionDatabase) {
   return {
@@ -411,6 +396,5 @@ export function createBankingService(createdBanksDb: IngestionDatabase) {
     transferTbd: (address: string, to: string, amount: bigint) =>
       transferTbd(address, to, amount, createdBanksDb),
     listBanks: () => listBanks(createdBanksDb),
-    getGovSettlementBank: () => getGovSettlementBank(createdBanksDb),
   };
 }

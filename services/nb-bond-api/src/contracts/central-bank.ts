@@ -53,15 +53,20 @@ export const centralBankSchema = z
       .meta({
         description: 'WNOK binding state. Null when WNOK is unreachable.',
       }),
-    govSettlementBank: z
+    govReserve: z
       .object({
-        name: z.string().meta({ description: 'Bank whose TBD settles government bond payments' }),
-        address: addressSchema,
+        address: addressSchema.meta({
+          description: 'BondManager.GOV_RESERVE — the government reserve account (a WNOK holder)',
+        }),
+        wnokBalance: bigIntStringSchema.meta({
+          description:
+            'Live WNOK balance of the reserve in 1-NOK units. Issuance credits it; buyback, coupon, and redemption debit it.',
+        }),
       })
       .nullable()
       .meta({
         description:
-          "BondManager.GOV_TBD resolved to a configured bank — the government's bond-payment settlement bank. Null when BondManager is unavailable.",
+          'The government reserve account every bond cash leg settles against, with its WNOK balance. Null when BondManager is unavailable.',
       }),
     md5: md5Schema,
   })

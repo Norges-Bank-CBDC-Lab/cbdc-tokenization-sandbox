@@ -70,23 +70,16 @@ IBondDvP public immutable BOND_DVP
 ```
 
 
-### GOV_TBD
-Store target TBD for bond payments (cash leg)
+### GOV_RESERVE
+Government reserve account: receives issuance proceeds and pays buyback,
+coupon, and redemption cash. Every cash leg settles in WNOK.
 
 
 ```solidity
-address public immutable GOV_TBD
+address public immutable GOV_RESERVE
 ```
 
 
-### _GOV_RESERVE
-
-```solidity
-address private immutable _GOV_RESERVE
-```
-
-
-## State Variables
 ### name
 
 ```solidity
@@ -129,7 +122,7 @@ constructor(
     address _bondAuction,
     address _bondToken,
     address _bondDvp,
-    address _govTbd,
+    address _govReserve,
     uint256 _durationScalar
 ) ;
 ```
@@ -138,12 +131,12 @@ constructor(
 |Name|Type|Description|
 |----|----|-----------|
 |`_name`|`string`|Name of the BondManager instance.|
-|`_wNok`|`address`|Address of the mock WNOK token used for the cash leg.|
+|`_wNok`|`address`|Address of the WNOK token used for every cash leg.|
 |`_controller`|`address`|Bond issuer address granted BOND_MANAGER_ROLE.|
 |`_bondAuction`|`address`|Address of the BondAuction instance coordinating sealed bids.|
 |`_bondToken`|`address`|Address of the BondToken contract (single deployment for all bonds).|
 |`_bondDvp`|`address`||
-|`_govTbd`|`address`|Government nominated TBD.|
+|`_govReserve`|`address`|Government reserve account holding WNOK.|
 |`_durationScalar`|`uint256`|Duration scalar for coupon intervals (31556926 for year, smaller for testing)|
 
 
@@ -409,52 +402,17 @@ function getSealedBids(string calldata _isin) external view returns (IBondAuctio
 |`<none>`|`IBondAuction.Bid[]`|bids Array of sealed bids.|
 
 
-### withdrawFailedIssuance
-
-Allows the issuer to recover bonds that failed to settle during DVP.
-
-
-```solidity
-function withdrawFailedIssuance(string calldata _isin) external onlyRole(Roles.BOND_MANAGER_ROLE);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|Target ISIN with failed issuance.|
-
-
-### redeem
-
-Redeem bonds on behalf of holders
-
-Restricted to BOND_MANAGER_ROLE
-
-Passes msg.sender (BOND_MANAGER_ROLE holder) as operator
-
-Payment is atomic for all holders
-
-
-```solidity
-function redeem(string calldata _isin, address[] calldata _holders) external onlyRole(Roles.BOND_MANAGER_ROLE);
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_isin`|`string`|ISIN string|
-|`_holders`|`address[]`|Array of addresses holding the bonds to be redeemed and receiving WNOK payment|
-
-
 ### payCoupon
 
-Pay coupon to bond holders for a specific ISIN
+Pay the next coupon to every holder; the final coupon also repays principal and closes the bond.
 
-Restricted to BOND_MANAGER_ROLE
+Restricted to BOND_MANAGER_ROLE. Atomic: any failed leg reverts the whole payment.
 
-Payment is atomic for all holders
+Units held by this contract were never sold: they earn no coupon and are burned at maturity
+without any cash movement.
 
-Flags bond as matured after final coupon payment
+On the final period each holder is settled once for coupon plus nominal, every unit is burned,
+partition supply must reach zero, and BondMatured is emitted exactly once.
 
 
 ```solidity
@@ -465,7 +423,7 @@ function payCoupon(string calldata _isin, address[] calldata _holders) external 
 |Name|Type|Description|
 |----|----|-----------|
 |`_isin`|`string`|ISIN string|
-|`_holders`|`address[]`|Array of holder addresses to receive coupon payments|
+|`_holders`|`address[]`|Every current holder of the partition, including this contract when it holds unsold units|
 
 
 ### _handleAllocationFailure

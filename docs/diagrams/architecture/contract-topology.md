@@ -43,8 +43,7 @@ flowchart TB
     manager -->|"partition, mint, coupon, redeem"| bond
     manager -->|"settle each allocation or payout"| bondDvp
     bondDvp -->|"partition transfer or redemption"| bond
-    bondDvp -->|"RATE / PRICE issuance cash"| wnok
-    bondDvp -->|"BUYBACK, coupon, redemption via Nordea TBD"| tbdN
+    bondDvp -->|"issuance, buyback, coupon, redemption cash<br/>against the government reserve account"| wnok
 
     stockFactory -->|"deterministic minimal clones"| stock
     broker -->|"buy / sell / revoke"| orderbook

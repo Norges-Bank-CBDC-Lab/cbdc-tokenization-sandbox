@@ -1291,4 +1291,100 @@ contract OrderBookTest is Test {
         // Submit buy order for 3 units
         orderBook.buy(secContrAddr, buyAmount, bidPrice, buyerSecAddr, buyerTbdAddr, buyerBankTbdContrAddr);
     }
+
+    /**
+     * Regression: a maker that fails settlement with an Unknown reason after an
+     * earlier maker at the same price level already filled must not make the
+     * matching loop re-walk the unchanged level forever. The taker keeps the
+     * filled amount, the remainder rests in the book, and the Unknown-failing
+     * maker is left in place.
+     */
+    function test_buy_partialFill_thenUnknownFail_restsRemainder() public {
+        SettlementInfo memory makerOk = _sell();
+        SettlementInfo memory makerStuck =
+            orderBook.sell(secContrAddr, secAmount, askPrice, otherSecAddr, sellerTbdAddr, sellerBankTbdContrAddr);
+        assertEq(orderBook.getAllSellOrders().length, 2);
+
+        // Only the second maker (otherSecAddr) fails, and for an unattributed reason.
+        vm.mockCallRevert(
+            dvpContrAddr,
+            abi.encodeWithSelector(
+                dvpContract.settle.selector,
+                secContrAddr,
+                otherSecAddr,
+                buyerSecAddr,
+                secAmount,
+                sellerTbdAddr,
+                buyerTbdAddr,
+                askPrice * secAmount,
+                sellerBankTbdContrAddr,
+                buyerBankTbdContrAddr
+            ),
+            abi.encodeWithSelector(DvP.SettlementFailure.selector, DvP.FailureReason.Unknown, "")
+        );
+
+        SettlementInfo memory settlementInfo =
+            orderBook.buy(secContrAddr, 2 * secAmount, bidPrice, buyerSecAddr, buyerTbdAddr, buyerBankTbdContrAddr);
+
+        assertEq(settlementInfo.settled, false);
+        assertEq(settlementInfo.validOrder, true);
+        assertEq(settlementInfo.settlementAmount, secAmount);
+
+        // The filled maker is gone, the stuck maker is still resting.
+        IOrderBook.Order[] memory sellOrders = orderBook.getAllSellOrders();
+        assertEq(sellOrders.length, 1);
+        assertEq(sellOrders[0].id, makerStuck.orderId);
+        assertTrue(sellOrders[0].id != makerOk.orderId);
+
+        // The unfilled remainder rests as a buy order.
+        IOrderBook.Order[] memory buyOrders = orderBook.getBuyOrders(buyerSecAddr);
+        assertEq(buyOrders.length, 1);
+        assertEq(buyOrders[0].amount, secAmount);
+        assertEq(orderBook.getBuyLevelVolume(bidPrice), secAmount);
+    }
+
+    /**
+     * Sell-side mirror of test_buy_partialFill_thenUnknownFail_restsRemainder.
+     */
+    function test_sell_partialFill_thenUnknownFail_restsRemainder() public {
+        SettlementInfo memory makerOk = _buy();
+        SettlementInfo memory makerStuck =
+            orderBook.buy(secContrAddr, secAmount, bidPrice, otherSecAddr, buyerTbdAddr, buyerBankTbdContrAddr);
+        assertEq(orderBook.getAllBuyOrders().length, 2);
+
+        // Only the second maker (otherSecAddr) fails, and for an unattributed reason.
+        vm.mockCallRevert(
+            dvpContrAddr,
+            abi.encodeWithSelector(
+                dvpContract.settle.selector,
+                secContrAddr,
+                sellerSecAddr,
+                otherSecAddr,
+                secAmount,
+                sellerTbdAddr,
+                buyerTbdAddr,
+                bidPrice * secAmount,
+                sellerBankTbdContrAddr,
+                buyerBankTbdContrAddr
+            ),
+            abi.encodeWithSelector(DvP.SettlementFailure.selector, DvP.FailureReason.Unknown, "")
+        );
+
+        SettlementInfo memory settlementInfo =
+            orderBook.sell(secContrAddr, 2 * secAmount, askPrice, sellerSecAddr, sellerTbdAddr, sellerBankTbdContrAddr);
+
+        assertEq(settlementInfo.settled, false);
+        assertEq(settlementInfo.validOrder, true);
+        assertEq(settlementInfo.settlementAmount, secAmount);
+
+        IOrderBook.Order[] memory buyOrders = orderBook.getAllBuyOrders();
+        assertEq(buyOrders.length, 1);
+        assertEq(buyOrders[0].id, makerStuck.orderId);
+        assertTrue(buyOrders[0].id != makerOk.orderId);
+
+        IOrderBook.Order[] memory sellOrders = orderBook.getSellOrders(sellerSecAddr);
+        assertEq(sellOrders.length, 1);
+        assertEq(sellOrders[0].amount, secAmount);
+        assertEq(orderBook.getSellLevelVolume(askPrice), secAmount);
+    }
 }

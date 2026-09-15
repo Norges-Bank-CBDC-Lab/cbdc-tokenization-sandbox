@@ -1,6 +1,6 @@
 import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
-import { tbdAbi } from '../../abi';
+import { wnokAbi } from '../../abi';
 import { computeBuybackAllocation, computeUniformAllocation } from '../../allocation';
 import { DependencyUnavailableError, type MutationResource } from '../../application-errors';
 import { normalizeSealedBid, unsealBid } from '../../bid';
@@ -322,8 +322,10 @@ export function createAuctionService(dependencies: AuctionServiceDependencies) {
         opType: 'AUCTION_FINALISE',
         target: auctionId,
         detail: { isin, allocations: allocations.length },
-        interfaces: [bondManager.interface, new Interface(tbdAbi)],
+        interfaces: [bondManager.interface, new Interface(wnokAbi)],
         txHashOf: (sent) => sent.tx.hash,
+        // Issuance and buyback cash move WNOK between bidders and the reserve.
+        changedResources: ['bidders', 'central-bank'],
       },
       () =>
         sendWithManagedNonce(async (nonce) => {

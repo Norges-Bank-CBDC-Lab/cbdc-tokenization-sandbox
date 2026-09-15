@@ -273,16 +273,10 @@ error BondDoesNotExist(string isin);
 error IncorrectBondState(string isin, bool expected);
 ```
 
-### NoFailedIssuance
+### GovReserveAddressZero
 
 ```solidity
-error NoFailedIssuance();
-```
-
-### InvalidGovTbd
-
-```solidity
-error InvalidGovTbd();
+error GovReserveAddressZero();
 ```
 
 ### RedemptionIncomplete
@@ -319,6 +313,12 @@ error AllCouponsPaid(string isin);
 
 ```solidity
 error CouponPaymentBalanceMismatch(string isin, uint256 processedBalance, uint256 totalSupply);
+```
+
+### DuplicateHolder
+
+```solidity
+error DuplicateHolder(string isin, address holder);
 ```
 
 ### BondAlreadyDisabled

@@ -11,7 +11,7 @@
  *     by the error middleware
  *
  * Mutations always return the *updated parent* (Bond after coupon /
- * redeem / createAuction; Auction after close / cancel / finalise) so
+ * createAuction; Auction after close / cancel / finalise) so
  * the UI can atomically swap its cache.
  */
 import cors from 'cors';
@@ -107,12 +107,12 @@ import {
 } from './bidders';
 import { BidderBidError, submitImpersonatedBid } from './bidder-bid';
 import {
-  CentralBankNotConfiguredError,
-  WnokUnavailableError,
   addToAllowlist,
   burnWnok,
+  CentralBankNotConfiguredError,
   getCbAddress,
   getCbWnokBalance,
+  getGovReserve,
   getWnokTotalSupply,
   isCentralBankReady,
   listAllowlist,
@@ -120,6 +120,7 @@ import {
   mintWnok,
   removeFromAllowlist,
   transferWnokFromCb,
+  WnokUnavailableError,
 } from './central-bank';
 import { withMd5 } from './http';
 import { provider } from './chain';
@@ -252,12 +253,24 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       let bondAuctionAddress = ZERO_ADDR;
       let bondTokenAddress = ZERO_ADDR;
       let wnokAddr: string | null = null;
+      let bondManagerCompatible: boolean | null = null;
       try {
         const bondManager = await getBondManager();
         bondManagerAddress = bondManager.target.toString();
         bondAuctionAddress = await getBondAuctionAddress();
         bondTokenAddress = await bondManager.BOND_TOKEN();
         wnokAddr = await getWnokAddress().catch(() => null);
+        // The API's ABI expects the reserve-account BondManager (GOV_RESERVE, BondMatured).
+        // An older deployment reverts here; say so instead of degrading silently.
+        bondManagerCompatible = await bondManager
+          .GOV_RESERVE()
+          .then(() => true)
+          .catch(() => false);
+        if (!bondManagerCompatible) {
+          logger.error(
+            `BondManager at ${bondManagerAddress} does not expose GOV_RESERVE(); the deployed contract predates this API's ABI`,
+          );
+        }
       } catch {
         // Chain unreachable at boot — contract addresses unknown. The
         // status derivation handles this via headReachable=false.
@@ -275,6 +288,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
           bondAuction: bondAuctionAddress,
           bondToken: bondTokenAddress,
           wnok: wnokAddr,
+          bondManagerCompatible,
         },
         sealingPubKey: sealingKeys.publicKey,
         chain: {
@@ -574,18 +588,21 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         const { holders } = req.body as HoldersBody;
         const requested = holders && holders.length > 0 ? holders : await getActiveHolders(isin);
         if (!requested.length) {
-          throw notFound('no holders found for coupon payment');
+          // A bond bought back to zero supply has nobody to pay but still owes its
+          // remaining periods; the contract accepts an empty list then and the final
+          // period closes the bond. Anything else with no holders is a real miss.
+          const current = await composeBond(historyDb, isin);
+          if (!current) throw notFound(`bond ${isin} not found`);
+          if (current.totalSupply !== '0') {
+            throw notFound('no holders found for coupon payment');
+          }
         }
 
         // BondManager.payCoupon requires the holder set to cover the ENTIRE
-        // partition supply (CouponPaymentBalanceMismatch otherwise), so
-        // treasury-held units — the unsold remainder the BondManager itself
-        // keeps after a partial allocation — cannot be excluded here. When
-        // present they deadlock the payout on-chain: the government TBD's
-        // allowlist (correctly) refuses the manager contract, unless the
-        // operator explicitly allowlists it. See docs/KNOWN_ISSUES.md.
+        // partition supply (CouponPaymentBalanceMismatch otherwise), so unsold
+        // units the BondManager itself keeps after a failed allocation stay in
+        // the list; on-chain they earn no coupon and are burned at maturity.
         const bondManager = await getBondManager();
-        const managerAddress = bondManager.target.toString().toLowerCase();
 
         try {
           const sent = await withOperationRecording(
@@ -594,8 +611,11 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
               opType: 'COUPON_PAYMENT',
               target: isin,
               detail: { holders: requested.length },
-              interfaces: [bondManager.interface, new Interface(tbdAbi)],
+              interfaces: [bondManager.interface, new Interface(wnokAbi)],
               txHashOf: (sent) => sent.tx.hash,
+              // Coupon cash moves WNOK from the reserve to the holders: the
+              // Bidders and Central Bank pages show those balances live.
+              changedResources: ['bidders', 'central-bank'],
             },
             () =>
               sendWithManagedNonce(async (nonce) => {
@@ -606,59 +626,12 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         } catch (err) {
           // Surface on-chain reverts readably; settlement failures wrap the
           // refusing token's own error in their lowLevelData bytes.
-          const description = describeRevert(err, [bondManager.interface, new Interface(tbdAbi)]);
+          const description = describeRevert(err, [bondManager.interface, new Interface(wnokAbi)]);
           if (description) {
-            const treasuryHint =
-              description.includes('AllowlistViolation') &&
-              description.toLowerCase().includes(managerAddress)
-                ? ' — the BondManager holds unsold units from a partial allocation and is not ' +
-                  'allowlisted on the government settlement TBD; see docs/KNOWN_ISSUES.md for ' +
-                  'the workaround and the planned contract-side fix'
-                : '';
-            throw conflict(`coupon payment reverted on-chain: ${description}${treasuryHint}`);
+            throw conflict(`coupon payment reverted on-chain: ${description}`);
           }
           throw err;
         }
-
-        const bond = await composeBond(historyDb, isin);
-        if (!bond) throw notFound(`bond ${isin} not found`);
-        okResponse(req, res, bond);
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
-
-  app.post(
-    '/v1/bonds/:isin/redemptions',
-    validateRequest(isinParamSchema, 'params'),
-    validateRequest(holdersBodySchema),
-    async (req, res, next) => {
-      try {
-        const { isin } = req.params as { isin: string };
-        const { holders } = req.body as HoldersBody;
-        const targetHolders =
-          holders && holders.length > 0 ? holders : await getActiveHolders(isin);
-        if (!targetHolders.length) {
-          throw notFound('no holders found for redemption');
-        }
-
-        const bondManager = await getBondManager();
-        const sent = await withOperationRecording(
-          {
-            db: biddersDb,
-            opType: 'REDEMPTION',
-            target: isin,
-            detail: { holders: targetHolders.length },
-            interfaces: [bondManager.interface, new Interface(tbdAbi)],
-            txHashOf: (sent) => sent.tx.hash,
-          },
-          () =>
-            sendWithManagedNonce(async (nonce) => {
-              return bondManager.redeem(isin, targetHolders, { nonce });
-            }),
-        );
-        await awaitMutationProjection(sent, { type: 'bond', id: isin });
 
         const bond = await composeBond(historyDb, isin);
         if (!bond) throw notFound(`bond ${isin} not found`);
@@ -1006,7 +979,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
               : '0x0000000000000000000000000000000000000000',
             available: false,
             wnok: null,
-            govSettlementBank: null,
+            govReserve: null,
           }),
         );
         return;
@@ -1020,16 +993,16 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
             address: getCbAddress(),
             available: false,
             wnok: null,
-            govSettlementBank: null,
+            govReserve: null,
           }),
         );
         return;
       }
-      const [balance, allowlist, totalSupply, govSettlementBank] = await Promise.all([
+      const [balance, allowlist, totalSupply, govReserve] = await Promise.all([
         getCbWnokBalance().catch(() => 0n),
         listAllowlist().catch(() => [] as string[]),
         getWnokTotalSupply().catch(() => 0n),
-        banking.getGovSettlementBank().catch(() => null),
+        getGovReserve().catch(() => null),
       ]);
       okResponse(
         req,
@@ -1043,7 +1016,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
             totalSupply: totalSupply.toString(),
             allowlistSize: allowlist.length,
           },
-          govSettlementBank,
+          govReserve,
         }),
       );
     } catch (err) {

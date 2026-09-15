@@ -124,22 +124,26 @@ Key functions:
   then runs DvP settlement for each allocation.
 - `cancelAuction(isin)`:
   cancels an active auction and reduces the reserved offering accordingly.
-- `withdrawFailedIssuance(isin)`:
-  recovers unsold or failed-to-settle bonds still held by the manager contract.
 - `payCoupon(isin, holders)`:
   pays the next coupon to the provided holder list and advances coupon state.
-- `redeem(isin, holders)`:
-  redeems the remaining supply for the provided holder list and checks that the
-  partition is fully redeemed.
+  On the final period it also repays principal, burns every unit (unsold units
+  held by the manager without payment), requires zero supply, and emits
+  `BondMatured` once. There is no separate redemption entry point.
 
 Important notes:
 
 - `BondManager` depends on privileged role setup across `BondAuction`,
-  `BondToken`, `BondDvP`, and the cash-side contracts.
+  `BondToken`, `BondDvP`, and `Wnok`.
+- Every cash leg settles in `Wnok` against one government reserve account
+  (`GOV_RESERVE`, fixed at deployment): issuance credits the reserve, while
+  buyback and coupon payments debit it. The reserve must hold enough WNOK and
+  must have approved `BondDvP` to spend it; a shortfall reverts the whole
+  payment, and the closing payment (coupon plus principal for every holder) is
+  the largest single movement.
 - Auction allocation is not calculated on-chain. Finalisation assumes the
   off-chain auction operator provides correct allocations and matching proofs.
-- Coupon and redemption flows depend on the caller providing a complete and
-  correct holder list.
+- Coupon payments depend on the caller providing a complete and correct holder
+  list, including the manager itself when it holds unsold units.
 - This contract is powerful and already owns many lifecycle responsibilities,
   so new features should be added carefully to avoid turning it into a catch-all
   orchestrator.
@@ -250,8 +254,9 @@ Source:
 [`contracts/src/norges-bank/Wnok.sol`](../src/norges-bank/Wnok.sol)
 
 Role in system:
-Tokenized central-bank-style cash leg used by local settlement flows and by
-cross-bank movements into `Tbd`.
+Tokenized central-bank-style cash leg used by every bond cash leg (issuance,
+buyback, coupon, redemption), by local settlement flows, and by cross-bank
+movements into `Tbd`.
 
 Key functions:
 
@@ -382,6 +387,10 @@ Important notes:
 - The order book is tightly coupled to the settlement model in `DvP`.
 - Unknown settlement errors are intentionally treated differently from
   buyer-side or seller-side faults so matching can continue where appropriate.
+  A maker that fails with an unknown reason stays in the book; once a price
+  level has been walked in full without being cleared, matching stops and the
+  taker's remainder rests, so a stuck maker can never make `buy()` / `sell()`
+  loop until the transaction runs out of gas.
 - The contract uses `nonReentrant` because it sits on top of a multi-contract
   settlement stack.
 

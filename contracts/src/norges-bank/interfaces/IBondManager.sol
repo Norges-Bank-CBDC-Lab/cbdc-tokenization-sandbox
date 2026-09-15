@@ -23,11 +23,33 @@ interface IBondManager {
     event BondIssuanceComplete(bytes32 indexed id, string isin, uint256 total);
     event BondBuybackComplete(bytes32 indexed id, string isin, uint256 total);
 
-    // Redemption event
-    event BondRedeemed(string indexed isin, address indexed holder, uint256 value, uint256 wnokAmount);
-    event BondRedemptionComplete(string indexed isin);
-
-    // Coupon payment event
+    // Coupon payment event (one per holder per period)
     event CouponPaid(string indexed isin, address indexed holder, uint256 paymentAmount, uint256 paymentNumber);
-    event AllCouponsPaid(string indexed isin);
+
+    /**
+     * @notice Emitted once per coupon period after the payment count advances, whether or not any
+     *         holder received cash (units held by the manager earn nothing).
+     * @param isin ISIN of the bond.
+     * @param paymentNumber 1-based period that was just paid.
+     * @param holdersPaid Number of holders that received a coupon this period.
+     * @param couponPaid Total coupon paid this period in WNOK.
+     */
+    event CouponPeriodPaid(string indexed isin, uint256 paymentNumber, uint256 holdersPaid, uint256 couponPaid);
+
+    // Principal repayment event (one per holder, final period only)
+    event BondRedeemed(string indexed isin, address indexed holder, uint256 value, uint256 wnokAmount);
+
+    /**
+     * @notice Emitted once when the final coupon closes the bond: every unit is burned, holders
+     *         were paid coupon plus principal, and unsold units held by the manager were burned
+     *         without payment.
+     * @param isin ISIN of the closed bond.
+     * @param paymentCount Number of coupon periods paid over the bond's life.
+     * @param principalPaid Total nominal repaid to holders in WNOK.
+     * @param couponPaid Total coupon paid in the final period in WNOK.
+     * @param unsoldBurned Units held by the manager that were burned without payment.
+     */
+    event BondMatured(
+        string indexed isin, uint256 paymentCount, uint256 principalPaid, uint256 couponPaid, uint256 unsoldBurned
+    );
 }

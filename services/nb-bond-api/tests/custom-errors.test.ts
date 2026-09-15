@@ -1,5 +1,5 @@
 import { Interface } from 'ethers';
-import { bondAuctionAbi, bondManagerAbi, tbdAbi } from '../src/abi';
+import { bondAuctionAbi, bondManagerAbi, tbdAbi, wnokAbi } from '../src/abi';
 import { decodeCustomError, describeRevert } from '../src/chain';
 
 describe('decodeCustomError', () => {
@@ -41,10 +41,12 @@ describe('describeRevert', () => {
   const managerIface = new Interface(bondManagerAbi);
   const tbdIface = new Interface(tbdAbi);
 
-  // Real revert captured from a live coupon payment whose default holder
-  // list still included the BondManager itself (treasury-held units after
-  // a partial allocation): BondDvP wrapped the government TBD's
-  // AllowlistViolation in SettlementFailure's lowLevelData bytes.
+  // Real revert captured from a live coupon payment (when payouts still ran
+  // through a government TBD) whose default holder list included the
+  // BondManager itself (treasury-held units after a partial allocation):
+  // BondDvP wrapped the token's AllowlistViolation in SettlementFailure's
+  // lowLevelData bytes. The shape is identical for WNOK, which now settles
+  // every bond cash leg and shares the same Errors library.
   const settlementRevertData =
     '0xc974ce95' +
     '0000000000000000000000000000000000000000000000000000000000000001' +
@@ -65,6 +67,21 @@ describe('describeRevert', () => {
     expect(described).toContain('AllowlistViolation');
     expect(described).toContain('TBD Nordea');
     expect(described).toContain('0xe61a63Ef630b7B6FF9b9e595B61f641171a4eB97');
+  });
+
+  it('decodes a WNOK-nested SettlementFailure with the WNOK interface', () => {
+    const wnokIface = new Interface(wnokAbi);
+    const inner = wnokIface.encodeErrorResult('AllowlistViolation', [
+      'Wholesale NOK',
+      '0xe61a63Ef630b7B6FF9b9e595B61f641171a4eB97',
+      'recipient not on allowlist',
+    ]);
+    const wrapped = managerIface.encodeErrorResult('SettlementFailure', [1, inner]);
+    const described = describeRevert({ data: wrapped }, [managerIface, wnokIface]);
+    expect(described).toContain('SettlementFailure');
+    expect(described).toContain('AllowlistViolation');
+    expect(described).toContain('Wholesale NOK');
+    expect(described).toContain('recipient not on allowlist');
   });
 
   it('describes a flat error without nesting', () => {

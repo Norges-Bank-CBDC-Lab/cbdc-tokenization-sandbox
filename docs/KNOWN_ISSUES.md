@@ -2,8 +2,8 @@
 
 ## Root `overrides` security pins go stale silently
 - The root `package.json` `overrides` block pins transitive packages
-  (currently `ws`, `undici`, `js-yaml`, and two scoped `brace-expansion`
-  pins) as security floors. Nothing in CI flags when a newer patched
+  (currently `ws`, `undici`, `js-yaml`, `qs`, and two scoped
+  `brace-expansion` pins) as security floors. Nothing in CI flags when a newer patched
   version supersedes a pin, so the floors themselves become the reason
   Dependabot alerts stay open.
 - Treat every Dependabot alert against an overridden package as an
@@ -18,31 +18,21 @@
   lockfile diff (parse both lockfiles and compare entries) — the changed
   entry set must be exactly the intended packages.
 
-## Partially allocated bonds deadlock coupon payment and redemption on-chain
-- When an auction is finalised with less than full allocation (or a
-  buyback repurchases units), the remainder stays on the BondManager's
-  own balance — the manager contract is a "holder" of its own bond.
-- Such bonds cannot pay coupons or redeem on-chain today, in both
-  directions of the pincer:
-  - `BondManager.payCoupon` and `redeem` require the processed holder
-    set to cover the **entire** partition supply
-    (`CouponPaymentBalanceMismatch` / the redeem zero-supply check), so
-    the manager cannot be skipped;
-  - including the manager fails the cash leg with
-    `SettlementFailure(AllowlistViolation)` because the government
-    settlement TBD's allowlist (correctly) does not include the manager
-    contract.
-- The API surfaces these reverts as readable 409 details (nested custom
-  errors decoded, with a treasury-specific hint), and the payout modal
-  flags treasury-held units with a warning before the transaction is
-  attempted.
-- Sandbox workarounds: allowlist the BondManager on the government TBD
-  via the Banking page (the payment then succeeds; the treasury's own
-  coupon cash accrues to the manager contract), or use fully-allocated
-  auctions when coupon/redemption flows are being tested.
-- Planned follow-up (contract-side decision): burn unsold units at
-  finalisation, or skip self-held units in `payCoupon` / `redeem`
-  on-chain.
+## Order-book makers that fail settlement with an unknown reason stay resting
+- `OrderBook` keeps a resting maker in place when `DvP.settle` fails with
+  `FailureReason.Unknown` (a revert the settlement contract cannot attribute
+  to the buyer or the seller, e.g. an allowlist change on the wNOK side).
+  Matching now stops after a price level has been walked in full and the
+  taker's remainder rests, so a stuck maker no longer makes crossing orders
+  revert out of gas.
+- The stuck maker itself is not evicted: the book can sit crossed (a bid at
+  or above the best ask that never trades) until the maker's broker revokes
+  it or the underlying condition clears. Issuance orders created by
+  `initializeSellOrders` carry `broker == address(0)` and cannot be revoked
+  by anyone, so such an order stays at its price level until it becomes
+  settleable again. Follow-up: an `ORDER_ADMIN_ROLE` purge for
+  broker-less issuance orders, and a decision on whether repeated unknown
+  failures should evict the maker.
 
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
@@ -301,7 +291,7 @@ visible at a glance.
   `nb-bond-api` suite stays green: jest, lint, build), but it was held.
 - Why deferred — a correct upgrade is more than a version bump:
   - Babel 8 requires Node `^22.18.0 || >=24.11.0`. That is satisfied (the repo
-    pins Node 25 via `common/node-version.env`), but `@babel/core` 8 hoisted to
+    pins Node 26 via `common/node-version.env`), but `@babel/core` 8 hoisted to
     the workspace root breaks `nb-ui`'s `@vitejs/plugin-react`, which
     peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
     keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
@@ -320,23 +310,32 @@ visible at a glance.
   verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
   (not merged) with this rationale.
 
-## BondManager hard-codes the government settlement bank (`GOV_TBD`)
-- `BondManager` stores the government's cash-leg settlement bank as an `immutable`
-  — `GOV_TBD`, with `_GOV_RESERVE` derived from `ITbd(GOV_TBD).govReserve()`
-  (`contracts/src/norges-bank/BondManager.sol:46-94`). It is the TBD (tokenized
-  bank deposit) whose tokens settle bond coupon and redemption payments
-  (`payCoupon`, `redeem`); in the local sandbox it is wired to Nordea
-  (`TBD_NORDEA_CONTRACT_NAME`, resolved from GlobalRegistry at deploy —
-  `contracts/script/norges-bank/10_Bond.s.sol:26`, `11_BondSetup.s.sol:32`).
-- Because it is `immutable`, switching the government's agent bank requires
-  redeploying `BondManager` and re-wiring the bond stack. The source of truth is
-  also split: the deploy resolves the bank from a GlobalRegistry name, then freezes
-  it on `BondManager`. This is fine for the single-bank sandbox but is the wrong
-  long-term home — "who settles government cash" is a settlement / governance
-  concern, not a bond-contract detail.
-- Planned follow-up: move the designation to mutable, well-modelled state — either a
-  stable, resolvable GlobalRegistry entry (e.g. a `Gov TBD` name) or the settlement
-  layer / `PrimaryDealerRegistry` introduced by
-  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md),
-  so the agent bank can change without a redeploy. The operator Central Bank page
-  surfaces the current value by reading `BondManager.GOV_TBD()`.
+## Every bond holder must be on the WNOK allowlist or the whole coupon payment reverts
+- `BondManager.payCoupon` settles every holder in one transaction and does not
+  catch cash-leg failures. A single holder that is not on the WNOK allowlist
+  (removed after bidding, or an address that received units by transfer)
+  makes every coupon payment, including the closing one, revert with
+  `SettlementFailure(AllowlistViolation)`; the bond stays `outstanding`.
+- Units held by `BondManager` itself (a failed allocation) are exempt: they
+  earn no coupon and are burned at maturity without payment.
+- Sandbox workaround: add the holder to the WNOK allowlist from the Central
+  Bank page, then retry the payment. The 409 detail names the refused address.
+- Planned follow-up: decide whether the auction and transfer paths should
+  refuse to deliver units to an address that cannot receive WNOK, so this
+  state cannot arise.
+
+## BondManager fixes the government reserve account at deployment (`GOV_RESERVE`)
+- `BondManager` stores the government reserve account as an `immutable`,
+  `GOV_RESERVE` (`contracts/src/norges-bank/BondManager.sol`). It is the WNOK
+  account that receives issuance proceeds and pays buyback, coupon, and
+  redemption cash (ADR 0004). In the local sandbox it is the fixture reserve
+  key (`PK_GOV_RESERVE`), passed by `contracts/script/norges-bank/10_Bond.s.sol`.
+- Because it is `immutable`, changing the reserve account requires redeploying
+  `BondManager` and re-wiring the bond stack. This is fine for the sandbox, but
+  "which account pays the state's obligations" is a governance concern that may
+  deserve mutable, role-gated state.
+- Planned follow-up: decide whether the designation becomes mutable (admin
+  setter with its own ADR) or moves to the settlement layer introduced by
+  [`docs/plans/closed-loop-settlement-and-omnibus-custody-plan.md`](plans/closed-loop-settlement-and-omnibus-custody-plan.md).
+  The operator Central Bank page surfaces the current account and its WNOK
+  balance by reading `BondManager.GOV_RESERVE()`.

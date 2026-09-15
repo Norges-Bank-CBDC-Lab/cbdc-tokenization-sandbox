@@ -28,7 +28,11 @@ import { PayCouponModal } from './PayCouponModal.jsx';
 import { isMutationAccepted, mutationAcceptedMessage } from '../api/httpClient.js';
 
 function payButtonTitle(coupon) {
-  if (coupon.payable) return 'Pay this coupon to all current holders';
+  if (coupon.payable) {
+    return Number(coupon.payments?.remaining ?? 0) === 1
+      ? 'Pay the final coupon plus principal to all holders and close the bond'
+      : 'Pay this coupon to all current holders';
+  }
   if (coupon.nextPaymentDue == null || Number(coupon.payments?.remaining ?? 0) === 0) {
     return 'All coupons paid';
   }
@@ -44,11 +48,17 @@ export function CouponPayoutPage({ navigate }) {
   const [payTarget, setPayTarget] = useState(null);
   const toast = useToast();
 
-  // Only bonds that can ever receive a coupon: issued supply, not
-  // soft-deleted, and carrying an on-chain coupon schedule.
+  // Work queue: issued bonds that still owe coupon periods. A bond bought back
+  // to zero supply stays listed until its final (empty) payment closes it.
   const bonds = useMemo(
     () =>
-      (data ?? []).filter((b) => Number(b.totalSupply ?? 0) > 0 && !b.disabled && b.coupon != null),
+      (data ?? []).filter(
+        (b) =>
+          !b.disabled &&
+          b.coupon != null &&
+          b.status !== 'matured' &&
+          (Number(b.totalSupply ?? 0) > 0 || Number(b.coupon.payments?.remaining ?? 0) > 0),
+      ),
     [data],
   );
 
@@ -93,8 +103,15 @@ export function CouponPayoutPage({ navigate }) {
           <div className="crumbs">Operator</div>
           <h1>Coupon payout</h1>
           <div className="subtitle">
-            Pay the periodic coupon on issued bonds. The cash leg settles from the government
-            reserve to every holder, proportional to their balance.
+            Pay the periodic coupon on issued bonds. The cash leg settles in WNOK from the
+            government reserve to every holder, proportional to their balance. The final coupon also
+            repays principal, burns every unit, and closes the bond.
+          </div>
+          <div className="hint">
+            This page is a work queue: it lists issued bonds that still owe coupon periods and are
+            not disabled, including a bond bought back to zero supply until its final payment closes
+            it. A bond leaves the list when its final coupon closes it (status matured) or when it
+            is disabled; closed bonds keep their full coupon history on the Bonds page.
           </div>
         </div>
         <div className="actions">
@@ -130,7 +147,7 @@ export function CouponPayoutPage({ navigate }) {
         {!loading && !error && bonds.length === 0 && (
           <EmptyState
             title="No issued bonds with a coupon schedule"
-            message="Bonds appear here once an auction has been finalised and supply is minted."
+            message="Bonds appear here once an auction has been finalised and supply is minted, and leave when the final coupon closes them. See the Bonds page for closed bonds and their coupon history."
           />
         )}
         {!loading && !error && bonds.length > 0 && (

@@ -16,7 +16,7 @@ sequenceDiagram
     participant BT as BondToken
     actor Bidder as Primary dealer
     participant DVP as BondDvP
-    participant Cash as WNOK or government TBD
+    participant Cash as WNOK
 
     Operator->>UI: Create bond or schedule auction
     UI->>API: POST /v1/bonds or POST /v1/bonds/{isin}/auctions
@@ -81,7 +81,7 @@ sequenceDiagram
         end
     else BUYBACK
         loop Each allocation
-            BM->>DVP: settle bond burn + government TBD payment
+            BM->>DVP: settle bond burn + government reserve WNOK payment
             DVP->>BT: buybackRedeemFor(bidder)
             DVP->>Cash: transferFrom(government reserve, bidder)
         end
@@ -94,6 +94,6 @@ sequenceDiagram
 
 Each `BondDvP.settle` call is atomic. Auction settlement as a whole is not:
 `BondManager` catches a failed allocation, emits `BondAllocationFailed`, and
-continues. A RATE/PRICE failure can therefore leave minted units in
-`BondManager` for `withdrawFailedIssuance` while the auction remains
-`FINALISED`.
+continues. A RATE/PRICE failure can therefore leave minted units on
+`BondManager` while the auction remains `FINALISED`; those units earn no coupon
+and are burned without payment when the final coupon closes the bond.

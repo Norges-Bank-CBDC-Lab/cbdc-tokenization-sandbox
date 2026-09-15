@@ -185,15 +185,29 @@ function holder(row: BondSnapshot['balances'][number]): HolderBalance {
   return withMd5({ holder: row.holder, balance: row.balance });
 }
 
+function remainingCouponPeriods(state: BondSnapshot['state']): bigint {
+  if (state.maturity_duration === null || state.coupon_duration === null) return 0n;
+  const couponDuration = BigInt(state.coupon_duration);
+  if (couponDuration <= 0n) return 0n;
+  const total = BigInt(state.maturity_duration) / couponDuration;
+  const made = BigInt(state.coupon_payment_count);
+  return total > made ? total - made : 0n;
+}
+
 function bondStatus(snapshot: BondSnapshot): BondStatus {
   const state = snapshot.state;
   const supply = BigInt(state.total_supply);
-  if (state.ever_issued && state.redemption_complete && supply === 0n) return 'redeemed';
+  // Terminal: the final coupon paid principal and burned every unit (BondMatured).
   if (state.is_matured) return 'matured';
 
   const latestAuction = snapshot.auctions[snapshot.auctions.length - 1]?.row;
   if (latestAuction?.status === 'open' || latestAuction?.status === 'closed') return 'auctioning';
-  if (state.ever_issued && supply > 0n) return 'outstanding';
+  // An issued bond stays outstanding while it holds units or still owes coupon
+  // periods: a full buyback empties the supply but only the final payCoupon
+  // closes the schedule, so it must stay reachable from the payout queue.
+  if (state.ever_issued && (supply > 0n || remainingCouponPeriods(state) > 0n)) {
+    return 'outstanding';
+  }
   return 'staged';
 }
 

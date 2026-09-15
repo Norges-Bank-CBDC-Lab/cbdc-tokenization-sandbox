@@ -10,7 +10,6 @@ import {BondToken} from "@norges-bank/BondToken.sol";
 import {IBondToken} from "@norges-bank/interfaces/IBondToken.sol";
 import {BondDvP} from "@norges-bank/BondDvP.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
-import {Tbd} from "@private-bank/Tbd.sol";
 import {Errors} from "@common/Errors.sol";
 import {Roles} from "@common/Roles.sol";
 import {AuctionHelper} from "../utils/AuctionHelper.sol";
@@ -20,11 +19,9 @@ contract BondManagerTest is Test, AuctionHelper {
     BondAuction bondAuction;
     BondToken bondToken;
     BondDvP bondDvp;
-    Tbd govTbd;
 
     address deployer = address(this);
     address govReserve = address(0x800);
-    address govBank = address(0x900);
     address holder1 = address(0x400);
     address holder2 = address(0x500);
     address bidder1;
@@ -64,7 +61,6 @@ contract BondManagerTest is Test, AuctionHelper {
         wnok.add(bidder1);
         wnok.add(bidder2);
         wnok.add(govReserve);
-        wnok.add(govBank);
 
         initGlobals(PLAINTEXT_HASH, CIPHERTEXT, UNIT_NOMINAL, PERCENTAGE_PRECISION);
         initActors(bondAdmin);
@@ -75,9 +71,6 @@ contract BondManagerTest is Test, AuctionHelper {
         bondAuction = new BondAuction("Bond Auction");
         bondToken = new BondToken("Bond Token", "BOND");
         bondDvp = new BondDvP("Bond DvP", deployer);
-        govTbd = new Tbd(deployer, govBank, address(wnok), address(bondDvp), "Gov TBD", "GTBD", govReserve);
-
-        wnok.add(address(govTbd));
 
         bondManager = new BondManager(
             "Bond Manager",
@@ -86,7 +79,7 @@ contract BondManagerTest is Test, AuctionHelper {
             address(bondAuction),
             address(bondToken),
             address(bondDvp),
-            address(govTbd),
+            govReserve,
             DURATION_SCALAR
         );
 
@@ -110,25 +103,15 @@ contract BondManagerTest is Test, AuctionHelper {
 
         bytes32 transferFromRole = keccak256("TRANSFER_FROM_ROLE");
         wnok.grantRole(transferFromRole, address(bondDvp));
-        wnok.grantRole(transferFromRole, address(govTbd));
 
         bytes32 minterRole = keccak256("MINTER_ROLE");
         wnok.grantRole(minterRole, bondAdmin);
 
-        govTbd.add(govReserve);
-        govTbd.add(bidder1);
-        govTbd.add(bidder2);
-
         uint256 largeAmount = 1_000_000_000 * 10 ** 18;
         wnok.mint(govReserve, largeAmount);
-        vm.prank(deployer);
-        govTbd.mint(govReserve, largeAmount);
 
         vm.prank(govReserve);
-        wnok.approve(address(govTbd), type(uint256).max);
-
-        vm.prank(govReserve);
-        govTbd.approve(address(bondDvp), type(uint256).max);
+        wnok.approve(address(bondDvp), type(uint256).max);
 
         vm.startPrank(bidder1);
         wnok.approve(address(bondDvp), type(uint256).max);
@@ -258,6 +241,9 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256[] memory nonces = new uint256[](1);
         IBondAuction.BidVerification[] memory proofs = _proofs(auctionId, bidders, nonces);
 
+        uint256 bidderWnokBefore = wnok.balanceOf(bidder1);
+        uint256 reserveWnokBefore = wnok.balanceOf(govReserve);
+
         vm.prank(bondAdmin);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
 
@@ -265,6 +251,10 @@ contract BondManagerTest is Test, AuctionHelper {
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         assertEq(bondToken.balanceOfByPartition(partition, bidder1), OFFERING);
+
+        // Issuance cash leg: bidder pays face value in WNOK to the government reserve
+        assertEq(bidderWnokBefore - wnok.balanceOf(bidder1), OFFERING * UNIT_NOMINAL);
+        assertEq(wnok.balanceOf(govReserve) - reserveWnokBefore, OFFERING * UNIT_NOMINAL);
 
         // Check coupon parameters were set
         assertEq(bondToken.couponYield(partition), COUPON_YIELD);
@@ -305,11 +295,18 @@ contract BondManagerTest is Test, AuctionHelper {
         uint256[] memory nonces = new uint256[](1);
         IBondAuction.BidVerification[] memory proofs = _proofs(auctionId, bidders, nonces);
 
+        uint256 bidderWnokBefore = wnok.balanceOf(bidder2);
+        uint256 reserveWnokBefore = wnok.balanceOf(govReserve);
+
         vm.prank(bondAdmin);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         assertEq(bondToken.balanceOfByPartition(partition, bidder2), additionalOffering);
+
+        // Issuance cash leg: bidder pays the discounted price in WNOK to the government reserve
+        assertEq(bidderWnokBefore - wnok.balanceOf(bidder2), paymentDue);
+        assertEq(wnok.balanceOf(govReserve) - reserveWnokBefore, paymentDue);
     }
 
     function test_FinaliseAuction_Buyback() public {
@@ -341,7 +338,7 @@ contract BondManagerTest is Test, AuctionHelper {
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         uint256 supplyBefore = bondToken.totalSupplyByPartition(partition);
-        uint256 bidderBalanceBefore = govTbd.balanceOf(bidder1);
+        uint256 bidderBalanceBefore = wnok.balanceOf(bidder1);
 
         vm.prank(bondAdmin);
         IBondAuction.BidVerification[] memory proofs = new IBondAuction.BidVerification[](2);
@@ -354,7 +351,7 @@ contract BondManagerTest is Test, AuctionHelper {
 
         assertEq(bondToken.totalSupplyByPartition(partition), supplyBefore - buybackSize);
         assertEq(bondToken.balanceOfByPartition(partition, bidder1), 0);
-        assertEq(govTbd.balanceOf(bidder1) - bidderBalanceBefore, expectedPayment);
+        assertEq(wnok.balanceOf(bidder1) - bidderBalanceBefore, expectedPayment);
 
         auctionId = bondAuction.getAuctionId(ISIN);
         assertEq(uint256(bondAuction.getAuctionStatus(auctionId)), uint256(IBondAuction.AuctionStatus.FINALISED));
@@ -379,13 +376,13 @@ contract BondManagerTest is Test, AuctionHelper {
             isin: ISIN, bidder: bidder1, units: OFFERING, rate: 9500, auctionType: IBondAuction.AuctionType.BUYBACK
         });
 
-        // Remove allowance so payment leg fails
+        // Remove the reserve's WNOK allowance so the payment leg fails
         vm.prank(govReserve);
-        govTbd.approve(address(bondDvp), 0);
+        wnok.approve(address(bondDvp), 0);
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
         uint256 supplyBefore = bondToken.totalSupplyByPartition(partition);
-        uint256 bidderBalanceBefore = govTbd.balanceOf(bidder1);
+        uint256 bidderBalanceBefore = wnok.balanceOf(bidder1);
 
         vm.expectEmit();
         emit IBondManager.BondAllocationFailed(auctionId, ISIN, bidder1, "Cash");
@@ -401,7 +398,7 @@ contract BondManagerTest is Test, AuctionHelper {
 
         assertEq(bondToken.totalSupplyByPartition(partition), supplyBefore);
         assertEq(bondToken.balanceOfByPartition(partition, bidder1), OFFERING);
-        assertEq(govTbd.balanceOf(bidder1), bidderBalanceBefore);
+        assertEq(wnok.balanceOf(bidder1), bidderBalanceBefore);
     }
 
     // ============ cancelAuction Tests ============
@@ -450,17 +447,22 @@ contract BondManagerTest is Test, AuctionHelper {
         address[] memory holders = new address[](1);
         holders[0] = bidder1; // Use bidder1 who actually owns the bonds
 
-        uint256 balanceBefore = govTbd.balanceOf(bidder1);
+        uint256 balanceBefore = wnok.balanceOf(bidder1);
+        uint256 wnokSupplyBefore = wnok.totalSupply();
 
         vm.prank(bondAdmin);
         bondManager.payCoupon(ISIN, holders);
 
-        uint256 balanceAfter = govTbd.balanceOf(bidder1);
+        uint256 balanceAfter = wnok.balanceOf(bidder1);
         // Match contract calculation: paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION
         // Then paymentAmount = balance * paymentPerBond
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+        assertEq(paymentPerBond, 42); // 1000 nominal at 4.25%, integer-truncated
         uint256 expectedPayment = OFFERING * paymentPerBond;
         assertEq(balanceAfter - balanceBefore, expectedPayment);
+
+        // A coupon moves existing central-bank money; it never mints WNOK
+        assertEq(wnok.totalSupply(), wnokSupplyBefore);
     }
 
     function test_PayCoupon_RevertIf_NotReady() public {
@@ -491,10 +493,66 @@ contract BondManagerTest is Test, AuctionHelper {
         holders[1] = bidder1; // Duplicate
 
         vm.prank(bondAdmin);
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.CouponPaymentBalanceMismatch.selector, ISIN, OFFERING * 2, OFFERING)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Errors.DuplicateHolder.selector, ISIN, bidder1));
         bondManager.payCoupon(ISIN, holders);
+    }
+
+    function test_PayCoupon_RevertIf_DuplicateHolder_WithAnotherHolderOmitted() public {
+        // Two holders of 5 units each: [A, A] would sum to the full supply and pass the
+        // coverage check while paying A twice and B never; the duplicate scan must catch it.
+        _createAndFinalizeBond();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        vm.prank(bidder1);
+        bondToken.transferByPartition(partition, bidder2, OFFERING / 2, "");
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+
+        address[] memory holders = new address[](2);
+        holders[0] = bidder1;
+        holders[1] = bidder1;
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.DuplicateHolder.selector, ISIN, bidder1));
+        bondManager.payCoupon(ISIN, holders);
+        assertEq(wnok.balanceOf(govReserve), reserveBefore);
+    }
+
+    function test_PayCoupon_EmitsCouponPeriodPaid() public {
+        _createAndFinalizeBond();
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        address[] memory holders = new address[](1);
+        holders[0] = bidder1;
+        uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+
+        vm.expectEmit();
+        emit IBondManager.CouponPeriodPaid(ISIN, 1, 1, OFFERING * paymentPerBond);
+        vm.prank(bondAdmin);
+        bondManager.payCoupon(ISIN, holders);
+    }
+
+    function test_PayCoupon_EmptyHolders_ClosesZeroSupplyBond() public {
+        // A full buyback leaves no holders; the remaining periods are paid with an empty list
+        // and the final one still closes the bond and emits BondMatured with zero totals.
+        _createAndFinalizeBond();
+        _buyBackAllUnits();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+
+        address[] memory nobody = new address[](0);
+        _payCoupons(nobody, MATURITY_YEARS - 1);
+        assertEq(bondToken.couponPaymentCount(partition), MATURITY_YEARS - 1);
+
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        vm.expectEmit();
+        emit IBondManager.CouponPeriodPaid(ISIN, MATURITY_YEARS, 0, 0);
+        vm.expectEmit();
+        emit IBondManager.BondMatured(ISIN, MATURITY_YEARS, 0, 0, 0);
+        vm.prank(bondAdmin);
+        bondManager.payCoupon(ISIN, nobody);
+
+        assertTrue(bondToken.isMatured(partition));
+        assertEq(wnok.balanceOf(govReserve), reserveBefore);
     }
 
     function test_PayCoupon_RevertIf_AllCouponsPaid() public {
@@ -536,17 +594,21 @@ contract BondManagerTest is Test, AuctionHelper {
         address[] memory holders = new address[](1);
         holders[0] = bidder1;
 
-        uint256 balanceBefore = govTbd.balanceOf(bidder1);
+        uint256 balanceBefore = wnok.balanceOf(bidder1);
+        uint256 wnokSupplyBefore = wnok.totalSupply();
 
         vm.prank(bondAdmin);
         bondManager.payCoupon(ISIN, holders);
 
-        uint256 balanceAfter = govTbd.balanceOf(bidder1);
+        uint256 balanceAfter = wnok.balanceOf(bidder1);
         // Match contract calculation: paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION
         // Then paymentAmount = balance * paymentPerBond
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
         uint256 expectedPayment = OFFERING * paymentPerBond;
         assertEq(balanceAfter - balanceBefore, expectedPayment);
+
+        // A coupon moves existing central-bank money; it never mints WNOK
+        assertEq(wnok.totalSupply(), wnokSupplyBefore);
     }
 
     function testFuzz_PayCoupon_DistributesAcrossCurrentHolders(uint16 transferUnitsSeed) public {
@@ -565,8 +627,8 @@ contract BondManagerTest is Test, AuctionHelper {
         holders[0] = bidder1;
         holders[1] = bidder2;
 
-        uint256 bidder1BalanceBefore = govTbd.balanceOf(bidder1);
-        uint256 bidder2BalanceBefore = govTbd.balanceOf(bidder2);
+        uint256 bidder1BalanceBefore = wnok.balanceOf(bidder1);
+        uint256 bidder2BalanceBefore = wnok.balanceOf(bidder2);
 
         uint256 bidder1Units = bondToken.balanceOfByPartition(partition, bidder1);
         uint256 bidder2Units = bondToken.balanceOfByPartition(partition, bidder2);
@@ -575,68 +637,188 @@ contract BondManagerTest is Test, AuctionHelper {
         bondManager.payCoupon(ISIN, holders);
 
         uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
-        assertEq(govTbd.balanceOf(bidder1) - bidder1BalanceBefore, bidder1Units * paymentPerBond);
-        assertEq(govTbd.balanceOf(bidder2) - bidder2BalanceBefore, bidder2Units * paymentPerBond);
+        assertEq(wnok.balanceOf(bidder1) - bidder1BalanceBefore, bidder1Units * paymentPerBond);
+        assertEq(wnok.balanceOf(bidder2) - bidder2BalanceBefore, bidder2Units * paymentPerBond);
         assertEq(
-            (govTbd.balanceOf(bidder1) - bidder1BalanceBefore) + (govTbd.balanceOf(bidder2) - bidder2BalanceBefore),
+            (wnok.balanceOf(bidder1) - bidder1BalanceBefore) + (wnok.balanceOf(bidder2) - bidder2BalanceBefore),
             OFFERING * paymentPerBond
         );
     }
 
     // ============ redeem Tests ============
 
-    function test_Redeem() public {
+    function test_PayCoupon_RevertIf_ReserveUnderfunded() public {
         _createAndFinalizeBond();
-        _payAllCoupons(); // Mature the bond
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
 
-        // Advance time to ensure bond is fully matured
-        vm.warp(block.timestamp + DURATION_SCALAR);
+        address[] memory holders = new address[](1);
+        holders[0] = bidder1;
+
+        // Drain the reserve below the coupon due; deployer holds BURNER_ROLE on WNOK
+        wnok.burn(govReserve, wnok.balanceOf(govReserve));
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
-        // Redeem from bidder1 who owns the bonds
-        address[] memory holders = new address[](1);
-        holders[0] = bidder1;
-
-        uint256 tbdBalanceBefore = govTbd.balanceOf(bidder1);
-        uint256 bondBalanceBefore = bondToken.balanceOfByPartition(partition, bidder1);
+        uint256 holderWnokBefore = wnok.balanceOf(bidder1);
+        uint256 paymentCountBefore = bondToken.couponPaymentCount(partition);
 
         vm.prank(bondAdmin);
-        bondManager.redeem(ISIN, holders);
+        vm.expectPartialRevert(Errors.SettlementFailure.selector);
+        bondManager.payCoupon(ISIN, holders);
 
-        uint256 tbdBalanceAfter = govTbd.balanceOf(bidder1);
-        uint256 bondBalanceAfter = bondToken.balanceOfByPartition(partition, bidder1);
-
-        assertEq(bondBalanceBefore - bondBalanceAfter, OFFERING);
-        assertEq(tbdBalanceAfter - tbdBalanceBefore, OFFERING * REDEMPTION_RATE);
+        // All-or-nothing: no partial payout, no coupon state advance
+        assertEq(wnok.balanceOf(bidder1), holderWnokBefore);
+        assertEq(bondToken.couponPaymentCount(partition), paymentCountBefore);
     }
 
-    function test_Redeem_RevertIf_NotMatured() public {
+    function test_PayCoupon_RevertIf_HolderNotOnWnokAllowlist() public {
         _createAndFinalizeBond();
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
 
         address[] memory holders = new address[](1);
         holders[0] = bidder1;
 
+        // The holder must be able to receive central-bank money
+        wnok.remove(bidder1);
+
+        uint256 holderWnokBefore = wnok.balanceOf(bidder1);
+        uint256 reserveWnokBefore = wnok.balanceOf(govReserve);
+
         vm.prank(bondAdmin);
-        vm.expectRevert();
-        bondManager.redeem(ISIN, holders);
+        vm.expectPartialRevert(Errors.SettlementFailure.selector);
+        bondManager.payCoupon(ISIN, holders);
+
+        assertEq(wnok.balanceOf(bidder1), holderWnokBefore);
+        assertEq(wnok.balanceOf(govReserve), reserveWnokBefore);
     }
 
-    function test_Redeem_RevertIf_ZeroAddress() public {
+    function test_PayCoupon_FinalPeriodPaysPrincipalAndClosesBond() public {
         _createAndFinalizeBond();
-        _payAllCoupons();
-
-        // Advance time to ensure bond is fully matured
-        vm.warp(block.timestamp + DURATION_SCALAR);
-
         address[] memory holders = new address[](1);
-        holders[0] = address(0);
+        holders[0] = bidder1;
+        _payCoupons(holders, MATURITY_YEARS - 1);
 
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+        uint256 holderBefore = wnok.balanceOf(bidder1);
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+        uint256 supplyBefore = wnok.totalSupply();
+
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        vm.expectEmit();
+        emit IBondManager.CouponPaid(ISIN, bidder1, OFFERING * paymentPerBond, MATURITY_YEARS);
+        vm.expectEmit();
+        emit IBondManager.BondRedeemed(ISIN, bidder1, OFFERING, OFFERING * REDEMPTION_RATE);
+        vm.expectEmit();
+        emit IBondManager.BondMatured(ISIN, MATURITY_YEARS, OFFERING * REDEMPTION_RATE, OFFERING * paymentPerBond, 0);
         vm.prank(bondAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RedemptionIncomplete.selector, ISIN, OFFERING));
-        bondManager.redeem(ISIN, holders);
+        bondManager.payCoupon(ISIN, holders);
+
+        // Final payout = coupon + principal in one WNOK movement; every unit burned; no minting
+        uint256 expected = OFFERING * (paymentPerBond + REDEMPTION_RATE);
+        assertEq(wnok.balanceOf(bidder1) - holderBefore, expected);
+        assertEq(reserveBefore - wnok.balanceOf(govReserve), expected);
+        assertEq(wnok.totalSupply(), supplyBefore);
+        assertEq(bondToken.balanceOfByPartition(partition, bidder1), 0);
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+        assertTrue(bondToken.isMatured(partition));
+        assertEq(bondToken.couponPaymentCount(partition), MATURITY_YEARS);
     }
 
-    function testFuzz_Redeem_PaysAllRemainingSupply(uint16 transferUnitsSeed) public {
+    function test_PayCoupon_FinalPeriod_RevertIf_HoldersIncomplete() public {
+        _createAndFinalizeBond();
+        address[] memory holders = new address[](1);
+        holders[0] = bidder1;
+        _payCoupons(holders, MATURITY_YEARS - 1);
+
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        address[] memory nobody = new address[](1);
+        nobody[0] = address(0);
+
+        vm.prank(bondAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Errors.CouponPaymentBalanceMismatch.selector, ISIN, 0, OFFERING));
+        bondManager.payCoupon(ISIN, nobody);
+    }
+
+    function test_PayCoupon_FinalPeriod_RevertIf_ReserveUnderfunded() public {
+        _createAndFinalizeBond();
+        address[] memory holders = new address[](1);
+        holders[0] = bidder1;
+        _payCoupons(holders, MATURITY_YEARS - 1);
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        // Enough for the coupon, not for coupon plus principal
+        wnok.burn(govReserve, wnok.balanceOf(govReserve) - OFFERING * REDEMPTION_RATE);
+        uint256 holderBefore = wnok.balanceOf(bidder1);
+
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        vm.prank(bondAdmin);
+        vm.expectPartialRevert(Errors.SettlementFailure.selector);
+        bondManager.payCoupon(ISIN, holders);
+
+        // Whole closure reverted: nothing paid, nothing burned, not matured
+        assertEq(wnok.balanceOf(bidder1), holderBefore);
+        assertEq(bondToken.totalSupplyByPartition(partition), OFFERING);
+        assertFalse(bondToken.isMatured(partition));
+        assertEq(bondToken.couponPaymentCount(partition), MATURITY_YEARS - 1);
+    }
+
+    function test_PayCoupon_UnsoldUnits_SkippedThenBurnedAtMaturity() public {
+        // Bidder1 pays for 60 units; bidder2's cash leg fails (failed issuance), leaving 40 units on the manager.
+        bytes32 auctionId = _deployRateAuction();
+        address[] memory bidders = new address[](2);
+        bidders[0] = bidder1;
+        bidders[1] = bidder2;
+        _submitBids(auctionId, bidders);
+        _close(auctionId);
+
+        IBondAuction.Allocation[] memory allocations = new IBondAuction.Allocation[](2);
+        allocations[0] = IBondAuction.Allocation({
+            isin: ISIN, bidder: bidder1, units: 60, rate: COUPON_YIELD, auctionType: IBondAuction.AuctionType.RATE
+        });
+        allocations[1] = IBondAuction.Allocation({
+            isin: ISIN, bidder: bidder2, units: 40, rate: COUPON_YIELD, auctionType: IBondAuction.AuctionType.RATE
+        });
+        _prefundAndApprove(bidder1, 60 * UNIT_NOMINAL);
+        _prefundAndApprove(bidder2, 40 * UNIT_NOMINAL);
+        wnok.remove(bidder2); // off the WNOK allowlist: bidder2's cash leg fails, units stay on the manager
+
+        uint256[] memory nonces = new uint256[](2);
+        nonces[1] = 1;
+        vm.prank(bondAdmin);
+        bondManager.finaliseAuction(ISIN, allocations, _proofs(auctionId, bidders, nonces));
+
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertEq(bondToken.balanceOfByPartition(partition, address(bondManager)), 40);
+
+        address[] memory holders = new address[](2);
+        holders[0] = bidder1;
+        holders[1] = address(bondManager);
+        uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+
+        // Interim coupon: only the 60 sold units are paid; the manager receives nothing
+        uint256 managerBefore = wnok.balanceOf(address(bondManager));
+        uint256 reserveBefore = wnok.balanceOf(govReserve);
+        _payCoupons(holders, 1);
+        assertEq(wnok.balanceOf(address(bondManager)), managerBefore);
+        assertEq(reserveBefore - wnok.balanceOf(govReserve), 60 * paymentPerBond);
+
+        _payCoupons(holders, MATURITY_YEARS - 2);
+
+        // Final period: 60 units paid coupon + principal, 40 unsold units burned for free
+        reserveBefore = wnok.balanceOf(govReserve);
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
+        vm.expectEmit();
+        emit IBondManager.BondMatured(ISIN, MATURITY_YEARS, 60 * REDEMPTION_RATE, 60 * paymentPerBond, 40);
+        vm.prank(bondAdmin);
+        bondManager.payCoupon(ISIN, holders);
+
+        assertEq(reserveBefore - wnok.balanceOf(govReserve), 60 * (paymentPerBond + REDEMPTION_RATE));
+        assertEq(wnok.balanceOf(address(bondManager)), managerBefore);
+        assertEq(bondToken.balanceOfByPartition(partition, address(bondManager)), 0);
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+    }
+
+    function testFuzz_PayCoupon_FinalPeriodPaysAllRemainingSupply(uint16 transferUnitsSeed) public {
         _createAndFinalizeBond();
 
         bytes32 partition = bondToken.isinToPartition(ISIN);
@@ -649,67 +831,21 @@ contract BondManagerTest is Test, AuctionHelper {
         address[] memory holders = new address[](2);
         holders[0] = bidder1;
         holders[1] = bidder2;
-        _payAllCoupons(holders);
+        _payCoupons(holders, MATURITY_YEARS - 1);
 
-        vm.warp(block.timestamp + DURATION_SCALAR);
+        uint256 paymentPerBond = (REDEMPTION_RATE * COUPON_YIELD) / PERCENTAGE_PRECISION;
+        uint256 wnokBefore = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
 
-        uint256 tbdBefore = govTbd.balanceOf(bidder1) + govTbd.balanceOf(bidder2);
-        uint256 bondBefore =
-            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
-
+        vm.warp(block.timestamp + DURATION_SCALAR + 1);
         vm.prank(bondAdmin);
-        bondManager.redeem(ISIN, holders);
+        bondManager.payCoupon(ISIN, holders);
 
-        uint256 tbdAfter = govTbd.balanceOf(bidder1) + govTbd.balanceOf(bidder2);
-        uint256 bondAfter =
-            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2);
-
-        assertEq(bondBefore, OFFERING);
-        assertEq(bondAfter, 0);
-        assertEq(tbdAfter - tbdBefore, OFFERING * REDEMPTION_RATE);
-    }
-
-    // ============ withdrawFailedIssuance Tests ============
-
-    function test_WithdrawFailedIssuance() public {
-        vm.prank(bondAdmin);
-        bondManager.deployBondWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING, MATURITY_YEARS);
-
-        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
-        _submitBid(auctionId, bidder1);
-
-        vm.warp(_getEndTime() + 1);
-        vm.prank(bondAdmin);
-        bondManager.closeAuction(ISIN);
-
-        IBondAuction.Allocation[] memory allocations = new IBondAuction.Allocation[](1);
-        allocations[0] = IBondAuction.Allocation({
-            isin: ISIN, bidder: bidder1, units: OFFERING, rate: COUPON_YIELD, auctionType: IBondAuction.AuctionType.RATE
-        });
-
-        wnok.mint(bidder1, OFFERING * UNIT_NOMINAL);
-        vm.stopPrank();
-
-        // Remove bidder1 approval, so DVP will fail
-        vm.prank(bidder1);
-        wnok.approve(address(bondDvp), 0);
-
-        vm.prank(bondAdmin);
-        IBondAuction.BidVerification[] memory proofs = new IBondAuction.BidVerification[](1);
-        proofs[0] = _proof(auctionId, 0, bidder1, 0);
-        bondManager.finaliseAuction(ISIN, allocations, proofs);
-
-        // Bonds should remain in BondManager
-        bytes32 partition = bondToken.isinToPartition(ISIN);
-        uint256 failedIssuance = bondToken.balanceOfByPartition(partition, address(bondManager));
-        assertGt(failedIssuance, 0);
-
-        // Withdraw failed issuance
-        vm.prank(bondAdmin);
-        bondManager.withdrawFailedIssuance(ISIN);
-
-        uint256 failedIssuanceAfter = bondToken.balanceOfByPartition(partition, address(bondManager));
-        assertEq(failedIssuanceAfter, 0);
+        uint256 wnokAfter = wnok.balanceOf(bidder1) + wnok.balanceOf(bidder2);
+        assertEq(wnokAfter - wnokBefore, OFFERING * (paymentPerBond + REDEMPTION_RATE));
+        assertEq(
+            bondToken.balanceOfByPartition(partition, bidder1) + bondToken.balanceOfByPartition(partition, bidder2), 0
+        );
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
     }
 
     function test_FinaliseAuction_IssuanceCashLegFailure() public {
@@ -817,14 +953,6 @@ contract BondManagerTest is Test, AuctionHelper {
         proofs[0] = _proof(auctionId, 0, bidder1, 0);
         bondManager.finaliseAuction(ISIN, allocations, proofs);
     }
-
-    function test_WithdrawFailedIssuance_RevertIf_None() public {
-        vm.prank(bondAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NoFailedIssuance.selector));
-        bondManager.withdrawFailedIssuance(ISIN);
-    }
-
-    // ============ closeAuction Tests ============
 
     function test_CloseAuction() public {
         vm.prank(bondAdmin);
@@ -1054,20 +1182,44 @@ contract BondManagerTest is Test, AuctionHelper {
         _payAllCoupons(holders);
     }
 
+    /// Buys back every issued unit from bidder1 through a BUYBACK auction (supply to zero).
+    function _buyBackAllUnits() internal {
+        vm.prank(bondAdmin);
+        bondManager.buybackWithAuction(ISIN, _getEndTime(), PUB_KEY, OFFERING);
+        bytes32 auctionId = bondAuction.getAuctionId(ISIN);
+        address[] memory bidders = new address[](1);
+        bidders[0] = bidder1;
+        _submitBids(auctionId, bidders);
+        vm.warp(_getEndTime() + 1);
+        vm.prank(bondAdmin);
+        bondManager.closeAuction(ISIN);
+
+        IBondAuction.Allocation[] memory allocations = new IBondAuction.Allocation[](1);
+        allocations[0] = IBondAuction.Allocation({
+            isin: ISIN, bidder: bidder1, units: OFFERING, rate: 9800, auctionType: IBondAuction.AuctionType.BUYBACK
+        });
+        IBondAuction.BidVerification[] memory proofs = new IBondAuction.BidVerification[](1);
+        proofs[0] = _proof(auctionId, 0, bidder1, 0);
+        vm.prank(bondAdmin);
+        bondManager.finaliseAuction(ISIN, allocations, proofs);
+    }
+
+    /// Pays every coupon period; the last one closes the bond (matured, supply zero).
     function _payAllCoupons(address[] memory holders) internal {
-        uint256 expectedPayments = MATURITY_YEARS; // 4 payments
-
+        _payCoupons(holders, MATURITY_YEARS);
         bytes32 partition = bondToken.isinToPartition(ISIN);
+        assertTrue(bondToken.isMatured(partition));
+        assertEq(bondToken.totalSupplyByPartition(partition), 0);
+    }
 
+    function _payCoupons(address[] memory holders, uint256 periods) internal {
         uint256 t = block.timestamp;
-        for (uint256 i = 0; i < expectedPayments; i++) {
+        for (uint256 i = 0; i < periods; i++) {
             t += DURATION_SCALAR + 1;
             vm.warp(t);
             vm.prank(bondAdmin);
             bondManager.payCoupon(ISIN, holders);
         }
-
-        assertTrue(bondToken.isMatured(partition));
     }
 
     function _deployRateAuction() internal returns (bytes32) {
@@ -1084,5 +1236,17 @@ contract BondManagerTest is Test, AuctionHelper {
         vm.warp(_getEndTime() + 1);
         vm.prank(bondAdmin);
         bondManager.closeAuction(ISIN);
+    }
+}
+
+/**
+ * Constructor guard kept in its own small contract: a second `new BondManager` inside
+ * BondManagerTest pushes that contract past the via-IR assembly tag limit.
+ */
+contract BondManagerConstructorTest is Test {
+    function test_Constructor_RevertIf_GovReserveZero() public {
+        // The reserve check runs before any external call, so placeholder addresses suffice.
+        vm.expectRevert(Errors.GovReserveAddressZero.selector);
+        new BondManager("Bond Manager", address(1), address(2), address(3), address(4), address(5), address(0), 1);
     }
 }

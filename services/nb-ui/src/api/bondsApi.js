@@ -50,11 +50,6 @@ async function payCoupon(isin, holders) {
   return HttpClient.post(`/v1/bonds/${encodeURIComponent(isin)}/coupon-payments`, body);
 }
 
-async function redeem(isin, holders) {
-  const body = { holders: holders ?? null };
-  return HttpClient.post(`/v1/bonds/${encodeURIComponent(isin)}/redemptions`, body);
-}
-
 export const BondsApi = {
   listBonds,
   getBond,
@@ -62,5 +57,4 @@ export const BondsApi = {
   disableBond,
   listBondHistory,
   payCoupon,
-  redeem,
 };

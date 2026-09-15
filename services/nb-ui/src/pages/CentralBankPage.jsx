@@ -2,7 +2,7 @@
  * CentralBankPage — Norges Bank operator surface against WNOK.
  *
  * Surfaces:
- *  - KPIs: WNOK balance (at CB), supply, in-circulation, government settlement bank
+ *  - KPIs: WNOK balance (at CB), supply, in-circulation, government reserve (WNOK balance)
  *  - Addresses (CB account + WNOK contract) and the allowlist editor (add/remove)
  *  - Mint / Burn / Transfer actions in the header (all transactions originate
  *    from the CB account, gated by MINTER/BURNER roles + the WNOK allowlist)
@@ -181,9 +181,15 @@ export function CentralBankPage() {
               <div className="kpi-sub">WNOK held outside the CB</div>
             </div>
             <div className="kpi">
-              <div className="kpi-label">Government bank</div>
-              <div className="kpi-value">{cb.govSettlementBank?.name ?? '—'}</div>
-              <div className="kpi-sub">Settles bond coupon / redemption</div>
+              <div className="kpi-label">Government reserve</div>
+              <div className="kpi-value mono">
+                {cb.govReserve ? Fmt.formatUnits(cb.govReserve.wnokBalance) : '—'}
+              </div>
+              <div className="kpi-sub mono" title={cb.govReserve?.address ?? ''}>
+                {cb.govReserve
+                  ? `${Fmt.shortHex(cb.govReserve.address)} · pays coupon, buyback, redemption`
+                  : 'BondManager unavailable'}
+              </div>
             </div>
           </div>
 

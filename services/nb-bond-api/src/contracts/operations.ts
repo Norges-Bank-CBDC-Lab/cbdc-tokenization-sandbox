@@ -13,6 +13,7 @@ export const operationTypeSchema = z
     'AUCTION_CANCEL',
     'AUCTION_FINALISE',
     'COUPON_PAYMENT',
+    // Legacy: produced before principal moved into the final coupon payment; kept so stored rows validate.
     'REDEMPTION',
     'BID_SUBMISSION',
     'WNOK_MINT',

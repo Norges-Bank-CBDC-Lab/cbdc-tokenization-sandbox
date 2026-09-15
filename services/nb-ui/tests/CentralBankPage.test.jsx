@@ -16,7 +16,7 @@ const FIXTURE_CB = {
     totalSupply: '25000000',
     allowlistSize: 3,
   },
-  govSettlementBank: { name: 'DNB', address: '0x3333333333333333333333333333333333333333' },
+  govReserve: { address: '0x3333333333333333333333333333333333333333', wnokBalance: '7500000' },
   md5: 'a',
 };
 
@@ -71,8 +71,9 @@ describe('CentralBankPage', () => {
     });
     expect(screen.getByText('WNOK supply')).toBeInTheDocument();
     expect(screen.getByText('In circulation')).toBeInTheDocument();
-    expect(screen.getByText('Government bank')).toBeInTheDocument();
-    expect(screen.getByText('DNB')).toBeInTheDocument();
+    expect(screen.getByText('Government reserve')).toBeInTheDocument();
+    expect(screen.getByText(Fmt.formatUnits('7500000'))).toBeInTheDocument();
+    expect(screen.getByText(/pays coupon, buyback, redemption/)).toBeInTheDocument();
 
     // Allowlist entries show their live WNOK holding; a failed chain
     // read (null) renders an em dash instead of a number. The holding

@@ -83,7 +83,6 @@ vi.mock('../src/api/bondsApi.js', () => ({
     disableBond: vi.fn(),
     listBondHistory: vi.fn(),
     payCoupon: vi.fn(),
-    redeem: vi.fn(),
   },
 }));
 
