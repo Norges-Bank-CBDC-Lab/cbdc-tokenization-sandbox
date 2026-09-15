@@ -1,6 +1,6 @@
 # Dependabot security rollup (September 2026) — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped via #281; alerts #78–#81 fixed; archived 2026-09-15
 **Created:** 2026-09-15
 **Scope:** root `package.json` (`overrides`), `services/nb-ui/package.json`, `package-lock.json`, `THIRD_PARTY_LICENSES.md`
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -84,4 +84,4 @@ One PR, one commit.
 
 ## Done Criteria
 
-- [ ] Four alerts fixed; no other lockfile entry changed; gates green; inventory matches.
+- [x] Four alerts fixed; no other lockfile entry changed; gates green; inventory matches.
