@@ -2,8 +2,8 @@
 
 **Plan:** [`plan.md`](plan.md)
 **Last updated:** 2026-09-15 — Phases 1 and 2 done; PR opening
-**Current phase:** Phase 3: PR and alert check
-**Next action:** Merge the PR, confirm alerts #78–#81 read fixed, archive this folder
+**Current phase:** Complete — #281 merged, alerts #78–#81 read fixed on GitHub, no alerts open; archived 2026-09-15
+**Next action:** None
 
 ## Phase Log
 
@@ -11,7 +11,7 @@
 |---|---|---|---|
 | 1 — Manifests and lockfile | Done | structural diff: exactly `js-yaml` 4.3.1→4.3.2, `vitest` and its seven `@vitest/*` siblings 4.1.10→4.1.11, and the nb-ui workspace range; zero added or removed entries; every root override at its pin, nested `brace-expansion` copies unchanged; inventory `vitest` row updated (2026-09-15) | PR |
 | 2 — Gates | Done | `npm ci` installs vitest 4.1.11 and js-yaml 4.3.2; nb-ui format, lint, 125 vitest tests, build; nb-bond-api lint, format, 249 jest tests, build; license inventory, node-version, hygiene, and link checks pass (2026-09-15) | PR |
-| 3 — PR and alert check | Not started | | |
+| 3 — PR and alert check | Done | #281 merged 2026-09-15; Dependabot shows #78–#81 fixed and zero open alerts; no release cut (development-only packages) | #281 |
 
 ## Deviations From the Plan
 
