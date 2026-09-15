@@ -1,6 +1,6 @@
 # Dependabot rollup (September 2026) — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped in the same PR as the change; archived 2026-09-15
 **Created:** 2026-09-15
 **Scope:** `services/nb-bond-api/package.json`, `services/nb-ui/package.json`, `scripts/bid-encryption/package.json`, `scripts/bid-submitter/package.json`, `common/node-version.env`, `package-lock.json`, `THIRD_PARTY_LICENSES.md`, plus any reformatted or lint-fixed files and `services/nb-bond-api/openapi.json` if regeneration changes it
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -61,6 +61,6 @@ Exit: all green; test counts unchanged (nb-bond-api 249, nb-ui 125) or the chang
 
 ## Done Criteria
 
-- [ ] Five bumps landed; only required siblings moved; overrides intact.
-- [ ] All gates and verification scripts pass; consequences documented.
-- [ ] #267–#271 closed as superseded.
+- [x] Five bumps landed; only required siblings moved; overrides intact.
+- [x] All gates and verification scripts pass; consequences documented.
+- [x] #267–#271 closed as superseded.
