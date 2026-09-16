@@ -61,7 +61,7 @@ License labels and deployment-time notes remain curated review items.
 | `helmet` | `8.3.0` | MIT |
 | `jose` | `6.2.8` | MIT |
 | `winston` | `3.19.0` | MIT |
-| `zod` | `4.4.3` | MIT |
+| `zod` | `4.5.4` | MIT |
 | `zod-openapi` | `6.0.1` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
@@ -70,16 +70,16 @@ License labels and deployment-time notes remain curated review items.
 | `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `26.1.1` | MIT |
+| `@types/node` | `26.5.1` | MIT |
 | `babel-jest` | `30.4.1` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.7.0` | MIT |
 | `jest` | `30.4.2` | MIT |
-| `prettier` | `3.9.5` | MIT |
+| `prettier` | `3.9.6` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.64.0` | MIT |
+| `typescript-eslint` | `8.69.0` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -87,7 +87,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.1.1` | MIT |
+| `@types/node` | `26.5.1` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 
@@ -97,7 +97,7 @@ License labels and deployment-time notes remain curated review items.
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.1.1` | MIT |
+| `@types/node` | `26.5.1` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 
@@ -108,7 +108,7 @@ License labels and deployment-time notes remain curated review items.
 | `@azure/msal-browser` | `5.18.0` | MIT |
 | `react` | `19.2.8` | MIT |
 | `react-dom` | `19.2.8` | MIT |
-| `@testing-library/jest-dom` | `6.9.1` | MIT |
+| `@testing-library/jest-dom` | `7.0.1` | MIT |
 | `@testing-library/react` | `16.3.2` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
 | `@vitejs/plugin-react` | `6.0.3` | MIT |
@@ -118,9 +118,9 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
 | `globals` | `17.7.0` | MIT |
 | `jsdom` | `30.0.1` | MIT |
-| `prettier` | `3.9.5` | MIT |
+| `prettier` | `3.9.6` | MIT |
 | `vite` | `8.2.1` | MIT |
-| `vitest` | `4.1.10` | MIT |
+| `vitest` | `4.1.11` | MIT |
 
 ### `services/blockscout/bens-microservice`
 

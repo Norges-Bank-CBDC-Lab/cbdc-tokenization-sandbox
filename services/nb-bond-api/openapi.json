@@ -2834,26 +2834,18 @@
             "description": "HTTP status code"
           },
           "detail": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Human-readable explanation"
+            "description": "Human-readable explanation",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "instance": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Path that produced the error"
+            "description": "Path that produced the error",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "errors": {
             "anyOf": [
@@ -2956,15 +2948,11 @@
             "description": "WNOK contract address; null when WNOK is not registered in GlobalRegistry"
           },
           "bondManagerCompatible": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "True when the deployed BondManager exposes GOV_RESERVE() (the ABI this service is built against); false when the call reverts, meaning the contract predates this API; null when the chain is unreachable"
+            "description": "True when the deployed BondManager exposes GOV_RESERVE() (the ABI this service is built against); false when the call reverts, meaning the contract predates this API; null when the chain is unreachable",
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         },
         "required": [
@@ -2996,26 +2984,18 @@
             ]
           },
           "chainId": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "EVM chainId reported by the provider, or null when unreachable"
+            "description": "EVM chainId reported by the provider, or null when unreachable",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "head": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Chain head block number, or null when unreachable"
+            "description": "Chain head block number, or null when unreachable",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "headReachable": {
             "type": "boolean",
@@ -3039,52 +3019,36 @@
             "description": "True once startIngestionLoop() has wired its setInterval"
           },
           "lastBlockProcessed": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Last block the loop wrote to the projection, or null before the first tick"
+            "description": "Last block the loop wrote to the projection, or null before the first tick",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lag": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "chain.head - ingestion.lastBlockProcessed; null when either side is unknown"
+            "description": "chain.head - ingestion.lastBlockProcessed; null when either side is unknown",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "pollIntervalMs": {
             "type": "number",
             "description": "Configured poll cadence for the ingestion loop"
           },
           "lastTickAt": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Unix-epoch ms of the last tick (success or failure), or null pre-first-tick"
+            "description": "Unix-epoch ms of the last tick (success or failure), or null pre-first-tick",
+            "type": [
+              "number",
+              "null"
+            ]
           },
           "lastEventTxHash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Most recent tx hash whose log we ingested; null before any events have been seen this process"
+            "description": "Most recent tx hash whose log we ingested; null before any events have been seen this process",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "consecutiveFailures": {
             "type": "number",
@@ -3123,15 +3087,11 @@
             "description": "Error message from the failing tick"
           },
           "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Error code (ethers `err.code`) or class name; null when neither set"
+            "description": "Error code (ethers `err.code`) or class name; null when neither set",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -4410,15 +4370,11 @@
             "description": "Transaction hash when one was broadcast; null when gas estimation rejected the send before broadcast or the operation spans multiple transactions"
           },
           "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Decoded revert reason or failure message; null on success"
+            "description": "Decoded revert reason or failure message; null on success",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "detail": {
             "anyOf": [
