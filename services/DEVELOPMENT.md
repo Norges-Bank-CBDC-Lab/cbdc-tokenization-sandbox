@@ -9,10 +9,14 @@ sandbox workflow, start from the repository root with `./sandbox.sh start`.
 From the repository root:
 
 - start the full sandbox: `./sandbox.sh start`
-- stop services but keep the Kind cluster and image cache:
-  `./sandbox.sh stop`
-- delete the Kind cluster while retaining the separate local-registry
-  container and its cached images: `./sandbox.sh delete`
+- stop the whole sandbox and keep all state (chain, Blockscout index and
+  verifications, NB Bond API database); `start` resumes it: `./sandbox.sh stop`
+- delete the Kind cluster and all sandbox state while retaining the separate
+  local-registry container and its cached images: `./sandbox.sh delete`
+
+Each service script follows the same rule: `stop` scales the service to zero
+and keeps its data and Helm release, `start` brings it back, and `delete`
+removes the service and its data.
 
 Use service-specific scripts only when you are working on one area in
 isolation and the infra layer is already available.
@@ -28,7 +32,18 @@ Manual lifecycle from the repository root:
 cd services/blockscout
 ./blockscout.sh start
 ./blockscout.sh stop
+./blockscout.sh delete
 ```
+
+`stop` keeps the PostgreSQL volume, so the index and contract verifications
+survive. Besu keeps producing blocks meanwhile, and the catch-up indexer is
+disabled, so blocks mined while Blockscout is stopped are never indexed; stop
+the whole sandbox with `./sandbox.sh stop` to avoid the gap. `delete` removes
+the `blockscout` namespace and its database; after the next `start` it indexes
+only blocks mined from then on (earlier blocks stay unindexed while catch-up is
+disabled), and contracts need re-verifying with
+`./contracts/contracts.sh verify-latest`. For a complete explorer, reset the
+whole sandbox with `./sandbox.sh delete` and `./sandbox.sh start`.
 
 Primary URLs:
 

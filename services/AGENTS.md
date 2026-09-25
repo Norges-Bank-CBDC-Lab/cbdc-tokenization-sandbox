@@ -10,7 +10,8 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 ### Commands (per service)
 - `services/blockscout/`:
   - Start: `./blockscout.sh start`
-  - Stop: `./blockscout.sh stop`
+  - Stop: `./blockscout.sh stop` (scales to zero; keeps the database)
+  - Delete: `./blockscout.sh delete` (removes the namespace and its database)
   - Name service: `cd services/blockscout/bens-microservice && ./bens-microservice.sh start`
   - BENS OpenAPI regen: `cd services/blockscout/bens-microservice && ./regen-openapi.sh`
   - Backend/frontend source tags: pinned in `common/images.yaml`; current
@@ -19,6 +20,8 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
   - URLs: `http://blockscout.cbdc-sandbox.local/`
 - `services/nb-bond-api/`:
   - Start: `./nb-bond-api.sh start`
+  - Stop: `./nb-bond-api.sh stop` (scales to zero; keeps the SQLite volume)
+  - Delete: `./nb-bond-api.sh delete` (uninstalls the release and its volume; operator-added bidder keys are lost)
   - Local Helm values: generate `services/nb-bond-api/helm/values.local.yaml` with `node scripts/generate-local-sandbox-fixtures.mjs` before direct deploys if the start script has not already created it
   - Lint: `npm run lint`
   - Format check: `npm run format:check`

@@ -628,6 +628,7 @@ To prevent that, the helm chart mounts a `PersistentVolumeClaim`
 
 The Kind local-path-provisioner stores the backing directory under the
 Kind node's filesystem. **Survives** helm upgrades, `./nb-bond-api.sh
-start`, `kubectl rollout restart`. **Does not survive** `kind delete
+start` and `stop`, `./sandbox.sh stop`, `kubectl rollout restart`. **Does not
+survive** `./nb-bond-api.sh delete`, `./sandbox.sh delete`, or `kind delete
 cluster` — bidders will need to be re-added (or wait for re-seeding of
 the fixtures) after a full sandbox tear-down.

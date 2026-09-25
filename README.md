@@ -193,9 +193,9 @@ Use `/etc/hosts` on Linux/macOS or
 
 | Command | Purpose |
 | --- | --- |
-| `./sandbox.sh start` | Create or update the local sandbox |
-| `./sandbox.sh stop` | Stop workloads while keeping the cluster and cached images |
-| `./sandbox.sh delete` | Tear down the Kind cluster. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, run `./sandbox.sh registry-reset` (or `docker rm -f kind-registry`). |
+| `./sandbox.sh start` | Create or update the local sandbox; resumes a sandbox stopped with `stop` |
+| `./sandbox.sh stop` | Stop the whole sandbox gracefully and keep all state: the chain, Blockscout's index and contract verifications, and the NB Bond API database. `start` brings it back as it was. Run it before quitting Docker or rebooting; see [unclean shutdowns](docs/KNOWN_ISSUES.md#sandbox-must-be-stopped-before-docker-quits-or-the-host-reboots). The Kind node gets `SANDBOX_STOP_TIMEOUT_SECONDS` (default 330) to shut down; a stop takes about 90 seconds |
+| `./sandbox.sh delete` | Tear down the Kind cluster and **all sandbox state**; `delete` then `start` gives a fresh sandbox. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, run `./sandbox.sh registry-reset` (or `docker rm -f kind-registry`). |
 | `./sandbox.sh generate-config` | Create `.env.sandbox` with deploy toggles |
 | `./infra/infra.sh registry-start` | Start the local registry container (one-time setup; no-op if already running) |
 | `./infra/infra.sh registry-sync` | Optional pre-warm: push every pinned third-party image into the local registry up front so `sandbox.sh start` doesn't pull them on demand |

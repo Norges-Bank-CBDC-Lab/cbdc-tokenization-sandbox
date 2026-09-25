@@ -268,6 +268,118 @@ function clusterExists() {
     fi
 }
 
+# Node containers of this Kind cluster, running or stopped.
+function clusterNodeContainers() {
+    kind get nodes --name "$CLUSTER_NAME" 2>/dev/null || true
+}
+
+function nodeContainerRunning() {
+    [ "$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null)" == "true" ]
+}
+
+# Stops the cluster's node containers gracefully and keeps all state. Docker's default
+# 10-second stop timeout is shorter than the pods' own shutdown, so the node gets
+# SANDBOX_STOP_TIMEOUT_SECONDS; a stop that still ends in SIGKILL (exit 137) fails loudly,
+# because it is the unclean shutdown this command exists to avoid.
+function stopClusterNodes() {
+    local timeout="${SANDBOX_STOP_TIMEOUT_SECONDS:-330}"
+    local node started elapsed exit_code
+
+    for node in $(clusterNodeContainers); do
+        if ! nodeContainerRunning "$node"; then
+            echo "Node '$node' is already stopped."
+            continue
+        fi
+
+        echo "Stopping node '$node' (waits up to ${timeout}s for its pods to shut down)..."
+        started=$(date +%s)
+        docker stop --time "$timeout" "$node" >/dev/null
+        elapsed=$(( $(date +%s) - started ))
+
+        exit_code=$(docker inspect --format '{{.State.ExitCode}}' "$node")
+        if [ "$exit_code" == "137" ]; then
+            echo "❌ Node '$node' was killed after ${elapsed}s: its shutdown did not finish within ${timeout}s."
+            echo "   Raise SANDBOX_STOP_TIMEOUT_SECONDS, and check PostgreSQL in services/blockscout/debugging.md on the next start."
+            exit 1
+        fi
+        echo "✅ Node '$node' stopped in ${elapsed}s. All state is kept; './sandbox.sh start' resumes it."
+    done
+}
+
+# Starts any stopped node containers of the cluster and waits for its API server.
+function startClusterNodes() {
+    local node started_any="false"
+
+    for node in $(clusterNodeContainers); do
+        if ! nodeContainerRunning "$node"; then
+            echo "Starting stopped node '$node'..."
+            docker start "$node" >/dev/null
+            started_any="true"
+        fi
+    done
+
+    if [ "$started_any" == "true" ]; then
+        waitForKubeApiServer
+    fi
+}
+
+# Stops one component without deleting anything: scales every Deployment and
+# StatefulSet in the given namespaces to zero and waits for their pods to go.
+# Releases, ConfigMaps, and volumes stay, and the component's `start` restores
+# the replica counts through `helm upgrade`. Completed job pods are left alone.
+function scaleNamespacesToZero() {
+    local namespace i
+    local timeout_seconds="${SANDBOX_STOP_TIMEOUT_SECONDS:-330}"
+
+    if [[ $(clusterExists) == "false" ]]; then
+        echo "Cluster '$CLUSTER_NAME' does not exist. Nothing to stop."
+        return 0
+    fi
+
+    for namespace in "$@"; do
+        if ! kubectl --context="kind-$CLUSTER_NAME" get namespace "$namespace" >/dev/null 2>&1; then
+            echo "Namespace '$namespace' does not exist. Nothing to stop there."
+            continue
+        fi
+
+        echo "Scaling workloads in '$namespace' to zero (volumes and releases are kept)..."
+        kubectl --context="kind-$CLUSTER_NAME" -n "$namespace" scale deployment,statefulset --all --replicas=0
+
+        i=0
+        while [ -n "$(kubectl --context="kind-$CLUSTER_NAME" -n "$namespace" get pods \
+                --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)" ]; do
+            sleep 1
+            i=$(( i+1 ))
+            if [ "$i" -ge "$timeout_seconds" ]; then
+                echo "❌ Pods in '$namespace' did not stop within ${timeout_seconds}s."
+                exit 1
+            fi
+        done
+        echo "✅ '$namespace' stopped."
+    done
+}
+
+function waitForKubeApiServer() {
+    local msg="Waiting for the Kubernetes API server..."
+    local i
+    local timeout_seconds=120
+
+    # waitMsg assigns the caller's `i`, so reset it after the start message.
+    waitMsg "$msg" start
+    i=0
+    until kubectl --context="kind-$CLUSTER_NAME" get --raw /readyz >/dev/null 2>&1; do
+        waitMsg "$msg" $i
+        sleep 1
+        i=$(( i+1 ))
+        if [ "$i" -ge "$timeout_seconds" ]; then
+            echo
+            echo "❌ The API server of '$CLUSTER_NAME' was not ready after ${timeout_seconds}s."
+            exit 1
+        fi
+    done
+    waitMsg "$msg" end
+}
+
 function getImageValue() {
     local key=$1
     local default=$2
@@ -643,10 +755,6 @@ data:
 EOF
 }
 
-function clearContractsDeploymentMarker() {
-    kubectl --context=kind-$CLUSTER_NAME -n $CONTRACTS_DEPLOYMENT_NAMESPACE delete configmap $CONTRACTS_DEPLOYMENT_CONFIGMAP >/dev/null 2>&1 || true
-}
-
 function deployRegistryContractAddressToConfigmap() {
     registry_contract_address=$1
 
@@ -885,6 +993,7 @@ function createKindCluster() {
         kind create cluster --config $REPO_ROOT/infra/cluster/cluster-config.yaml --name $CLUSTER_NAME
     else
         echo "Cluster '$CLUSTER_NAME' already exists. Skipping cluster creation."
+        startClusterNodes
     fi
 
     # Ensure kubeconfig has the expected kind context (and fail fast if the cluster is unhealthy).
@@ -918,14 +1027,14 @@ function deployApiGateway() {
     # removed in the NGF 2.x chart (the data-plane Service is provisioned
     # per Gateway by the control plane; the local NodePort Service in
     # infra/gateway selects the provisioned data-plane pods directly).
-    helm upgrade ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
          --install \
          --version ${NGINX_GATEWAY_FABRIC_VERSION} \
          --kube-context kind-$CLUSTER_NAME \
          --namespace nginx-gateway \
          --create-namespace
 
-    helm upgrade gateway $REPO_ROOT/infra/gateway \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" gateway $REPO_ROOT/infra/gateway \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace nginx-gateway \
@@ -1240,7 +1349,7 @@ function syncImagesToRegistry() {
 # no cluster. Always succeeds.
 function currentDeployedTagFor() {
     local repo="$1"
-    kubectl get pods --all-namespaces \
+    kubectl --context="kind-$CLUSTER_NAME" get pods --all-namespaces \
         -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
         | grep "/${repo}:" \
         | sed "s#.*/${repo}:##" \
@@ -1266,7 +1375,7 @@ function reportSandboxImages() {
 
     echo "=== Running sandbox pod images ==="
     if [ "$(clusterExists)" == "true" ]; then
-        kubectl get pods --all-namespaces \
+        kubectl --context="kind-$CLUSTER_NAME" get pods --all-namespaces \
             -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
             | grep -E "localhost:${KIND_REGISTRY_PORT}/(nb-ui|nb-bond-api|bens-microservice):" \
             | sort -u \
@@ -1412,7 +1521,7 @@ function deployBesu() {
     BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
     echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
 
-    helm upgrade besu $REPO_ROOT/infra/besu \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" besu $REPO_ROOT/infra/besu \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace besu \
@@ -1545,7 +1654,7 @@ function deployBlockscout() {
     BLOCKSCOUT_BACKEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
 
     # deploy postgres db and blockscout
-    helm upgrade blockscout $BLOCKSCOUT_TMPDIR/blockscout-stack \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" blockscout $BLOCKSCOUT_TMPDIR/blockscout-stack \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $BLOCKSCOUT_NAMESPACE \
@@ -1692,7 +1801,7 @@ function deployNBBondAPI() {
         return 1
     fi
 
-    helm upgrade nb-bond-api $REPO_ROOT/services/nb-bond-api/helm \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" nb-bond-api $REPO_ROOT/services/nb-bond-api/helm \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $NB_BOND_API_NAMESPACE \
@@ -1752,7 +1861,7 @@ function deployNBUI() {
         "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
         "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}")" || return 1
 
-    helm upgrade nb-ui "$REPO_ROOT/services/nb-ui/helm" \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" nb-ui "$REPO_ROOT/services/nb-ui/helm" \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $NB_UI_NAMESPACE \
