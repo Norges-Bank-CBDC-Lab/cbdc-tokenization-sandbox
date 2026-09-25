@@ -36,14 +36,12 @@ cd services/blockscout
 ```
 
 `stop` keeps the PostgreSQL volume, so the index and contract verifications
-survive. Besu keeps producing blocks meanwhile, and the catch-up indexer is
-disabled, so blocks mined while Blockscout is stopped are never indexed; stop
-the whole sandbox with `./sandbox.sh stop` to avoid the gap. `delete` removes
-the `blockscout` namespace and its database; after the next `start` it indexes
-only blocks mined from then on (earlier blocks stay unindexed while catch-up is
-disabled), and contracts need re-verifying with
-`./contracts/contracts.sh verify-latest`. For a complete explorer, reset the
-whole sandbox with `./sandbox.sh delete` and `./sandbox.sh start`.
+survive. Besu keeps producing blocks meanwhile; after `start`, Blockscout's
+catch-up indexer fills them in within seconds. `delete` removes the
+`blockscout` namespace and its database; after the next `start`, catch-up
+re-indexes the whole chain from block 0 (about a minute for a chain of a
+hundred blocks), and contracts need re-verifying with
+`./contracts/contracts.sh verify-latest`.
 
 Primary URLs:
 

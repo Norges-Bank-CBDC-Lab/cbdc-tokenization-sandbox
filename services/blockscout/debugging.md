@@ -114,9 +114,8 @@ finishes its migrations and becomes Ready. Once Blockscout is healthy, remove
 
 **If more is damaged**, recovery fails again with a different error. Then run
 `./services/blockscout/blockscout.sh delete` and `start` to re-index, and
-`./contracts/contracts.sh verify-latest` to restore verifications. Blocks mined
-before the new start stay unindexed while the catch-up indexer is disabled; a
-full `./sandbox.sh delete` and `start` gives a complete index instead.
+`./contracts/contracts.sh verify-latest` to restore verifications. The catch-up
+indexer re-indexes the whole chain from block 0.
 
 **Prevention.** Run `./sandbox.sh stop` before quitting Docker or rebooting.
 

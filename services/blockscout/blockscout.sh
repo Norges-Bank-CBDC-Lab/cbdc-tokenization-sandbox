@@ -67,8 +67,8 @@ if [ "$CMD" == "start" ]; then
     composeBlockscoutChart
     deployBlockscout
 elif [ "$CMD" == "stop" ]; then
-    # Besu keeps producing blocks while Blockscout is stopped, and the catch-up
-    # indexer is disabled, so blocks mined in the meantime are not indexed.
+    # Besu keeps producing blocks while Blockscout is stopped; the catch-up
+    # indexer fills them in after the next start.
     scaleNamespacesToZero $BLOCKSCOUT_NAMESPACE
 elif [ "$CMD" == "delete" ]; then
     echo "Deleting namespace..."
