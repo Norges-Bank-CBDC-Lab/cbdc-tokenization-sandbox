@@ -61,7 +61,7 @@ License labels and deployment-time notes remain curated review items.
 | `helmet` | `8.3.0` | MIT |
 | `jose` | `6.2.8` | MIT |
 | `winston` | `3.19.0` | MIT |
-| `zod` | `4.5.4` | MIT |
+| `zod` | `4.6.5` | MIT |
 | `zod-openapi` | `6.0.1` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
@@ -79,7 +79,7 @@ License labels and deployment-time notes remain curated review items.
 | `prettier` | `3.9.6` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.69.0` | MIT |
+| `typescript-eslint` | `8.70.1` | MIT |
 
 ### `scripts/bid-encryption`
 
@@ -109,9 +109,9 @@ License labels and deployment-time notes remain curated review items.
 | `react` | `19.2.8` | MIT |
 | `react-dom` | `19.2.8` | MIT |
 | `@testing-library/jest-dom` | `7.0.1` | MIT |
-| `@testing-library/react` | `16.3.2` | MIT |
+| `@testing-library/react` | `16.3.3` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
-| `@vitejs/plugin-react` | `6.0.3` | MIT |
+| `@vitejs/plugin-react` | `6.1.1` | MIT |
 | `eslint` | `9.39.5` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
