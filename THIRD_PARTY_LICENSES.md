@@ -52,7 +52,7 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@noble/secp256k1` | `3.1.0` | MIT |
-| `better-sqlite3` | `12.11.1` | MIT |
+| `better-sqlite3` | `13.0.3` | MIT |
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.17.0` | MIT |
