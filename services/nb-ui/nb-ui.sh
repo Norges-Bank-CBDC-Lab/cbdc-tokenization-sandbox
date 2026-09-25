@@ -10,7 +10,10 @@ source ../../common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop>"
+    echo "  $(basename "$0") <start|stop|delete>"
+    echo
+    echo "  stop: scales the component to zero; its data, configuration, and release are kept."
+    echo "  delete: uninstalls the release (the UI keeps no data)."
 }
 
 
@@ -67,5 +70,7 @@ if [ "$CMD" == "start" ]; then
     fi
 
 elif [ "$CMD" == "stop" ]; then
-    helm uninstall nb-ui -n nb-ui || true
+    scaleNamespacesToZero $NB_UI_NAMESPACE
+elif [ "$CMD" == "delete" ]; then
+    helm uninstall --kube-context "kind-$CLUSTER_NAME" nb-ui -n nb-ui || true
 fi

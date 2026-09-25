@@ -11,7 +11,10 @@ source ../../common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop>"
+    echo "  $(basename "$0") <start|stop|delete>"
+    echo
+    echo "  stop: scales the component to zero; its data, configuration, and release are kept."
+    echo "  delete: deletes the blockscout namespace, including its PostgreSQL volume (index and verifications)."
 }
 
 # parse command
@@ -64,6 +67,10 @@ if [ "$CMD" == "start" ]; then
     composeBlockscoutChart
     deployBlockscout
 elif [ "$CMD" == "stop" ]; then
+    # Besu keeps producing blocks while Blockscout is stopped, and the catch-up
+    # indexer is disabled, so blocks mined in the meantime are not indexed.
+    scaleNamespacesToZero $BLOCKSCOUT_NAMESPACE
+elif [ "$CMD" == "delete" ]; then
     echo "Deleting namespace..."
     kubectl --context=kind-$CLUSTER_NAME delete namespaces $BLOCKSCOUT_NAMESPACE
     echo "Shutdown completed successfully!"

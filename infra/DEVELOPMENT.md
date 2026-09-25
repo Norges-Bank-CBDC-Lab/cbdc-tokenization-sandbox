@@ -8,15 +8,15 @@ layer: Kind, the local registry workflow, Besu, and the gateway.
 From `infra/`:
 
 - start infra and create the Kind cluster if needed: `./infra.sh start`
-- stop infra workloads but keep the cluster and cached images:
-  `./infra.sh stop`
-- delete the Kind cluster while retaining the separate local-registry
-  container and its cached images: `./infra.sh delete`
+- stop Besu and the gateway (scaled to zero) and keep the chain, the cluster,
+  and cached images: `./infra.sh stop`
+- delete the Kind cluster and all sandbox state while retaining the separate
+  local-registry container and its cached images: `./infra.sh delete`
 - start the local registry container: `./infra.sh registry-start`
 - push pinned images into the local registry: `./infra.sh registry-sync`
 
-If you want to preserve the Kind node's own image cache, prefer `stop` over
-`delete`. The separate local-registry cache survives either command.
+`stop` keeps the chain and the Kind node's own image cache; `delete` loses
+both. The separate local-registry cache survives either command.
 
 ## Local Registry Workflow
 

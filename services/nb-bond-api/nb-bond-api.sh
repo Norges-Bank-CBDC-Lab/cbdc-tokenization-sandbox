@@ -10,7 +10,10 @@ source ../../common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop>"
+    echo "  $(basename "$0") <start|stop|delete>"
+    echo
+    echo "  stop: scales the component to zero; its data, configuration, and release are kept."
+    echo "  delete: uninstalls the release, including its SQLite volume (bidder keys cannot be recovered)."
 }
 
 
@@ -66,5 +69,7 @@ if [ "$CMD" == "start" ]; then
     fi
 
 elif [ "$CMD" == "stop" ]; then
-    helm uninstall nb-bond-api -n nb-bond-api || true
+    scaleNamespacesToZero $NB_BOND_API_NAMESPACE
+elif [ "$CMD" == "delete" ]; then
+    helm uninstall --kube-context "kind-$CLUSTER_NAME" nb-bond-api -n nb-bond-api || true
 fi

@@ -23,9 +23,9 @@ function printHelp() {
     echo "      --prune-build-cache - cleanup-images: also run 'docker builder prune -f' (GLOBAL, all projects)"
     echo
     echo "    Description:"
-    echo "      start: Start the cluster and components of the cbdc sandbox"
-    echo "      stop: Stop components of the cbdc sandbox (keeps cluster)"
-    echo "      delete: Delete the kind cluster (full teardown)"
+    echo "      start: Start the cluster and components of the cbdc sandbox (resumes a stopped sandbox)"
+    echo "      stop: Stop the sandbox gracefully; keeps the chain, Blockscout, and NB Bond API state"
+    echo "      delete: Delete the kind cluster and all sandbox state (full teardown)"
     echo "      generate-config: Create $DEPLOYMENT_CONFIG_FILE config file with flags to control"
     echo "                       which components to deploy."
     echo "      registry-start: Start the local registry container"
@@ -46,6 +46,8 @@ function printHelp() {
 # - DEPLOY_NB_BOND_API: true deploys NB Bond API; false skips the API service.
 # - DEPLOY_NB_UI: true deploys the NB UI frontend; false skips the operator UI.
 # - WAIT_FOR_APP_TIMEOUT_SECONDS: max seconds to wait; lower fails faster.
+# - SANDBOX_STOP_TIMEOUT_SECONDS: seconds `stop` lets the Kind node shut its pods
+#   down before Docker kills it; lower risks an unclean stop that can corrupt state.
 ################################################################################
 export DEPLOY_INFRA="true"
 export DEPLOY_CONTRACTS="true"
@@ -55,6 +57,7 @@ export DEPLOY_BLOCKSCOUT="true"
 export DEPLOY_NB_BOND_API="true"
 export DEPLOY_NB_UI="true"
 export WAIT_FOR_APP_TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-60}"
+export SANDBOX_STOP_TIMEOUT_SECONDS="${SANDBOX_STOP_TIMEOUT_SECONDS:-330}"
 
 function printServiceUrls() {
     title="SERVICE URLS (READY)"
@@ -168,6 +171,11 @@ if [ "$CMD" == "start" ]; then
     deployedSomething="false"
 
     requireKindRegistry
+
+    # resume a sandbox that `stop` left with its node container stopped
+    if [[ $(clusterExists) == "true" ]]; then
+        startClusterNodes
+    fi
 
     # deploy infra
     if [ "$DEPLOY_INFRA" == "true" ]; then
@@ -294,31 +302,9 @@ elif [ "$CMD" == "stop" ]; then
         exit 0
     fi
 
-    if [ "$DEPLOY_NB_UI" == "true" ]; then
-        cd $SCRIPT_DIR/services/nb-ui
-        ./nb-ui.sh stop --as-subtask || true
-    fi
-
-    if [ "$DEPLOY_NB_BOND_API" == "true" ]; then
-        cd $SCRIPT_DIR/services/nb-bond-api
-        ./nb-bond-api.sh stop --as-subtask || true
-    fi
-
-    if [ "$DEPLOY_CONTRACTS" == "true" ]; then
-        cd $SCRIPT_DIR/contracts
-        ./contracts.sh stop --as-subtask || true
-    fi
-
-    if [ "$DEPLOY_BLOCKSCOUT" == "true" ]; then
-        cd $SCRIPT_DIR/services/blockscout
-        ./blockscout.sh stop --as-subtask || true
-    fi
-
-    if [ "$DEPLOY_INFRA" == "true" ]; then
-        cd $SCRIPT_DIR/infra
-        ./infra.sh stop --as-subtask || true
-        clearContractsDeploymentMarker
-    fi
+    # Stopping the whole node stops the chain with everything else, so Blockscout
+    # misses no blocks, and every volume, release, and marker stays for `start`.
+    stopClusterNodes
 elif [ "$CMD" == "delete" ]; then
     checkPrereqs
     ensureLocalhostHostEntries

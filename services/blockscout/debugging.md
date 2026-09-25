@@ -65,6 +65,61 @@ IO.inspect(EthereumJSONRPC.fetch_blocks_by_numbers([506], args))"'
 ```
 If this fails but curl works, the issue is in Blockscout client config.
 
+## PostgreSQL does not start after an unclean shutdown
+
+**Symptom.** The `postgres` pod in `blockscout` is in `CrashLoopBackOff`, the
+Blockscout backend waits in its `init-migrations` container, and the PostgreSQL
+log ends with:
+
+```text
+database system was not properly shut down; automatic recovery in progress
+PANIC:  replication checkpoint has wrong magic 0 instead of 307747550
+```
+
+**Why.** The Kind node was killed rather than stopped (see
+[`docs/KNOWN_ISSUES.md`](../../docs/KNOWN_ISSUES.md#sandbox-must-be-stopped-before-docker-quits-or-the-host-reboots)).
+PostgreSQL had just written `pg_logical/replorigin_checkpoint`, its 8-byte list of
+replication origins, and the file reached disk as zeros. Crash recovery reads it
+before replaying the write-ahead log and aborts. Blockscout uses no replication
+origins, so the file only ever says "none".
+
+**Recovery.** Confirm the PANIC above first; this procedure is for that message
+only. Every command names the sandbox's context and node container explicitly.
+
+```sh
+CTX=kind-cluster-cbdc-monoledger
+NODE=cluster-cbdc-monoledger-control-plane
+
+# 1. Stop PostgreSQL so nothing restarts it while the volume is edited.
+kubectl --context=$CTX -n blockscout scale deploy/postgres --replicas=0
+
+# 2. Find the volume directory on the Kind node.
+PV=$(kubectl --context=$CTX -n blockscout get pvc postgres-volume-claim -o jsonpath='{.spec.volumeName}')
+DIR=$(kubectl --context=$CTX get pv "$PV" -o jsonpath='{.spec.hostPath.path}')
+
+# 3. Check the file is all zeros (a healthy one starts `de da 57 12`),
+#    back up the data directory, and move the file aside.
+docker exec $NODE od -A d -t x1 "$DIR/pgdata/pg_logical/replorigin_checkpoint"
+docker exec $NODE sh -c "cd '$DIR' && cp -a pgdata pgdata.bak && mv pgdata/pg_logical/replorigin_checkpoint replorigin_checkpoint.zeroed"
+
+# 4. Start PostgreSQL again.
+kubectl --context=$CTX -n blockscout scale deploy/postgres --replicas=1
+```
+
+**Validation.** The PostgreSQL log shows `redo done` and `database system is
+ready to accept connections`, and PostgreSQL has written a new checkpoint file.
+`select count(*) from pg_replication_origin;` returns `0`; the Blockscout backend
+finishes its migrations and becomes Ready. Once Blockscout is healthy, remove
+`pgdata.bak` and `replorigin_checkpoint.zeroed` from the volume directory.
+
+**If more is damaged**, recovery fails again with a different error. Then run
+`./services/blockscout/blockscout.sh delete` and `start` to re-index, and
+`./contracts/contracts.sh verify-latest` to restore verifications. Blocks mined
+before the new start stay unindexed while the catch-up indexer is disabled; a
+full `./sandbox.sh delete` and `start` gives a complete index instead.
+
+**Prevention.** Run `./sandbox.sh stop` before quitting Docker or rebooting.
+
 ## Common pitfalls
 
 - **`ETHEREUM_JSONRPC_HTTP_INSECURE=true` on plain HTTP**  

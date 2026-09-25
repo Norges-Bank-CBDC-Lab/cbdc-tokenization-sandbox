@@ -34,6 +34,29 @@
   broker-less issuance orders, and a decision on whether repeated unknown
   failures should evict the maker.
 
+## Sandbox must be stopped before Docker quits or the host reboots
+- If Docker Desktop quits, or the host reboots, while the sandbox runs, Docker
+  gives the Kind node container its default 10 seconds and then kills it. Pods
+  get no clean shutdown. In one observed case Blockscout's PostgreSQL lost a
+  freshly written checkpoint file, then refused to start with
+  `PANIC: replication checkpoint has wrong magic 0`, and Blockscout stayed down
+  until the file was moved aside. The recovery procedure is in
+  [`services/blockscout/debugging.md`](../services/blockscout/debugging.md#postgresql-does-not-start-after-an-unclean-shutdown).
+- Run `./sandbox.sh stop` first. It stops the Kind node with
+  `SANDBOX_STOP_TIMEOUT_SECONDS` (default 330) and keeps all state; `./sandbox.sh start`
+  resumes it. A stop takes about 90 seconds: the workloads, PostgreSQL and etcd
+  included, exit within seconds, and the rest is systemd inside the Kind node
+  image waiting its 90-second timeout for `kube-apiserver` and the containerd
+  shims, which hold no state.
+- Blockscout runs with its catch-up indexer disabled
+  (`DISABLE_CATCHUP_INDEXER` in `services/blockscout/values.backend.env.yaml`).
+  Blocks mined while Besu runs without Blockscout, for example after
+  `./services/blockscout/blockscout.sh stop` or while its database is broken,
+  are never indexed. `./sandbox.sh stop` avoids the gap by stopping the chain
+  too; `./sandbox.sh delete` and `./sandbox.sh start` rebuild a complete index.
+- Follow-up: decide whether to enable the catch-up indexer so gaps heal
+  themselves.
+
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
   finality but no Byzantine fault tolerance.

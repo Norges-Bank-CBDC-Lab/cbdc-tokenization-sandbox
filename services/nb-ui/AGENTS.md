@@ -45,7 +45,8 @@ This file covers the React + Vite operator frontend specifically.
 - Lint / format / test: `npm run lint`, `npm run format:check`, `npm test`
 - Deploy into the local Kind cluster: `./nb-ui.sh start` (called by
   `./sandbox.sh start` when `DEPLOY_NB_UI=true`)
-- Stop the helm release: `./nb-ui.sh stop`
+- Stop (scale to zero, keep the helm release): `./nb-ui.sh stop`
+- Remove the helm release: `./nb-ui.sh delete`
 
 ### Style and conventions
 

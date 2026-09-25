@@ -12,8 +12,9 @@ Inherits the root `AGENTS.md`. This file covers infra-specific structure and sty
 
 ### How to run
 - Start: `./infra/infra.sh start`
-- Stop: `./infra/infra.sh stop` (keeps cluster and image cache)
-- Delete: `./infra/infra.sh delete` (full teardown)
+- Stop: `./infra/infra.sh stop` (scales Besu and the gateway to zero; keeps the chain, cluster, and image cache)
+- Delete: `./infra/infra.sh delete` (full teardown: removes the cluster and all sandbox state)
+- Whole sandbox: `./sandbox.sh stop` stops everything and keeps all state; `./sandbox.sh delete` discards it
 - Most commands assume you run them from `infra/`.
 
 ### Commands (detail)

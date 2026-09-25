@@ -13,7 +13,8 @@ function printHelp() {
     echo "  $(basename "$0") <start|stop|delete|registry-start|registry-sync|registry-reset|cleanup-images|image-report> [--keep N] [--prune-build-cache]"
     echo
     echo "Notes:"
-    echo "  stop keeps the kind cluster and its image cache; delete removes the cluster."
+    echo "  stop scales Besu and the gateway to zero; the chain, cluster, and image cache are kept."
+    echo "  delete removes the kind cluster and all sandbox state (the local registry is kept)."
     echo "  registry-start starts the local registry container."
     echo "  registry-sync pushes configured images to the local registry."
     echo "  registry-reset recreates the registry container and re-syncs base images (reclaims registry disk)."
@@ -83,9 +84,7 @@ if [ "$CMD" == "start" ]; then
 elif [ "$CMD" == "stop" ]; then
     checkPrereqs
     ensureLocalhostHostEntries
-    helm uninstall gateway -n nginx-gateway || true
-    helm uninstall ngf -n nginx-gateway || true
-    helm uninstall besu -n besu || true
+    scaleNamespacesToZero besu nginx-gateway
 elif [ "$CMD" == "registry-start" ]; then
     ensureKindRegistry
 elif [ "$CMD" == "registry-sync" ]; then
