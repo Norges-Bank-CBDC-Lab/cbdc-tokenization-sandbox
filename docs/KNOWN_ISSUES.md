@@ -48,14 +48,9 @@
   included, exit within seconds, and the rest is systemd inside the Kind node
   image waiting its 90-second timeout for `kube-apiserver` and the containerd
   shims, which hold no state.
-- Blockscout runs with its catch-up indexer disabled
-  (`DISABLE_CATCHUP_INDEXER` in `services/blockscout/values.backend.env.yaml`).
-  Blocks mined while Besu runs without Blockscout, for example after
-  `./services/blockscout/blockscout.sh stop` or while its database is broken,
-  are never indexed. `./sandbox.sh stop` avoids the gap by stopping the chain
-  too; `./sandbox.sh delete` and `./sandbox.sh start` rebuild a complete index.
-- Follow-up: decide whether to enable the catch-up indexer so gaps heal
-  themselves.
+- Blocks mined while Blockscout was down are filled in by its catch-up indexer
+  once it runs again, so an outage like this one leaves no permanent gap in
+  the explorer.
 
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
