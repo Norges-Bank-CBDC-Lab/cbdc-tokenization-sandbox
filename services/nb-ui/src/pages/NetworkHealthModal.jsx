@@ -7,6 +7,10 @@
  *   - **Resync from block 0** drops the projection and rebuilds from
  *     chain. Gated behind ConfirmResyncModal (type-to-confirm).
  *
+ * Both recovery actions call the operator-only /v1/admin surface, so they
+ * are shown only to accounts that can operate (always in `none` mode);
+ * everyone else gets the read-only view with Refresh.
+ *
  * The modal shares the same poll as the HealthBadge via the
  * `useHealthPoll` hook — the parent passes its `health` snapshot and
  * `onReload` callback so the modal can refresh in place after a
@@ -17,6 +21,7 @@ import { Button, Modal, useToast } from '../components/ui.jsx';
 import { summarise } from '../components/HealthBadge.jsx';
 import { HealthApi } from '../api/healthApi.js';
 import { ConfirmResyncModal } from './ConfirmResyncModal.jsx';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 
 function formatRelative(ts) {
   if (!ts) return '—';
@@ -74,6 +79,7 @@ const STATUS_COLOR = {
 };
 
 export function NetworkHealthModal({ health, onReload, onClose }) {
+  const { canOperate } = useCapabilities();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -130,12 +136,20 @@ export function NetworkHealthModal({ health, onReload, onClose }) {
             <Button onClick={onReload} disabled={reconnecting}>
               Refresh
             </Button>
-            <Button onClick={reconnect} disabled={reconnecting} variant="primary">
-              {reconnecting ? 'Reconnecting…' : 'Reconnect'}
-            </Button>
-            <Button onClick={() => setConfirmOpen(true)} variant="danger" disabled={reconnecting}>
-              Resync from block 0…
-            </Button>
+            {canOperate && (
+              <>
+                <Button onClick={reconnect} disabled={reconnecting} variant="primary">
+                  {reconnecting ? 'Reconnecting…' : 'Reconnect'}
+                </Button>
+                <Button
+                  onClick={() => setConfirmOpen(true)}
+                  variant="danger"
+                  disabled={reconnecting}
+                >
+                  Resync from block 0…
+                </Button>
+              </>
+            )}
           </>
         }
       >

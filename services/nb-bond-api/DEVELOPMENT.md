@@ -56,7 +56,7 @@ Important optional settings:
 - `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
 - `NB_BOND_API_AUTH_MODE`: `none` (default) or `entra`. See §7.7.
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE`: required when `NB_BOND_API_AUTH_MODE=entra`.
-- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES`: comma-separated Entra App Role values for role-based access (operator gates `/v1/central-bank/*`; recognised = operator ∪ tester). Operator roles required in `entra` mode. See §7.7.
+- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES`: comma-separated Entra App Role values for role-based access (operator gates issuer actions, coupon payments, `/v1/admin/*`, and `/v1/central-bank/*`; recognised = operator ∪ tester). Operator roles required in `entra` mode. See §7.7.
 
 ### 2.3 Start commands
 
@@ -495,10 +495,22 @@ token, `entra` mode authorizes it against the `roles` claim (Entra App Roles):
   granting baseline access without Central Bank. Optional.
 - Every authenticated endpoint requires at least one _recognised_ role
   (operator ∪ tester); a valid token carrying none is rejected with `403`.
-  `/v1/central-bank/*` additionally requires an operator role (`403`
-  otherwise). `none` mode performs no role checks. The values must match the
-  nb-ui `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values
-  defined in Entra.
+  `none` mode performs no role checks. The values must match the nb-ui
+  `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values defined
+  in Entra.
+- Route matrix in `entra` mode (operator-only routes answer `403` to any
+  other recognised role, before request validation):
+
+  | Routes                                                                                                       | Roles      |
+  | ------------------------------------------------------------------------------------------------------------ | ---------- |
+  | All reads, `/v1/events`, `POST` / `DELETE /v1/bidders`, `POST /v1/bidders/{address}/bids`, `/v1/banking/*`   | recognised |
+  | `POST /v1/bonds`, `DELETE /v1/bonds/{isin}`, `POST /v1/bonds/{isin}/auctions`                                | operator   |
+  | `PATCH /v1/auctions/{id}` (close), `DELETE /v1/auctions/{id}` (cancel), `PUT /v1/auctions/{id}/finalisation` | operator   |
+  | `POST /v1/bonds/{isin}/coupon-payments`, `/v1/admin/*`, `/v1/central-bank/*`                                 | operator   |
+
+  `tests/route-authorization.test.ts` exercises every mutating route as an
+  operator and as a tester, so a missing or misplaced gate fails CI.
+
 - The `testMode` query flag (unseal open bids on bond / auction reads, skip
   the close end-time pre-check) is honoured only for operator callers
   (`src/test-mode.ts`, using `isOperatorRequest` in `src/auth.ts`). A tester's

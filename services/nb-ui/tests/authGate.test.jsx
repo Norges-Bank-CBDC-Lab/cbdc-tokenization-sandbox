@@ -145,8 +145,7 @@ describe('auth gate (entra mode)', () => {
 
     expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Central Bank/ })).not.toBeInTheDocument();
-    // Banking is tester-accessible — Central Bank is the only
-    // operator-locked surface.
+    // Banking is tester-accessible — Central Bank is operator-only.
     expect(screen.getByRole('button', { name: /Banking/ })).toBeInTheDocument();
     // The test-mode toggle is operator-only.
     expect(screen.queryByRole('button', { name: /Test:/ })).not.toBeInTheDocument();
@@ -196,6 +195,37 @@ describe('auth gate (entra mode)', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Securities/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('auth gate (issuer actions)', () => {
+  it('shows "+ New auction" to an operator but not to a tester', async () => {
+    const operator = await loadApp({ accounts: [operatorAccount] });
+    window.location.hash = '#/auctions';
+    const { unmount } = render(<operator.App />);
+    expect(await screen.findByRole('button', { name: /New auction/ })).toBeInTheDocument();
+    unmount();
+
+    const tester = await loadApp({ accounts: [testerAccount] });
+    window.location.hash = '#/auctions';
+    render(<tester.App />);
+    expect(await screen.findByRole('heading', { name: 'Auctions' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /New auction/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('auth gate (unknown mode)', () => {
+  it('renders only the configuration error naming the bad AUTH_MODE', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { App } = await loadApp({ authMode: 'pigeon-courier' });
+    render(<App />);
+
+    expect(
+      await screen.findByText('Configuration error: unknown AUTH_MODE "pigeon-courier".'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Securities/ })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    error.mockRestore();
   });
 });
 

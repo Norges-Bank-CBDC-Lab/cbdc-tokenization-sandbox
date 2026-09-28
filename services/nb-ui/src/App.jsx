@@ -4,7 +4,7 @@
  * has no usable session.
  */
 import { useEffect, useState } from 'react';
-import { auth, authMode } from './auth/index.js';
+import { auth, authMode, isKnownAuthMode } from './auth/index.js';
 import { capabilitiesForAccount } from './auth/capabilities.js';
 import { CapabilitiesContext } from './auth/capabilitiesContext.js';
 import { useRoute } from './hooks/useRoute.js';
@@ -12,6 +12,7 @@ import { ToastProvider, EmptyState } from './components/ui.jsx';
 import { Layout } from './components/Layout.jsx';
 import { LoginPage } from './components/LoginPage.jsx';
 import { AccessDeniedPage } from './components/AccessDeniedPage.jsx';
+import { ConfigErrorPage } from './components/ConfigErrorPage.jsx';
 import { BondsPage } from './pages/BondsPage.jsx';
 import { BondDetailPage } from './pages/BondDetailPage.jsx';
 import { AuctionsPage } from './pages/AuctionsPage.jsx';
@@ -68,6 +69,12 @@ export function App() {
       .finally(() => setAuthReady(true));
     return unsubscribe;
   }, []);
+
+  // An unrecognised AUTH_MODE is a deployment error: refuse to run rather than
+  // guess at a mode. The API fails fast on the same mistake.
+  if (!isKnownAuthMode) {
+    return <ConfigErrorPage authMode={authMode} />;
+  }
 
   if (authMode === 'entra') {
     // Hold rendering until handleRedirectPromise has settled, so returning

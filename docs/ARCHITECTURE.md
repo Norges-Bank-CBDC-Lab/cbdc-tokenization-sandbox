@@ -391,8 +391,12 @@ defaults to no-auth locally and can be switched to OIDC (Entra / MSAL) per
 deployment via runtime config without rebuilding the bundle. Tenant- and
 client-specific values are intentionally **not** committed in this repo. In
 `entra` mode both tiers additionally enforce role-based access from Entra App
-Roles (operator vs tester; the Central Bank surface is operator-only), with the
-NB Bond API as the authoritative boundary.
+Roles, with the NB Bond API as the authoritative boundary. Operators hold the
+issuer actions (creating and disabling bonds; creating, closing, cancelling, and
+finalising auctions; coupon payments), the Central Bank surface, and the admin
+recovery actions; testers keep reads, bidding, and Banking. The UI hides
+operator-only controls from testers to mirror the API, and refuses to start on
+an unrecognised `AUTH_MODE`.
 
 ### Live updates
 

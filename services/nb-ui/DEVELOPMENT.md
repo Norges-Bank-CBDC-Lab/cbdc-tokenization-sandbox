@@ -99,7 +99,10 @@ touching `services/nb-ui/**` via `.github/workflows/nb-ui.yml`.
 
 ## Pluggable auth
 
-The auth seam is `src/auth/index.js`. It resolves one of:
+The auth seam is `src/auth/index.js`. It resolves one of the providers
+below. Any other `AUTH_MODE` value is a configuration error: the UI renders
+only a page naming the bad value (`src/components/ConfigErrorPage.jsx`) and
+`capabilities.js` grants nothing, so no page mounts and nothing calls the API.
 
 - `noneAuth` — no `Authorization` header, no sign-in UI. Default; the
   local sandbox runs this way because the NB Bond API has no auth (per
@@ -126,10 +129,17 @@ claims first, access-token decode as a fallback) and mapped to capabilities by
 - The Central Bank nav item is hidden for non-operators and the
   `#/central-bank` route is guarded, so the page never mounts for them.
 - Operator-only controls read `canOperate` from `CapabilitiesContext`
-  (`src/auth/capabilitiesContext.js`, provided by `App.jsx`). The top-bar
-  test-mode toggle is hidden for testers, and `getTestMode()`
-  (`src/utils/debugSettings.js`) ignores a stored flag for any account that
-  cannot operate, so a tester never sends `?testMode=true`.
+  (`src/auth/capabilitiesContext.js`, provided by `App.jsx`) and are hidden,
+  not merely disabled, for testers:
+  - issuer actions: "+ New bond" (Bonds), "+ New auction" (Auctions),
+    "Disable bond…" (bond detail), and Close / Select winners & finalise /
+    Cancel in the auction lifecycle panel;
+  - Reconnect and Resync in the Network Health modal (Refresh stays);
+  - the top-bar test-mode toggle. `getTestMode()`
+    (`src/utils/debugSettings.js`) also ignores a stored flag for any account
+    that cannot operate, so a tester never sends `?testMode=true`.
+- Testers keep reads, bidding (the Bidders page and "Place bid"), and the
+  Banking surface.
 - The Bidders page shows "Held by the server" when the API returns
   `privateKey: null` (always in `entra` mode, and for keys supplied by the
   API's `PK_*` overrides).

@@ -77,6 +77,18 @@ describe('capabilitiesForAccount', () => {
     });
   });
 
+  it('grants nothing on an unrecognised auth mode', async () => {
+    const cap = await loadCapabilities({ ...entra, AUTH_MODE: 'pigeon-courier' });
+    const none = {
+      canUseApp: false,
+      canAccessCentralBank: false,
+      canAccessBanking: false,
+      canOperate: false,
+    };
+    expect(cap(null)).toEqual(none);
+    expect(cap({ roles: ['Sandbox.Operator'] })).toEqual(none);
+  });
+
   it('lets operator capabilities win when an account holds both roles', async () => {
     const cap = await loadCapabilities(entra);
     expect(cap({ roles: ['Sandbox.Tester', 'Sandbox.Operator'] })).toEqual({

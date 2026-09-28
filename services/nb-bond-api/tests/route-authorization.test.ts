@@ -1,6 +1,7 @@
 /**
  * Route-level authorization in `entra` mode, through the real auth middleware
- * and the real route wiring in createApp.
+ * and the real route wiring in createApp. The ROUTES table covers every
+ * mutating route, so removing or misplacing any gate fails a row.
  *
  * `jose` is mocked so a bearer token's text becomes its `roles` claim
  * (`Bearer operator` → the operator role, `Bearer tester` → the tester role).
@@ -54,6 +55,85 @@ const { createBidder } = require('../src/bidders') as typeof import('../src/bidd
 
 type Caller = 'operator' | 'tester';
 
+const BAD_ID = 'not-a-bytes32';
+const BAD_ADDRESS = 'not-an-address';
+const ISIN = 'NO0000000001';
+
+/**
+ * Every mutating route with an input that fails validation right after the
+ * gate, so a passing gate answers without reaching the chain. `pass` is the
+ * status a caller who clears the gate gets. `DELETE /v1/bonds/{isin}` has no
+ * invalid path value, so it reaches the handler and fails on the offline
+ * chain (500); `/v1/admin` is covered through its prefix guard.
+ */
+const ROUTES: Array<{
+  gate: 'operator' | 'recognised';
+  method: string;
+  path: string;
+  body?: unknown;
+  pass: number;
+}> = [
+  // Issuer actions (operator-only).
+  { gate: 'operator', method: 'POST', path: '/v1/bonds', body: {}, pass: 400 },
+  { gate: 'operator', method: 'DELETE', path: `/v1/bonds/${ISIN}`, pass: 500 },
+  { gate: 'operator', method: 'POST', path: `/v1/bonds/${ISIN}/auctions`, body: {}, pass: 400 },
+  {
+    gate: 'operator',
+    method: 'PATCH',
+    path: `/v1/auctions/${BAD_ID}`,
+    body: { status: 'closed' },
+    pass: 400,
+  },
+  { gate: 'operator', method: 'DELETE', path: `/v1/auctions/${BAD_ID}`, pass: 400 },
+  {
+    gate: 'operator',
+    method: 'PUT',
+    path: `/v1/auctions/${BAD_ID}/finalisation`,
+    body: { approve: true },
+    pass: 400,
+  },
+  {
+    gate: 'operator',
+    method: 'POST',
+    path: `/v1/bonds/${ISIN}/coupon-payments`,
+    body: { holders: [BAD_ADDRESS] },
+    pass: 400,
+  },
+  // Admin and Central Bank prefix guards (operator-only).
+  { gate: 'operator', method: 'POST', path: '/v1/admin/no-such-route', pass: 404 },
+  {
+    gate: 'operator',
+    method: 'PUT',
+    path: `/v1/central-bank/allowlist/${BAD_ADDRESS}`,
+    pass: 400,
+  },
+  { gate: 'operator', method: 'POST', path: '/v1/central-bank/wnok/mint', body: {}, pass: 400 },
+  // Bidding and Banking (any recognised role).
+  { gate: 'recognised', method: 'POST', path: '/v1/bidders', body: {}, pass: 400 },
+  { gate: 'recognised', method: 'DELETE', path: `/v1/bidders/${BAD_ADDRESS}`, pass: 400 },
+  {
+    gate: 'recognised',
+    method: 'POST',
+    path: `/v1/bidders/${BAD_ADDRESS}/bids`,
+    body: {},
+    pass: 400,
+  },
+  { gate: 'recognised', method: 'POST', path: '/v1/banking/banks', body: {}, pass: 400 },
+  {
+    gate: 'recognised',
+    method: 'PUT',
+    path: `/v1/banking/tbd/${BAD_ADDRESS}/allowlist/${BAD_ADDRESS}`,
+    pass: 400,
+  },
+  {
+    gate: 'recognised',
+    method: 'POST',
+    path: `/v1/banking/tbd/${BAD_ADDRESS}/mint`,
+    body: {},
+    pass: 400,
+  },
+];
+
 describe('route authorization (entra mode)', () => {
   const db = openDatabase({ dbPath: ':memory:', readonly: false }) as IngestionDatabase & {
     close: () => void;
@@ -87,6 +167,21 @@ describe('route authorization (entra mode)', () => {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   }
+
+  it.each(ROUTES)('$method $path: operators clear the gate', async (route) => {
+    const response = await call('operator', route.method, route.path, route.body);
+    expect(response.status).toBe(route.pass);
+  });
+
+  it.each(ROUTES)('$method $path: testers get the $gate gate', async (route) => {
+    const response = await call('tester', route.method, route.path, route.body);
+    expect(response.status).toBe(route.gate === 'operator' ? 403 : route.pass);
+  });
+
+  it('rejects a request without a bearer token', async () => {
+    const response = await fetch(`${baseUrl}/v1/bonds`, { method: 'POST' });
+    expect(response.status).toBe(401);
+  });
 
   it('returns no bidder private key outside none mode, for testers and operators alike', async () => {
     createBidder(db, { name: 'Generated' });
