@@ -30,28 +30,25 @@ contract Tbd is ITbd, IERC1363Receiver, ERC20, AccessControl, Allowlist {
     Wnok private immutable _WNOK;
 
     /**
-     * Defined government reserve account;
+     * The DvP contract given at construction; the only caller that may move another account's
+     * funds through `cctFrom`.
      */
-    address public govReserve;
+    address private immutable _DVP;
 
     /**
      * @dev Create a new TBD token.
      * @param admin The user to receive DEFAULT_ADMIN_ROLE
      * @param bank The bank which owns the token
      * @param wnok The global central bank contract
-     * @param dvp The global DvP contract
+     * @param dvp The global DvP contract; granted CCT_FROM_CALLER_ROLE and allowed to settle on
+     *            behalf of the payer
      * @param name_ of the TBD contract
      * @param symbol_ of the TBD token
      */
-    constructor(
-        address admin,
-        address bank,
-        address wnok,
-        address dvp,
-        string memory name_,
-        string memory symbol_,
-        address _govReserve
-    ) Allowlist(admin) ERC20(name_, symbol_) {
+    constructor(address admin, address bank, address wnok, address dvp, string memory name_, string memory symbol_)
+        Allowlist(admin)
+        ERC20(name_, symbol_)
+    {
         if (admin == address(0)) revert Errors.AdminAddressZero();
         if (bank == address(0)) revert Errors.BankAddressZero();
         if (wnok == address(0)) revert Errors.WnokAddressZero();
@@ -64,9 +61,9 @@ contract Tbd is ITbd, IERC1363Receiver, ERC20, AccessControl, Allowlist {
         // ITbd
         _supportedInterfaces[Tbd(address(0)).cctFrom.selector ^ Tbd(address(0)).cctSetToAddr.selector] = true;
 
-        govReserve = _govReserve;
         _BANK = bank;
         _WNOK = Wnok(wnok);
+        _DVP = dvp;
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(Roles.MINTER_ROLE, admin);
         _grantRole(Roles.BURNER_ROLE, admin);
@@ -118,12 +115,16 @@ contract Tbd is ITbd, IERC1363Receiver, ERC20, AccessControl, Allowlist {
 
     /**
      * @inheritdoc ITbd
+     * @dev The caller must hold CCT_FROM_CALLER_ROLE and be either the payer (`from`) or the DvP
+     *      contract given at construction.
      */
     function cctFrom(address from, address to, address toTbdContrAddr, uint256 value)
         external
         onlyRole(Roles.CCT_FROM_CALLER_ROLE)
         returns (bool)
     {
+        if (from != msg.sender && msg.sender != _DVP) revert Errors.CctFromNotCaller(from, msg.sender);
+
         bool success;
 
         if (toTbdContrAddr == address(this)) {
@@ -148,25 +149,6 @@ contract Tbd is ITbd, IERC1363Receiver, ERC20, AccessControl, Allowlist {
      */
     function getBankAddress() external view returns (address) {
         return _BANK;
-    }
-
-    /**
-     * @dev Is TBD used for government issuance.
-     * @return Boolean if TBD has been nominated.
-     */
-    function isGovernmentNominated() public view returns (bool) {
-        return govReserve != address(0);
-    }
-
-    /**
-     * @dev A mint function to convert gov. WNOK to TBD.
-     * @param _value Value to mint in token units.
-     */
-    function _mintFromGovReserve(uint256 _value) internal {
-        if (govReserve == address(0)) revert Errors.NotGovernmentNominated();
-        bool ok = _WNOK.transferFrom(govReserve, address(this), _value);
-        if (!ok) revert Errors.TokenTransferFailed();
-        _mint(govReserve, _value);
     }
 
     /**
@@ -200,11 +182,6 @@ contract Tbd is ITbd, IERC1363Receiver, ERC20, AccessControl, Allowlist {
         }
         if (recipient != address(0) && !_allowlist[recipient]) {
             revert Errors.AllowlistViolation(ERC20.name(), recipient, "");
-        }
-
-        // Gov. reserve account will deposit and mint when transfer is requested
-        if (isGovernmentNominated() && spender == govReserve) {
-            _mintFromGovReserve(value);
         }
 
         return super._update(spender, recipient, value);

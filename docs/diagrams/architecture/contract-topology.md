@@ -10,7 +10,7 @@ flowchart TB
 
     subgraph money["Money layer"]
         wnok["WNOK<br/>allowlisted wholesale cash token"]
-        tbdN["TBD instances per private bank<br/>Nordea is government-nominated"]
+        tbdN["TBD instances per private bank<br/>cctFrom by payer or bound DvP"]
     end
 
     subgraph primary["Primary bond market"]

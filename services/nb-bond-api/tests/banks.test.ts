@@ -17,6 +17,7 @@ import * as path from 'path';
 
 import { getAddress } from 'ethers';
 
+import { tbdAbi } from '../src/abi';
 import type { CreateBankChainOps } from '../src/banks';
 import { deriveBidderAddress, generateBidderPrivateKey } from '../src/bidders';
 import { type IngestionDatabase, insertBankRow, openDatabase } from '../src/ingestion-db';
@@ -38,6 +39,21 @@ function fakeOps(overrides: Partial<CreateBankChainOps> = {}): CreateBankChainOp
     ...overrides,
   };
 }
+
+describe('Tbd deploy artifact', () => {
+  it('matches the six-argument constructor deployTbd passes', () => {
+    const ctor = tbdAbi.find((entry) => entry.type === 'constructor');
+    expect(ctor?.inputs?.map((input) => input.name)).toEqual([
+      'admin',
+      'bank',
+      'wnok',
+      'dvp',
+      'name_',
+      'symbol_',
+    ]);
+    expect(tbdAbi.some((entry) => 'name' in entry && entry.name === 'govReserve')).toBe(false);
+  });
+});
 
 describe('banks', () => {
   const originalKey = process.env.CENTRAL_BANK_PK;

@@ -25,6 +25,16 @@ Wnok private immutable _WNOK
 ```
 
 
+### _DVP
+The DvP contract given at construction; the only caller that may move another account's
+funds through `cctFrom`.
+
+
+```solidity
+address private immutable _DVP
+```
+
+
 ## State Variables
 ### _supportedInterfaces
 ERC165 supported interfaces.
@@ -45,15 +55,6 @@ mapping(address from => address to) private _cctFromToList
 ```
 
 
-### govReserve
-Defined government reserve account;
-
-
-```solidity
-address public govReserve
-```
-
-
 ## Functions
 ### constructor
 
@@ -61,15 +62,9 @@ Create a new TBD token.
 
 
 ```solidity
-constructor(
-    address admin,
-    address bank,
-    address wnok,
-    address dvp,
-    string memory name_,
-    string memory symbol_,
-    address _govReserve
-) Allowlist(admin) ERC20(name_, symbol_);
+constructor(address admin, address bank, address wnok, address dvp, string memory name_, string memory symbol_)
+    Allowlist(admin)
+    ERC20(name_, symbol_);
 ```
 **Parameters**
 
@@ -78,10 +73,9 @@ constructor(
 |`admin`|`address`|The user to receive DEFAULT_ADMIN_ROLE|
 |`bank`|`address`|The bank which owns the token|
 |`wnok`|`address`|The global central bank contract|
-|`dvp`|`address`|The global DvP contract|
+|`dvp`|`address`|The global DvP contract; granted CCT_FROM_CALLER_ROLE and allowed to settle on behalf of the payer|
 |`name_`|`string`|of the TBD contract|
 |`symbol_`|`string`|of the TBD token|
-|`_govReserve`|`address`||
 
 
 ### supportsInterface
@@ -140,6 +134,10 @@ function cctSetToAddr(address to) external;
 
 Moves a `value` amount of tokens from the from account to `to`
 via the customer credit transfer (cct) settlement process, using the CBDC.
+The caller must be the payer (`from`) or the DvP contract the TBD was constructed with.
+
+The caller must hold CCT_FROM_CALLER_ROLE and be either the payer (`from`) or the DvP
+contract given at construction.
 
 
 ```solidity
@@ -177,36 +175,6 @@ function getBankAddress() external view returns (address);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`address`|The bank address.|
-
-
-### isGovernmentNominated
-
-Is TBD used for government issuance.
-
-
-```solidity
-function isGovernmentNominated() public view returns (bool);
-```
-**Returns**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`<none>`|`bool`|Boolean if TBD has been nominated.|
-
-
-### _mintFromGovReserve
-
-A mint function to convert gov. WNOK to TBD.
-
-
-```solidity
-function _mintFromGovReserve(uint256 _value) internal;
-```
-**Parameters**
-
-|Name|Type|Description|
-|----|----|-----------|
-|`_value`|`uint256`|Value to mint in token units.|
 
 
 ### mint

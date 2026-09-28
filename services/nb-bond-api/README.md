@@ -42,7 +42,7 @@ Two sandbox-only resource families sit alongside the bond tree:
 - **`banking`** — surface over the per-bank TBD (tokenized bank
   deposit) tokens. `GET /v1/banking/banks` lists the configured banks (the
   signer selector); `GET /v1/banking/tbd[/{address}]` returns each TBD with its
-  owning bank, supply, WNOK reserve backing, government-nomination, and holders;
+  owning bank, supply, WNOK reserve backing, and holders;
   `PUT/DELETE /v1/banking/tbd/{address}/allowlist/{holder}` and
   `POST /v1/banking/tbd/{address}/{mint,burn,transfer}` mutate it, signed by the
   token's owning bank. Open to both operator and tester roles (Central Bank

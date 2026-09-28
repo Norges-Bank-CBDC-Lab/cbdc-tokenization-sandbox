@@ -52,7 +52,7 @@ library Errors {
     error InvalidReceiver();
     error TokenTransferFailed();
     error CctFailed();
-    error NotGovernmentNominated();
+    error CctFromNotCaller(address from, address caller);
 
     // --- BondOrderBookFactory ---
     error BondTokenAddressZero();

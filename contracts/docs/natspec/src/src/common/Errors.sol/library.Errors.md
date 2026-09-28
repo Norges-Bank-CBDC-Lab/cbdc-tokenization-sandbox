@@ -237,10 +237,10 @@ error TokenTransferFailed();
 error CctFailed();
 ```
 
-### NotGovernmentNominated
+### CctFromNotCaller
 
 ```solidity
-error NotGovernmentNominated();
+error CctFromNotCaller(address from, address caller);
 ```
 
 ### BondTokenAddressZero

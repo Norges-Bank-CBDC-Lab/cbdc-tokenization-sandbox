@@ -135,8 +135,8 @@ contract OrderBookIntegrationTest is Test {
         // Create wNOK, DvP, TBDs
         wnok = new Wnok(wnokadmin, wnokName, wnokSymbol);
         dvp = new DvP(csdadmin);
-        tbd1 = new Tbd(tbd1admin, bank1, address(wnok), address(dvp), tbd1Name, tbd1Symbol, address(0));
-        tbd2 = new Tbd(tbd2admin, bank2, address(wnok), address(dvp), tbd2Name, tbd2Symbol, address(0));
+        tbd1 = new Tbd(tbd1admin, bank1, address(wnok), address(dvp), tbd1Name, tbd1Symbol);
+        tbd2 = new Tbd(tbd2admin, bank2, address(wnok), address(dvp), tbd2Name, tbd2Symbol);
 
         vm.startPrank(tbd1admin);
         tbd1.add(investorATbd);

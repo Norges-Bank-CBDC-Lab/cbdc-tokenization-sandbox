@@ -293,21 +293,7 @@ export function BankingPage() {
                     <div className="kpi">
                       <div
                         className="kpi-label"
-                        title="The TBD has a designated government reserve account that can mint TBD by depositing WNOK 1:1 (sovereign-money issuance). This is NOT WNOK-allowlist membership."
-                      >
-                        Government-nominated ⓘ
-                      </div>
-                      <div className="kpi-value">{token.government.nominated ? 'Yes' : 'No'}</div>
-                      <div className="kpi-sub">
-                        {token.government.nominated
-                          ? Fmt.shortHex(token.government.reserveAddress, 8, 6)
-                          : 'No gov-reserve mint path'}
-                      </div>
-                    </div>
-                    <div className="kpi">
-                      <div
-                        className="kpi-label"
-                        title="Whether the owning bank's address is on the WNOK allowlist — required to hold the WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination."
+                        title="Whether the owning bank's address is on the WNOK allowlist — required to hold the WNOK reserve and settle cross-bank in WNOK."
                       >
                         WNOK settlement ⓘ
                       </div>
