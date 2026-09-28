@@ -33,7 +33,7 @@ The closed-loop model: **wNOK is central-bank money; only allowlisted entities h
 - **The bond token already has the controller/operator/redeem surface** custody needs: `addController`/`isController`/`controllers`, `authorizeOperatorByPartition`/`operatorTransferByPartition`, `redeemFor`/`buybackRedeemFor` (`contracts/src/norges-bank/BondToken.sol`). The bond leg in `BondDvP._settleSecurityLeg` already moves partitions via `operatorTransferByPartition` — no change needed for Phase 1.
 - **Existing role wiring:** `contracts/script/norges-bank/11_BondSetup.s.sol:54` grants `SETTLE_ROLE` on BondDvP to BondManager; line **64** grants `TRANSFER_FROM_ROLE` on wNOK to BondDvP. That line 64 is the single wiring line Phase 1 changes.
 - **A two-tier money/custody model already exists for the customer side:** `Tbd` (tokenized bank deposit, `contracts/src/private-bank/Tbd.sol`) with `IERC1363Receiver.onTransferReceived`, and `ClientList` (`contracts/src/broker/ClientList.sol`) mapping clients → `tbdContrAddr`/`securitiesWallet`. The auction path does **not** use them — it treats the dealer as a bare wNOK wallet. Phases 2–6 reconcile this.
-- **The secondary market presumes on-chain per-holder balances:** `BondOrderBook` (`contracts/src/norges-bank/BondOrderBook.sol`) is a holder-level on-chain limit book vs. wNOK — *incompatible with omnibus custody* (see Phase 5).
+- **The secondary market presumed on-chain per-holder balances:** the removed holder-level `BondOrderBook` was an on-chain limit book vs. wNOK — *incompatible with omnibus custody*; no bond secondary venue exists now (see Phase 5).
 
 ---
 
@@ -45,7 +45,7 @@ The closed-loop model: **wNOK is central-bank money; only allowlisted entities h
 | **2** | `PrimaryDealerRegistry` — vetted once, one source of truth | new registry; auction gate; wNOK allowlist wiring | ✅ |
 | **3** | Omnibus custody — `IBrokerage`/`BondBrokerage`/factory + off-chain sub-ledger service | new custody layer; issuance `bondTo` = broker | ✅ (MVP completes) |
 | **4** | Integrity — on-chain Merkle commitments of the broker sub-ledger | brokerage `commitSubLedger` + verification | later |
-| **5** | Secondary venue refactor to broker-level (replaces holder-level `BondOrderBook`) | new venue; EIP-712 signed orders (open-loop cash) | later |
+| **5** | Secondary venue refactor to broker-level (replaces the removed holder-level `BondOrderBook`) | new venue; EIP-712 signed orders (open-loop cash) | later |
 | **6** | Coupon & redemption — two-tier via gov bank → brokers; maturity reverse-DvP | coupon engine; `redeemFor`/`buybackRedeemFor` wiring | later |
 
 **Sequencing:** Phase 1 ships alone and fixes production. 2 + 3 give a working confidential closed-loop primary auction (the MVP). 4/5/6 depend on 3 and can reorder — recommend **6 before 5** (coupon is core lifecycle; secondary trading is later).
@@ -204,7 +204,7 @@ PrimaryDealerRegistry (Phase 2), any custody/broker change (Phase 3+), coupon/re
 
 **Phase 4 — Integrity (Model B).** `commitSubLedger(merkleRoot, asOfBlock)` on the brokerage; periodic root commitment of `{client → balance}` ⇒ provable balances, detectable fraud, customer-portable proofs, without revealing balances to peers.
 
-**Phase 5 — Secondary venue refactor.** Replace the holder-level `BondOrderBook` (which presumes segregated on-chain balances, incompatible with omnibus) with a **broker-level venue**: same-broker fills = off-chain book entries; cross-broker fills = on-chain DvP with **EIP-712 signed orders + open-loop cash authorization** (the legitimately-open-loop leg that *does* use signatures/allowances).
+**Phase 5 — Secondary venue refactor.** In place of the removed holder-level `BondOrderBook` (which presumed segregated on-chain balances, incompatible with omnibus), build a **broker-level venue**: same-broker fills = off-chain book entries; cross-broker fills = on-chain DvP with **EIP-712 signed orders + open-loop cash authorization** (the legitimately-open-loop leg that *does* use signatures/allowances).
 
 **Phase 6 — Coupon & redemption.** _Note (2026-09-08): coupon, buyback, and redemption already settle in wNOK from the government reserve account (ADR 0004, `docs/plans/archive/bond-cash-leg-wnok/`), so this phase starts from a single token; the TBD leg described below is superseded. (2026-09-09) Maturity now closes the bond in one `payCoupon` (final coupon plus principal, all units burned, `BondMatured` emitted; ADR 0005), which is the "maturity reverse-DvP" below._ Coupon: CB debits the gov reserve (authority) → the gov's designated bank mints **backed** TBD (`Tbd._mintFromGovReserve` already backs it) → distributes **per broker** (fan-out scales) → brokers credit clients off-chain. Redemption at maturity: reverse DvP via `redeemFor`/`buybackRedeemFor` (burn bond ↔ return principal in wNOK by authority).
 
