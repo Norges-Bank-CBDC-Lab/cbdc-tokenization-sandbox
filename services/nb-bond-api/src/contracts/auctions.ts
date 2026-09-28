@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { ZodOpenApiPathsObject } from 'zod-openapi';
 
-import { errorRefs, mutationAcceptedJson, successJson } from '../openapi/shared-responses';
+import {
+  errorRefs,
+  mutationAcceptedJson,
+  operatorOnlyDescription,
+  successJson,
+} from '../openapi/shared-responses';
 
 import {
   addressSchema,
@@ -242,6 +247,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'closeAuction',
       summary: 'Transition auction to a new status. Only "closed" accepted today.',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam, testModeQueryParam],
       requestBody: {
         required: true,
@@ -257,6 +263,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'cancelAuction',
       summary: 'Cancel auction (soft-delete; stays on-chain with status="cancelled")',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam],
       responses: {
         200: successJson('Cancelled auction (status="cancelled")', auctionSchema, true),
@@ -270,6 +277,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'finaliseAuction',
       summary: 'Approve and submit the selected allocation',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam],
       requestBody: {
         required: true,

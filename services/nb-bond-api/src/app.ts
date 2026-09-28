@@ -425,52 +425,63 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
     }
   });
 
+  // Issuer actions — creating and disabling bonds, and creating, closing,
+  // cancelling, and finalising auctions — are operator-only. Each route mounts
+  // requireAnyRole(operatorRoles) ahead of validation, so a tester gets 403
+  // before any input is inspected. No-op in `none` mode.
+
   // Pre-stage a bond without scheduling an auction. The first auction is
   // scheduled separately via POST /v1/bonds/{isin}/auctions.
-  app.post('/v1/bonds', validateRequest(createBondBodySchema), async (req, res, next) => {
-    try {
-      const body = req.body as CreateBondBody;
-
-      let maturitySeconds: bigint;
+  app.post(
+    '/v1/bonds',
+    requireAnyRole(operatorRoles),
+    validateRequest(createBondBodySchema),
+    async (req, res, next) => {
       try {
-        maturitySeconds = parseBigInt(body.maturityDuration, 'maturityDuration');
+        const body = req.body as CreateBondBody;
+
+        let maturitySeconds: bigint;
+        try {
+          maturitySeconds = parseBigInt(body.maturityDuration, 'maturityDuration');
+        } catch (err) {
+          throw badRequest((err as Error).message);
+        }
+        if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
+
+        const bondManager = await getBondManager();
+        const sent = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'BOND_CREATE',
+            target: body.isin,
+            detail: { maturityDuration: body.maturityDuration },
+            interfaces: [bondManager.interface],
+            txHashOf: (sent) => sent.tx.hash,
+          },
+          async () => {
+            await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
+            return sendWithManagedNonce(async (nonce) =>
+              bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
+            );
+          },
+        );
+        await awaitMutationProjection(sent, { type: 'bond', id: body.isin });
+
+        const bond = await composeBond(historyDb, body.isin);
+        if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
+        successResponse(req, res, bond, { status: 201 });
       } catch (err) {
-        throw badRequest((err as Error).message);
+        next(err);
       }
-      if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
-
-      const bondManager = await getBondManager();
-      const sent = await withOperationRecording(
-        {
-          db: biddersDb,
-          opType: 'BOND_CREATE',
-          target: body.isin,
-          detail: { maturityDuration: body.maturityDuration },
-          interfaces: [bondManager.interface],
-          txHashOf: (sent) => sent.tx.hash,
-        },
-        async () => {
-          await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
-          return sendWithManagedNonce(async (nonce) =>
-            bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
-          );
-        },
-      );
-      await awaitMutationProjection(sent, { type: 'bond', id: body.isin });
-
-      const bond = await composeBond(historyDb, body.isin);
-      if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
-      successResponse(req, res, bond, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  });
+    },
+  );
 
   // Soft-delete a bond. Requires no minted supply, no in-flight auction,
   // and no FINALISED auction in history. Idempotent: 204 even if already
   // disabled (the contract's BondAlreadyDisabled is the no-op signal).
   app.delete(
     '/v1/bonds/:isin',
+    requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     async (req, res, next) => {
       try {
@@ -560,8 +571,8 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   app.post(
     '/v1/bonds/:isin/coupon-payments',
     // Operator-only — pays the coupon cash leg from the government
-    // reserve. The rest of /v1/bonds stays tester-accessible; no-op in
-    // `none` mode, 403 for non-operator roles in entra mode.
+    // reserve. Bond reads stay tester-accessible; no-op in `none` mode,
+    // 403 for non-operator roles in entra mode.
     requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     validateRequest(holdersBodySchema),
@@ -631,6 +642,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.post(
     '/v1/bonds/:isin/auctions',
+    requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     validateRequest(createAuctionBodySchema),
     async (req, res, next) => {
@@ -679,6 +691,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.patch(
     '/v1/auctions/:auctionId',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     validateRequest(closeAuctionBodySchema),
     async (req, res, next) => {
@@ -696,6 +709,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.delete(
     '/v1/auctions/:auctionId',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     async (req, res, next) => {
       try {
@@ -710,6 +724,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.put(
     '/v1/auctions/:auctionId/finalisation',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     validateRequest(finaliseBodySchema),
     async (req, res, next) => {
@@ -1194,8 +1209,8 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   // #region Banking (TBD) ──────────────────────────────────────────────
 
   // Banking (TBD) is open to both operator and tester roles so testers can
-  // exercise bank-money flows; Central Bank stays the only operator-locked
-  // surface. No-op in `none` mode; 403 for unrecognised tokens in `entra`.
+  // exercise bank-money flows; Central Bank stays operator-only. No-op in
+  // `none` mode; 403 for unrecognised tokens in `entra`.
   app.use('/v1/banking', requireAnyRole(recognizedRoles));
 
   app.get('/v1/banking/tbd', async (req, res, next) => {

@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { ZodOpenApiPathsObject } from 'zod-openapi';
 
 import { auctionSchema, createAuctionBodySchema } from './auctions';
-import { errorRefs, mutationAcceptedJson, successJson } from '../openapi/shared-responses';
+import {
+  errorRefs,
+  mutationAcceptedJson,
+  operatorOnlyDescription,
+  successJson,
+} from '../openapi/shared-responses';
 import {
   addressSchema,
   auctionIdSchema,
@@ -202,6 +207,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       summary:
         'Create a bond partition without scheduling an auction. The first auction is scheduled ' +
         'separately via POST /v1/bonds/{isin}/auctions.',
+      description: operatorOnlyDescription,
       requestBody: {
         required: true,
         content: { 'application/json': { schema: createBondBodySchema } },
@@ -230,6 +236,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       summary:
         'Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED ' +
         'auction in history. Idempotent — returns 204 even if the bond is already disabled.',
+      description: operatorOnlyDescription,
       parameters: [isinPathParam],
       responses: {
         204: { description: 'Bond disabled (or was already disabled)' },
@@ -289,6 +296,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'createAuction',
       summary: 'Create an auction under a bond. Response is the updated parent Bond.',
+      description: operatorOnlyDescription,
       parameters: [isinPathParam],
       requestBody: {
         required: true,

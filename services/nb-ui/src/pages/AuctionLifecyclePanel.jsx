@@ -8,9 +8,13 @@
  *   - Close auction       (open → closed, PATCH)
  *   - Approve allocation  (closed → finalised, PUT)
  *   - Cancel auction      (open|closed → cancelled, DELETE)
+ *
+ * The actions are issuer actions: shown only to accounts that can operate
+ * (always in `none` mode). Everyone else sees the read-only stepper.
  */
 import { useState } from 'react';
 import { Fmt } from '../utils/format.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 import { Button, Field, Input, Modal, StatusBadge } from '../components/ui.jsx';
 import { FinaliseAuctionModal } from './FinaliseAuctionModal.jsx';
 
@@ -202,6 +206,7 @@ function CancelModal({ auction, onClose, onConfirm, busy }) {
 }
 
 export function AuctionLifecyclePanel({ auction, onClose, onFinalise, onCancel, busy }) {
+  const { canOperate } = useCapabilities();
   const [modal, setModal] = useState(null);
   const s = auction.status;
 
@@ -238,7 +243,7 @@ export function AuctionLifecyclePanel({ auction, onClose, onFinalise, onCancel, 
         {summary && <p className="lc-summary">{summary}</p>}
         <TerminalBanner status={s} />
 
-        {!terminal && (
+        {!terminal && canOperate && (
           <div className="lc-actions">
             <div className="lc-action-row">
               <div className="lc-action-text">

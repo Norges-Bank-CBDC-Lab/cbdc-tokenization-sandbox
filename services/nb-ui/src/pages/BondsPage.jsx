@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { BondsApi } from '../api/bondsApi.js';
 import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 import {
   Button,
   EmptyState,
@@ -38,6 +39,7 @@ function writeShowDisabled(value) {
 }
 
 export function BondsPage({ navigate }) {
+  const { canOperate } = useCapabilities();
   // Default OFF: disabled bonds are clutter when looking at active state.
   // Setting persists across reloads, mirrors the "Hide cancelled" pattern
   // on AuctionsPage (PR #117).
@@ -103,9 +105,11 @@ export function BondsPage({ navigate }) {
           <Button onClick={reload} variant="ghost">
             Refresh
           </Button>
-          <Button onClick={() => setShowCreate(true)} variant="primary">
-            + New bond
-          </Button>
+          {canOperate && (
+            <Button onClick={() => setShowCreate(true)} variant="primary">
+              + New bond
+            </Button>
+          )}
         </div>
       </div>
 
@@ -190,7 +194,8 @@ export function BondsPage({ navigate }) {
                 : 'Adjust the filters above.'
             }
             action={
-              bonds.length === 0 && (
+              bonds.length === 0 &&
+              canOperate && (
                 <Button onClick={() => setShowCreate(true)} variant="primary">
                   + New bond
                 </Button>

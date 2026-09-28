@@ -297,6 +297,7 @@
         ],
         "operationId": "createBond",
         "summary": "Create a bond partition without scheduling an auction. The first auction is scheduled separately via POST /v1/bonds/{isin}/auctions.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "requestBody": {
           "required": true,
           "content": {
@@ -458,6 +459,7 @@
         ],
         "operationId": "disableBond",
         "summary": "Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED auction in history. Idempotent — returns 204 even if the bond is already disabled.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -683,6 +685,7 @@
         ],
         "operationId": "createAuction",
         "summary": "Create an auction under a bond. Response is the updated parent Bond.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -926,6 +929,7 @@
         ],
         "operationId": "closeAuction",
         "summary": "Transition auction to a new status. Only \"closed\" accepted today.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -1030,6 +1034,7 @@
         ],
         "operationId": "cancelAuction",
         "summary": "Cancel auction (soft-delete; stays on-chain with status=\"cancelled\")",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -1116,6 +1121,7 @@
         ],
         "operationId": "finaliseAuction",
         "summary": "Approve and submit the selected allocation",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",

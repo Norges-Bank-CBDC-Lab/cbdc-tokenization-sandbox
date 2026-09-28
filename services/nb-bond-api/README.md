@@ -48,7 +48,7 @@ Two sandbox-only resource families sit alongside the bond tree:
   `PUT/DELETE /v1/banking/tbd/{address}/allowlist/{holder}` and
   `POST /v1/banking/tbd/{address}/{mint,burn,transfer}` mutate it, signed by the
   token's owning bank. Open to both operator and tester roles (Central Bank
-  is the only operator-locked surface).
+  is operator-only).
 - **`operations`** — the operator audit trail. Every operator-initiated
   on-chain operation attempted through this API (bond lifecycle, auctions,
   bids, WNOK and TBD operations) is recorded in the preserved
@@ -150,9 +150,11 @@ start.
   sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
 - `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` –
   comma-separated Entra App Role values for role-based access in `entra` mode.
-  Operator roles gate the Central Bank endpoints (`/v1/central-bank/*`) and are
-  required; any recognised role (operator or tester) is needed for other
-  authenticated endpoints. Must match the nb-ui `AUTH_OPERATOR_ROLES` /
+  Operator roles gate the issuer actions (bond create / disable, auction
+  create / close / cancel / finalise, coupon payments), `/v1/admin/*`, and the
+  Central Bank endpoints (`/v1/central-bank/*`) and are required; any
+  recognised role (operator or tester) is needed for other authenticated
+  endpoints (see DEVELOPMENT.md §7.7 for the route matrix). Must match the nb-ui `AUTH_OPERATOR_ROLES` /
   `AUTH_TESTER_ROLES`.
 
 ## Live updates
