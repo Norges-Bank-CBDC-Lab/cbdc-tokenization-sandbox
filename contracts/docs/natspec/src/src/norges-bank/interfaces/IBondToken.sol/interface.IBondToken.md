@@ -92,6 +92,13 @@ function isMatured(bytes32 partition) external view returns (bool);
 function addController(address _controller) external;
 ```
 
+### removeController
+
+
+```solidity
+function removeController(address _controller) external;
+```
+
 ### isinToPartition
 
 

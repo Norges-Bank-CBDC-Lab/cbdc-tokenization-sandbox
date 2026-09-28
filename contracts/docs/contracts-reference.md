@@ -39,7 +39,7 @@ The current contract set falls into four main groups:
 - Cash and bank-money side:
   `Wnok`, `Tbd`
 - Secondary market and generic CSD settlement:
-  `BondOrderBook`, `OrderBook`, `DvP`, `BaseSecurityToken`
+  `OrderBook`, `DvP`, `BaseSecurityToken`
 
 ## Bond issuance lifecycle
 
@@ -133,7 +133,14 @@ Key functions:
 Important notes:
 
 - `BondManager` depends on privileged role setup across `BondAuction`,
-  `BondToken`, `BondDvP`, and `Wnok`.
+  `BondToken`, `BondDvP`, and `Wnok`. The constructor rejects a zero address
+  for any wired contract, the controller, or the reserve.
+- The deploy scripts give `BondManager` `BOND_CONTROLLER_ROLE` on `BondToken`
+  but no ERC-1410 controller status: it runs the lifecycle and moves units only
+  through `BondDvP`. Once wiring is done, the deployer key hands
+  `DEFAULT_ADMIN_ROLE` on `BondManager`, `BondAuction`, `BondToken`, and
+  `BondDvP` (and `BOND_ADMIN_ROLE` on `BondToken`) to the Norges Bank owner key
+  and renounces its own.
 - Every cash leg settles in `Wnok` against one government reserve account
   (`GOV_RESERVE`, fixed at deployment): issuance credits the reserve, while
   buyback and coupon payments debit it. The reserve must hold enough WNOK and
@@ -238,6 +245,12 @@ Key functions:
   marks the partition matured after the final coupon payment.
 - `isinToPartition(isin)`, `partitionToIsin(partition)`, `getCouponDetails(isin)`:
   useful lookup helpers for integrations and operational tooling.
+- `addController(controller)` and `removeController(controller)`
+  (`BOND_ADMIN_ROLE`):
+  manage ERC-1410 controllers, which act as operators for every holder. They
+  grant or revoke no lifecycle rights; `BOND_CONTROLLER_ROLE` is granted
+  separately. The deploy scripts make only `BondDvP` a controller, since it
+  moves units during settlement.
 
 Important notes:
 
@@ -312,35 +325,6 @@ Important notes:
 - New TBD supply comes only from `mint` (bank `MINTER_ROLE`) or from that
   receiver-side callback; the constructor takes no reserve account.
 
-### `BondOrderBook`
-
-Source:
-[`contracts/src/norges-bank/BondOrderBook.sol`](../src/norges-bank/BondOrderBook.sol)
-
-Role in system:
-Partition-specific bond order book for secondary trading against a `Tbd`
-cash-side token.
-
-Key functions:
-
-- `buy(secContrAddr, amount, price, bondReceiver, cashPayer)`:
-  submits a buy order and immediately tries to match it.
-- `sell(secContrAddr, amount, price, bondSeller, cashReceiver)`:
-  submits a sell order and immediately tries to match it.
-- `initializeSellOrders(numIssuance, price, secContrAddr, tbdContrAddr, investorSecAddr, investorTbdAddr)`:
-  bootstraps issuance-side sell liquidity.
-- `revokeBuyOrder(orderId)` and `revokeSellOrder(orderId)`:
-  remove an outstanding order.
-- `getBuyOrders()`, `getSellOrders()`, `getAllBuyOrders()`,
-  `getAllSellOrders()`:
-  inspect open book state.
-
-Important notes:
-
-- The contract is simplified and partition-specific.
-- Matching is immediate and uses maker price.
-- This is separate from the auction-based primary issuance flow.
-
 ### `DvP`
 
 Source:
@@ -381,14 +365,18 @@ Key functions:
 - `initializeSellOrders(numIssuance, price, secContrAddr, tbdContrAddr, investorSecAddr, investorTbdAddr)`:
   seeds initial sell-side book state.
 - `revokeBuyOrder(orderId)` and `revokeSellOrder(orderId)`:
-  cancel open orders.
+  cancel open orders; only the broker that submitted the order may revoke it.
 - `getBuyOrders()`, `getSellOrders()`, `getAllBuyOrders()`,
-  `getAllSellOrders()`:
+  `getAllSellOrders()`, `getOrder(orderId)`:
   inspect open book state.
 
 Important notes:
 
 - The order book is tightly coupled to the settlement model in `DvP`.
+- `SUBMIT_ORDER_ROLE` is granted only to the `Broker` contracts, which submit
+  orders on behalf of registered clients. A `Broker` lets a client revoke only
+  orders placed for that client's own securities wallet
+  (`OrderNotOwnedByClient` otherwise).
 - Unknown settlement errors are intentionally treated differently from
   buyer-side or seller-side faults so matching can continue where appropriate.
   A maker that fails with an unknown reason stays in the book; once a price

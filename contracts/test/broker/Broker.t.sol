@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {Broker} from "@broker/Broker.sol";
+import {Errors} from "@common/Errors.sol";
 import {SettlementInfo} from "@common/SettlementInfo.sol";
 import {OrderBook} from "@csd/OrderBook.sol";
 import {Test} from "forge-std/Test.sol";
@@ -21,6 +22,7 @@ contract BrokerTest is Test {
     address secToken = address(0x3);
     address tbdWallet = address(0x4);
     address secWallet = address(0x5);
+    address otherSecWallet = address(0x6);
     address unregistered = address(0x8);
     address orderBookAddr = address(0x9);
 
@@ -123,9 +125,10 @@ contract BrokerTest is Test {
     }
 
     /**
-     * @notice Registered client can revoke a buy order, forwarded to OrderBook.
+     * @notice Registered client can revoke its own buy order, forwarded to OrderBook.
      */
     function test_revokeBuyOrder_forwardedCorrectly() public {
+        _mockOrderOwnedBy(secWallet, true);
         vm.prank(client);
         vm.mockCall(orderBookAddr, abi.encodeWithSelector(OrderBook.revokeBuyOrder.selector, orderId), abi.encode(true));
         bool success = broker.revokeBuyOrder(orderId);
@@ -133,15 +136,53 @@ contract BrokerTest is Test {
     }
 
     /**
-     * @notice Registered client can revoke a sell order, forwarded to OrderBook.
+     * @notice Registered client can revoke its own sell order, forwarded to OrderBook.
      */
     function test_revokeSellOrder_forwardedCorrectly() public {
+        _mockOrderOwnedBy(secWallet, false);
         vm.prank(client);
         vm.mockCall(
             orderBookAddr, abi.encodeWithSelector(OrderBook.revokeSellOrder.selector, orderId), abi.encode(true)
         );
         bool success = broker.revokeSellOrder(orderId);
         assertTrue(success);
+    }
+
+    /**
+     * @notice A client cannot revoke a buy order placed for another client's securities wallet.
+     */
+    function test_RevokeBuyOrder_RevertIf_OrderBelongsToAnotherClient() public {
+        _mockOrderOwnedBy(otherSecWallet, true);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OrderNotOwnedByClient.selector, orderId));
+        vm.prank(client);
+        broker.revokeBuyOrder(orderId);
+    }
+
+    /**
+     * @notice A client cannot revoke a sell order placed for another client's securities wallet.
+     */
+    function test_RevokeSellOrder_RevertIf_OrderBelongsToAnotherClient() public {
+        _mockOrderOwnedBy(otherSecWallet, false);
+        vm.expectRevert(abi.encodeWithSelector(Errors.OrderNotOwnedByClient.selector, orderId));
+        vm.prank(client);
+        broker.revokeSellOrder(orderId);
+    }
+
+    function _mockOrderOwnedBy(address investorSecAddr, bool isBuySide) internal {
+        IOrderBook.Order memory order = IOrderBook.Order({
+            id: orderId,
+            broker: address(broker),
+            investorSecAddr: investorSecAddr,
+            secContrAddr: secToken,
+            amount: 1,
+            price: 1,
+            investorTbdAddr: tbdWallet,
+            tbdContrAddr: brokerBank,
+            isBuySide: isBuySide,
+            next: bytes32(0),
+            prev: bytes32(0)
+        });
+        vm.mockCall(orderBookAddr, abi.encodeWithSelector(OrderBook.getOrder.selector, orderId), abi.encode(order));
     }
 
     /// @notice Unregistered client calling buy should revert

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {Test, Vm} from "forge-std/Test.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 import {Errors} from "@common/Errors.sol";
@@ -249,15 +250,74 @@ contract BondTokenTest is Test {
 
     // ============ addController Tests ============
 
-    function test_AddController_AddsRoleAndControllerList() public {
+    function test_AddController_AddsControllerWithoutLifecycleRole() public {
         address newController = address(0x3);
 
         bondToken.addController(newController);
 
-        assertTrue(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, newController));
+        assertTrue(bondToken.isController(newController));
+        assertFalse(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, newController));
         address[] memory controllers = bondToken.controllers();
         assertEq(controllers.length, 1);
         assertEq(controllers[0], newController);
+    }
+
+    function test_RemoveController_RemovesOnlyThatController() public {
+        address first = address(0x3);
+        address second = address(0x4);
+        bondToken.addController(first);
+        bondToken.addController(second);
+        bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, first);
+
+        bondToken.removeController(first);
+
+        assertFalse(bondToken.isController(first));
+        assertTrue(bondToken.isController(second));
+        address[] memory controllers = bondToken.controllers();
+        assertEq(controllers.length, 1);
+        assertEq(controllers[0], second);
+        // Lifecycle rights are managed separately and stay as they were.
+        assertTrue(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, first));
+    }
+
+    function test_RemoveController_NoopWhenNotController() public {
+        address first = address(0x3);
+        bondToken.addController(first);
+
+        bondToken.removeController(address(0x4));
+
+        address[] memory controllers = bondToken.controllers();
+        assertEq(controllers.length, 1);
+        assertEq(controllers[0], first);
+    }
+
+    function test_RemoveController_RevertIf_NotBondAdmin() public {
+        address first = address(0x3);
+        bondToken.addController(first);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, holder1, Roles.BOND_ADMIN_ROLE
+            )
+        );
+        vm.prank(holder1);
+        bondToken.removeController(first);
+    }
+
+    function test_RemovedController_CannotMoveHolderUnits() public {
+        address operator = address(0x3);
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        vm.stopPrank();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+
+        bondToken.addController(operator);
+        bondToken.removeController(operator);
+
+        vm.expectRevert(Errors.UnauthorizedOperator.selector);
+        vm.prank(operator);
+        bondToken.operatorTransferByPartition(partition, holder1, holder2, 10, "", "");
     }
 
     function test_AddController_DeduplicatesExisting() public {

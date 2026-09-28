@@ -21,7 +21,7 @@ The API is defined by the OpenAPI 3.1 document in `services/nb-bond-api/openapi.
 ### 1.2 What it does not do
 
 - It does not provide endpoints for dealers/investors to place bids. Bids are submitted on-chain to `BondAuction` using the CLIs under `scripts/` (see §5).
-- It does not provide endpoints for secondary-market order placement. Scenario 3 trading is implemented on-chain via bond order book contracts, but is not driven through this OpenAPI surface.
+- It does not provide endpoints for secondary-market order placement. Scenario 3 (secondary bond trading) has no on-chain venue in this repository.
 - It implements two configurable auth modes — `none` (sandbox default, header accepted but ignored) and `entra` (JWT validated against a Microsoft Entra ID tenant). See §7.7. The OpenAPI document always declares `bearerAuth`; the `none` mode is a runtime override for the sandbox.
 
 ## 2. Quickstart (run the service)
@@ -301,7 +301,7 @@ Maturity: the final coupon payment (`coupon.payments.remaining == 1` before the 
 
 ### 6.5 Scenario 3, secondary trading (note)
 
-Scenario 3 trading is implemented on-chain (bond order book and settlement logic), but is not exposed through this OpenAPI service. If you need an HTTP interface for secondary trading, it should be designed as a separate work package (for example, an order placement API that wraps the on-chain `BondOrderBook` and enforces the correct authorisations and cash-token semantics).
+Scenario 3 (secondary bond trading) has no on-chain venue in this repository and is not exposed through this OpenAPI service. A bond secondary market, and any HTTP interface for it, should be designed as a separate work package that enforces the correct authorisations and cash-token semantics.
 
 ## 7. Operational notes and troubleshooting
 

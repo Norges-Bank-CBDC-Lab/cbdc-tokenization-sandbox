@@ -34,8 +34,6 @@
     - [BondAuction](src/norges-bank/BondAuction.sol/contract.BondAuction.md)
     - [BondDvP](src/norges-bank/BondDvP.sol/contract.BondDvP.md)
     - [BondManager](src/norges-bank/BondManager.sol/contract.BondManager.md)
-    - [BondOrderBook](src/norges-bank/BondOrderBook.sol/contract.BondOrderBook.md)
-    - [BondOrderBookFactory](src/norges-bank/BondOrderBookFactory.sol/contract.BondOrderBookFactory.md)
     - [BondToken](src/norges-bank/BondToken.sol/contract.BondToken.md)
     - [Wnok](src/norges-bank/Wnok.sol/contract.Wnok.md)
   - [❱ private-bank](src/private-bank/README.md)

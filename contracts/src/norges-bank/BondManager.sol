@@ -99,6 +99,13 @@ contract BondManager is IBondManager, AccessControl {
         address _govReserve,
         uint256 _durationScalar
     ) {
+        if (_wNok == address(0)) revert Errors.WnokAddressZero();
+        if (_controller == address(0)) revert Errors.ControllerAddressZero();
+        if (_bondAuction == address(0)) revert Errors.BondAuctionAddressZero();
+        if (_bondToken == address(0)) revert Errors.BondTokenAddressZero();
+        if (_bondDvp == address(0)) revert Errors.DvpAddressZero();
+        if (_govReserve == address(0)) revert Errors.GovReserveAddressZero();
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(Roles.BOND_MANAGER_ROLE, _controller);
 
@@ -108,7 +115,6 @@ contract BondManager is IBondManager, AccessControl {
         BOND_AUCTION = IBondAuction(_bondAuction);
         BOND_TOKEN = IBondToken(_bondToken);
         BOND_DVP = IBondDvP(_bondDvp);
-        if (_govReserve == address(0)) revert Errors.GovReserveAddressZero();
         GOV_RESERVE = _govReserve;
 
         if (_durationScalar == 0) revert Errors.DurationScalarZero();

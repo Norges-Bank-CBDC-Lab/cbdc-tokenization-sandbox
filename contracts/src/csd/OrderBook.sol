@@ -494,6 +494,13 @@ contract OrderBook is IOrderBook, AccessControl, ReentrancyGuard {
         return _fetchOrders(true, address(0), address(0));
     }
 
+    /**
+     * @inheritdoc IOrderBook
+     */
+    function getOrder(bytes32 orderId) external view override returns (Order memory) {
+        return orders[orderId];
+    }
+
     function getAllSellOrders() external view override returns (Order[] memory) {
         return _fetchOrders(false, address(0), address(0));
     }

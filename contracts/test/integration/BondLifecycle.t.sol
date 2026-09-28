@@ -83,7 +83,6 @@ contract BondLifecycleIntegrationTest is Test, AuctionHelper {
         bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, address(bondManager));
         bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, address(bondDvp));
         bondToken.grantRole(Roles.DEFAULT_ADMIN_ROLE, deployer);
-        bondToken.addController(address(bondManager));
         bondToken.addController(address(bondDvp));
         bondManager.grantRole(Roles.BOND_MANAGER_ROLE, bondAdmin);
 
