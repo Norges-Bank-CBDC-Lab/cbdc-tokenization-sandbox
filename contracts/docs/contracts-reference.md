@@ -39,7 +39,7 @@ The current contract set falls into four main groups:
 - Cash and bank-money side:
   `Wnok`, `Tbd`
 - Secondary market and generic CSD settlement:
-  `BondOrderBook`, `OrderBook`, `DvP`, `BaseSecurityToken`
+  `OrderBook`, `DvP`, `BaseSecurityToken`
 
 ## Bond issuance lifecycle
 
@@ -311,35 +311,6 @@ Important notes:
 - The receiver-side mint path is driven by `onTransferReceived`.
 - New TBD supply comes only from `mint` (bank `MINTER_ROLE`) or from that
   receiver-side callback; the constructor takes no reserve account.
-
-### `BondOrderBook`
-
-Source:
-[`contracts/src/norges-bank/BondOrderBook.sol`](../src/norges-bank/BondOrderBook.sol)
-
-Role in system:
-Partition-specific bond order book for secondary trading against a `Tbd`
-cash-side token.
-
-Key functions:
-
-- `buy(secContrAddr, amount, price, bondReceiver, cashPayer)`:
-  submits a buy order and immediately tries to match it.
-- `sell(secContrAddr, amount, price, bondSeller, cashReceiver)`:
-  submits a sell order and immediately tries to match it.
-- `initializeSellOrders(numIssuance, price, secContrAddr, tbdContrAddr, investorSecAddr, investorTbdAddr)`:
-  bootstraps issuance-side sell liquidity.
-- `revokeBuyOrder(orderId)` and `revokeSellOrder(orderId)`:
-  remove an outstanding order.
-- `getBuyOrders()`, `getSellOrders()`, `getAllBuyOrders()`,
-  `getAllSellOrders()`:
-  inspect open book state.
-
-Important notes:
-
-- The contract is simplified and partition-specific.
-- Matching is immediate and uses maker price.
-- This is separate from the auction-based primary issuance flow.
 
 ### `DvP`
 

@@ -141,18 +141,6 @@ error NotMultipleOfGranularity();
 error UnauthorizedOperator();
 ```
 
-### TbdAddressZero
-
-```solidity
-error TbdAddressZero();
-```
-
-### PartitionZero
-
-```solidity
-error PartitionZero();
-```
-
 ### ContractNotFound
 
 ```solidity
