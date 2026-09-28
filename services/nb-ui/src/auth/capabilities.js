@@ -1,6 +1,7 @@
 /**
  * Capability policy — maps the signed-in account's App Roles to what the UI
- * may show. Single source of truth for "who can see Central Bank".
+ * may show. Single source of truth for "who can see Central Bank" and "who
+ * can operate" (operator-only controls such as the test-mode toggle).
  *
  * In `none` mode (the local sandbox default) the UI is fully open: there are
  * no roles and no gating, matching the unauthenticated backend. Gating only
@@ -22,14 +23,29 @@ function parseRoleList(value) {
 const operatorRoles = parseRoleList(AppConfig.AUTH_OPERATOR_ROLES);
 const testerRoles = parseRoleList(AppConfig.AUTH_TESTER_ROLES);
 
-const FULL_ACCESS = { canUseApp: true, canAccessCentralBank: true, canAccessBanking: true };
-const NO_ACCESS = { canUseApp: false, canAccessCentralBank: false, canAccessBanking: false };
+const FULL_ACCESS = {
+  canUseApp: true,
+  canAccessCentralBank: true,
+  canAccessBanking: true,
+  canOperate: true,
+};
+const NO_ACCESS = {
+  canUseApp: false,
+  canAccessCentralBank: false,
+  canAccessBanking: false,
+  canOperate: false,
+};
 
 /**
  * Derive capability flags for an account.
  *
  * @param {{ roles?: string[] } | null} account
- * @returns {{ canUseApp: boolean, canAccessCentralBank: boolean, canAccessBanking: boolean }}
+ * @returns {{
+ *   canUseApp: boolean,
+ *   canAccessCentralBank: boolean,
+ *   canAccessBanking: boolean,
+ *   canOperate: boolean,
+ * }}
  */
 export function capabilitiesForAccount(account) {
   // Non-interactive auth (local sandbox) is fully open.
@@ -44,5 +60,8 @@ export function capabilitiesForAccount(account) {
     // open to testers so they can exercise bank-money flows end-to-end.
     canAccessCentralBank: isOperator,
     canAccessBanking: isOperator || isTester,
+    // Operator-only controls (test mode today). Mirrors the API, which
+    // honours operator-only behaviour for operator roles only.
+    canOperate: isOperator,
   };
 }

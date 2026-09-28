@@ -21,7 +21,7 @@ import helmet from 'helmet';
 import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 import { resetProjectionAndRestart, restartIngestionLoop } from './admin';
-import { authMiddleware, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
+import { authMiddleware, authMode, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
 import {
   composeAllAuctions,
   composeAllBonds,
@@ -94,12 +94,15 @@ import {
   wnokMintBurnBodySchema,
   wnokTransferBodySchema,
 } from './schemas';
+import { parseTestMode } from './test-mode';
 import { validateRequest } from './validation';
 import {
   BidderConflictError,
   BidderValidationError,
+  type BidderRecord,
   createBidder,
   deleteBidder,
+  exposedBidderPrivateKey,
   getBidderByAddress,
   listBidders,
   reconcileFixtureBidderOverrides,
@@ -395,32 +398,12 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   // #region Bonds ──────────────────────────────────────────────────────
 
-  /**
-   * Sandbox-only umbrella "test mode" flag. The operator UI flips this
-   * from the top-bar toggle and propagates it on every bond / auction
-   * read as well as on close / finalise. Today it gates:
-   *
-   *  - composeBond / composeAuction unseal sealed bids on still-open
-   *    auctions (`revealOpenBids` internally).
-   *  - PATCH /v1/auctions/{id} (close) skips the end-time pre-check so
-   *    the operator can attempt close before the bidding window expires.
-   *    The on-chain contract still enforces `block.timestamp >
-   *    metadata.end` and will revert with `InBidPhase()` if it's early.
-   *
-   * Future test affordances should plumb through this same parameter so
-   * a single toggle controls them all.
-   */
-  function parseTestMode(req: express.Request): boolean {
-    const raw = req.query.testMode;
-    return raw === 'true' || raw === '1';
-  }
-
   app.get('/v1/bonds', async (req, res, next) => {
     try {
       const includeDisabled =
         req.query.includeDisabled === 'true' || req.query.includeDisabled === '1';
       const bonds = await composeAllBonds(historyDb, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
         includeDisabled,
       });
       okResponse(req, res, bonds);
@@ -433,7 +416,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
     try {
       const { isin } = req.params as { isin: string };
       const bond = await composeBond(historyDb, isin, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
       });
       if (!bond) throw notFound(`bond ${isin} not found`);
       okResponse(req, res, bond);
@@ -669,7 +652,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   app.get('/v1/auctions', async (req, res, next) => {
     try {
       const auctions = await composeAllAuctions(historyDb, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
       });
       okResponse(req, res, auctions);
     } catch (err) {
@@ -684,7 +667,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       try {
         const { auctionId } = req.params as { auctionId: string };
         const auction = await composeAuction(historyDb, auctionId, {
-          revealOpenBids: parseTestMode(req),
+          revealOpenBids: parseTestMode(req, res),
         });
         if (!auction) throw notFound(`auction ${auctionId} not found`);
         okResponse(req, res, auction);
@@ -703,7 +686,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         const { auctionId } = req.params as { auctionId: string };
         const body = req.body as CloseAuctionBody;
         if (body.status !== 'closed') throw badRequest('only status="closed" is supported today');
-        const auction = await auctionService.close(auctionId, parseTestMode(req));
+        const auction = await auctionService.close(auctionId, parseTestMode(req, res));
         okResponse(req, res, auction);
       } catch (err) {
         next(err);
@@ -745,13 +728,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   // #region Bidders ────────────────────────────────────────────────────
 
-  async function composeBidderDto(record: {
-    address: string;
-    name: string;
-    publicKey: string;
-    privateKey: string;
-    createdAt: number;
-  }) {
+  // The private key leaves the server only in the unauthenticated local
+  // `none` mode and never for an env-override key (see
+  // exposedBidderPrivateKey); every other DTO carries `privateKey: null`.
+  async function composeBidderDto(record: BidderRecord) {
     const [ethBalance, wnok] = await Promise.all([
       provider.getBalance(record.address).catch(() => 0n),
       getWnok().catch(() => null),
@@ -763,7 +743,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       address: record.address,
       name: record.name,
       publicKey: record.publicKey,
-      privateKey: record.privateKey,
+      privateKey: exposedBidderPrivateKey(record, authMode),
       ethBalance: ethBalance.toString(),
       wnokBalance: wnokBalanceRaw.toString(),
       createdAt: record.createdAt,

@@ -226,7 +226,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           },
           {
             "in": "query",
@@ -400,7 +400,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -788,7 +788,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -868,7 +868,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -943,7 +943,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "requestBody": {
@@ -3942,8 +3942,15 @@
             "$ref": "#/components/schemas/HexString"
           },
           "privateKey": {
-            "description": "Private key, hex (0x + 64 chars). Returned in plaintext because this surface is sandbox-only.",
-            "$ref": "#/components/schemas/HexString"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HexString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Private key, hex (0x + 64 chars). Returned only in the unauthenticated local `none` auth mode, and only for keys the API generated or an operator imported. Null in `entra` mode and for fixture bidders whose key comes from a PK_* environment override: the server holds the key and signs with it, but never returns it."
           },
           "ethBalance": {
             "description": "Current ETH balance in wei",

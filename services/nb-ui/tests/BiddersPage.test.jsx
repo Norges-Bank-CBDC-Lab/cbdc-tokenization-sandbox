@@ -128,6 +128,27 @@ describe('BiddersPage', () => {
     expect(screen.getByLabelText(/Import existing private key/i)).toBeInTheDocument();
   });
 
+  it('shows a server-held key when the API returns no private key', async () => {
+    const { BiddersApi } = await import('../src/api/biddersApi.js');
+    BiddersApi.listBidders.mockResolvedValueOnce([{ ...FIXTURE_BIDDERS[0], privateKey: null }]);
+    const { BiddersPage } = await import('../src/pages/BiddersPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const user = userEvent.setup();
+
+    render(
+      <ToastProvider>
+        <BiddersPage />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => screen.getByText('Nordea'));
+    const nordeaRow = screen.getByText('Nordea').closest('tr');
+    await user.click(within(nordeaRow).getByRole('button', { name: /Reveal key/i }));
+
+    expect(await screen.findByText('Held by the server')).toBeInTheDocument();
+    expect(screen.queryByText('0xdead')).not.toBeInTheDocument();
+  });
+
   it('opens the PlaceBid modal when "Place bid" is clicked on a row', async () => {
     const { BiddersPage } = await import('../src/pages/BiddersPage.jsx');
     const { ToastProvider } = await import('../src/components/ui.jsx');
@@ -146,4 +167,33 @@ describe('BiddersPage', () => {
 
     expect(await screen.findByRole('heading', { name: /Place bid as Nordea/ })).toBeInTheDocument();
   });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'mentions Test mode on a disabled "Place bid" only when the account can operate (canOperate=%s)',
+    async (canOperate, mentionsTestMode) => {
+      const { BondsApi } = await import('../src/api/bondsApi.js');
+      BondsApi.listBonds.mockResolvedValueOnce([]);
+      const { BiddersPage } = await import('../src/pages/BiddersPage.jsx');
+      const { ToastProvider } = await import('../src/components/ui.jsx');
+      const { CapabilitiesContext } = await import('../src/auth/capabilitiesContext.js');
+
+      render(
+        <CapabilitiesContext.Provider value={{ canOperate }}>
+          <ToastProvider>
+            <BiddersPage />
+          </ToastProvider>
+        </CapabilitiesContext.Provider>,
+      );
+
+      await waitFor(() => screen.getByText('Nordea'));
+      const nordeaRow = screen.getByText('Nordea').closest('tr');
+      const placeBid = within(nordeaRow).getByRole('button', { name: /Place bid/i });
+      await waitFor(() => expect(placeBid).toBeDisabled());
+      expect(placeBid.getAttribute('title')).toMatch(/No auctions are currently accepting bids/);
+      expect(/Test mode/.test(placeBid.getAttribute('title'))).toBe(mentionsTestMode);
+    },
+  );
 });

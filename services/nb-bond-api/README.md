@@ -29,7 +29,9 @@ Two sandbox-only resource families sit alongside the bond tree:
   sealed bid on the bidder's behalf — the API constructs the plaintext,
   signs the EIP-712 `BidIntent`, dual-wraps with the auctioneer sealing
   key, and submits on-chain from a wallet bound to the bidder's stored
-  key. Private keys are stored in plaintext in the local SQLite DB;
+  key. Private keys are stored in plaintext in the local SQLite DB and are
+  returned by the API only in local `none` auth mode, never for keys supplied
+  by the `PK_*` overrides (`privateKey` is `null` otherwise);
   see [`docs/plans/archive/bidders-and-central-bank-plan.md`](../../docs/plans/archive/bidders-and-central-bank-plan.md).
 - **`central-bank`** — Norges Bank operator surface against the WNOK
   contract. `GET /v1/central-bank` returns the CB summary (address,

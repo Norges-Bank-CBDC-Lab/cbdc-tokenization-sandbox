@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { auth, authMode } from './auth/index.js';
 import { capabilitiesForAccount } from './auth/capabilities.js';
+import { CapabilitiesContext } from './auth/capabilitiesContext.js';
 import { useRoute } from './hooks/useRoute.js';
 import { ToastProvider, EmptyState } from './components/ui.jsx';
 import { Layout } from './components/Layout.jsx';
@@ -137,17 +138,19 @@ export function App() {
   else page = <BondsPage navigate={navigate} />;
 
   return (
-    <LiveUpdatesProvider>
-      <ToastProvider>
-        <Layout
-          route={route}
-          navigate={navigate}
-          canAccessCentralBank={caps.canAccessCentralBank}
-          canAccessBanking={caps.canAccessBanking}
-        >
-          {page}
-        </Layout>
-      </ToastProvider>
-    </LiveUpdatesProvider>
+    <CapabilitiesContext.Provider value={caps}>
+      <LiveUpdatesProvider>
+        <ToastProvider>
+          <Layout
+            route={route}
+            navigate={navigate}
+            canAccessCentralBank={caps.canAccessCentralBank}
+            canAccessBanking={caps.canAccessBanking}
+          >
+            {page}
+          </Layout>
+        </ToastProvider>
+      </LiveUpdatesProvider>
+    </CapabilitiesContext.Provider>
   );
 }

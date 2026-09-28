@@ -264,6 +264,9 @@ roster (`#/bidders`), and the Norges Bank operator surface against WNOK
 (`#/central-bank`). The two latter pages are **sandbox-only** —
 private keys for impersonable bidders and the CB operator are stored
 in plaintext server-side, and a visible banner says so on every render.
+The API returns a bidder's key only in local `none` auth mode, and never
+for keys supplied by the environment; otherwise the Bidders page shows the
+key as held by the server.
 The UI is a thin client over the NB Bond API:
 
 - the only network seam is `services/nb-ui/src/api/`; the rest of the UI does
@@ -283,8 +286,10 @@ The UI is a thin client over the NB Bond API:
   they are read from `window.__APP_CONFIG__` at startup
 - in `entra` mode the UI also enforces role-based access from Entra App Roles:
   operators get full access including the Central Bank page, testers get the UI
-  without it, and an unrecognised account sees an access-denied screen. The NB
-  Bond API enforces the same roles server-side; `none` mode is ungated
+  without it, and an unrecognised account sees an access-denied screen. The
+  sandbox test-mode toggle is operator-only, and the API ignores the
+  `testMode` flag from anyone else. The NB Bond API enforces the same roles
+  server-side; `none` mode is ungated
 - the operator pages include **Banking** (`#/tbd`) — per-bank tokenized bank
   deposits managed against the `/v1/banking/*` surface — alongside the Central
   Bank (WNOK) page; the top nav is grouped into dropdown categories

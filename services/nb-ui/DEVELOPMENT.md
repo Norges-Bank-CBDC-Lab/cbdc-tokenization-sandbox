@@ -125,6 +125,14 @@ claims first, access-token decode as a fallback) and mapped to capabilities by
   screen (`src/components/AccessDeniedPage.jsx`) instead of the app.
 - The Central Bank nav item is hidden for non-operators and the
   `#/central-bank` route is guarded, so the page never mounts for them.
+- Operator-only controls read `canOperate` from `CapabilitiesContext`
+  (`src/auth/capabilitiesContext.js`, provided by `App.jsx`). The top-bar
+  test-mode toggle is hidden for testers, and `getTestMode()`
+  (`src/utils/debugSettings.js`) ignores a stored flag for any account that
+  cannot operate, so a tester never sends `?testMode=true`.
+- The Bidders page shows "Held by the server" when the API returns
+  `privateKey: null` (always in `entra` mode, and for keys supplied by the
+  API's `PK_*` overrides).
 
 This is UX only — the NB Bond API independently enforces the same roles and is
 the real boundary. `none` mode is never gated (the local sandbox is fully open).

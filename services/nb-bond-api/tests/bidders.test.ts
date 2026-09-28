@@ -11,6 +11,7 @@ import {
   deriveBidderAddress,
   deriveFixturePrivateKey,
   derivePublicKey,
+  exposedBidderPrivateKey,
   generateBidderPrivateKey,
   getBidderByAddress,
   getBidderByName,
@@ -133,6 +134,23 @@ describe('bidders', () => {
       expect(mod.reconcileFixtureBidderOverrides(db)).toEqual({ migrated: 0 });
     });
 
+    it('exposes a generated key in none mode but never an override key', () => {
+      process.env.PK_NORDEA = OVERRIDE;
+      jest.resetModules();
+      const mod = loadModule();
+
+      mod.seedFixtureBiddersIfEmpty(db);
+      const generated = mod.createBidder(db, { name: 'Generated' });
+      const nordea = mod.getBidderByName(db, 'Nordea')!;
+      const dnb = mod.getBidderByName(db, 'DNB')!;
+
+      expect(mod.isOverrideKey(nordea)).toBe(true);
+      expect(mod.isOverrideKey(dnb)).toBe(false);
+      expect(mod.exposedBidderPrivateKey(generated, 'none')).toBe(generated.privateKey);
+      expect(mod.exposedBidderPrivateKey(dnb, 'none')).toBe(dnb.privateKey);
+      expect(mod.exposedBidderPrivateKey(nordea, 'none')).toBeNull();
+    });
+
     it('reconcile is a no-op without an override and respects deletion', () => {
       seedFixtureBiddersIfEmpty(db);
       expect(reconcileFixtureBidderOverrides(db)).toEqual({ migrated: 0 });
@@ -180,6 +198,14 @@ describe('bidders', () => {
       expect(() => createBidder(db, { name: 'BadPk', privateKey: '0x1234' })).toThrow(
         BidderValidationError,
       );
+    });
+  });
+
+  describe('exposedBidderPrivateKey', () => {
+    it('never exposes a key in entra mode', () => {
+      const bidder = createBidder(db, { name: 'EntraHidden' });
+      expect(exposedBidderPrivateKey(bidder, 'none')).toBe(bidder.privateKey);
+      expect(exposedBidderPrivateKey(bidder, 'entra')).toBeNull();
     });
   });
 
