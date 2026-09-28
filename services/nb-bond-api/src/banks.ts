@@ -47,8 +47,6 @@ import {
 } from './ingestion-db';
 import { logger } from './logger';
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-
 export class BankValidationError extends Error {
   constructor(
     message: string,
@@ -197,14 +195,14 @@ export const defaultCreateBankChainOps: CreateBankChainOps = {
   },
   async deployTbd(args) {
     // The bank's own wallet deploys, mirroring 04_Tbd.s.sol's
-    // (admin = bank, bank = bank, govReserve = 0) shape used for DNB.
+    // (admin = bank, bank = bank) shape.
     // Fresh keys start at nonce 0 and the zero-base-fee genesis means no
     // funding is needed, so no cross-request nonce coordination applies.
     const bankWallet = new Wallet(args.privateKey, provider);
     const factory = new ContractFactory(tbdAbi as InterfaceAbi, tbdBytecode, bankWallet);
     const contract = await withDecodedRevert('Tbd deploy', () =>
       factory
-        .deploy(args.bank, args.bank, args.wnok, args.dvp, args.name, args.symbol, ZERO_ADDRESS)
+        .deploy(args.bank, args.bank, args.wnok, args.dvp, args.name, args.symbol)
         .then(async (c) => {
           await c.waitForDeployment();
           return c;

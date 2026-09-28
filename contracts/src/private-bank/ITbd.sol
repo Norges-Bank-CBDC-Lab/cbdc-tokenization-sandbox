@@ -13,6 +13,7 @@ interface ITbd {
     /**
      * @dev Moves a `value` amount of tokens from the from account to `to`
      * via the customer credit transfer (cct) settlement process, using the CBDC.
+     * The caller must be the payer (`from`) or the DvP contract the TBD was constructed with.
      * @param from The TBD address from which tokens are being transferred.
      * @param to The TBD address to which tokens are being transferred.
      * @param toTbdContract The receiving TBD contract.
@@ -27,14 +28,4 @@ interface ITbd {
      * cct calls from the same sending TBC contract.
      */
     function cctSetToAddr(address to) external;
-
-    /**
-     * @dev Returns government reserve address if nominated.
-     */
-    function govReserve() external view returns (address);
-
-    /**
-     * @dev Returns if TBD has been government nominated for reserve access.
-     */
-    function isGovernmentNominated() external view returns (bool);
 }

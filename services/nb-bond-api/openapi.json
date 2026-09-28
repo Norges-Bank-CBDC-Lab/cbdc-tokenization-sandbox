@@ -4212,9 +4212,6 @@
           "reserve": {
             "$ref": "#/components/schemas/TbdReserve"
           },
-          "government": {
-            "$ref": "#/components/schemas/TbdGovernment"
-          },
           "holders": {
             "type": "array",
             "items": {
@@ -4238,7 +4235,6 @@
           "totalSupply",
           "bank",
           "reserve",
-          "government",
           "holders",
           "md5"
         ],
@@ -4279,7 +4275,7 @@
               },
               "bankAllowlisted": {
                 "type": "boolean",
-                "description": "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination."
+                "description": "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the WNOK reserve and settle cross-bank in WNOK."
               }
             },
             "required": [
@@ -4294,32 +4290,6 @@
           }
         ],
         "description": "WNOK reserve backing (informational). Null when WNOK is unreachable."
-      },
-      "TbdGovernment": {
-        "type": "object",
-        "properties": {
-          "nominated": {
-            "type": "boolean",
-            "description": "True when a government reserve account is set (enables the gov-reserve mint path)"
-          },
-          "reserveAddress": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The government reserve account, or null when not nominated"
-          }
-        },
-        "required": [
-          "nominated",
-          "reserveAddress"
-        ],
-        "additionalProperties": false,
-        "description": "Government-nomination state for this token"
       },
       "TbdHolder": {
         "type": "object",

@@ -7,7 +7,7 @@ deposit at the receiving bank through the ERC-1363 callback path.
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Caller as DvP / authorised CCT caller
+    participant Caller as Payer or constructor-bound DvP
     actor Payer
     participant BuyerTBD as Sender-bank TBD
     participant WNOK as WNOK
@@ -35,6 +35,10 @@ sequenceDiagram
         SellerTBD-->>Payee: Receiver-bank deposit minted
     end
 ```
+
+The caller must hold `CCT_FROM_CALLER_ROLE` on the sender-bank TBD and be either
+the payer itself or the DvP contract that TBD was constructed with; any other
+caller is rejected with `CctFromNotCaller`.
 
 All calls execute in one EVM transaction. Any allowlist, balance, role,
 allowance, or callback failure reverts the burn, reserve movement, and mint.

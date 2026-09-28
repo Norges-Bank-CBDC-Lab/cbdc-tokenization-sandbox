@@ -22,7 +22,6 @@ contract TbdScript is RegistryScript {
         uint256 key;
         string contractName;
         string contractSymbol;
-        address govReserveAddr;
     }
 
     /**
@@ -34,8 +33,7 @@ contract TbdScript is RegistryScript {
             addr: vm.addr(vm.envUint("PK_NORDEA")),
             key: vm.envUint("PK_NORDEA"),
             contractName: vm.envString("TBD_NORDEA_CONTRACT_NAME"),
-            contractSymbol: vm.envString("TBD_NORDEA_CONTRACT_SYMBOL"),
-            govReserveAddr: vm.addr(vm.envUint("PK_GOV_RESERVE"))
+            contractSymbol: vm.envString("TBD_NORDEA_CONTRACT_SYMBOL")
         });
 
         /// @dev Load DNB bank data from environment variables
@@ -43,8 +41,7 @@ contract TbdScript is RegistryScript {
             addr: vm.addr(vm.envUint("PK_DNB")),
             key: vm.envUint("PK_DNB"),
             contractName: vm.envString("TBD_DNB_CONTRACT_NAME"),
-            contractSymbol: vm.envString("TBD_DNB_CONTRACT_SYMBOL"),
-            govReserveAddr: address(0)
+            contractSymbol: vm.envString("TBD_DNB_CONTRACT_SYMBOL")
         });
 
         /// @dev Retrieve registry address from environment variables
@@ -67,21 +64,15 @@ contract TbdScript is RegistryScript {
 
         /// @notice Deploy TBD contracts for Nordea and DNB banks
         vm.startBroadcast(deployerKey);
-        tbdNordea = new Tbd(
-            nordea.addr, nordea.addr, wnok, dvp, nordea.contractName, nordea.contractSymbol, nordea.govReserveAddr
-        );
+        tbdNordea = new Tbd(nordea.addr, nordea.addr, wnok, dvp, nordea.contractName, nordea.contractSymbol);
 
-        tbdDnb = new Tbd(dnb.addr, dnb.addr, wnok, dvp, dnb.contractName, dnb.contractSymbol, dnb.govReserveAddr);
+        tbdDnb = new Tbd(dnb.addr, dnb.addr, wnok, dvp, dnb.contractName, dnb.contractSymbol);
         vm.stopBroadcast();
 
         /// @notice Register deployed contract addresses in GlobalRegistry
         vm.startBroadcast(ownerKey);
         registry.setContract(tbdNordea.name(), address(tbdNordea));
         registry.setContract(tbdDnb.name(), address(tbdDnb));
-        vm.stopBroadcast();
-
-        vm.startBroadcast(nordea.key);
-        tbdNordea.add(nordea.govReserveAddr);
         vm.stopBroadcast();
     }
 }

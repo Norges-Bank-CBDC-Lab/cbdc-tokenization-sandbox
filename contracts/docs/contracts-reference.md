@@ -244,6 +244,10 @@ Important notes:
 - The preferred integration path is usually through `BondManager`, not by
   calling `BondToken` mutation functions directly.
 - Coupon yield is set from the clearing rate of the initial RATE auction.
+- `transferByPartition` and `operatorTransferByPartition` always keep units in
+  the source partition: `data` is opaque and never selects a destination
+  partition, so `ChangedPartition` is never emitted and a partition's supply
+  changes only through mint and redemption.
 - The implementation is ERC1410-inspired and partition-based, but external
   integrators should still review the repo-specific semantics before assuming
   drop-in compatibility with other security-token systems.
@@ -289,13 +293,13 @@ Key functions:
 
 - `cctFrom(from, to, toTbdContract, value)`:
   moves value within the same bank or across banks via the `Wnok` bridge.
+  The caller needs `CCT_FROM_CALLER_ROLE` and must be the payer (`from`) or the
+  DvP contract passed to the constructor; otherwise it reverts with
+  `CctFromNotCaller`.
 - `cctSetToAddr(to)`:
   sets the payout address used by the receiving `Tbd` during cross-bank flows.
 - `getBankAddress()`:
   returns the bank address associated with this `Tbd`.
-- `govReserve()` and `isGovernmentNominated()`:
-  expose whether the contract is configured for government-reserve-backed
-  flows.
 - `mint(account, value)` and `burn(account, value)`:
   privileged supply management.
 
@@ -305,8 +309,8 @@ Important notes:
   prepares the receiver via `cctSetToAddr`, then moves `Wnok` into the target
   `Tbd` using `transferFromAndCall`.
 - The receiver-side mint path is driven by `onTransferReceived`.
-- Government nomination changes behavior: transfers from the reserve can mint
-  from reserve-backed `Wnok` on demand.
+- New TBD supply comes only from `mint` (bank `MINTER_ROLE`) or from that
+  receiver-side callback; the constructor takes no reserve account.
 
 ### `BondOrderBook`
 

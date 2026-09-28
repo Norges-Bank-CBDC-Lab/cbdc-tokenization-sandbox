@@ -46,7 +46,7 @@ contract BondOrderBookTest is Test {
 
     function setUp() public {
         wnok = new Wnok(admin, "Wholesale NOK", "WNOK");
-        tbd = new Tbd(admin, address(0xAA), address(wnok), address(0xBB), "TBD", "TBD", address(0xCC));
+        tbd = new Tbd(admin, address(0xAA), address(wnok), address(0xBB), "TBD", "TBD");
         bondToken = new BondToken("Bond Token", "BOND");
 
         // Roles and partition

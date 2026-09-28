@@ -79,8 +79,8 @@ contract DvPSettlement is Test {
         // Create wNOK, DvP, TBDs
         wnok = new Wnok(wnokadmin, wnokName, wnokSymbol);
         dvp = new DvP(dvpadmin);
-        tbd1 = new Tbd(tbd1admin, bank1, address(wnok), address(dvp), tbd1Name, tbd1Symbol, address(0));
-        tbd2 = new Tbd(tbd2admin, bank2, address(wnok), address(dvp), tbd2Name, tbd2Symbol, address(0));
+        tbd1 = new Tbd(tbd1admin, bank1, address(wnok), address(dvp), tbd1Name, tbd1Symbol);
+        tbd2 = new Tbd(tbd2admin, bank2, address(wnok), address(dvp), tbd2Name, tbd2Symbol);
 
         vm.startPrank(tbd1admin);
         tbd1.add(investor1tbd);
@@ -107,9 +107,7 @@ contract DvPSettlement is Test {
         vm.prank(bank2);
         wnok.approve(address(tbd2), type(uint256).max);
 
-        // Create DvP + Security (both owned by dvpadmin)
-        dvp = new DvP(dvpadmin);
-
+        // Create Security (owned by dvpadmin); the TBDs above were constructed with this DvP
         params = StockParams({
             name: "EquiNor",
             symbol: "EqNr",
@@ -332,6 +330,40 @@ contract DvPSettlement is Test {
         tbd1.cctFrom(investor1tbd, investor2tbd, address(tbd2), cctAmount);
         _assertEmpty();
         _assertInitFunds();
+    }
+
+    /**
+     * A reserve account wired as the deploy scripts once did (wNOK- and TBD-allowlisted, with a
+     * max wNOK allowance to the TBD contract) cannot be drawn on through `cctFrom` by another
+     * CCT_FROM_CALLER_ROLE holder.
+     */
+    function test_cctFrom_CannotDrawOnAnotherAccountsWnokAllowance() public {
+        address reserve = makeAddr("reserve");
+        uint256 reserveWnok = 10_000_000;
+        Tbd tbd = new Tbd(tbd1admin, bank1, address(wnok), address(dvp), tbd1Name, tbd1Symbol);
+
+        vm.startPrank(tbd1admin);
+        tbd.add(investor1tbd);
+        tbd.add(reserve);
+        tbd.grantRole(Roles.CCT_FROM_CALLER_ROLE, investor1tbd);
+        vm.stopPrank();
+
+        vm.startPrank(wnokadmin);
+        wnok.add(reserve);
+        wnok.add(address(tbd));
+        wnok.grantRole(Roles.TRANSFER_FROM_ROLE, address(tbd));
+        wnok.mint(reserve, reserveWnok);
+        vm.stopPrank();
+
+        vm.prank(reserve);
+        wnok.approve(address(tbd), type(uint256).max);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.CctFromNotCaller.selector, reserve, investor1tbd));
+        vm.prank(investor1tbd);
+        tbd.cctFrom(reserve, investor1tbd, address(tbd), reserveWnok);
+
+        assertEq(wnok.balanceOf(reserve), reserveWnok);
+        assertEq(tbd.balanceOf(investor1tbd), 0);
     }
 
     /**
