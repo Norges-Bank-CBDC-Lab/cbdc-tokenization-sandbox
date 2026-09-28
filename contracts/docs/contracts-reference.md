@@ -244,6 +244,10 @@ Important notes:
 - The preferred integration path is usually through `BondManager`, not by
   calling `BondToken` mutation functions directly.
 - Coupon yield is set from the clearing rate of the initial RATE auction.
+- `transferByPartition` and `operatorTransferByPartition` always keep units in
+  the source partition: `data` is opaque and never selects a destination
+  partition, so `ChangedPartition` is never emitted and a partition's supply
+  changes only through mint and redemption.
 - The implementation is ERC1410-inspired and partition-based, but external
   integrators should still review the repo-specific semantics before assuming
   drop-in compatibility with other security-token systems.

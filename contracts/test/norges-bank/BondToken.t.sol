@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.29;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 import {Errors} from "@common/Errors.sol";
@@ -17,6 +17,7 @@ contract BondTokenTest is Test {
     address holder2 = address(0x2);
 
     string constant ISIN = "NO0001234567";
+    string constant ISIN_B = "NO0007654321";
     uint256 constant OFFERING = 1000;
     uint256 constant MATURITY_DURATION = 4 * 365 days; // 4 years
     uint256 constant COUPON_DURATION = 365 days; // 1 year
@@ -382,6 +383,58 @@ contract BondTokenTest is Test {
         vm.prank(controller);
         vm.expectRevert(abi.encodeWithSelector(Errors.PartitionNotActive.selector, ISIN));
         bondToken.redeemFor(holder1, ISIN, 50, controller);
+    }
+
+    // ============ operatorTransferByPartition Tests ============
+
+    function test_OperatorTransferByPartition_KeepsPartition() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.createPartition(ISIN_B, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        bondToken.mintByIsin(ISIN_B, holder2, 100);
+        vm.stopPrank();
+
+        bytes32 partitionA = bondToken.isinToPartition(ISIN);
+        bytes32 partitionB = bondToken.isinToPartition(ISIN_B);
+
+        vm.recordLogs();
+        vm.prank(holder1);
+        bytes32 landedIn =
+            bondToken.operatorTransferByPartition(partitionA, holder1, holder2, 60, abi.encode(partitionB), "");
+
+        assertEq(landedIn, partitionA);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder1), 40);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder2), 60);
+        assertEq(bondToken.balanceOfByPartition(partitionB, holder2), 100);
+        assertEq(bondToken.totalSupplyByPartition(partitionA), 100);
+        assertEq(bondToken.totalSupplyByPartition(partitionB), 100);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 changedPartitionTopic = keccak256("ChangedPartition(bytes32,bytes32,uint256)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], changedPartitionTopic);
+        }
+    }
+
+    function test_OperatorTransferByPartition_CannotBlockIssuance() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        bondToken.createPartition(ISIN_B, OFFERING, MATURITY_DURATION);
+        vm.stopPrank();
+
+        bytes32 partitionA = bondToken.isinToPartition(ISIN);
+        bytes32 partitionB = bondToken.isinToPartition(ISIN_B);
+
+        vm.prank(holder1);
+        bondToken.operatorTransferByPartition(partitionA, holder1, holder2, 1, abi.encode(partitionB), "");
+
+        vm.prank(controller);
+        bondToken.mintByIsin(ISIN_B, holder2, OFFERING);
+
+        assertEq(bondToken.totalSupplyByPartition(partitionB), OFFERING);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder2), 1);
     }
 
     // ============ isinToPartition Tests ============
