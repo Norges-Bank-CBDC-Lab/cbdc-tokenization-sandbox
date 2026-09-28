@@ -20,9 +20,12 @@ export const bidderSchema = z
     publicKey: hexStringSchema.meta({
       description: 'Compressed secp256k1 public key (33-byte hex)',
     }),
-    privateKey: hexStringSchema.meta({
+    privateKey: hexStringSchema.nullable().meta({
       description:
-        'Private key, hex (0x + 64 chars). Returned in plaintext because this surface is sandbox-only.',
+        'Private key, hex (0x + 64 chars). Returned only in the unauthenticated local `none` ' +
+        'auth mode, and only for keys the API generated or an operator imported. Null in ' +
+        '`entra` mode and for fixture bidders whose key comes from a PK_* environment ' +
+        'override: the server holds the key and signs with it, but never returns it.',
     }),
     ethBalance: bigIntStringSchema.meta({ description: 'Current ETH balance in wei' }),
     wnokBalance: bigIntStringSchema.meta({

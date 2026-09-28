@@ -59,7 +59,7 @@ injects `Authorization: Bearer …` per request using whichever
 | `#/bonds/{isin}`  | Single bond — coupon, maturity, holders, auction history.                                                                  |
 | `#/auctions`      | Flat list of every auction across bonds.                                                                                   |
 | `#/auctions/{id}` | Single auction — bids, allocation, lifecycle actions. "Place bid" button is visible while the auction is in `BIDDING`.     |
-| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys, launch the impersonated-bid modal.                        |
+| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys (none mode), launch the impersonated-bid modal.            |
 | `#/central-bank`  | Norges Bank operator surface against WNOK — allowlist editor, mint / burn / transfer modals.                               |
 | `#/tbd`           | Banking — per-bank tokenized bank deposits (TBD): overview, "acting as bank" selector, allowlist / mint / burn / transfer. |
 

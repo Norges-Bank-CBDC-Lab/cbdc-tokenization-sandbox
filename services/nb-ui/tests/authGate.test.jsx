@@ -4,10 +4,11 @@ import userEvent from '@testing-library/user-event';
 
 // Feature: the auth gate in App.jsx. In entra mode a signed-out user sees ONLY
 // the login page; a signed-in user with a recognised role gets the app
-// (operators also see the Central Bank tab; testers do not, and the route is
-// guarded); a signed-in user with no recognised role sees the access-denied
-// page; none mode is never gated; and a silent-renewal expiry mid-session
-// swaps the app for the login page with the "session expired" notice. Roles
+// (operators also see the Central Bank tab and the test-mode toggle; testers
+// do not, and the route is guarded); a signed-in user with no recognised role
+// sees the access-denied page; none mode is never gated; and a
+// silent-renewal expiry mid-session swaps the app for the login page with the
+// "session expired" notice. Roles
 // come from the account's ID-token claims — see src/auth/entraAuth.js and
 // src/auth/capabilities.js.
 
@@ -133,6 +134,7 @@ describe('auth gate (entra mode)', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Central Bank/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Test:/ })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
   });
 
@@ -146,6 +148,8 @@ describe('auth gate (entra mode)', () => {
     // Banking is tester-accessible — Central Bank is the only
     // operator-locked surface.
     expect(screen.getByRole('button', { name: /Banking/ })).toBeInTheDocument();
+    // The test-mode toggle is operator-only.
+    expect(screen.queryByRole('button', { name: /Test:/ })).not.toBeInTheDocument();
     // Manually hitting the route shows the not-authorised panel, not the CB surface.
     expect(await screen.findByText('Not authorised')).toBeInTheDocument();
     expect(screen.queryByText('WNOK actions')).not.toBeInTheDocument();
@@ -203,6 +207,7 @@ describe('auth gate (none mode)', () => {
     expect(await screen.findByRole('button', { name: /Securities/ })).toBeInTheDocument();
     expect(screen.queryByText('You are signed out.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Test:/ })).toBeInTheDocument();
   });
 
   it('groups nav into dropdown categories; opening Securities reveals its pages', async () => {

@@ -499,6 +499,15 @@ token, `entra` mode authorizes it against the `roles` claim (Entra App Roles):
   otherwise). `none` mode performs no role checks. The values must match the
   nb-ui `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values
   defined in Entra.
+- The `testMode` query flag (unseal open bids on bond / auction reads, skip
+  the close end-time pre-check) is honoured only for operator callers
+  (`src/test-mode.ts`, using `isOperatorRequest` in `src/auth.ts`). A tester's
+  flag is ignored, not rejected: the response is the normal sealed view.
+- Bidder DTOs (`GET` / `POST /v1/bidders`) carry `privateKey` only in `none`
+  mode, and never for a fixture bidder whose key comes from a `PK_NORDEA` /
+  `PK_DNB` / `PK_ALICE_TBD` override (`exposedBidderPrivateKey` in
+  `src/bidders.ts`); otherwise `privateKey` is `null`. The server keeps
+  holding the key and signs with it, as it does for bank keys.
 
 `/v1/health`, `/docs`, and `/v1/openapi.json` are mounted before the
 auth gate and stay public in both modes. Every other endpoint goes

@@ -203,8 +203,10 @@ const testModeQueryParam = {
   required: false,
   schema: { type: 'boolean' as const, default: false },
   description:
-    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar; ArgoCD- ' +
-    'managed deployments should ignore it. Today `testMode=true` enables: ' +
+    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar. ' +
+    'Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller ' +
+    'gets the sealed view and the normal close pre-check, not an error). ' +
+    'When honoured, `testMode=true` enables: ' +
     '(a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; ' +
     '(b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the ' +
     'operator can attempt close before the bidding window expires — the on-chain contract still ' +

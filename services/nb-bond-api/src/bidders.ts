@@ -120,6 +120,33 @@ export function fixtureRoleKey(role: string): string {
   return FIXTURE_KEY_OVERRIDES[role] ?? deriveFixturePrivateKey(role);
 }
 
+/**
+ * True when the record's key is a fixture role's env override: an override
+ * is set for a roster entry and derives the record's address. Such keys
+ * belong to the environment (its fixture contracts were deployed with them),
+ * not to the sandbox roster, so the API never returns them.
+ */
+export function isOverrideKey(record: Pick<BidderRecord, 'address'>): boolean {
+  const address = record.address.toLowerCase();
+  return FIXTURE_ROSTER.some(({ role }) => {
+    const override = fixtureRoleKeyOverride(role);
+    return override !== undefined && deriveBidderAddress(override).toLowerCase() === address;
+  });
+}
+
+/**
+ * The private key a bidder DTO may carry. The stored key is returned only in
+ * the unauthenticated local `none` auth mode and only when it is not an env
+ * override (`isOverrideKey`); otherwise null — the server keeps holding the
+ * key and signs with it, as it does for bank keys.
+ */
+export function exposedBidderPrivateKey(
+  record: BidderRecord,
+  authMode: 'none' | 'entra',
+): string | null {
+  return authMode === 'none' && !isOverrideKey(record) ? record.privateKey : null;
+}
+
 export function derivePublicKey(privateKeyHex: string): string {
   const priv = normalizePrivateKey(privateKeyHex);
   const pub = secp256k1.getPublicKey(priv, true);

@@ -4,6 +4,8 @@ import type { Server } from 'node:http';
 jest.mock('../src/auth', () => ({
   authMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
   requireAnyRole: () => (_req: unknown, _res: unknown, next: () => void) => next(),
+  isOperatorRequest: () => true,
+  authMode: 'none',
   operatorRoles: ['Sandbox.Operator'],
   recognizedRoles: ['Sandbox.Operator', 'Sandbox.Tester'],
 }));

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppConfig } from '../config.js';
 import { auth, authMode } from '../auth/index.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 import { getTestMode, setTestMode, subscribeTestMode } from '../utils/debugSettings.js';
 import { HttpClient } from '../api/httpClient.js';
 import { HealthBadge } from './HealthBadge.jsx';
@@ -14,7 +15,8 @@ import { NorgesBankLogo } from './NorgesBankLogo.jsx';
 import { Button } from './ui.jsx';
 
 /**
- * TestModeToggle — top-bar sandbox-only umbrella switch.
+ * TestModeToggle — top-bar sandbox-only umbrella switch. Rendered only for
+ * accounts that can operate (always in `none` mode).
  *
  * When ON, the API gets `?testMode=true` on bond/auction reads
  * (unsealing sealed bids on still-open auctions) and on close /
@@ -241,6 +243,7 @@ export function Layout({
   canAccessCentralBank = true,
   canAccessBanking = true,
 }) {
+  const { canOperate } = useCapabilities();
   return (
     <div className="app">
       <header className="top-bar">
@@ -265,7 +268,7 @@ export function Layout({
           />
           <div className="top-bar-right">
             <AuthChrome />
-            <TestModeToggle />
+            {canOperate && <TestModeToggle />}
             <HealthBadge />
             <span>API /v1</span>
           </div>
