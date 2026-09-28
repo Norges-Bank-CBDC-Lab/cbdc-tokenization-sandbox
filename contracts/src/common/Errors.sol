@@ -42,6 +42,9 @@ library Errors {
     error MissingRole(bytes32 role, address account);
     error NotInAllowlist(string list, address addr);
 
+    // --- Broker ---
+    error OrderNotOwnedByClient(bytes32 orderId);
+
     // --- Wnok ---
     error BankAddressZero();
     error CallbackFailed(bytes4 received);
@@ -54,6 +57,7 @@ library Errors {
 
     // --- BondManager ---
     error BondTokenAddressZero();
+    error BondAuctionAddressZero();
     error DurationScalarZero();
     error BondUnitNominalZero();
     error BondDoesNotExist(string isin);

@@ -39,6 +39,8 @@ interface IBondToken is IERC1410 {
 
     function addController(address _controller) external;
 
+    function removeController(address _controller) external;
+
     function isinToPartition(string memory _isin) external pure returns (bytes32 partition);
     function partitionToIsin(bytes32 partition) external view returns (string memory);
 

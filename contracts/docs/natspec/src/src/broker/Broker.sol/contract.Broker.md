@@ -123,7 +123,8 @@ function sell(address secContrAddr, uint256 amount, uint256 askPrice) public ret
 
 Revokes a buy order.
 
-The caller must be a registered client. Wallet addresses are resolved from ClientList.
+The caller must be a registered client and the order must belong to the caller's
+securities wallet. Wallet addresses are resolved from ClientList.
 
 
 ```solidity
@@ -146,7 +147,8 @@ function revokeBuyOrder(bytes32 orderId) public returns (bool);
 
 Revokes a sell order.
 
-The caller must be a registered client. Wallet addresses are resolved from ClientList.
+The caller must be a registered client and the order must belong to the caller's
+securities wallet. Wallet addresses are resolved from ClientList.
 
 
 ```solidity
@@ -197,5 +199,16 @@ function getBuyOrders() public view returns (IOrderBook.Order[] memory);
 |Name|Type|Description|
 |----|----|-----------|
 |`<none>`|`IOrderBook.Order[]`|Order[] -> An array of the caller's active buy orders from the order book.|
+
+
+### _requireOwnOrder
+
+Reverts unless an existing order was placed for the caller's securities wallet.
+An unknown id is left to the OrderBook, which reverts with OrderNotFound.
+
+
+```solidity
+function _requireOwnOrder(bytes32 orderId) internal view;
+```
 
 

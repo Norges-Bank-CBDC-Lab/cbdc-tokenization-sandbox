@@ -105,6 +105,11 @@ interface IOrderBook {
     function getAllBuyOrders() external view returns (Order[] memory);
     function getAllSellOrders() external view returns (Order[] memory);
 
+    /**
+     * @notice Returns one order by id; every field is zero when the order does not exist.
+     */
+    function getOrder(bytes32 orderId) external view returns (Order memory);
+
     function revokeBuyOrder(bytes32 orderId) external returns (bool);
     function revokeSellOrder(bytes32 orderId) external returns (bool);
 
