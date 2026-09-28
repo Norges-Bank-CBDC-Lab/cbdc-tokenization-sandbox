@@ -26,8 +26,6 @@ library Errors {
     error InsufficientPartitionBalance();
     error NotMultipleOfGranularity();
     error UnauthorizedOperator();
-    error TbdAddressZero();
-    error PartitionZero();
 
     // --- Registry (GlobalRegistry) ---
     error ContractNotFound(string contractAddress);
@@ -44,6 +42,9 @@ library Errors {
     error MissingRole(bytes32 role, address account);
     error NotInAllowlist(string list, address addr);
 
+    // --- Broker ---
+    error OrderNotOwnedByClient(bytes32 orderId);
+
     // --- Wnok ---
     error BankAddressZero();
     error CallbackFailed(bytes4 received);
@@ -54,10 +55,9 @@ library Errors {
     error CctFailed();
     error CctFromNotCaller(address from, address caller);
 
-    // --- BondOrderBookFactory ---
-    error BondTokenAddressZero();
-
     // --- BondManager ---
+    error BondTokenAddressZero();
+    error BondAuctionAddressZero();
     error DurationScalarZero();
     error BondUnitNominalZero();
     error BondDoesNotExist(string isin);

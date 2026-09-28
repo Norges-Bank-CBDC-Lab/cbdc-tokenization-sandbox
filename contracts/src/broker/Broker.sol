@@ -97,23 +97,27 @@ contract Broker is ClientList {
 
     /**
      * @notice Revokes a buy order.
-     * @dev The caller must be a registered client. Wallet addresses are resolved from ClientList.
+     * @dev The caller must be a registered client and the order must belong to the caller's
+     *      securities wallet. Wallet addresses are resolved from ClientList.
      * @param orderId The unique identifier of the Order.
      * @return true/false representing the success of the transaction.
      */
     function revokeBuyOrder(bytes32 orderId) public returns (bool) {
         clientExistsGuard(msg.sender);
+        _requireOwnOrder(orderId);
         return _ORDER_BOOK.revokeBuyOrder(orderId);
     }
 
     /**
      * @notice Revokes a sell order.
-     * @dev The caller must be a registered client. Wallet addresses are resolved from ClientList.
+     * @dev The caller must be a registered client and the order must belong to the caller's
+     *      securities wallet. Wallet addresses are resolved from ClientList.
      * @param orderId The unique identifier of the Order.
      * @return true/false representing the success of the transaction.
      */
     function revokeSellOrder(bytes32 orderId) public returns (bool) {
         clientExistsGuard(msg.sender);
+        _requireOwnOrder(orderId);
         return _ORDER_BOOK.revokeSellOrder(orderId);
     }
 
@@ -135,5 +139,16 @@ contract Broker is ClientList {
     function getBuyOrders() public view returns (IOrderBook.Order[] memory) {
         clientExistsGuard(msg.sender);
         return _ORDER_BOOK.getBuyOrders(getSecuritiesWallet(msg.sender));
+    }
+
+    /**
+     * @dev Reverts unless an existing order was placed for the caller's securities wallet.
+     *      An unknown id is left to the OrderBook, which reverts with OrderNotFound.
+     */
+    function _requireOwnOrder(bytes32 orderId) internal view {
+        IOrderBook.Order memory order = _ORDER_BOOK.getOrder(orderId);
+        if (order.id != bytes32(0) && order.investorSecAddr != getSecuritiesWallet(msg.sender)) {
+            revert Errors.OrderNotOwnedByClient(orderId);
+        }
     }
 }
