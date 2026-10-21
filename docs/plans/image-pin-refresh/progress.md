@@ -1,11 +1,11 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 2 (nginx 1.30.6) implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 2: nginx-unprivileged 1.30.6 (awaiting PR and merge)
-**Next action:** After slice 2 merges, branch `feature/blockscout-support-pins` from a fresh
-`development`, re-check the newest Postgres 18.x, Python 3.14.x, `blockscout-stack` and verifier
-tags and their platforms, and run Phase 3.
+**Last updated:** 2026-10-21 — Phase 3 (Blockscout supporting components) implemented and verified on the local sandbox; PR pending
+**Current phase:** Phase 3: Blockscout supporting components (awaiting PR and merge)
+**Next action:** After slice 3 merges, branch `feature/ngf-2-8` from a fresh `development`,
+re-check the newest NGINX Gateway Fabric release, its Gateway API CRD version and platforms, and
+run Phase 4.
 
 ## Phase Log
 
@@ -13,8 +13,8 @@ tags and their platforms, and run Phase 3.
 |---|---|---|---|
 | 0 — Baseline | Done for planning (2026-10-21); re-run per slice | see below | — |
 | 1 — Image hash base refs | Done (merged 2026-10-21) | `check-image-hash-inputs.sh` 11/11 plus a negative test; one-time rebuild of all three images on the local sandbox; CI green | #308 |
-| 2 — nginx 1.30.6 | Done locally (2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served | pending |
-| 3 — Blockscout supporting components | Not started | | |
+| 2 — nginx 1.30.6 | Done (merged 2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served; CI green | #309 |
+| 3 — Blockscout supporting components | Done locally (2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok | pending |
 | 4 — NGINX Gateway Fabric 2.8.0 | Not started | | |
 | 5 — Besu 26.10.0 | Not started | | |
 | 6 — Blockscout v12 + frontend v2.12 | Not started | | |
@@ -22,6 +22,8 @@ tags and their platforms, and run Phase 3.
 
 ## Deviations From the Plan
 
+- 2026-10-21, Phase 3: `ANALYZE` runs on `blockscout_db` only; BENS has no separate database.
+  `plan.md` is corrected.
 - 2026-10-21: the operator approved D1–D6 and limited the scope to the local sandbox. The
   Besu rollback moved from `./sandbox.sh delete` to `besu storage revert-code-format`, after
   confirming that the 26.10.0 database upgrade affects only the Bonsai validator and ships a
@@ -63,6 +65,21 @@ tags and their platforms, and run Phase 3.
   rebuilt it without any manual step. The pod is Ready with the read-only root filesystem,
   `nginx -v` prints `nginx/1.30.6`, the UI answers 200 through the gateway, and `config.js` is
   served from the ConfigMap overlay. nb-ui format, lint, tests and build pass locally.
+- Phase 3 live check (2026-10-21): the newest tags were still `postgres:18.6`, `python:3.14.8`
+  (3.14.9 has no image yet), `blockscout-stack` 4.5.3 and verifier `v1.11.0`, all amd64 and
+  arm64. With the sandbox values, `helm template` of chart 4.5.1 and 4.5.3 differs only in the
+  `helm.sh/chart` label.
+  - `registry-sync` then `blockscout.sh start`: Postgres restarted on 18.6 against the existing
+    PVC, kept all 12 verified contracts, and `ANALYZE` ran.
+  - BENS rebuilt as `bens-microservice:1735ad6bb388`; `python -V` reports 3.14.8, and `/health`
+    answers 200.
+  - The explorer API answered 500 for about a minute after the database restart (its
+    `Repo.Replica1` pool reconnecting), then 200. The indexer reported "caught up" throughout,
+    and the latest indexed block equals the chain head.
+  - Verifier v1.11.0 with `SMART_CONTRACT_VERIFIER__COMPILERS__EXECUTION__TYPE=native`
+    recompiled `Wnok` (14 sources, solc 0.8.36) from its Blockscout-stored standard-JSON input
+    and returned `SUCCESS`, a partial match like the stored verification.
+  - `indexed_blocks_ratio` stays at 0.98, as before this slice.
 
 ## Blocked / Waiting On
 
@@ -79,12 +96,16 @@ tags and their platforms, and run Phase 3.
   `common/images.yaml:55` — re-check at the next bump.
 - The verifier fetches the `linux-amd64` solc list on every platform —
   `services/blockscout/templates/sc-verifier-deployment.yaml` — check behaviour on arm64.
+- `indexed_blocks_ratio` reports 0.98 while the indexer says it is caught up and the latest
+  indexed block equals the chain head; it predates this plan. Look at whether a block is
+  missing or the ratio counts differently.
 - `busybox:1.37.0` in `services/blockscout/templates/blockscout-migration-job.yaml` is outside
   the pin files and unchecked.
 
 ## Session Handoff
 
-Phase 1 merged as #308. Phase 2 is on `feature/nginx-1-30-6` (not yet pushed). The local sandbox now runs the
+Phases 1 and 2 merged as #308 and #309. Phase 3 is on `feature/blockscout-support-pins` (not yet
+pushed). The local sandbox now runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that

@@ -42,7 +42,7 @@ pulled at build/deploy time. Current examples include:
 - Python runtime images
 - PostgreSQL images
 - Blockscout charts and images, including the GPL-3.0 smart-contract-verifier
-  v1.10.6 image explicitly enabled for source verification
+  v1.11.0 image explicitly enabled for source verification
 - BusyBox image references in Helm templates
 - `nginxinc/nginx-unprivileged` (BSD-2-Clause), used as the runtime stage
   of the `services/nb-ui/Dockerfile` multi-stage build (and pinned in
