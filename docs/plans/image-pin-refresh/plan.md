@@ -197,10 +197,13 @@ which is cheap here.
 1. `common/versions.yaml` `charts.nginx_gateway_fabric`, the `helpers.sh` literal in
    `getNginxGatewayFabricVersion`, and the `nodeport-config.yaml` version label → `2.8.0`.
 2. `deployApiGateway`: after the Gateway API CRD apply, add
-   `kubectl apply --server-side -f "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v${NGINX_GATEWAY_FABRIC_VERSION}/deploy/crds.yaml"`.
-   Add a comment explaining why: Helm installs chart CRDs only on first install. This is the
-   one script change the bump cannot work without.
-3. `infra/DEVELOPMENT.md` (gateway section): a pin bump re-applies both CRD sets.
+   `kubectl apply --server-side --force-conflicts -f "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v${NGINX_GATEWAY_FABRIC_VERSION}/deploy/crds.yaml"`.
+   Add a comment explaining why: Helm installs chart CRDs only on first install. Server-side,
+   because `nginxproxies` is too large for client-side apply's annotation. `--force-conflicts`,
+   because the first install left Helm as the CRDs' field manager. This is the one script
+   change the bump cannot work without.
+3. `infra/DEVELOPMENT.md` (new "Gateway Version Bumps" section): a pin bump re-applies both
+   CRD sets.
 
 ### Verification Stop
 
@@ -424,7 +427,7 @@ where the change lands.
 | 3 Python 3.14.x | No | No | None (BENS is stateless; its database is untouched) | Rebuild the BENS image |
 | 3 Chart 4.5.3 | No | No | None (`separateApi` is disabled) | — |
 | 3 Verifier v1.11.0 | No | No | None (stateless) | **Must** set `SMART_CONTRACT_VERIFIER__COMPILERS__EXECUTION__TYPE=native`, or verification stops |
-| 4 Gateway Fabric 2.8.0 | No | No | Gateway API CRDs v1.5.1 → v1.6.3, NGF CRDs re-applied | Only where Gateway Fabric is used: Kubernetes ≥ 1.32; apply both CRD sets before the chart upgrade |
+| 4 Gateway Fabric 2.8.0 | No | No | Gateway API CRDs v1.5.1 → v1.6.3, NGF CRDs re-applied | Only where Gateway Fabric is used: Kubernetes ≥ 1.32; apply both CRD sets before the chart upgrade (server-side, taking ownership from Helm). Expect the data plane to roll a few times within a minute, and the controller to log `nginx image version mismatch` until the old data-plane pod is gone (seen locally) |
 | 5 Besu 26.10.0 | **No** (in-place upgrade) | **No** (no fork activation, genesis unchanged, chain continues) | **One-way-by-default:** the validator's Bonsai database is upgraded on first start; the Forest archive node is not | Back up node volumes first. Upgrade all nodes in one step: 26.8.0 and 26.9.0 change state-transition rules, so mixed versions can disagree. Rollback = `besu storage revert-code-format` before starting the old version. A wipe would mean a new chain and redeployed contracts, and is never part of the upgrade |
 | 6 Blockscout v12 + frontend v2.12 | No (explorer only; the chain is untouched) | No (a reindex would need contracts **re-verified**, not redeployed) | **One-way:** the explorer schema migrates and v11 cannot read it afterwards | Back up the explorer database first. Prerequisite: the explorer is on v11.0.2 or later and `fill_internal_transactions_address_ids` is `completed`. Build both images from source at the new tags. ffmpeg licence note (D4) |
 | 7 Registry 3.1.2 | No | No | Local registry cache emptied and re-synced | Local-only component; no non-local counterpart |

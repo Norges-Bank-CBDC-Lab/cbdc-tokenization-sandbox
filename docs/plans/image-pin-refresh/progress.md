@@ -1,11 +1,11 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 3 (Blockscout supporting components) implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 3: Blockscout supporting components (awaiting PR and merge)
-**Next action:** After slice 3 merges, branch `feature/ngf-2-8` from a fresh `development`,
-re-check the newest NGINX Gateway Fabric release, its Gateway API CRD version and platforms, and
-run Phase 4.
+**Last updated:** 2026-10-21 — Phase 4 (NGINX Gateway Fabric 2.8.0) implemented and verified on the local sandbox; PR pending
+**Current phase:** Phase 4: NGINX Gateway Fabric 2.8.0 (awaiting PR and merge)
+**Next action:** After slice 4 merges, branch `feature/besu-26-10` from a fresh `development`,
+re-check the newest Besu release and its platforms and release notes, and run Phase 5 (D5:
+in-place upgrade, rollback rehearsal with `besu storage revert-code-format`).
 
 ## Phase Log
 
@@ -14,14 +14,16 @@ run Phase 4.
 | 0 — Baseline | Done for planning (2026-10-21); re-run per slice | see below | — |
 | 1 — Image hash base refs | Done (merged 2026-10-21) | `check-image-hash-inputs.sh` 11/11 plus a negative test; one-time rebuild of all three images on the local sandbox; CI green | #308 |
 | 2 — nginx 1.30.6 | Done (merged 2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served; CI green | #309 |
-| 3 — Blockscout supporting components | Done locally (2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok | pending |
-| 4 — NGINX Gateway Fabric 2.8.0 | Not started | | |
+| 3 — Blockscout supporting components | Done (merged 2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok; CI green | #310 |
+| 4 — NGINX Gateway Fabric 2.8.0 | Done locally (2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer | pending |
 | 5 — Besu 26.10.0 | Not started | | |
 | 6 — Blockscout v12 + frontend v2.12 | Not started | | |
 | 7 — Local registry 3.1.2 | Not started | | |
 
 ## Deviations From the Plan
 
+- 2026-10-21, Phase 4: the NGF CRD apply needs `--force-conflicts`, and only server-side works
+  (see Verified So Far); `plan.md` step 2 is updated.
 - 2026-10-21, Phase 3: `ANALYZE` runs on `blockscout_db` only; BENS has no separate database.
   `plan.md` is corrected.
 - 2026-10-21: the operator approved D1–D6 and limited the scope to the local sandbox. The
@@ -80,6 +82,26 @@ run Phase 4.
     recompiled `Wnok` (14 sources, solc 0.8.36) from its Blockscout-stored standard-JSON input
     and returned `SUCCESS`, a partial match like the stored verification.
   - `indexed_blocks_ratio` stays at 0.98, as before this slice.
+- Phase 4 live check (2026-10-21): NGF 2.8.0 is still the newest release, and both images are
+  published for amd64 and arm64.
+  - Server-side dry runs against the live cluster: client-side apply of `deploy/crds.yaml`
+    fails (the `nginxproxies` annotation exceeds 256 KiB), and plain server-side apply
+    conflicts with the `helm` field manager. `--server-side --force-conflicts` applies cleanly.
+  - `deployApiGateway` alone (not `infra.sh start`, so Besu was not redeployed): Gateway API
+    CRDs at bundle v1.6.3; all 14 `gateway.nginx.org` CRDs applied, including the new
+    `accesspolicies`, `externalloadbalancers` and `payloadprocessors`; `ngf` revision 2 on
+    chart 2.8.0.
+  - Within about 30 seconds the data-plane Deployment rolled to revision 4. The controller
+    logged `nginx image version mismatch` four times (14:58:12–16Z) while the 2.6.6 pod was
+    still connected, and nothing after.
+  - The NodePort selector still matches the 2.8.0 data-plane pod, whose `nginx -v` prints
+    1.31.7. The Gateway is `Accepted`/`Programmed`, and all four HTTPRoutes are
+    `Accepted`/`ResolvedRefs`.
+  - `web` 200, `blockscout` 200 (UI and `/api/v2/stats`), `bond-api` `/v1/health` 200, and
+    Besu JSON-RPC answers through `:8545`.
+  - Not exercised: the fresh-cluster path, where the CRD apply runs before Helm's first install
+    and Helm skips CRDs that already exist (documented Helm behaviour). It is covered by the
+    next full `./sandbox.sh delete && ./sandbox.sh start`, which Phase 5 runs.
 
 ## Blocked / Waiting On
 
@@ -104,8 +126,7 @@ run Phase 4.
 
 ## Session Handoff
 
-Phases 1 and 2 merged as #308 and #309. Phase 3 is on `feature/blockscout-support-pins` (not yet
-pushed). The local sandbox now runs the
+Phases 1–3 merged as #308, #309 and #310. Phase 4 is on `feature/ngf-2-8` (not yet pushed). The local sandbox now runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that
