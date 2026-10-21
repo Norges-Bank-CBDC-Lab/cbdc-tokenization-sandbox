@@ -257,11 +257,14 @@ recreated by their component charts on the next start.
   5. A transaction through the NB Bond API, for example an operator action in the UI, is mined.
      Blockscout indexes it, including a contract-creation transaction with `"to": null`.
   6. NB Bond API `/health` shows `headReachable: true`.
-- Rollback rehearsal (local, in place): scale the validator down, run
-  `besu storage revert-code-format` against its data path (the exact invocation is printed in
-  the validator log after the upgrade), start 26.7.1 on it, check that blocks continue, then
-  return to 26.10.0. This proves the rollback the later non-local rollout would rely on, without
-  a wipe.
+- Rollback rehearsal (local, in place): scale both nodes down, run
+  `besu storage revert-code-format` against the validator's data path in a one-off pod (the
+  exact invocation is printed in the validator log after the upgrade), start the validator on
+  26.7.1, check that blocks continue, then return to 26.10.0 with `deployBesu`. This proves the
+  rollback the later non-local rollout would rely on, without a wipe. Any image change made
+  outside Helm (for example `kubectl set image`) leaves a second field manager on the
+  StatefulSet, and Helm's next server-side apply conflicts. Set the image back to Helm's value
+  and remove that `managedFields` entry afterwards.
 - Fresh chain (local only): `./sandbox.sh delete && ./sandbox.sh start` once, to prove a new
   genesis on 26.10.0. This is a local node wipe with contract redeployment. It is extra proof,
   not a step the upgrade needs.
@@ -269,7 +272,17 @@ recreated by their component charts on the next start.
 ### Rollback
 
 Revert the pins. On the validator, run `besu storage revert-code-format` before starting 26.7.1,
-because 26.7.1 cannot open the upgraded Bonsai database. The Forest archive node needs nothing.
+because 26.7.1 cannot open the upgraded Bonsai database. The subcommand also deletes the
+validator's version metadata, so 26.7.1 then starts.
+
+The Forest archive node's storage format does not change, but Besu's version-compatibility
+protection still refuses the downgrade: it is on by default with a custom genesis file, and the
+node's metadata records 26.10.0. `revert-code-format` treats a Forest database as needing no
+revert and leaves that metadata in place. Downgrading the archive therefore needs one start with
+`--version-compatibility-protection=false`, the option Besu's own error message names. This
+disables a safety check, so it is an operator decision at rollback time, and it was not
+rehearsed here.
+
 Local last resort: `./sandbox.sh delete && ./sandbox.sh start` (new chain, contracts redeploy;
 D5).
 
@@ -428,7 +441,7 @@ where the change lands.
 | 3 Chart 4.5.3 | No | No | None (`separateApi` is disabled) | — |
 | 3 Verifier v1.11.0 | No | No | None (stateless) | **Must** set `SMART_CONTRACT_VERIFIER__COMPILERS__EXECUTION__TYPE=native`, or verification stops |
 | 4 Gateway Fabric 2.8.0 | No | No | Gateway API CRDs v1.5.1 → v1.6.3, NGF CRDs re-applied | Only where Gateway Fabric is used: Kubernetes ≥ 1.32; apply both CRD sets before the chart upgrade (server-side, taking ownership from Helm). Expect the data plane to roll a few times within a minute, and the controller to log `nginx image version mismatch` until the old data-plane pod is gone (seen locally) |
-| 5 Besu 26.10.0 | **No** (in-place upgrade) | **No** (no fork activation, genesis unchanged, chain continues) | **One-way-by-default:** the validator's Bonsai database is upgraded on first start; the Forest archive node is not | Back up node volumes first. Upgrade all nodes in one step: 26.8.0 and 26.9.0 change state-transition rules, so mixed versions can disagree. Rollback = `besu storage revert-code-format` before starting the old version. A wipe would mean a new chain and redeployed contracts, and is never part of the upgrade |
+| 5 Besu 26.10.0 | **No** (in-place upgrade) | **No** (no fork activation, genesis unchanged, chain continues) | **One-way-by-default:** the validator's Bonsai database is upgraded on first start. The Forest archive node's format is not, but its version metadata blocks a downgrade | Back up node volumes first. Upgrade all nodes in one step: 26.8.0 and 26.9.0 change state-transition rules, so mixed versions can disagree. Rollback: run `besu storage revert-code-format` on each Bonsai node before starting the old version (rehearsed locally: 26.7.1 then sealed blocks on the reverted validator). A Forest node needs one old-version start with `--version-compatibility-protection=false`, an operator decision that was not rehearsed. A wipe would mean a new chain and redeployed contracts, and is never part of the upgrade |
 | 6 Blockscout v12 + frontend v2.12 | No (explorer only; the chain is untouched) | No (a reindex would need contracts **re-verified**, not redeployed) | **One-way:** the explorer schema migrates and v11 cannot read it afterwards | Back up the explorer database first. Prerequisite: the explorer is on v11.0.2 or later and `fill_internal_transactions_address_ids` is `completed`. Build both images from source at the new tags. ffmpeg licence note (D4) |
 | 7 Registry 3.1.2 | No | No | Local registry cache emptied and re-synced | Local-only component; no non-local counterpart |
 

@@ -35,7 +35,7 @@ metadata change.
 This source repository does not relicense software that is only referenced or
 pulled at build/deploy time. Current examples include:
 
-- Hyperledger Besu 26.7.1 (Apache-2.0), pinned in `common/images.yaml`
+- Hyperledger Besu 26.10.0 (Apache-2.0), pinned in `common/images.yaml`
 - NGINX Gateway Fabric
 - Docker Distribution Registry
 - Node.js runtime images
