@@ -1,11 +1,10 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 4 (NGINX Gateway Fabric 2.8.0) implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 4: NGINX Gateway Fabric 2.8.0 (awaiting PR and merge)
-**Next action:** After slice 4 merges, branch `feature/besu-26-10` from a fresh `development`,
-re-check the newest Besu release and its platforms and release notes, and run Phase 5 (D5:
-in-place upgrade, rollback rehearsal with `besu storage revert-code-format`).
+**Last updated:** 2026-10-21 — Phase 5 (Besu 26.10.0) implemented and verified on the local sandbox; PR pending
+**Current phase:** Phase 5: Besu 26.10.0 (awaiting PR and merge)
+**Next action:** After slice 5 merges, get D4's second confirmation (ffmpeg licence), then
+branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 
 ## Phase Log
 
@@ -15,13 +14,16 @@ in-place upgrade, rollback rehearsal with `besu storage revert-code-format`).
 | 1 — Image hash base refs | Done (merged 2026-10-21) | `check-image-hash-inputs.sh` 11/11 plus a negative test; one-time rebuild of all three images on the local sandbox; CI green | #308 |
 | 2 — nginx 1.30.6 | Done (merged 2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served; CI green | #309 |
 | 3 — Blockscout supporting components | Done (merged 2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok; CI green | #310 |
-| 4 — NGINX Gateway Fabric 2.8.0 | Done locally (2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer | pending |
-| 5 — Besu 26.10.0 | Not started | | |
+| 4 — NGINX Gateway Fabric 2.8.0 | Done (merged 2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer; fresh-cluster path covered by the Phase 5 fresh boot; CI green | #311 |
+| 5 — Besu 26.10.0 | Done locally (2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | pending |
 | 6 — Blockscout v12 + frontend v2.12 | Not started | | |
 | 7 — Local registry 3.1.2 | Not started | | |
 
 ## Deviations From the Plan
 
+- 2026-10-21, Phase 5: the rollback rehearsal covered only the Bonsai validator. The Forest
+  archive's downgrade needs a safety override that was not run (see Verified So Far). `plan.md`
+  now documents both halves and the Helm field-manager cleanup.
 - 2026-10-21, Phase 4: the NGF CRD apply needs `--force-conflicts`, and only server-side works
   (see Verified So Far); `plan.md` step 2 is updated.
 - 2026-10-21, Phase 3: `ANALYZE` runs on `blockscout_db` only; BENS has no separate database.
@@ -102,6 +104,34 @@ in-place upgrade, rollback rehearsal with `besu storage revert-code-format`).
   - Not exercised: the fresh-cluster path, where the CRD apply runs before Helm's first install
     and Helm skips CRDs that already exist (documented Helm behaviour). It is covered by the
     next full `./sandbox.sh delete && ./sandbox.sh start`, which Phase 5 runs.
+- Phase 5 live check (2026-10-21): Besu 26.10.0 is still the newest release (amd64 and arm64).
+  None of the options or genesis keys removed in 26.8.0–26.10.0 appear in `infra/besu/`.
+  Discovery is off on both nodes, and the NB Bond API uses neither `trace_*` nor transaction
+  `to`.
+  - In place (`deployBesu` only): both nodes on 26.10.0. The validator log shows the Bonsai
+    database upgrading from version 3 to 4 and migrating its code storage; the Forest archive
+    logs no upgrade. A contract creation from a fixture key was mined in block 175 with
+    `to: null`, and Blockscout and NB Bond API ingestion followed it.
+  - Rollback rehearsal: both nodes stopped, then `besu storage revert-code-format` ran on the
+    validator's volume in a one-off pod. It rewrote the code storage, reverted the metadata to
+    Bonsai version 3, and deleted the version metadata. The validator on 26.7.1 then sealed
+    blocks, including a transaction in block 179.
+  - The Forest archive on 26.7.1 refused to start: version-compatibility protection is on by
+    default with a custom genesis file, and its metadata recorded 26.10.0. The override
+    (`--version-compatibility-protection=false`) disables a safety check; it was not run, so the
+    archive half of the rollback is documented in `plan.md` but not rehearsed. The archive went
+    back to 26.10.0 instead.
+  - Return: `deployBesu` first conflicted with the image field that `kubectl set image` had
+    taken from Helm. After setting the image back to Helm's value it applied (revision 4), and
+    the `kubectl-set` `managedFields` entries were removed. The validator re-upgraded its
+    database, and a transaction was mined in block 180.
+  - Fresh chain: `./sandbox.sh delete && ./sandbox.sh start` with the slice 4 and slice 5
+    changes. The NGF CRDs were applied server-side before Helm's first install, which then
+    completed, covering the Phase 4 fresh-cluster path. Besu 26.10.0 created a new database;
+    chain 2018; contracts redeployed (local only); NB Bond API, nb-ui and Blockscout followed
+    the head.
+  - `contracts.sh verify-latest` verified all 12 contracts through forge, Blockscout and
+    verifier v1.11.0 (`Pass - Verified`).
 
 ## Blocked / Waiting On
 
@@ -121,12 +151,18 @@ in-place upgrade, rollback rehearsal with `besu storage revert-code-format`).
 - `indexed_blocks_ratio` reports 0.98 while the indexer says it is caught up and the latest
   indexed block equals the chain head; it predates this plan. Look at whether a block is
   missing or the ratio counts differently.
+- The deploy-time verification in `./sandbox.sh start` (`DEPLOY_VERIFY_CONTRACTS=true`, passed
+  as `--verify` through `contracts.sh` and `deploy.sh`) submitted nothing to Blockscout on
+  2026-10-21; `contracts.sh verify-latest` then verified every contract. Not caused by any
+  image pin. Trace where the flag is lost (`contracts/contracts.sh`, `contracts/deploy.sh`).
 - `busybox:1.37.0` in `services/blockscout/templates/blockscout-migration-job.yaml` is outside
   the pin files and unchecked.
 
 ## Session Handoff
 
-Phases 1–3 merged as #308, #309 and #310. Phase 4 is on `feature/ngf-2-8` (not yet pushed). The local sandbox now runs the
+Phases 1–4 merged as #308, #309, #310 and #311. Phase 5 is on `feature/besu-26-10`, rebased onto
+`development` after #311 merged. The local sandbox now runs a fresh chain (new contract
+addresses) on all slice 1–5 pins. The local sandbox now runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that
