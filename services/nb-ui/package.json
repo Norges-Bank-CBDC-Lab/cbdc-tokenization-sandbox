@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@azure/msal-browser": "5.18.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "7.0.1",
@@ -28,10 +28,10 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
-    "globals": "17.7.0",
+    "globals": "17.13.0",
     "jsdom": "30.0.1",
-    "prettier": "3.9.6",
-    "vite": "8.2.1",
+    "prettier": "3.9.10",
+    "vite": "8.2.4",
     "vitest": "4.1.11"
   }
 }
