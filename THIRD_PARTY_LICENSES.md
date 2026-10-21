@@ -57,9 +57,9 @@ License labels and deployment-time notes remain curated review items.
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.17.0` | MIT |
 | `express` | `5.2.1` | MIT |
-| `express-rate-limit` | `8.6.2` | MIT |
+| `express-rate-limit` | `8.7.1` | MIT |
 | `helmet` | `8.3.0` | MIT |
-| `jose` | `6.2.8` | MIT |
+| `jose` | `6.2.13` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.6.5` | MIT |
 | `zod-openapi` | `6.0.1` | MIT |
@@ -74,9 +74,9 @@ License labels and deployment-time notes remain curated review items.
 | `babel-jest` | `30.4.1` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.7.0` | MIT |
+| `globals` | `17.13.0` | MIT |
 | `jest` | `30.4.2` | MIT |
-| `prettier` | `3.9.6` | MIT |
+| `prettier` | `3.9.10` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
 | `typescript-eslint` | `8.70.1` | MIT |
@@ -106,8 +106,8 @@ License labels and deployment-time notes remain curated review items.
 | Package | Version | License |
 | --- | --- | --- |
 | `@azure/msal-browser` | `5.18.0` | MIT |
-| `react` | `19.2.8` | MIT |
-| `react-dom` | `19.2.8` | MIT |
+| `react` | `19.3.1` | MIT |
+| `react-dom` | `19.3.1` | MIT |
 | `@testing-library/jest-dom` | `7.0.1` | MIT |
 | `@testing-library/react` | `16.3.3` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
@@ -116,10 +116,10 @@ License labels and deployment-time notes remain curated review items.
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
 | `eslint-plugin-react-hooks` | `7.1.1` | MIT |
-| `globals` | `17.7.0` | MIT |
+| `globals` | `17.13.0` | MIT |
 | `jsdom` | `30.0.1` | MIT |
-| `prettier` | `3.9.6` | MIT |
-| `vite` | `8.2.1` | MIT |
+| `prettier` | `3.9.10` | MIT |
+| `vite` | `8.2.4` | MIT |
 | `vitest` | `4.1.11` | MIT |
 
 ### `services/blockscout/bens-microservice`
