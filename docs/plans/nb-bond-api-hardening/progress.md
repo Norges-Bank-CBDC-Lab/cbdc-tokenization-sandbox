@@ -126,6 +126,10 @@ Effects on this plan:
 - The `testMode` descriptions in `src/contracts/{bonds,auctions}.ts` no longer name deployment
   tooling (#304); the names remain in `src/env-vars.ts` and `src/auth.ts` comments.
 - `app.ts` line references in `design.md` predate these changes; re-check them in Phase 0.
+- The Node pin moved from 26.5.0 to 26.12.1 (2026-10-21), so the slim runtime base in Phase 0
+  and Phase 4b is now `node:26.12.1-slim`. The 2.0 GB image measurement in `design.md` was
+  taken on 26.5.0 and is kept as recorded. The repo-owned image hashes now include their base
+  image refs, so the Phase 4b runtime-base switch rebuilds the API image by itself.
 
 ## Session Handoff
 

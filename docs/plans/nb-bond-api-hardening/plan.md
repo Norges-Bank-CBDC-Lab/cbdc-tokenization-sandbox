@@ -61,7 +61,7 @@ production code changes.
    tag. In a scratch copy of the Dockerfile, try
    `npm ci --omit=dev --workspace nb-bond-api --include-workspace-root=false` in a separate
    `deps` stage. Check that `node -e "require('better-sqlite3')"` succeeds in the runtime
-   stage. Repeat with `node:26.5.0-slim` as the runtime base, without pushing anything to
+   stage. Repeat with `node:26.12.1-slim` as the runtime base, without pushing anything to
    the shared registry.
 5. Fixture regeneration check. Copy `services/nb-bond-api/helm/values.local.yaml` to a
    scratch directory, run `node scripts/generate-local-sandbox-fixtures.mjs --force` with
@@ -375,7 +375,7 @@ Optionally, it runs on a smaller base.
 
 ### Steps (4b, only after explicit approval)
 
-1. Add `SANDBOX_NODE_RUNTIME_SLIM_IMAGE=node:26.5.0-slim` to `common/node-version.env`.
+1. Add `SANDBOX_NODE_RUNTIME_SLIM_IMAGE=node:26.12.1-slim` to `common/node-version.env`.
 2. In `common/helpers.sh`, set `NB_BOND_API_RUNTIME_BASEIMAGE=$SANDBOX_NODE_RUNTIME_SLIM_IMAGE`.
 3. In `check-node-version-consistency.py`, require the runtime to derive from the new
    variable, and require the slim tag to equal `node:${SANDBOX_NODE_VERSION}-slim`.

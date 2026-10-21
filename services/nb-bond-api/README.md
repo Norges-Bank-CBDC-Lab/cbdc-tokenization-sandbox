@@ -94,7 +94,8 @@ development.
 from `services/nb-bond-api/Dockerfile` (multi-stage: builder runs `npm ci` +
 `npm run build`, runtime ships only `dist/` plus production `node_modules`).
 The image is tagged with a content hash over `src/`, `package.json`,
-`package-lock.json`, `tsconfig.json`, and the `Dockerfile`, pushed to the
+`package-lock.json`, `tsconfig.json`, the `Dockerfile`, and the builder and
+runtime base image refs (from `common/node-version.env`), pushed to the
 local Kind registry at `localhost:5001/nb-bond-api:<hash>`, and the Helm
 chart is installed with `--set image=<that tag>`. Re-runs skip the build
 when the content hash matches an existing registry tag.
