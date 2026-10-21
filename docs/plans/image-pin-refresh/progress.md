@@ -1,18 +1,19 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 1 implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 1: image hash base refs (awaiting PR and merge)
-**Next action:** After slice 1 merges, branch `feature/nginx-1-30-6` from a fresh `development`,
-re-check the newest nginx 1.30.x tag and its platforms, and run Phase 2.
+**Last updated:** 2026-10-21 — Phase 2 (nginx 1.30.6) implemented and verified on the local sandbox; PR pending
+**Current phase:** Phase 2: nginx-unprivileged 1.30.6 (awaiting PR and merge)
+**Next action:** After slice 2 merges, branch `feature/blockscout-support-pins` from a fresh
+`development`, re-check the newest Postgres 18.x, Python 3.14.x, `blockscout-stack` and verifier
+tags and their platforms, and run Phase 3.
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
 | 0 — Baseline | Done for planning (2026-10-21); re-run per slice | see below | — |
-| 1 — Image hash base refs | Done locally (2026-10-21) | `check-image-hash-inputs.sh` 11/11 plus a negative test; one-time rebuild of all three images on the local sandbox | pending |
-| 2 — nginx 1.30.6 | Not started | | |
+| 1 — Image hash base refs | Done (merged 2026-10-21) | `check-image-hash-inputs.sh` 11/11 plus a negative test; one-time rebuild of all three images on the local sandbox; CI green | #308 |
+| 2 — nginx 1.30.6 | Done locally (2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served | pending |
 | 3 — Blockscout supporting components | Not started | | |
 | 4 — NGINX Gateway Fabric 2.8.0 | Not started | | |
 | 5 — Besu 26.10.0 | Not started | | |
@@ -56,6 +57,12 @@ re-check the newest nginx 1.30.x tag and its platforms, and run Phase 2.
   lag 0); nb-ui answers 200 through the gateway; BENS answers 2xx; Blockscout is unaffected.
 - Phase 1 negative test: with the nginx and BENS base-ref lines removed from a scratch copy of
   `common/helpers.sh`, the check fails on `nb_ui.nginx` and `blockscout.bens`.
+- Phase 2 live check (2026-10-21): `nginxinc/nginx-unprivileged:1.30.6-alpine` is still the newest
+  1.30.x tag (amd64 and arm64). `registry-sync` then `nb-ui.sh start` built `nb-ui:7aa301b9b8bc`
+  from base digest `sha256:f5116ed4…` (the Docker Hub digest for the tag); the slice 1 hash
+  rebuilt it without any manual step. The pod is Ready with the read-only root filesystem,
+  `nginx -v` prints `nginx/1.30.6`, the UI answers 200 through the gateway, and `config.js` is
+  served from the ConfigMap overlay. nb-ui format, lint, tests and build pass locally.
 
 ## Blocked / Waiting On
 
@@ -77,7 +84,7 @@ re-check the newest nginx 1.30.x tag and its platforms, and run Phase 2.
 
 ## Session Handoff
 
-Phase 1 is on `feature/image-hash-base-refs` (not yet pushed). The local sandbox now runs the
+Phase 1 merged as #308. Phase 2 is on `feature/nginx-1-30-6` (not yet pushed). The local sandbox now runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that

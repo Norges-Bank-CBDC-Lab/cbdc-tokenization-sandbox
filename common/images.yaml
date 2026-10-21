@@ -52,6 +52,6 @@ blockscout:
 # The nginx runtime base below is pre-pulled by registry-sync so the local
 # nb-ui Docker build works without internet.
 nb_ui:
-  nginx: nginxinc/nginx-unprivileged:1.30.3-alpine
+  nginx: nginxinc/nginx-unprivileged:1.30.6-alpine
 
 local_registry: registry:2.8.3

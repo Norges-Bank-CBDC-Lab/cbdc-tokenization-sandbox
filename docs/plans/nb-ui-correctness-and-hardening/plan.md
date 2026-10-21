@@ -423,7 +423,7 @@ and token-free; no source maps ship.
 ### Steps
 
 1. Read the pinned image's default server config (`docker run --rm
-   nginxinc/nginx-unprivileged:1.30.3-alpine cat /etc/nginx/conf.d/default.conf`) and
+   nginxinc/nginx-unprivileged:1.30.6-alpine cat /etc/nginx/conf.d/default.conf`) and
    `/etc/nginx/nginx.conf`; record listen port, root, and temp paths in `progress.md`.
 2. `values.yaml`: add
    - `web.cspReportOnly: false`, `web.extraConnectSrc: []`, `web.fontOrigins` (the two CDN
@@ -468,7 +468,7 @@ and token-free; no source maps ship.
   `connect-src`.
 - Save the rendered `default.conf` to a scratch file and run `docker run --rm -v
   <scratch>/default.conf:/etc/nginx/conf.d/default.conf:ro
-  nginxinc/nginx-unprivileged:1.30.3-alpine nginx -t` (pinned image, throwaway container).
+  nginxinc/nginx-unprivileged:1.30.6-alpine nginx -t` (pinned image, throwaway container).
 - `npm run build -w nb-ui` then `find services/nb-ui/dist -name '*.map'` is empty.
 - Optional, with operator go-ahead: `./services/nb-ui/nb-ui.sh start`, then `curl -sI
   http://web.cbdc-sandbox.local/`, `/config.js`, and one `/assets/*.js` show the expected
