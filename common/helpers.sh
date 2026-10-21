@@ -49,7 +49,7 @@ NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
 NB_UI_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
-NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.3-alpine
+NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine
 # Backwards-compat alias; older code paths and external callers may still
 # reference NB_UI_BASEIMAGE expecting the nginx runtime base.
 NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
