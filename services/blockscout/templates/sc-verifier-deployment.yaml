@@ -54,6 +54,12 @@ spec:
               value: "/tmp/solidity-compilers"
             - name: SMART_CONTRACT_VERIFIER__SOLIDITY__FETCHER__LIST__LIST_URL
               value: "https://binaries.soliditylang.org/linux-amd64/list.json"
+            # From v1.11.0 compiler execution defaults to "disabled" and the
+            # compiler-backed verification endpoints refuse to start without
+            # a mode. "native" runs solc inside this pod, as before; the
+            # alternative ("docker") needs a remote Docker host over SSH.
+            - name: SMART_CONTRACT_VERIFIER__COMPILERS__EXECUTION__TYPE
+              value: "native"
             # Solidity-only sandbox (Foundry). Vyper and Sourcify are unused and
             # would add startup egress; disable them.
             - name: SMART_CONTRACT_VERIFIER__VYPER__ENABLED

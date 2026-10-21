@@ -169,8 +169,9 @@ registry unless `cleanup-images` pruned it.
 
 - `registry-sync`, then `./services/blockscout/blockscout.sh start`. The Postgres pod restarts
   on 18.6 against the existing PVC, and `SELECT version()` reports 18.6.
-- Run `ANALYZE;` once on `blockscout_db` and on the BENS database. This is upstream's
-  post-update advice for GIN `reltuples`; it is cheap at this size.
+- Run `ANALYZE;` once on `blockscout_db`; BENS has no database of its own (its init job writes
+  into `blockscout_db`). This is upstream's post-update advice for GIN `reltuples`; it is cheap
+  at this size.
 - BENS: a new `bens-microservice:<hash>` tag (proves Phase 1). The pod is Ready. `python -V` in
   the pod prints the new version.
 - Verifier pod is Ready, and its log shows the native execution mode.
@@ -419,7 +420,7 @@ where the change lands.
 |---|---|---|---|---|
 | 1 Hash inputs | No | No | None | Local build tooling only |
 | 2 nginx 1.30.6 | No | No | None (stateless) | Rebuild the NB UI image from the new base |
-| 3 Postgres 18.6 | No | No | In place on the existing volume; no dump/restore within 18.x | Run `ANALYZE` afterwards; back up the explorer database first as routine |
+| 3 Postgres 18.6 | No | No | In place on the existing volume; no dump/restore within 18.x | Run `ANALYZE` afterwards; back up the explorer database first as routine. Expect the explorer API to answer 500 for about a minute after the database restart, while its read pool reconnects (seen locally) |
 | 3 Python 3.14.x | No | No | None (BENS is stateless; its database is untouched) | Rebuild the BENS image |
 | 3 Chart 4.5.3 | No | No | None (`separateApi` is disabled) | — |
 | 3 Verifier v1.11.0 | No | No | None (stateless) | **Must** set `SMART_CONTRACT_VERIFIER__COMPILERS__EXECUTION__TYPE=native`, or verification stops |
