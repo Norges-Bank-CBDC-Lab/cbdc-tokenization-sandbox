@@ -25,8 +25,11 @@ integrators.
   repo-owned images (`nb-ui`, `nb-bond-api`, `bens-microservice`) — asserts each
   `*BundleHash` is sensitive to files inside its hashed input set and insensitive
   to files outside it, so a source file silently dropping out of a hash list
-  cannot ship a stale image. Pure and offline (no Docker, cluster, or network;
-  tracked files are never modified)
+  cannot ship a stale image. It also asserts each hash reacts to its stage base
+  image refs (Node for `nb-ui` and `nb-bond-api`, nginx for `nb-ui`, python for
+  `bens-microservice`), so a base-image pin bump rebuilds the image. Pure and
+  offline (no Docker, cluster, or network; edits only a throwaway copy of
+  `common/images.yaml`; tracked files are never modified)
 
 ## Typical Usage
 

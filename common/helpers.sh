@@ -1557,7 +1557,8 @@ function bensImageHash() {
     # Sources that affect the build output: generated server tree +
     # requirements.txt + Dockerfile. The swagger spec is the source for
     # the generator, but the generator output is what ships, so we hash
-    # only the output.
+    # only the output. The python stage base ref is an input too, so a
+    # Python pin bump rebuilds the image.
     {
         find "$BLOCKSCOUT_BENS_DIR/src/openapi_server" -type f \
             -not -path '*/__pycache__/*' -not -name '*.pyc' \
@@ -1565,6 +1566,7 @@ function bensImageHash() {
         shasum -a 256 \
             "$BLOCKSCOUT_BENS_DIR/requirements.txt" \
             "$BLOCKSCOUT_BENS_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getBensBaseImage)"
     } | shasum -a 256 | cut -c1-12
 }
 
@@ -1748,7 +1750,9 @@ function nbBondApiBundleHash() {
     # Dockerfile + the root-level workspace metadata (package.json /
     # package-lock.json) since deps now resolve at the repo root.
     # Anything outside this list (tests, README, openapi.json snapshot,
-    # dev-only configs) legitimately doesn't bust the cache.
+    # dev-only configs) legitimately doesn't bust the cache. The stage base
+    # refs are inputs too: a Node pin bump changes no file listed here, and
+    # without them the build would be skipped and the old base kept.
     {
         find "$NB_BOND_API_DIR/src" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
@@ -1757,6 +1761,7 @@ function nbBondApiBundleHash() {
             "$NB_BOND_API_DIR/package.json" \
             "$NB_BOND_API_DIR/tsconfig.json" \
             "$NB_BOND_API_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getNBBondApiBuilderImage)" "$(getNBBondApiRuntimeImage)"
     } | shasum -a 256 | cut -c1-12
 }
 
@@ -1819,7 +1824,8 @@ function nbUIBundleHash() {
     # + Dockerfile + the root-level workspace metadata (package.json /
     # package-lock.json) since deps now resolve at the repo root.
     # Anything outside this list (tests, README, .dockerignore)
-    # legitimately doesn't bust the cache.
+    # legitimately doesn't bust the cache. The stage base refs are inputs
+    # too, so a Node or nginx pin bump rebuilds the image.
     {
         find "$NB_UI_DIR/src" "$NB_UI_DIR/public" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
@@ -1829,6 +1835,7 @@ function nbUIBundleHash() {
             "$NB_UI_DIR/index.html" \
             "$NB_UI_DIR/vite.config.js" \
             "$NB_UI_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getNBUIBuilderImage)" "$(getNBUINginxImage)"
     } | shasum -a 256 | cut -c1-12
 }
 

@@ -6,11 +6,14 @@
 # A stale image ships when a source file silently falls out of a
 # *BundleHash input list: the hash would not change, so the build is skipped
 # even though the runtime bundle changed. This asserts each hash is:
-#   - sensitive   to files under its hashed input dir, and
-#   - insensitive to files outside its input set.
+#   - sensitive   to files under its hashed input dir,
+#   - insensitive to files outside its input set, and
+#   - sensitive   to its stage base image refs: Node (nb-ui, nb-bond-api),
+#     nginx (nb-ui), and python (bens-microservice).
 #
 # Pure/offline: sources common/helpers.sh and exercises the hash functions
-# by creating and removing throwaway files. No docker, cluster, or network.
+# by creating and removing throwaway files, and by pointing IMAGES_CONFIG at
+# a throwaway copy of common/images.yaml. No docker, cluster, or network.
 # Tracked files are never modified.
 
 set -uo pipefail
@@ -87,11 +90,63 @@ assert_hash_sensitivity() {
     fi
 }
 
+# assert_base_image_sensitivity NAME HASH_FN BASE_VAR
+#
+# Asserts HASH_FN changes when the stage base image held in BASE_VAR changes,
+# so a Node pin bump in common/node-version.env rebuilds the image instead of
+# reusing the cached tag. The override lives in a subshell; nothing on disk
+# is touched.
+assert_base_image_sensitivity() {
+    local name="$1" hash_fn="$2" base_var="$3"
+
+    local baseline changed
+    baseline="$("$hash_fn")"
+    changed="$(eval "$base_var=\"\${$base_var}-hashcheck\""; "$hash_fn")"
+    if [ -z "$baseline" ] || [ "$changed" == "$baseline" ]; then
+        fail "$name: changing $base_var did NOT change the hash — a base-image bump would reuse the old image"
+    else
+        pass "$name: hash reacts to $base_var"
+    fi
+}
+
+# assert_images_key_sensitivity NAME HASH_FN IMAGES_KEY
+#
+# Asserts HASH_FN changes when the stage base image pinned at IMAGES_KEY in
+# common/images.yaml changes. These refs are read from the file through
+# getImageValue, not from a shell variable, so the check edits a throwaway
+# copy of the file and points IMAGES_CONFIG at it inside a subshell.
+assert_images_key_sensitivity() {
+    local name="$1" hash_fn="$2" images_key="$3"
+
+    local images_copy
+    images_copy="$(mktemp "${TMPDIR:-/tmp}/hashcheck-images.XXXXXX")"
+    TMP_FILES+=("$images_copy")
+    cp "$IMAGES_CONFIG" "$images_copy"
+    if ! yq -i ".${images_key} += \"-hashcheck\"" "$images_copy" 2>/dev/null; then
+        fail "$name: could not rewrite $images_key in a copy of $(rel "$IMAGES_CONFIG") (is yq installed?)"
+        return
+    fi
+
+    local baseline changed
+    baseline="$("$hash_fn")"
+    changed="$(IMAGES_CONFIG="$images_copy"; "$hash_fn")"
+    if [ -z "$baseline" ] || [ "$changed" == "$baseline" ]; then
+        fail "$name: changing $images_key did NOT change the hash — a base-image bump would reuse the old image"
+    else
+        pass "$name: hash reacts to $images_key"
+    fi
+}
+
 main() {
     echo "Checking image content-hash inputs..."
     assert_hash_sensitivity "nb-ui"             nbUIBundleHash      "$NB_UI_DIR/src"                          "$NB_UI_DIR"
     assert_hash_sensitivity "nb-bond-api"       nbBondApiBundleHash "$NB_BOND_API_DIR/src"                    "$NB_BOND_API_DIR"
     assert_hash_sensitivity "bens-microservice" bensImageHash       "$BLOCKSCOUT_BENS_DIR/src/openapi_server" "$BLOCKSCOUT_BENS_DIR"
+    assert_base_image_sensitivity "nb-ui"       nbUIBundleHash      NB_UI_BUILDER_BASEIMAGE
+    assert_base_image_sensitivity "nb-bond-api" nbBondApiBundleHash NB_BOND_API_BUILDER_BASEIMAGE
+    assert_base_image_sensitivity "nb-bond-api" nbBondApiBundleHash NB_BOND_API_RUNTIME_BASEIMAGE
+    assert_images_key_sensitivity "nb-ui"             nbUIBundleHash nb_ui.nginx
+    assert_images_key_sensitivity "bens-microservice" bensImageHash  blockscout.bens
 
     echo
     if [ "$FAILURES" -gt 0 ]; then
