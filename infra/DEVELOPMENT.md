@@ -18,6 +18,17 @@ From `infra/`:
 `stop` keeps the chain and the Kind node's own image cache; `delete` loses
 both. The separate local-registry cache survives either command.
 
+## Gateway Version Bumps
+
+The NGINX Gateway Fabric chart version is pinned in `common/versions.yaml`
+(`charts.nginx_gateway_fabric`), and the same version is the `app.kubernetes.io/version`
+label in `infra/gateway/templates/nodeport-config.yaml`. On every `start`,
+`deployApiGateway` applies two CRD sets at that release before the chart
+upgrade: the Gateway API CRDs (client-side, from NGF's kustomize base) and
+NGF's own `gateway.nginx.org` CRDs (server-side with `--force-conflicts`). Helm
+installs a chart's CRDs only on first install, so the second apply is what
+moves an existing cluster's NGF CRDs to a new release.
+
 ## Local Registry Workflow
 
 The sandbox uses a local registry for Kind to avoid image import drift and to

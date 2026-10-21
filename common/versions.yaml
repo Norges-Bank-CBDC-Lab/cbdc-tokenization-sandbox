@@ -22,4 +22,4 @@
 #
 charts:
   blockscout_stack: 4.5.3
-  nginx_gateway_fabric: 2.6.6
+  nginx_gateway_fabric: 2.8.0

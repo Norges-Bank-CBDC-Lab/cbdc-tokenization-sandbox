@@ -1022,6 +1022,16 @@ function deployApiGateway() {
     # add gateway api resources
     kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v${NGINX_GATEWAY_FABRIC_VERSION}" | kubectl --context=kind-$CLUSTER_NAME apply -f -
 
+    # NGF's own CRDs (gateway.nginx.org). Helm installs a chart's CRDs only on
+    # first install and never upgrades them, so without this a version bump
+    # runs the new controller against the old CRDs. Server-side because
+    # nginxproxies is too large for client-side apply's annotation;
+    # --force-conflicts because the first install left Helm as their field
+    # manager, and Helm never touches them again. On a fresh cluster Helm
+    # finds them present and skips its own copy.
+    kubectl --context=kind-$CLUSTER_NAME apply --server-side --force-conflicts \
+        -f "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v${NGINX_GATEWAY_FABRIC_VERSION}/deploy/crds.yaml"
+
     # install api gateway
     # NOTE: no `--set service.create=false` here anymore — the value was
     # removed in the NGF 2.x chart (the data-plane Service is provisioned
@@ -1115,7 +1125,7 @@ function getBlockscoutChartVersion() {
 }
 
 function getNginxGatewayFabricVersion() {
-    getVersionValue "charts.nginx_gateway_fabric" "2.6.6"
+    getVersionValue "charts.nginx_gateway_fabric" "2.8.0"
 }
 
 function getBlockscoutDbImage() {
