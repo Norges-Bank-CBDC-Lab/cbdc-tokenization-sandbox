@@ -40,7 +40,7 @@ blockscout:
   backend: ghcr.io/blockscout/blockscout:v11.2.6
   frontend: ghcr.io/blockscout/frontend:v2.10.3
   db: postgres:18.6
-  bens: python:3.14.8
+  bens: python:3.14.9
   # Smart-contract verification microservice. Modern Blockscout delegates
   # source compilation / bytecode matching to this standalone service; the
   # backend (v10 and later) does not verify in-process. GPL-3.0, same as the
