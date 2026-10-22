@@ -120,7 +120,7 @@ License labels and deployment-time notes remain curated review items.
 | `jsdom` | `30.0.1` | MIT |
 | `prettier` | `3.9.10` | MIT |
 | `vite` | `8.2.4` | MIT |
-| `vitest` | `4.1.11` | MIT |
+| `vitest` | `4.1.12` | MIT |
 
 ### `services/blockscout/bens-microservice`
 
