@@ -339,7 +339,7 @@ can be reversed cheaply.
 | Readiness semantics | Readiness stays on bounded `/v1/health`, so the pod is Ready while the chain is down and reports `down` | Single replica; better UI signal | **Decide before Phase 3** |
 | `/livez` in OpenAPI | No, like `/docs` | Kubelet-facing, not an API resource | Confirm |
 | Chart defaults location | Move to `values.yaml`; strip the example; one-time `--force` regeneration | Otherwise the change never reaches existing sandboxes | Confirm the regeneration step |
-| Slim runtime base `node:26.5.0-slim` | Adopt as Phase 4b behind approval: new `SANDBOX_NODE_RUNTIME_SLIM_IMAGE` in `common/node-version.env`, and a `check-node-version-consistency.py` rule update | New image tag and a verification-script change | **Explicit approval** |
+| Slim runtime base `node:26.12.1-slim` | Adopt as Phase 4b behind approval: new `SANDBOX_NODE_RUNTIME_SLIM_IMAGE` in `common/node-version.env`, and a `check-node-version-consistency.py` rule update | New image tag and a verification-script change | **Explicit approval** |
 | OpenAPI snapshot test | Add to `tests/openapi-contract.test.ts` (runs in the existing `format-lint-test` job) | Cheap; no new workflow | **Explicit approval** (makes an existing CI check stricter) |
 | ABI and bytecode sync check | New `scripts/verification/check-nb-bond-api-abi-sync.py` plus a step in Contracts CI after `forge build`, with sparse checkout extended to `services/nb-bond-api/src/abi` | Only that job has `forge build` output | **Explicit approval** (new script and CI step) |
 | Route-module extraction | Optional Phase 7, one PR per feature, after the separate hardening change lands | Large refactor | **Explicit go-ahead** |

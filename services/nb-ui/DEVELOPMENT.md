@@ -218,7 +218,8 @@ to the pod's Service like any other backend.
   1. Pulls both stage bases through Docker (`loadImageToKind`) so the
      build works offline.
   2. Computes a short content-hash over `src/`, `public/`, `package*.json`,
-     `index.html`, `vite.config.js`, `Dockerfile` → the image tag.
+     `index.html`, `vite.config.js`, `Dockerfile`, and the Node builder and
+     nginx runtime base image refs → the image tag.
   3. Checks the local Kind registry; if `nb-ui:<hash>` already exists
      there, skips the build entirely (cache key = bundle content).
   4. Otherwise: `docker build` → `docker tag → docker push` to
@@ -236,7 +237,8 @@ _doesn't_ bust the cache.
 
 ## Known gotchas
 
-- The cache key is `services/nb-ui/{src,public,package.json,package-lock.json,index.html,vite.config.js,Dockerfile}`.
+- The cache key is `services/nb-ui/{src,public,package.json,package-lock.json,index.html,vite.config.js,Dockerfile}`
+  plus the two stage base image refs, so a Node or nginx pin bump rebuilds the image.
   If you add a new build input that legitimately affects `dist/`, extend
   `nbUIBundleHash` in `common/helpers.sh` accordingly.
 - nginx-unprivileged listens on port `8080`, not `80`. The chart's
