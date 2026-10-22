@@ -10,6 +10,7 @@ import {BondDvP} from "@norges-bank/BondDvP.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 
 import {Roles} from "@common/Roles.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract BondSetupScript is RegistryScript {
     function setUp() public {}
@@ -45,8 +46,13 @@ contract BondSetupScript is RegistryScript {
         vm.startBroadcast(deployerKey);
 
         bondAuction.grantRole(Roles.BOND_AUCTION_ADMIN_ROLE, bondManagerAddr);
-        bondToken.addController(bondManagerAddr);
+
+        // BondManager runs the bond lifecycle but never moves holder units itself, so it gets
+        // BOND_CONTROLLER_ROLE only. BondDvP moves units in settlement (ERC-1410 controller)
+        // and burns them on redemption and buyback (BOND_CONTROLLER_ROLE).
+        bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, bondManagerAddr);
         bondToken.addController(address(bondDvp));
+        bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, address(bondDvp));
 
         bondDvp.grantRole(Roles.SETTLE_ROLE, bondManagerAddr);
 
@@ -78,6 +84,41 @@ contract BondSetupScript is RegistryScript {
 
         vm.startBroadcast(dnbKey); // DNB
         wnok.approve(address(bondDvp), type(uint256).max);
+        vm.stopBroadcast();
+
+        _handAdminToOwner(deployerKey, owner, bondManagerAddr, bondAuction, bondToken, bondDvp);
+    }
+
+    /**
+     * @dev The deployer key is only needed to deploy and wire the bond contracts. Once wiring is
+     *      done, the Norges Bank owner key takes over DEFAULT_ADMIN_ROLE (and BOND_ADMIN_ROLE on
+     *      BondToken) so roles can still be rotated, and the deployer renounces its own.
+     */
+    function _handAdminToOwner(
+        uint256 deployerKey,
+        address owner,
+        address bondManagerAddr,
+        BondAuction bondAuction,
+        BondToken bondToken,
+        BondDvP bondDvp
+    ) internal {
+        address deployer = vm.addr(deployerKey);
+        if (deployer == owner) return;
+
+        IAccessControl[4] memory bondContracts = [
+            IAccessControl(bondManagerAddr),
+            IAccessControl(address(bondAuction)),
+            IAccessControl(address(bondToken)),
+            IAccessControl(address(bondDvp))
+        ];
+
+        vm.startBroadcast(deployerKey);
+        bondToken.grantRole(Roles.BOND_ADMIN_ROLE, owner);
+        bondToken.renounceRole(Roles.BOND_ADMIN_ROLE, deployer);
+        for (uint256 i = 0; i < bondContracts.length; i++) {
+            bondContracts[i].grantRole(Roles.DEFAULT_ADMIN_ROLE, owner);
+            bondContracts[i].renounceRole(Roles.DEFAULT_ADMIN_ROLE, deployer);
+        }
         vm.stopBroadcast();
     }
 }

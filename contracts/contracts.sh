@@ -10,7 +10,10 @@ source ../common/helpers.sh
 # print help message
 function printHelp() {
     echo "Usage is: "
-    echo "  $(basename "$0") <start|stop|verify|verify-latest>"
+    echo "  $(basename "$0") <start|stop|delete|verify|verify-latest>"
+    echo
+    echo "  stop: nothing to stop; the contracts live on the Besu chain."
+    echo "  delete: removes the contract registry ConfigMap from the cluster; the contracts stay on the chain."
     echo
     echo "  verify:"
     echo "    --address <contract-address> (required)"
@@ -95,8 +98,8 @@ fi
 IS_SUBTASK="false"
 VERIFY_CONTRACTS=""
 
-# parse flags and options for start/stop only
-if [ "$CMD" == "start" ] || [ "$CMD" == "stop" ]; then
+# parse flags and options for start/stop/delete only
+if [ "$CMD" == "start" ] || [ "$CMD" == "stop" ] || [ "$CMD" == "delete" ]; then
     while [[ $# -ge 1 ]] ; do
         key="$1"
         case $key in
@@ -180,6 +183,8 @@ if [ "$CMD" == "start" ]; then
 
     deployContracts $NETWORK $CHAIN_ID $VERIFY_CONTRACTS
 elif [ "$CMD" == "stop" ]; then
+    echo "Nothing to stop: the contracts live on the Besu chain and stop with it."
+elif [ "$CMD" == "delete" ]; then
     echo "deleting the contract registry from the cluster, but leaving contracts deployed and running in Besu"
 
     kubectl --context=kind-$CLUSTER_NAME -n $REGISTRY_CONTRACT_NAMESPACE delete configmap $REGISTRY_CONTRACT_CONFIGMAP || true

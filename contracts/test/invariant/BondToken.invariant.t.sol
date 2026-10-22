@@ -12,6 +12,8 @@ contract BondTokenHandler is Test {
 
     string internal constant ISIN = "NO0001234567";
     bytes32 internal constant PARTITION = keccak256(abi.encodePacked(ISIN));
+    string internal constant ISIN_B = "NO0007654321";
+    bytes32 internal constant PARTITION_B = keccak256(abi.encodePacked(ISIN_B));
 
     address[4] internal holders = [address(0x101), address(0x102), address(0x103), address(0x104)];
 
@@ -20,27 +22,44 @@ contract BondTokenHandler is Test {
         controller = _controller;
     }
 
-    function createPartition(uint96 offeringSeed, uint32 maturitySeed) external {
-        if (bondToken.activePartitions(PARTITION)) return;
+    function createPartition(uint96 offeringSeed, uint32 maturitySeed, uint8 isinSeed) external {
+        (string memory isin, bytes32 partition) = _isin(isinSeed);
+        if (bondToken.activePartitions(partition)) return;
 
         uint256 offering = _boundNonZero(uint256(offeringSeed), 1, 1_000_000);
         uint256 maturityDuration = _boundNonZero(uint256(maturitySeed), 1 days, 10 * 365 days);
 
         vm.prank(controller);
-        bondToken.createPartition(ISIN, offering, maturityDuration);
+        bondToken.createPartition(isin, offering, maturityDuration);
     }
 
-    function mintToHolder(uint96 amountSeed, uint8 holderSeed) external {
-        if (!bondToken.activePartitions(PARTITION)) return;
+    function mintToHolder(uint96 amountSeed, uint8 holderSeed, uint8 isinSeed) external {
+        (string memory isin, bytes32 partition) = _isin(isinSeed);
+        if (!bondToken.activePartitions(partition)) return;
 
-        uint256 currentSupply = bondToken.totalSupplyByPartition(PARTITION);
-        uint256 offering = bondToken.partitionOffering(PARTITION);
+        uint256 currentSupply = bondToken.totalSupplyByPartition(partition);
+        uint256 offering = bondToken.partitionOffering(partition);
         if (currentSupply >= offering) return;
 
         uint256 amount = _boundNonZero(uint256(amountSeed), 1, offering - currentSupply);
 
         vm.prank(controller);
-        bondToken.mintByIsin(ISIN, _holder(holderSeed), amount);
+        bondToken.mintByIsin(isin, _holder(holderSeed), amount);
+    }
+
+    /// @dev A holder moves its own units; `data` names either partition.
+    function holderTransfer(uint96 amountSeed, uint8 fromSeed, uint8 toSeed, uint8 dataSeed) external {
+        address from = _holder(fromSeed);
+        bytes32[] memory held = bondToken.partitionsOf(from);
+        if (held.length == 0) return;
+
+        bytes32 partition = held[uint256(amountSeed) % held.length];
+        uint256 balance = bondToken.balanceOfByPartition(partition, from);
+        uint256 amount = _boundNonZero(uint256(amountSeed), 1, balance);
+        (, bytes32 dataPartition) = _isin(dataSeed);
+
+        vm.prank(from);
+        bondToken.operatorTransferByPartition(partition, from, _holder(toSeed), amount, abi.encode(dataPartition), "");
     }
 
     function extendOffering(uint96 deltaSeed) external {
@@ -112,6 +131,10 @@ contract BondTokenHandler is Test {
         bondToken.redeemFor(holder, ISIN, amount, controller);
     }
 
+    function _isin(uint8 isinSeed) internal pure returns (string memory isin, bytes32 partition) {
+        return isinSeed % 2 == 0 ? (ISIN, PARTITION) : (ISIN_B, PARTITION_B);
+    }
+
     function _holder(uint8 holderSeed) internal view returns (address) {
         return holders[uint256(holderSeed) % holders.length];
     }
@@ -129,6 +152,8 @@ contract BondTokenInvariantTest is Test {
     address internal constant CONTROLLER = address(0x999);
     string internal constant ISIN = "NO0001234567";
     bytes32 internal constant PARTITION = keccak256(abi.encodePacked(ISIN));
+    string internal constant ISIN_B = "NO0007654321";
+    bytes32 internal constant PARTITION_B = keccak256(abi.encodePacked(ISIN_B));
     address[4] internal HOLDERS = [address(0x101), address(0x102), address(0x103), address(0x104)];
 
     function setUp() public {
@@ -137,7 +162,7 @@ contract BondTokenInvariantTest is Test {
 
         handler = new BondTokenHandler(bondToken, CONTROLLER);
 
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = handler.createPartition.selector;
         selectors[1] = handler.mintToHolder.selector;
         selectors[2] = handler.extendOffering.selector;
@@ -146,26 +171,19 @@ contract BondTokenInvariantTest is Test {
         selectors[5] = handler.buybackRedeem.selector;
         selectors[6] = handler.markMatured.selector;
         selectors[7] = handler.redeemHolder.selector;
+        selectors[8] = handler.holderTransfer.selector;
 
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
     function invariant_TotalSupplyNeverExceedsOffering() public view {
-        if (!bondToken.activePartitions(PARTITION)) {
-            assertEq(bondToken.totalSupplyByPartition(PARTITION), 0);
-            return;
-        }
-
-        assertLe(bondToken.totalSupplyByPartition(PARTITION), bondToken.partitionOffering(PARTITION));
+        _assertSupplyWithinOffering(PARTITION);
+        _assertSupplyWithinOffering(PARTITION_B);
     }
 
     function invariant_SupplyMatchesTrackedHolderBalances() public view {
-        uint256 trackedBalance;
-        for (uint256 i = 0; i < HOLDERS.length; i++) {
-            trackedBalance += bondToken.balanceOfByPartition(PARTITION, HOLDERS[i]);
-        }
-
-        assertEq(bondToken.totalSupplyByPartition(PARTITION), trackedBalance);
+        _assertSupplyMatchesHolders(PARTITION);
+        _assertSupplyMatchesHolders(PARTITION_B);
     }
 
     function invariant_CouponConfigRemainsSelfConsistent() public view {
@@ -186,5 +204,23 @@ contract BondTokenInvariantTest is Test {
         if (bondToken.isMatured(PARTITION)) {
             assertTrue(bondToken.activePartitions(PARTITION));
         }
+    }
+
+    function _assertSupplyWithinOffering(bytes32 partition) internal view {
+        if (!bondToken.activePartitions(partition)) {
+            assertEq(bondToken.totalSupplyByPartition(partition), 0);
+            return;
+        }
+
+        assertLe(bondToken.totalSupplyByPartition(partition), bondToken.partitionOffering(partition));
+    }
+
+    function _assertSupplyMatchesHolders(bytes32 partition) internal view {
+        uint256 trackedBalance;
+        for (uint256 i = 0; i < HOLDERS.length; i++) {
+            trackedBalance += bondToken.balanceOfByPartition(partition, HOLDERS[i]);
+        }
+
+        assertEq(bondToken.totalSupplyByPartition(partition), trackedBalance);
     }
 }

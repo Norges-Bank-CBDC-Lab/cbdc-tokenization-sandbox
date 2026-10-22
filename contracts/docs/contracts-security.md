@@ -40,10 +40,12 @@ in [`contracts/src/common/Roles.sol`](../src/common/Roles.sol).
 
 | Role | Used by | Why it matters |
 | --- | --- | --- |
-| `DEFAULT_ADMIN_ROLE` | multiple contracts | Can grant and revoke other roles. This is the highest-trust role and should be tightly controlled. |
+| `DEFAULT_ADMIN_ROLE` | multiple contracts | Can grant and revoke other roles. This is the highest-trust role and should be tightly controlled. On `BondManager`, `BondAuction`, `BondToken`, and `BondDvP` the deploy scripts hand it to the Norges Bank owner key and the deployer key renounces it. |
+| `BOND_ADMIN_ROLE` | `BondToken` | Can add and remove ERC-1410 controllers, which act as operators over every holder's units. Only `BondDvP` is made a controller, because it moves units during settlement. |
 | `BOND_MANAGER_ROLE` | `BondManager` | Can open, close, cancel, and finalise auctions, recover failed issuance, pay coupons, and redeem bonds. |
 | `BOND_AUCTION_ADMIN_ROLE` | `BondAuction` | Can create, close, cancel, and finalise auctions. In practice this should align with the `BondManager` control path. |
-| `BOND_CONTROLLER_ROLE` | `BondToken` | Can create partitions, extend or reduce offering, mint by ISIN, update coupon state, and mark bonds matured. |
+| `BOND_CONTROLLER_ROLE` | `BondToken` | Can create partitions, extend or reduce offering, mint by ISIN, update coupon state, and mark bonds matured. Held by `BondManager` and by `BondDvP` (for redemption and buyback burns); granted separately from controller status. |
+| `SUBMIT_ORDER_ROLE` | `OrderBook` | Can submit buy and sell orders. Granted only to the `Broker` contracts, which let a client revoke only its own orders. |
 | `SETTLE_ROLE` | `BondDvP` | Can execute settlement, including bond-leg and cash-leg transfers. Misconfiguration here directly affects issuance, buyback, coupon, and redemption flows. |
 | `MINTER_ROLE` / `BURNER_ROLE` / `TRANSFER_FROM_ROLE` | `Wnok` and related cash flows | Control the tokenized cash leg and the ability to move cash during settlement. `BondDvP` holds `TRANSFER_FROM_ROLE` and moves WNOK for every bond cash leg, bounded by the payer's allowance: the bidder's for issuance and the government reserve account's for buyback, coupon, and redemption. |
 

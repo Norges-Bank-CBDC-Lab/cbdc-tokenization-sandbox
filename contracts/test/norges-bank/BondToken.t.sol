@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.29;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {BondToken} from "@norges-bank/BondToken.sol";
 import {Wnok} from "@norges-bank/Wnok.sol";
 import {Errors} from "@common/Errors.sol";
@@ -17,6 +18,7 @@ contract BondTokenTest is Test {
     address holder2 = address(0x2);
 
     string constant ISIN = "NO0001234567";
+    string constant ISIN_B = "NO0007654321";
     uint256 constant OFFERING = 1000;
     uint256 constant MATURITY_DURATION = 4 * 365 days; // 4 years
     uint256 constant COUPON_DURATION = 365 days; // 1 year
@@ -248,15 +250,74 @@ contract BondTokenTest is Test {
 
     // ============ addController Tests ============
 
-    function test_AddController_AddsRoleAndControllerList() public {
+    function test_AddController_AddsControllerWithoutLifecycleRole() public {
         address newController = address(0x3);
 
         bondToken.addController(newController);
 
-        assertTrue(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, newController));
+        assertTrue(bondToken.isController(newController));
+        assertFalse(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, newController));
         address[] memory controllers = bondToken.controllers();
         assertEq(controllers.length, 1);
         assertEq(controllers[0], newController);
+    }
+
+    function test_RemoveController_RemovesOnlyThatController() public {
+        address first = address(0x3);
+        address second = address(0x4);
+        bondToken.addController(first);
+        bondToken.addController(second);
+        bondToken.grantRole(Roles.BOND_CONTROLLER_ROLE, first);
+
+        bondToken.removeController(first);
+
+        assertFalse(bondToken.isController(first));
+        assertTrue(bondToken.isController(second));
+        address[] memory controllers = bondToken.controllers();
+        assertEq(controllers.length, 1);
+        assertEq(controllers[0], second);
+        // Lifecycle rights are managed separately and stay as they were.
+        assertTrue(bondToken.hasRole(Roles.BOND_CONTROLLER_ROLE, first));
+    }
+
+    function test_RemoveController_NoopWhenNotController() public {
+        address first = address(0x3);
+        bondToken.addController(first);
+
+        bondToken.removeController(address(0x4));
+
+        address[] memory controllers = bondToken.controllers();
+        assertEq(controllers.length, 1);
+        assertEq(controllers[0], first);
+    }
+
+    function test_RemoveController_RevertIf_NotBondAdmin() public {
+        address first = address(0x3);
+        bondToken.addController(first);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, holder1, Roles.BOND_ADMIN_ROLE
+            )
+        );
+        vm.prank(holder1);
+        bondToken.removeController(first);
+    }
+
+    function test_RemovedController_CannotMoveHolderUnits() public {
+        address operator = address(0x3);
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        vm.stopPrank();
+        bytes32 partition = bondToken.isinToPartition(ISIN);
+
+        bondToken.addController(operator);
+        bondToken.removeController(operator);
+
+        vm.expectRevert(Errors.UnauthorizedOperator.selector);
+        vm.prank(operator);
+        bondToken.operatorTransferByPartition(partition, holder1, holder2, 10, "", "");
     }
 
     function test_AddController_DeduplicatesExisting() public {
@@ -382,6 +443,58 @@ contract BondTokenTest is Test {
         vm.prank(controller);
         vm.expectRevert(abi.encodeWithSelector(Errors.PartitionNotActive.selector, ISIN));
         bondToken.redeemFor(holder1, ISIN, 50, controller);
+    }
+
+    // ============ operatorTransferByPartition Tests ============
+
+    function test_OperatorTransferByPartition_KeepsPartition() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.createPartition(ISIN_B, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        bondToken.mintByIsin(ISIN_B, holder2, 100);
+        vm.stopPrank();
+
+        bytes32 partitionA = bondToken.isinToPartition(ISIN);
+        bytes32 partitionB = bondToken.isinToPartition(ISIN_B);
+
+        vm.recordLogs();
+        vm.prank(holder1);
+        bytes32 landedIn =
+            bondToken.operatorTransferByPartition(partitionA, holder1, holder2, 60, abi.encode(partitionB), "");
+
+        assertEq(landedIn, partitionA);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder1), 40);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder2), 60);
+        assertEq(bondToken.balanceOfByPartition(partitionB, holder2), 100);
+        assertEq(bondToken.totalSupplyByPartition(partitionA), 100);
+        assertEq(bondToken.totalSupplyByPartition(partitionB), 100);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 changedPartitionTopic = keccak256("ChangedPartition(bytes32,bytes32,uint256)");
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertNotEq(logs[i].topics[0], changedPartitionTopic);
+        }
+    }
+
+    function test_OperatorTransferByPartition_CannotBlockIssuance() public {
+        vm.startPrank(controller);
+        bondToken.createPartition(ISIN, OFFERING, MATURITY_DURATION);
+        bondToken.mintByIsin(ISIN, holder1, 100);
+        bondToken.createPartition(ISIN_B, OFFERING, MATURITY_DURATION);
+        vm.stopPrank();
+
+        bytes32 partitionA = bondToken.isinToPartition(ISIN);
+        bytes32 partitionB = bondToken.isinToPartition(ISIN_B);
+
+        vm.prank(holder1);
+        bondToken.operatorTransferByPartition(partitionA, holder1, holder2, 1, abi.encode(partitionB), "");
+
+        vm.prank(controller);
+        bondToken.mintByIsin(ISIN_B, holder2, OFFERING);
+
+        assertEq(bondToken.totalSupplyByPartition(partitionB), OFFERING);
+        assertEq(bondToken.balanceOfByPartition(partitionA, holder2), 1);
     }
 
     // ============ isinToPartition Tests ============

@@ -14,4 +14,4 @@ bensPort: 80
 # values for db
 dbPassword: ps_user
 
-# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/blockscout-stack-4.5.1/charts/blockscout-stack/values.yaml
+# Overwrites default values based on : https://github.com/blockscout/helm-charts/blob/blockscout-stack-4.5.3/charts/blockscout-stack/values.yaml

@@ -12,12 +12,9 @@ contract OrderBookScript is RegistryScript {
     function run() external {
         uint256 deployerKey = vm.envUint("PK_DEPLOYER");
         uint256 ownerKey = vm.envUint("PK_NORGES_BANK");
-        uint256 csdKey = vm.envUint("PK_CSD");
         address owner = vm.addr(ownerKey);
 
         address csdAddr = vm.addr(vm.envUint("PK_CSD"));
-        address broker1Addr = vm.addr(vm.envUint("PK_BROKER1"));
-        address broker2Addr = vm.addr(vm.envUint("PK_BROKER2"));
 
         address registryAddr = vm.envAddress("REGISTRY_ADDR");
         _ensureRegistry(registryAddr, owner);
@@ -30,13 +27,10 @@ contract OrderBookScript is RegistryScript {
         (bool found, address stockTokenAddr) = stockTokenFactory.getDeployedStockToken("NO0001234567");
         require(found, "Stock token NO0001234567 not found.");
 
+        // SUBMIT_ORDER_ROLE goes only to the broker contracts (09_BrokersSetup), which submit
+        // orders on behalf of their registered clients; broker EOAs get no direct order access.
         vm.startBroadcast(deployerKey);
         OrderBook orderBook = new OrderBook(csdAddr, wnokAddr, address(dvp), stockTokenAddr);
-        vm.stopBroadcast();
-
-        vm.startBroadcast(csdKey);
-        orderBook.grantRole(Roles.SUBMIT_ORDER_ROLE, broker1Addr);
-        orderBook.grantRole(Roles.SUBMIT_ORDER_ROLE, broker2Addr);
         vm.stopBroadcast();
 
         vm.startBroadcast(ownerKey);

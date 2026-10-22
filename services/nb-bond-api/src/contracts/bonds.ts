@@ -2,7 +2,12 @@ import { z } from 'zod';
 import type { ZodOpenApiPathsObject } from 'zod-openapi';
 
 import { auctionSchema, createAuctionBodySchema } from './auctions';
-import { errorRefs, mutationAcceptedJson, successJson } from '../openapi/shared-responses';
+import {
+  errorRefs,
+  mutationAcceptedJson,
+  operatorOnlyDescription,
+  successJson,
+} from '../openapi/shared-responses';
 import {
   addressSchema,
   auctionIdSchema,
@@ -159,8 +164,10 @@ const testModeQueryParam = {
   required: false,
   schema: { type: 'boolean' as const, default: false },
   description:
-    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar; ArgoCD- ' +
-    'managed deployments should ignore it. Today `testMode=true` enables: ' +
+    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar. ' +
+    'Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller ' +
+    'gets the sealed view and the normal close pre-check, not an error). ' +
+    'When honoured, `testMode=true` enables: ' +
     '(a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; ' +
     '(b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the ' +
     'operator can attempt close before the bidding window expires — the on-chain contract still ' +
@@ -200,6 +207,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       summary:
         'Create a bond partition without scheduling an auction. The first auction is scheduled ' +
         'separately via POST /v1/bonds/{isin}/auctions.',
+      description: operatorOnlyDescription,
       requestBody: {
         required: true,
         content: { 'application/json': { schema: createBondBodySchema } },
@@ -228,6 +236,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       summary:
         'Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED ' +
         'auction in history. Idempotent — returns 204 even if the bond is already disabled.',
+      description: operatorOnlyDescription,
       parameters: [isinPathParam],
       responses: {
         204: { description: 'Bond disabled (or was already disabled)' },
@@ -287,6 +296,7 @@ export const bondPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'createAuction',
       summary: 'Create an auction under a bond. Response is the updated parent Bond.',
+      description: operatorOnlyDescription,
       parameters: [isinPathParam],
       requestBody: {
         required: true,

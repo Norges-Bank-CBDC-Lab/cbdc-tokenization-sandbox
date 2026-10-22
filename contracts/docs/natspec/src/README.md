@@ -142,11 +142,15 @@ Deploy and verify in Blockscout:
 ./contracts.sh start --verify
 ```
 
-Stop only the registry/configmap side of the contract deployment integration:
+Remove only the registry/configmap side of the contract deployment
+integration; the contracts stay deployed on the chain:
 
 ```console
-./contracts.sh stop
+./contracts.sh delete
 ```
+
+`./contracts.sh stop` does nothing: the contracts live on the Besu chain and
+stop with it (`./sandbox.sh stop`).
 
 Verify the latest full deployment:
 

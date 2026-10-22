@@ -10,6 +10,7 @@ import { BondsApi } from '../api/bondsApi.js';
 import { useMutation } from '../hooks/useApi.js';
 import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 import {
   Button,
   EmptyState,
@@ -22,6 +23,7 @@ import {
 import { ConfirmDisableBondModal } from './ConfirmDisableBondModal.jsx';
 
 export function BondDetailPage({ isin, navigate }) {
+  const { canOperate } = useCapabilities();
   const bondQ = useLiveQuery(
     [LiveResource.BONDS, LiveResource.AUCTIONS],
     () => BondsApi.getBond(isin),
@@ -111,7 +113,7 @@ export function BondDetailPage({ isin, navigate }) {
           <Button variant="ghost" onClick={bondQ.reload}>
             Refresh
           </Button>
-          {canDisable && (
+          {canOperate && canDisable && (
             <Button
               variant="danger"
               onClick={() => setShowDisable(true)}

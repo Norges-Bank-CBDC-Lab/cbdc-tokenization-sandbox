@@ -21,7 +21,7 @@ The API is defined by the OpenAPI 3.1 document in `services/nb-bond-api/openapi.
 ### 1.2 What it does not do
 
 - It does not provide endpoints for dealers/investors to place bids. Bids are submitted on-chain to `BondAuction` using the CLIs under `scripts/` (see §5).
-- It does not provide endpoints for secondary-market order placement. Scenario 3 trading is implemented on-chain via bond order book contracts, but is not driven through this OpenAPI surface.
+- It does not provide endpoints for secondary-market order placement. Scenario 3 (secondary bond trading) has no on-chain venue in this repository.
 - It implements two configurable auth modes — `none` (sandbox default, header accepted but ignored) and `entra` (JWT validated against a Microsoft Entra ID tenant). See §7.7. The OpenAPI document always declares `bearerAuth`; the `none` mode is a runtime override for the sandbox.
 
 ## 2. Quickstart (run the service)
@@ -56,7 +56,7 @@ Important optional settings:
 - `CORS_ALLOWED_ORIGINS`: comma-separated list of origins the CORS middleware accepts. Defaults to `http://web.cbdc-sandbox.local` (the local sandbox frontend at `services/nb-ui/`). Override (with multiple comma-separated origins if needed) for a non-local deployment.
 - `NB_BOND_API_AUTH_MODE`: `none` (default) or `entra`. See §7.7.
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE`: required when `NB_BOND_API_AUTH_MODE=entra`.
-- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES`: comma-separated Entra App Role values for role-based access (operator gates `/v1/central-bank/*`; recognised = operator ∪ tester). Operator roles required in `entra` mode. See §7.7.
+- `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES`: comma-separated Entra App Role values for role-based access (operator gates issuer actions, coupon payments, `/v1/admin/*`, and `/v1/central-bank/*`; recognised = operator ∪ tester). Operator roles required in `entra` mode. See §7.7.
 
 ### 2.3 Start commands
 
@@ -301,7 +301,7 @@ Maturity: the final coupon payment (`coupon.payments.remaining == 1` before the 
 
 ### 6.5 Scenario 3, secondary trading (note)
 
-Scenario 3 trading is implemented on-chain (bond order book and settlement logic), but is not exposed through this OpenAPI service. If you need an HTTP interface for secondary trading, it should be designed as a separate work package (for example, an order placement API that wraps the on-chain `BondOrderBook` and enforces the correct authorisations and cash-token semantics).
+Scenario 3 (secondary bond trading) has no on-chain venue in this repository and is not exposed through this OpenAPI service. A bond secondary market, and any HTTP interface for it, should be designed as a separate work package that enforces the correct authorisations and cash-token semantics.
 
 ## 7. Operational notes and troubleshooting
 
@@ -495,10 +495,31 @@ token, `entra` mode authorizes it against the `roles` claim (Entra App Roles):
   granting baseline access without Central Bank. Optional.
 - Every authenticated endpoint requires at least one _recognised_ role
   (operator ∪ tester); a valid token carrying none is rejected with `403`.
-  `/v1/central-bank/*` additionally requires an operator role (`403`
-  otherwise). `none` mode performs no role checks. The values must match the
-  nb-ui `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values
-  defined in Entra.
+  `none` mode performs no role checks. The values must match the nb-ui
+  `AUTH_OPERATOR_ROLES` / `AUTH_TESTER_ROLES` and the App Role values defined
+  in Entra.
+- Route matrix in `entra` mode (operator-only routes answer `403` to any
+  other recognised role, before request validation):
+
+  | Routes                                                                                                       | Roles      |
+  | ------------------------------------------------------------------------------------------------------------ | ---------- |
+  | All reads, `/v1/events`, `POST` / `DELETE /v1/bidders`, `POST /v1/bidders/{address}/bids`, `/v1/banking/*`   | recognised |
+  | `POST /v1/bonds`, `DELETE /v1/bonds/{isin}`, `POST /v1/bonds/{isin}/auctions`                                | operator   |
+  | `PATCH /v1/auctions/{id}` (close), `DELETE /v1/auctions/{id}` (cancel), `PUT /v1/auctions/{id}/finalisation` | operator   |
+  | `POST /v1/bonds/{isin}/coupon-payments`, `/v1/admin/*`, `/v1/central-bank/*`                                 | operator   |
+
+  `tests/route-authorization.test.ts` exercises every mutating route as an
+  operator and as a tester, so a missing or misplaced gate fails CI.
+
+- The `testMode` query flag (unseal open bids on bond / auction reads, skip
+  the close end-time pre-check) is honoured only for operator callers
+  (`src/test-mode.ts`, using `isOperatorRequest` in `src/auth.ts`). A tester's
+  flag is ignored, not rejected: the response is the normal sealed view.
+- Bidder DTOs (`GET` / `POST /v1/bidders`) carry `privateKey` only in `none`
+  mode, and never for a fixture bidder whose key comes from a `PK_NORDEA` /
+  `PK_DNB` / `PK_ALICE_TBD` override (`exposedBidderPrivateKey` in
+  `src/bidders.ts`); otherwise `privateKey` is `null`. The server keeps
+  holding the key and signs with it, as it does for bank keys.
 
 `/v1/health`, `/docs`, and `/v1/openapi.json` are mounted before the
 auth gate and stay public in both modes. Every other endpoint goes
@@ -628,6 +649,7 @@ To prevent that, the helm chart mounts a `PersistentVolumeClaim`
 
 The Kind local-path-provisioner stores the backing directory under the
 Kind node's filesystem. **Survives** helm upgrades, `./nb-bond-api.sh
-start`, `kubectl rollout restart`. **Does not survive** `kind delete
+start` and `stop`, `./sandbox.sh stop`, `kubectl rollout restart`. **Does not
+survive** `./nb-bond-api.sh delete`, `./sandbox.sh delete`, or `kind delete
 cluster` — bidders will need to be re-added (or wait for re-seeding of
 the fixtures) after a full sandbox tear-down.

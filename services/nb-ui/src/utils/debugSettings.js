@@ -12,16 +12,23 @@
  *
  * Future test affordances should hang off the same toggle — read via
  * `getTestMode()` from any API module, append `?testMode=true` to the
- * relevant requests, and the backend's `parseTestMode(req)` will pick
- * it up.
+ * relevant requests, and the backend's `parseTestMode(req, res)` will
+ * pick it up.
  *
- * Sandbox-only. ArgoCD-managed deployments should ignore this flag.
+ * Operator-only: `getTestMode()` reports the stored flag only when the
+ * current account can operate (always in `none` mode), so every consumer
+ * inherits the gate and a stale flag left by another account is ignored.
+ * The API applies the same rule and ignores the flag for everyone else.
  */
+import { auth } from '../auth/index.js';
+import { capabilitiesForAccount } from '../auth/capabilities.js';
+
 const LS_KEY = 'nbui.testMode';
 
 const listeners = new Set();
 
 export function getTestMode() {
+  if (!capabilitiesForAccount(auth.getAccount()).canOperate) return false;
   try {
     return window.localStorage.getItem(LS_KEY) === 'true';
   } catch {

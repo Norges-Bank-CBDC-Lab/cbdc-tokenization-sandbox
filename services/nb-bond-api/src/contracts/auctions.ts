@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import type { ZodOpenApiPathsObject } from 'zod-openapi';
 
-import { errorRefs, mutationAcceptedJson, successJson } from '../openapi/shared-responses';
+import {
+  errorRefs,
+  mutationAcceptedJson,
+  operatorOnlyDescription,
+  successJson,
+} from '../openapi/shared-responses';
 
 import {
   addressSchema,
@@ -203,8 +208,10 @@ const testModeQueryParam = {
   required: false,
   schema: { type: 'boolean' as const, default: false },
   description:
-    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar; ArgoCD- ' +
-    'managed deployments should ignore it. Today `testMode=true` enables: ' +
+    'Sandbox-only umbrella "test mode" flag. The operator UI flips this from the top bar. ' +
+    'Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller ' +
+    'gets the sealed view and the normal close pre-check, not an error). ' +
+    'When honoured, `testMode=true` enables: ' +
     '(a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; ' +
     '(b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the ' +
     'operator can attempt close before the bidding window expires — the on-chain contract still ' +
@@ -240,6 +247,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'closeAuction',
       summary: 'Transition auction to a new status. Only "closed" accepted today.',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam, testModeQueryParam],
       requestBody: {
         required: true,
@@ -255,6 +263,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'cancelAuction',
       summary: 'Cancel auction (soft-delete; stays on-chain with status="cancelled")',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam],
       responses: {
         200: successJson('Cancelled auction (status="cancelled")', auctionSchema, true),
@@ -268,6 +277,7 @@ export const auctionPaths: ZodOpenApiPathsObject = {
       tags: ['auctions'],
       operationId: 'finaliseAuction',
       summary: 'Approve and submit the selected allocation',
+      description: operatorOnlyDescription,
       parameters: [auctionIdPathParam],
       requestBody: {
         required: true,

@@ -172,19 +172,21 @@ contract ERC1410Minimal is IERC1410, ERC165 {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Transfer value from the caller out of a partition.
-     * @dev If `data` is 32 bytes long, it is treated as the destination partition.
+     * @notice Transfer value from the caller within a partition.
+     * @dev Units stay in `partition`; `data` is opaque and only echoed in the event.
      */
     function transferByPartition(bytes32 partition, address to, uint256 value, bytes calldata data)
         external
         override
         returns (bytes32)
     {
-        return _transferByPartition(partition, partition, msg.sender, msg.sender, to, value, data, "");
+        return _transferByPartition(partition, msg.sender, msg.sender, to, value, data, "");
     }
 
     /**
      * @notice Operator transfer respecting global and partition-level approvals.
+     * @dev Units stay in `partition`; `data` and `operatorData` are opaque and only echoed in
+     *      the event. Moving units between partitions is not supported.
      */
     function operatorTransferByPartition(
         bytes32 partition,
@@ -196,9 +198,7 @@ contract ERC1410Minimal is IERC1410, ERC165 {
     ) external override returns (bytes32) {
         if (!isOperatorForPartition(partition, msg.sender, from)) revert Errors.UnauthorizedOperator();
 
-        // forge-lint: disable-next-line(unsafe-typecast)
-        bytes32 toPartition = data.length >= 32 ? bytes32(data) : partition;
-        return _transferByPartition(partition, toPartition, msg.sender, from, to, value, data, operatorData);
+        return _transferByPartition(partition, msg.sender, from, to, value, data, operatorData);
     }
 
     /**
@@ -244,8 +244,7 @@ contract ERC1410Minimal is IERC1410, ERC165 {
     //////////////////////////////////////////////////////////////*/
 
     function _transferByPartition(
-        bytes32 fromPartition,
-        bytes32 toPartition,
+        bytes32 partition,
         address operator,
         address from,
         address to,
@@ -255,43 +254,35 @@ contract ERC1410Minimal is IERC1410, ERC165 {
     ) internal returns (bytes32) {
         if (to == address(0)) revert Errors.InvalidRecipient();
 
-        _move(fromPartition, toPartition, from, to, value);
+        _move(partition, from, to, value);
 
-        emit TransferByPartition(fromPartition, operator, from, to, value, data, operatorData);
-        if (fromPartition != toPartition) {
-            emit ChangedPartition(fromPartition, toPartition, value);
-        }
+        emit TransferByPartition(partition, operator, from, to, value, data, operatorData);
 
-        return toPartition;
+        return partition;
     }
 
-    function _move(bytes32 fromPartition, bytes32 toPartition, address from, address to, uint256 value) internal {
+    /**
+     * @dev Moves `value` units of `partition` from `from` to `to`. Partition supply is unchanged.
+     */
+    function _move(bytes32 partition, address from, address to, uint256 value) internal {
         _enforceGranularity(value);
         if (_balances[from] < value) revert Errors.InsufficientBalance();
-        if (_balanceOfByPartition[from][fromPartition] < value) revert Errors.InsufficientPartitionBalance();
+        if (_balanceOfByPartition[from][partition] < value) revert Errors.InsufficientPartitionBalance();
 
-        if (from != to) {
-            _balances[from] -= value;
-            _balances[to] += value;
-        }
-
-        if (fromPartition == toPartition && from == to) {
+        if (from == to) {
             return;
         }
 
-        _balanceOfByPartition[from][fromPartition] -= value;
-        _totalSupplyByPartition[fromPartition] -= value;
-        if (_balanceOfByPartition[from][fromPartition] == 0) {
-            _removePartition(from, fromPartition);
+        _balances[from] -= value;
+        _balances[to] += value;
+
+        _balanceOfByPartition[from][partition] -= value;
+        if (_balanceOfByPartition[from][partition] == 0) {
+            _removePartition(from, partition);
         }
 
-        _balanceOfByPartition[to][toPartition] += value;
-        _totalSupplyByPartition[toPartition] += value;
-        _addPartition(to, toPartition);
-        _trackPartition(toPartition);
-        if (_totalSupplyByPartition[fromPartition] == 0 && fromPartition != toPartition) {
-            _untrackPartition(fromPartition);
-        }
+        _balanceOfByPartition[to][partition] += value;
+        _addPartition(to, partition);
     }
 
     function _mint(

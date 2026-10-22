@@ -3,8 +3,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Feature: NetworkHealthModal pretty-prints /v1/health, surfaces recent
-// errors, and exposes Reconnect + Resync-from-block-0 actions. The
-// destructive Resync is gated behind a type-to-confirm phrase.
+// errors, and exposes Reconnect + Resync-from-block-0 actions to accounts
+// that can operate. The destructive Resync is gated behind a type-to-confirm
+// phrase.
 
 const okHealth = (overrides = {}) => ({
   status: 'ok',
@@ -33,22 +34,31 @@ async function loadModal({ restartIngestion } = {}) {
       restartIngestion: restart,
     },
   }));
-  const [{ NetworkHealthModal }, { ToastProvider }] = await Promise.all([
+  const [{ NetworkHealthModal }, { ToastProvider }, { CapabilitiesContext }] = await Promise.all([
     import('../src/pages/NetworkHealthModal.jsx'),
     import('../src/components/ui.jsx'),
+    import('../src/auth/capabilitiesContext.js'),
   ]);
-  return { NetworkHealthModal, ToastProvider, restart };
+  return { NetworkHealthModal, ToastProvider, CapabilitiesContext, restart };
 }
 
 function renderModal(NetworkHealthModal, ToastProvider, health, overrides = {}) {
-  return render(
+  const modal = (
     <ToastProvider>
       <NetworkHealthModal
         health={health}
         onReload={overrides.onReload ?? vi.fn().mockResolvedValue(undefined)}
         onClose={overrides.onClose ?? vi.fn()}
       />
-    </ToastProvider>,
+    </ToastProvider>
+  );
+  const { CapabilitiesContext, capabilities } = overrides;
+  return render(
+    CapabilitiesContext ? (
+      <CapabilitiesContext.Provider value={capabilities}>{modal}</CapabilitiesContext.Provider>
+    ) : (
+      modal
+    ),
   );
 }
 
@@ -91,6 +101,23 @@ describe('NetworkHealthModal', () => {
     expect(screen.getByText('rpc timeout')).toBeInTheDocument();
     expect(screen.getByText('TIMEOUT')).toBeInTheDocument();
     expect(screen.getByText('getaddrinfo EAI_AGAIN')).toBeInTheDocument();
+  });
+
+  it('hides Reconnect and Resync for an account that cannot operate', async () => {
+    const { NetworkHealthModal, ToastProvider, CapabilitiesContext } = await loadModal();
+    renderModal(NetworkHealthModal, ToastProvider, okHealth(), {
+      CapabilitiesContext,
+      capabilities: {
+        canUseApp: true,
+        canAccessCentralBank: false,
+        canAccessBanking: true,
+        canOperate: false,
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Reconnect/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resync from block 0/ })).not.toBeInTheDocument();
   });
 
   it('Reconnect button calls HealthApi.restartIngestion() and reloads', async () => {

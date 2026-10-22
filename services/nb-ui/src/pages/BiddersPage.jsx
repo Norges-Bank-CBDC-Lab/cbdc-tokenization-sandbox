@@ -28,6 +28,7 @@ import {
 import { AddBidderModal } from './AddBidderModal.jsx';
 import { PlaceBidModal } from './PlaceBidModal.jsx';
 import { getTestMode } from '../utils/debugSettings.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 
 export function BiddersPage() {
   const { data, loading, error, reload } = useLiveQuery(
@@ -48,6 +49,7 @@ export function BiddersPage() {
   const [placeBidFor, setPlaceBidFor] = useState(null);
   const [revealedKey, setRevealedKey] = useState(null);
   const toast = useToast();
+  const { canOperate } = useCapabilities();
 
   const deleteMut = useMutation((address) => BiddersApi.deleteBidder(address));
 
@@ -174,7 +176,10 @@ export function BiddersPage() {
                       title={
                         placeBidEnabled
                           ? undefined
-                          : 'No auctions are currently accepting bids — either none are open or all have passed their end timestamp. Enable Test mode in the top bar to force submit (chain will reject expired).'
+                          : 'No auctions are currently accepting bids — either none are open or all have passed their end timestamp.' +
+                            (canOperate
+                              ? ' Enable Test mode in the top bar to force submit (chain will reject expired).'
+                              : '')
                       }
                     >
                       Place bid
@@ -230,10 +235,12 @@ export function BiddersPage() {
 function RevealKeyModal({ bidder, onClose }) {
   return (
     <Modal title={`Private key — ${bidder.name}`} onClose={onClose}>
-      <SandboxOnlyBanner>
-        The key below grants full impersonation of this bidder. Do not paste it anywhere outside
-        this sandbox.
-      </SandboxOnlyBanner>
+      {bidder.privateKey && (
+        <SandboxOnlyBanner>
+          The key below grants full impersonation of this bidder. Do not paste it anywhere outside
+          this sandbox.
+        </SandboxOnlyBanner>
+      )}
       <div className="field">
         <label
           title={
@@ -271,9 +278,22 @@ function RevealKeyModal({ bidder, onClose }) {
         >
           Private key (signing)
         </label>
-        <div className="mono" style={{ wordBreak: 'break-all', color: '#7a3a00' }}>
-          {bidder.privateKey}
-        </div>
+        {bidder.privateKey ? (
+          <div className="mono" style={{ wordBreak: 'break-all', color: '#7a3a00' }}>
+            {bidder.privateKey}
+          </div>
+        ) : (
+          <div
+            className="muted"
+            title={
+              'The API keeps this key and signs with it on the bidder’s behalf. It returns ' +
+              'keys only in the local no-auth mode, and never for keys supplied by the ' +
+              'environment.'
+            }
+          >
+            Held by the server
+          </div>
+        )}
       </div>
     </Modal>
   );

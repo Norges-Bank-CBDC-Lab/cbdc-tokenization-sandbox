@@ -48,7 +48,7 @@ export const tbdTokenSchema = z
         bankAllowlisted: z.boolean().meta({
           description:
             "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the " +
-            'WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination.',
+            'WNOK reserve and settle cross-bank in WNOK.',
         }),
       })
       .nullable()
@@ -56,17 +56,6 @@ export const tbdTokenSchema = z
         id: 'TbdReserve',
         description: 'WNOK reserve backing (informational). Null when WNOK is unreachable.',
       }),
-    government: z
-      .object({
-        nominated: z.boolean().meta({
-          description:
-            'True when a government reserve account is set (enables the gov-reserve mint path)',
-        }),
-        reserveAddress: addressSchema.nullable().meta({
-          description: 'The government reserve account, or null when not nominated',
-        }),
-      })
-      .meta({ id: 'TbdGovernment', description: 'Government-nomination state for this token' }),
     holders: z
       .array(tbdHolderSchema)
       .meta({ description: 'Allowlisted addresses with their TBD balances (sandbox-scale)' }),

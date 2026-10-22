@@ -73,6 +73,15 @@ function getAllBuyOrders() external view returns (Order[] memory);
 function getAllSellOrders() external view returns (Order[] memory);
 ```
 
+### getOrder
+
+Returns one order by id; every field is zero when the order does not exist.
+
+
+```solidity
+function getOrder(bytes32 orderId) external view returns (Order memory);
+```
+
 ### revokeBuyOrder
 
 

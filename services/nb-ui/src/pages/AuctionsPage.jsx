@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { AuctionsApi } from '../api/auctionsApi.js';
 import { LiveResource, useLiveQuery } from '../sync/LiveUpdatesProvider.jsx';
 import { Fmt } from '../utils/format.js';
+import { useCapabilities } from '../auth/capabilitiesContext.js';
 import {
   Button,
   EmptyState,
@@ -39,6 +40,7 @@ function writeHideCancelled(value) {
 }
 
 export function AuctionsPage({ navigate }) {
+  const { canOperate } = useCapabilities();
   const { data, loading, error, refreshing, refreshError, reload } = useLiveQuery(
     [LiveResource.AUCTIONS],
     () => AuctionsApi.listAuctions(),
@@ -110,9 +112,11 @@ export function AuctionsPage({ navigate }) {
           <Button variant="ghost" onClick={reload}>
             Refresh
           </Button>
-          <Button variant="primary" onClick={() => setShowCreate(true)}>
-            + New auction
-          </Button>
+          {canOperate && (
+            <Button variant="primary" onClick={() => setShowCreate(true)}>
+              + New auction
+            </Button>
+          )}
         </div>
       </div>
 
@@ -205,7 +209,8 @@ export function AuctionsPage({ navigate }) {
               auctions.length === 0 ? 'Run an auction to get started.' : 'Adjust the filters above.'
             }
             action={
-              auctions.length === 0 && (
+              auctions.length === 0 &&
+              canOperate && (
                 <Button onClick={() => setShowCreate(true)} variant="primary">
                   + New auction
                 </Button>

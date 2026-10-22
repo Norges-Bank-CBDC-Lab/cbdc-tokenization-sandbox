@@ -141,18 +141,6 @@ error NotMultipleOfGranularity();
 error UnauthorizedOperator();
 ```
 
-### TbdAddressZero
-
-```solidity
-error TbdAddressZero();
-```
-
-### PartitionZero
-
-```solidity
-error PartitionZero();
-```
-
 ### ContractNotFound
 
 ```solidity
@@ -207,6 +195,12 @@ error MissingRole(bytes32 role, address account);
 error NotInAllowlist(string list, address addr);
 ```
 
+### OrderNotOwnedByClient
+
+```solidity
+error OrderNotOwnedByClient(bytes32 orderId);
+```
+
 ### BankAddressZero
 
 ```solidity
@@ -237,16 +231,22 @@ error TokenTransferFailed();
 error CctFailed();
 ```
 
-### NotGovernmentNominated
+### CctFromNotCaller
 
 ```solidity
-error NotGovernmentNominated();
+error CctFromNotCaller(address from, address caller);
 ```
 
 ### BondTokenAddressZero
 
 ```solidity
 error BondTokenAddressZero();
+```
+
+### BondAuctionAddressZero
+
+```solidity
+error BondAuctionAddressZero();
 ```
 
 ### DurationScalarZero

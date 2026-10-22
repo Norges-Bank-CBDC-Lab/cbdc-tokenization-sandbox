@@ -226,7 +226,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           },
           {
             "in": "query",
@@ -297,6 +297,7 @@
         ],
         "operationId": "createBond",
         "summary": "Create a bond partition without scheduling an auction. The first auction is scheduled separately via POST /v1/bonds/{isin}/auctions.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "requestBody": {
           "required": true,
           "content": {
@@ -400,7 +401,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -458,6 +459,7 @@
         ],
         "operationId": "disableBond",
         "summary": "Soft-delete a bond. Requires no minted supply, no in-flight auction, and no FINALISED auction in history. Idempotent — returns 204 even if the bond is already disabled.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -683,6 +685,7 @@
         ],
         "operationId": "createAuction",
         "summary": "Create an auction under a bond. Response is the updated parent Bond.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -788,7 +791,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -868,7 +871,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "responses": {
@@ -926,6 +929,7 @@
         ],
         "operationId": "closeAuction",
         "summary": "Transition auction to a new status. Only \"closed\" accepted today.",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -943,7 +947,7 @@
               "type": "boolean",
               "default": false
             },
-            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar; ArgoCD- managed deployments should ignore it. Today `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
+            "description": "Sandbox-only umbrella \"test mode\" flag. The operator UI flips this from the top bar. Honoured only in `none` auth mode or for operator callers; ignored otherwise (the caller gets the sealed view and the normal close pre-check, not an error). When honoured, `testMode=true` enables: (a) unsealing of bids on auctions still in the BIDDING phase on bond / auction GETs; (b) skipping the API-side end-time pre-check on PATCH /v1/auctions/{id} (close) so the operator can attempt close before the bidding window expires — the on-chain contract still enforces `block.timestamp > metadata.end` and reverts with `InBidPhase()` if the window is open. Future test affordances will plumb through this same flag."
           }
         ],
         "requestBody": {
@@ -1030,6 +1034,7 @@
         ],
         "operationId": "cancelAuction",
         "summary": "Cancel auction (soft-delete; stays on-chain with status=\"cancelled\")",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -1116,6 +1121,7 @@
         ],
         "operationId": "finaliseAuction",
         "summary": "Approve and submit the selected allocation",
+        "description": "Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator App Role; any other recognised role gets 403 Forbidden before the request is validated. Open in `none` mode.",
         "parameters": [
           {
             "in": "path",
@@ -3942,8 +3948,15 @@
             "$ref": "#/components/schemas/HexString"
           },
           "privateKey": {
-            "description": "Private key, hex (0x + 64 chars). Returned in plaintext because this surface is sandbox-only.",
-            "$ref": "#/components/schemas/HexString"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HexString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Private key, hex (0x + 64 chars). Returned only in the unauthenticated local `none` auth mode, and only for keys the API generated or an operator imported. Null in `entra` mode and for fixture bidders whose key comes from a PK_* environment override: the server holds the key and signs with it, but never returns it."
           },
           "ethBalance": {
             "description": "Current ETH balance in wei",
@@ -4212,9 +4225,6 @@
           "reserve": {
             "$ref": "#/components/schemas/TbdReserve"
           },
-          "government": {
-            "$ref": "#/components/schemas/TbdGovernment"
-          },
           "holders": {
             "type": "array",
             "items": {
@@ -4238,7 +4248,6 @@
           "totalSupply",
           "bank",
           "reserve",
-          "government",
           "holders",
           "md5"
         ],
@@ -4279,7 +4288,7 @@
               },
               "bankAllowlisted": {
                 "type": "boolean",
-                "description": "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the WNOK reserve and settle cross-bank in WNOK. Distinct from government-nomination."
+                "description": "True when the owning bank's address is on the WNOK allowlist — i.e. it can hold the WNOK reserve and settle cross-bank in WNOK."
               }
             },
             "required": [
@@ -4294,32 +4303,6 @@
           }
         ],
         "description": "WNOK reserve backing (informational). Null when WNOK is unreachable."
-      },
-      "TbdGovernment": {
-        "type": "object",
-        "properties": {
-          "nominated": {
-            "type": "boolean",
-            "description": "True when a government reserve account is set (enables the gov-reserve mint path)"
-          },
-          "reserveAddress": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Address"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The government reserve account, or null when not nominated"
-          }
-        },
-        "required": [
-          "nominated",
-          "reserveAddress"
-        ],
-        "additionalProperties": false,
-        "description": "Government-nomination state for this token"
       },
       "TbdHolder": {
         "type": "object",

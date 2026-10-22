@@ -82,6 +82,15 @@ export const errorRefs = {
   },
 };
 
+/**
+ * Operation description for issuer actions gated to operators. The 403 itself
+ * is the shared Forbidden response already listed in `errorRefs.mutate`.
+ */
+export const operatorOnlyDescription =
+  'Operator-only issuer action. In `entra` auth mode the bearer token must carry an operator ' +
+  'App Role; any other recognised role gets 403 Forbidden before the request is validated. ' +
+  'Open in `none` mode.';
+
 export const noContent204 = {
   description: 'No Content — operation succeeded; response body intentionally empty.',
 };

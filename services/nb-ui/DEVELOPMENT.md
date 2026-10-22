@@ -99,7 +99,10 @@ touching `services/nb-ui/**` via `.github/workflows/nb-ui.yml`.
 
 ## Pluggable auth
 
-The auth seam is `src/auth/index.js`. It resolves one of:
+The auth seam is `src/auth/index.js`. It resolves one of the providers
+below. Any other `AUTH_MODE` value is a configuration error: the UI renders
+only a page naming the bad value (`src/components/ConfigErrorPage.jsx`) and
+`capabilities.js` grants nothing, so no page mounts and nothing calls the API.
 
 - `noneAuth` — no `Authorization` header, no sign-in UI. Default; the
   local sandbox runs this way because the NB Bond API has no auth (per
@@ -125,6 +128,21 @@ claims first, access-token decode as a fallback) and mapped to capabilities by
   screen (`src/components/AccessDeniedPage.jsx`) instead of the app.
 - The Central Bank nav item is hidden for non-operators and the
   `#/central-bank` route is guarded, so the page never mounts for them.
+- Operator-only controls read `canOperate` from `CapabilitiesContext`
+  (`src/auth/capabilitiesContext.js`, provided by `App.jsx`) and are hidden,
+  not merely disabled, for testers:
+  - issuer actions: "+ New bond" (Bonds), "+ New auction" (Auctions),
+    "Disable bond…" (bond detail), and Close / Select winners & finalise /
+    Cancel in the auction lifecycle panel;
+  - Reconnect and Resync in the Network Health modal (Refresh stays);
+  - the top-bar test-mode toggle. `getTestMode()`
+    (`src/utils/debugSettings.js`) also ignores a stored flag for any account
+    that cannot operate, so a tester never sends `?testMode=true`.
+- Testers keep reads, bidding (the Bidders page and "Place bid"), and the
+  Banking surface.
+- The Bidders page shows "Held by the server" when the API returns
+  `privateKey: null` (always in `entra` mode, and for keys supplied by the
+  API's `PK_*` overrides).
 
 This is UX only — the NB Bond API independently enforces the same roles and is
 the real boundary. `none` mode is never gated (the local sandbox is fully open).
@@ -200,7 +218,8 @@ to the pod's Service like any other backend.
   1. Pulls both stage bases through Docker (`loadImageToKind`) so the
      build works offline.
   2. Computes a short content-hash over `src/`, `public/`, `package*.json`,
-     `index.html`, `vite.config.js`, `Dockerfile` → the image tag.
+     `index.html`, `vite.config.js`, `Dockerfile`, and the Node builder and
+     nginx runtime base image refs → the image tag.
   3. Checks the local Kind registry; if `nb-ui:<hash>` already exists
      there, skips the build entirely (cache key = bundle content).
   4. Otherwise: `docker build` → `docker tag → docker push` to
@@ -218,7 +237,8 @@ _doesn't_ bust the cache.
 
 ## Known gotchas
 
-- The cache key is `services/nb-ui/{src,public,package.json,package-lock.json,index.html,vite.config.js,Dockerfile}`.
+- The cache key is `services/nb-ui/{src,public,package.json,package-lock.json,index.html,vite.config.js,Dockerfile}`
+  plus the two stage base image refs, so a Node or nginx pin bump rebuilds the image.
   If you add a new build input that legitimately affects `dist/`, extend
   `nbUIBundleHash` in `common/helpers.sh` accordingly.
 - nginx-unprivileged listens on port `8080`, not `80`. The chart's

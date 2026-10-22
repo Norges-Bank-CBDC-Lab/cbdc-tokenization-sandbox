@@ -10,6 +10,17 @@ import { AppConfig } from '../config.js';
 import { createNoneAuth } from './noneAuth.js';
 import { createEntraAuth } from './entraAuth.js';
 
+/**
+ * Provider for an unrecognised AUTH_MODE. Same interface as noneAuth, but it
+ * never has an account and sends no Authorization header. App.jsx renders the
+ * configuration-error page instead of the app for such a mode, and
+ * capabilities.js grants it nothing, so no page mounts and nothing calls the
+ * API.
+ */
+function createMisconfiguredAuth() {
+  return createNoneAuth();
+}
+
 function resolve() {
   switch (AppConfig.AUTH_MODE) {
     case 'entra':
@@ -19,12 +30,14 @@ function resolve() {
     case undefined:
       return createNoneAuth();
     default:
-      // Unknown mode: fail closed to the no-auth implementation and let the
-      // visible "auth mode unknown" warning in DEVELOPMENT.md guide the fix.
-      console.warn(`Unknown AUTH_MODE "${AppConfig.AUTH_MODE}" — falling back to no-auth.`);
-      return createNoneAuth();
+      // Unknown mode: fail closed. The UI shows a configuration error naming
+      // the value instead of opening any surface.
+      console.error(`Unknown AUTH_MODE "${AppConfig.AUTH_MODE}" — the UI will not start.`);
+      return createMisconfiguredAuth();
   }
 }
 
 export const auth = resolve();
 export const authMode = AppConfig.AUTH_MODE || 'none';
+/** False when AUTH_MODE is neither `none` (or unset) nor `entra`. */
+export const isKnownAuthMode = authMode === 'none' || authMode === 'entra';

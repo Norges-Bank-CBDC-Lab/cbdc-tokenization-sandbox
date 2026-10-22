@@ -32,11 +32,6 @@
           "name": "symbol_",
           "type": "string",
           "internalType": "string"
-        },
-        {
-          "name": "_govReserve",
-          "type": "address",
-          "internalType": "address"
         }
       ],
       "stateMutability": "nonpayable"
@@ -278,19 +273,6 @@
     },
     {
       "type": "function",
-      "name": "govReserve",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "address",
-          "internalType": "address"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
       "name": "grantRole",
       "inputs": [
         {
@@ -322,19 +304,6 @@
           "internalType": "address"
         }
       ],
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool",
-          "internalType": "bool"
-        }
-      ],
-      "stateMutability": "view"
-    },
-    {
-      "type": "function",
-      "name": "isGovernmentNominated",
-      "inputs": [],
       "outputs": [
         {
           "name": "",
@@ -740,6 +709,22 @@
     },
     {
       "type": "error",
+      "name": "CctFromNotCaller",
+      "inputs": [
+        {
+          "name": "from",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "caller",
+          "type": "address",
+          "internalType": "address"
+        }
+      ]
+    },
+    {
+      "type": "error",
       "name": "DvpAddressZero",
       "inputs": []
     },
@@ -832,11 +817,6 @@
     {
       "type": "error",
       "name": "InvalidReceiver",
-      "inputs": []
-    },
-    {
-      "type": "error",
-      "name": "NotGovernmentNominated",
       "inputs": []
     },
     {

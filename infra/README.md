@@ -29,6 +29,11 @@ From `infra/`:
 ./infra.sh registry-sync
 ```
 
+`stop` scales Besu and the gateway to zero and keeps the chain and the
+cluster; `start` brings them back. `delete` removes the Kind cluster and all
+sandbox state. To stop the whole sandbox, including Blockscout and the NB Bond
+API, use `./sandbox.sh stop` from the repository root.
+
 `registry-start` creates or reuses the persistent local registry container, and
 `registry-sync` pushes the sandbox's pinned images into that registry for Kind
 to pull. Sandbox deploy/build image pins are centralized in
@@ -41,7 +46,7 @@ The currently documented local baseline is:
 
 - one Kind control-plane node hosting two separate Besu processes
 - one QBFT validator plus one non-validator archive/RPC node
-- Besu 26.7.1 with QBFT consensus
+- Besu 26.10.0 with QBFT consensus
 - Osaka EVM milestone from genesis
 - 1-second transaction blocks and a 5-minute idle empty-block period
 - `zeroBaseFee: true` in the Besu genesis

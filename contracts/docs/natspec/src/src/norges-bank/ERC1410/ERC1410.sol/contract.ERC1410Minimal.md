@@ -358,9 +358,9 @@ function isOperatorForPartition(bytes32 partition, address operator, address tok
 
 ### transferByPartition
 
-Transfer value from the caller out of a partition.
+Transfer value from the caller within a partition.
 
-If `data` is 32 bytes long, it is treated as the destination partition.
+Units stay in `partition`; `data` is opaque and only echoed in the event.
 
 
 ```solidity
@@ -373,6 +373,9 @@ function transferByPartition(bytes32 partition, address to, uint256 value, bytes
 ### operatorTransferByPartition
 
 Operator transfer respecting global and partition-level approvals.
+
+Units stay in `partition`; `data` and `operatorData` are opaque and only echoed in
+the event. Moving units between partitions is not supported.
 
 
 ```solidity
@@ -453,8 +456,7 @@ function revokeOperatorByPartition(bytes32 partition, address operator) external
 
 ```solidity
 function _transferByPartition(
-    bytes32 fromPartition,
-    bytes32 toPartition,
+    bytes32 partition,
     address operator,
     address from,
     address to,
@@ -466,9 +468,11 @@ function _transferByPartition(
 
 ### _move
 
+Moves `value` units of `partition` from `from` to `to`. Partition supply is unchanged.
+
 
 ```solidity
-function _move(bytes32 fromPartition, bytes32 toPartition, address from, address to, uint256 value) internal;
+function _move(bytes32 partition, address from, address to, uint256 value) internal;
 ```
 
 ### _mint

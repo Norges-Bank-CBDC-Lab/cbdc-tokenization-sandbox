@@ -18,6 +18,48 @@
   lockfile diff (parse both lockfiles and compare entries) — the changed
   entry set must be exactly the intended packages.
 
+## Third-party images still trust the compromised eMudhra CA root (October 2026)
+- In October 2026 the private keys of eight eMudhra intermediate CAs became
+  derivable from their public certificates
+  ([Mozilla bug 2083449](https://bugzilla.mozilla.org/show_bug.cgi?id=2083449)).
+  Mozilla removed **"emSign ECC Root CA - G3"** in NSS 3.131.1, and Sectigo revoked
+  the intermediates' cross-signs from "AAA Certificate Services". Debian also
+  distrusted that root. A trust store that still holds either root accepts
+  certificates from the compromised intermediates.
+- Fixed in this repository: the Node pin (26.12.1, built-in roots from NSS 3.131.1
+  plus a block on the intermediates' keys), the BENS base image (`python:3.14.9`:
+  Debian `ca-certificates 20250419+deb13u1` and pip 26.2.2 with certifi
+  2026.10.19), and Foundry in Contracts CI (v1.8.6: `rustls-webpki` 0.103.16,
+  `webpki-roots` 1.0.10).
+- Still exposed, waiting on upstream releases (checked 2026-10-22):
+
+  | Component (pin) | Store that still holds the root | Outbound TLS | Waiting for |
+  |---|---|---|---|
+  | `smart-contract-verifier` (`v1.11.0`) | Ubuntu 24.04 `ca-certificates 20260601~24.04.1`, used through OpenSSL | **Yes**: downloads Solidity compilers from `binaries.soliditylang.org` | An image built on the fixed Ubuntu `ca-certificates` |
+  | Blockscout backend (`v11.2.6`) | `castore` 1.0.20 and Erlang `certifi` 2.15.0 in the release, Alpine `ca-certificates 20250911-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22 (v12.0.3 still pins 1.0.21) |
+  | Blockscout frontend (`v2.10.3`) | Node 22.14.0 built-in roots (also "AAA Certificate Services") | No (in-cluster backend only) | A release on Node ≥ 22.23.4 / 24.22.1 (v2.12.1 uses 24.21.0) |
+  | Besu (`26.10.0`) | Temurin 25.0.3 `cacerts` | No (P2P is not TLS; discovery is off) | A JDK update that blocks the intermediates; the October 2026 JDK updates do not |
+  | Kind node (`kindest/node:v1.32.11`) | Debian 12 `ca-certificates 20230311+deb12u1` (also "AAA Certificate Services"); containerd built with Go 1.25.5 | **Yes**: containerd pulls images that are not in the local registry | A kind node image built on the fixed Debian `ca-certificates` |
+  | NGINX Gateway Fabric (`2.8.0`, control plane and nginx) | Distroless Debian bundle (also "AAA Certificate Services") with Go 1.27.2; Alpine `ca-certificates 20260909-r0` | No (Kubernetes API and in-cluster upstreams only) | A release on Go ≥ 1.27.3 and Alpine `ca-certificates 20261020-r0` |
+  | `nginxinc/nginx-unprivileged` (`1.30.6-alpine`, NB UI runtime) | Alpine `ca-certificates 20260909-r0` | No (serves static files) | A tag rebuilt on Alpine `ca-certificates 20261020-r0` |
+  | Local registry (`registry:2.8.3`) | Alpine 3.18 `ca-certificates 20241121-r1` (also "AAA Certificate Services") | No (no pull-through proxy) | A `registry` image on Alpine `ca-certificates 20261020-r0` (3.1.2 is not yet) |
+  | `crytic/slither-action` (Contracts CI) | Not checked (image not inspected) | Yes: downloads `solc` | Check when the action next releases |
+
+- To re-check a bundle, count it as exposed only when it contains one of the
+  affected roots:
+
+  ```bash
+  openssl storeutl -noout -text -certs <bundle.pem> \
+    | grep -E 'Subject:.*(emSign (Root TLS|Root CS|ECC Root) CA - G3|AAA Certificate Services)'
+  ```
+
+  For an image, `docker create` it and `docker cp` its
+  `/etc/ssl/certs/ca-certificates.crt` out, so nothing inside it runs. Language
+  runtimes that ship their own list (Node's `tls.rootCertificates`, JDK `cacerts`,
+  `castore`, `certifi`) need their own check.
+- Follow-up: move each pin once its upstream fix is published, and remove this
+  item when the table is empty.
+
 ## Order-book makers that fail settlement with an unknown reason stay resting
 - `OrderBook` keeps a resting maker in place when `DvP.settle` fails with
   `FailureReason.Unknown` (a revert the settlement contract cannot attribute
@@ -33,6 +75,24 @@
   settleable again. Follow-up: an `ORDER_ADMIN_ROLE` purge for
   broker-less issuance orders, and a decision on whether repeated unknown
   failures should evict the maker.
+
+## Sandbox must be stopped before Docker quits or the host reboots
+- If Docker Desktop quits, or the host reboots, while the sandbox runs, Docker
+  gives the Kind node container its default 10 seconds and then kills it. Pods
+  get no clean shutdown. In one observed case Blockscout's PostgreSQL lost a
+  freshly written checkpoint file, then refused to start with
+  `PANIC: replication checkpoint has wrong magic 0`, and Blockscout stayed down
+  until the file was moved aside. The recovery procedure is in
+  [`services/blockscout/debugging.md`](../services/blockscout/debugging.md#postgresql-does-not-start-after-an-unclean-shutdown).
+- Run `./sandbox.sh stop` first. It stops the Kind node with
+  `SANDBOX_STOP_TIMEOUT_SECONDS` (default 330) and keeps all state; `./sandbox.sh start`
+  resumes it. A stop takes about 90 seconds: the workloads, PostgreSQL and etcd
+  included, exit within seconds, and the rest is systemd inside the Kind node
+  image waiting its 90-second timeout for `kube-apiserver` and the containerd
+  shims, which hold no state.
+- Blocks mined while Blockscout was down are filled in by its catch-up indexer
+  once it runs again, so an outage like this one leaves no permanent gap in
+  the explorer.
 
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic

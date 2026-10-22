@@ -33,8 +33,6 @@ import { withMd5 } from './http';
 import { type IngestionDatabase, listBankRows } from './ingestion-db';
 import { logger } from './logger';
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-
 /**
  * The local-sandbox bank roster. `role` is the fixture key role used by
  * `scripts/generate-local-sandbox-fixtures.mjs` and bidders.ts — it drives
@@ -96,16 +94,14 @@ export interface TbdHolderData {
 /** Read one TBD contract and compose its enriched, md5-stamped DTO. */
 async function composeToken(bankName: string, address: string) {
   const tbd = new Contract(address, tbdAbi, provider);
-  const [name, symbol, decimalsRaw, totalSupplyRaw, bankAddrRaw, govReserveRaw, allowlistRaw] =
-    await Promise.all([
-      tbd.name() as Promise<string>,
-      tbd.symbol() as Promise<string>,
-      tbd.decimals() as Promise<bigint>,
-      tbd.totalSupply() as Promise<bigint>,
-      tbd.getBankAddress() as Promise<string>,
-      tbd.govReserve() as Promise<string>,
-      tbd.allowlistQueryAll() as Promise<string[]>,
-    ]);
+  const [name, symbol, decimalsRaw, totalSupplyRaw, bankAddrRaw, allowlistRaw] = await Promise.all([
+    tbd.name() as Promise<string>,
+    tbd.symbol() as Promise<string>,
+    tbd.decimals() as Promise<bigint>,
+    tbd.totalSupply() as Promise<bigint>,
+    tbd.getBankAddress() as Promise<string>,
+    tbd.allowlistQueryAll() as Promise<string[]>,
+  ]);
 
   const bankAddress = getAddress(bankAddrRaw);
 
@@ -132,9 +128,6 @@ async function composeToken(bankName: string, address: string) {
     };
   }
 
-  const govReserve = getAddress(govReserveRaw);
-  const nominated = govReserve !== ZERO_ADDRESS;
-
   return withMd5({
     address: getAddress(address),
     name,
@@ -143,7 +136,6 @@ async function composeToken(bankName: string, address: string) {
     totalSupply: totalSupplyRaw.toString(),
     bank: { name: bankName, address: bankAddress },
     reserve,
-    government: { nominated, reserveAddress: nominated ? govReserve : null },
     holders,
   });
 }

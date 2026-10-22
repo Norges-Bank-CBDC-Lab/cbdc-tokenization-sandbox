@@ -22,7 +22,7 @@ contract TbdTest is Test {
     address dvpContract = address(0x6);
 
     function setUp() public {
-        tbd = new Tbd(admin, bank, cbContract, dvpContract, contractName, contractSymbol, address(0));
+        tbd = new Tbd(admin, bank, cbContract, dvpContract, contractName, contractSymbol);
     }
 
     /**
@@ -277,11 +277,48 @@ contract TbdTest is Test {
     }
 
     /**
+     * A CCT_FROM_CALLER_ROLE holder can move only its own funds with cctFrom
+     */
+    function test_cctFrom_RevertIf_CallerIsNotPayer() public {
+        uint256 amount = 100;
+
+        tbd.grantRole(Roles.CCT_FROM_CALLER_ROLE, investor2);
+
+        tbd.add(investor1);
+        tbd.add(investor2);
+        tbd.mint(investor1, amount);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.CctFromNotCaller.selector, investor1, investor2));
+        vm.prank(investor2);
+        tbd.cctFrom(investor1, investor2, address(tbd), amount);
+
+        assertEq(tbd.balanceOf(investor1), amount);
+        assertEq(tbd.balanceOf(investor2), 0);
+    }
+
+    /**
+     * The DvP contract given at construction settles on behalf of the payer
+     */
+    function test_cctFrom_DvpMovesOnBehalfOfPayer() public {
+        uint256 amount = 100;
+
+        tbd.add(investor1);
+        tbd.add(investor2);
+        tbd.mint(investor1, amount);
+
+        vm.prank(dvpContract);
+        tbd.cctFrom(investor1, investor2, address(tbd), amount);
+
+        assertEq(tbd.balanceOf(investor1), 0);
+        assertEq(tbd.balanceOf(investor2), amount);
+    }
+
+    /**
      * The admin address may not be the zero address
      */
     function test_revertIf_adminAddressZero() public {
         vm.expectRevert(Errors.AdminAddressZero.selector);
-        new Tbd(address(0), bank, cbContract, dvpContract, contractName, contractSymbol, address(0));
+        new Tbd(address(0), bank, cbContract, dvpContract, contractName, contractSymbol);
     }
 
     /**
@@ -289,7 +326,7 @@ contract TbdTest is Test {
      */
     function test_revertIf_bankAddressZero() public {
         vm.expectRevert(Errors.BankAddressZero.selector);
-        new Tbd(admin, address(0), cbContract, dvpContract, contractName, contractSymbol, address(0));
+        new Tbd(admin, address(0), cbContract, dvpContract, contractName, contractSymbol);
     }
 
     /**
@@ -297,7 +334,7 @@ contract TbdTest is Test {
      */
     function test_revertIf_cbContractAddressZero() public {
         vm.expectRevert(Errors.WnokAddressZero.selector);
-        new Tbd(admin, bank, address(0), dvpContract, contractName, contractSymbol, address(0));
+        new Tbd(admin, bank, address(0), dvpContract, contractName, contractSymbol);
     }
 
     /**
@@ -305,7 +342,7 @@ contract TbdTest is Test {
      */
     function test_revertIf_dvpContractAddressZero() public {
         vm.expectRevert(Errors.DvpAddressZero.selector);
-        new Tbd(admin, bank, cbContract, address(0), contractName, contractSymbol, address(0));
+        new Tbd(admin, bank, cbContract, address(0), contractName, contractSymbol);
     }
 
     /**

@@ -117,6 +117,30 @@ describe('BondsPage', () => {
     expect(screen.getByText('NO0011223344')).toBeInTheDocument();
   });
 
+  it('hides "+ New bond" for an account that cannot operate', async () => {
+    const { BondsPage } = await import('../src/pages/BondsPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const { CapabilitiesContext } = await import('../src/auth/capabilitiesContext.js');
+
+    render(
+      <CapabilitiesContext.Provider
+        value={{
+          canUseApp: true,
+          canAccessCentralBank: false,
+          canAccessBanking: true,
+          canOperate: false,
+        }}
+      >
+        <ToastProvider>
+          <BondsPage navigate={() => {}} />
+        </ToastProvider>
+      </CapabilitiesContext.Provider>,
+    );
+
+    await waitFor(() => screen.getByText('NO0012345678'));
+    expect(screen.queryByRole('button', { name: /New bond/ })).not.toBeInTheDocument();
+  });
+
   it('filters bonds by ISIN substring', async () => {
     const { BondsPage } = await import('../src/pages/BondsPage.jsx');
     const { ToastProvider } = await import('../src/components/ui.jsx');

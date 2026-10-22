@@ -36,9 +36,9 @@ BLOCKSCOUT_NAMESPACE=blockscout
 BLOCKSCOUT_CHAIN_IDENTITY_CONFIGMAP=blockscout-chain-identity
 BLOCKSCOUT_DIR=$REPO_ROOT/services/blockscout
 BLOCKSCOUT_TMPDIR=$BLOCKSCOUT_DIR/.tmp
-BLOCKSCOUT_CHART_VERSION=4.5.1
+BLOCKSCOUT_CHART_VERSION=4.5.3
 BLOCKSCOUT_BENS_DIR=$BLOCKSCOUT_DIR/bens-microservice
-BENS_BASEIMAGE=python:3.14.5
+BENS_BASEIMAGE=python:3.14.9
 
 NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_DIR=$REPO_ROOT/services/nb-bond-api
@@ -49,7 +49,7 @@ NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
 NB_UI_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
-NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.3-alpine
+NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine
 # Backwards-compat alias; older code paths and external callers may still
 # reference NB_UI_BASEIMAGE expecting the nginx runtime base.
 NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
@@ -266,6 +266,118 @@ function clusterExists() {
     else
         echo "true"
     fi
+}
+
+# Node containers of this Kind cluster, running or stopped.
+function clusterNodeContainers() {
+    kind get nodes --name "$CLUSTER_NAME" 2>/dev/null || true
+}
+
+function nodeContainerRunning() {
+    [ "$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null)" == "true" ]
+}
+
+# Stops the cluster's node containers gracefully and keeps all state. Docker's default
+# 10-second stop timeout is shorter than the pods' own shutdown, so the node gets
+# SANDBOX_STOP_TIMEOUT_SECONDS; a stop that still ends in SIGKILL (exit 137) fails loudly,
+# because it is the unclean shutdown this command exists to avoid.
+function stopClusterNodes() {
+    local timeout="${SANDBOX_STOP_TIMEOUT_SECONDS:-330}"
+    local node started elapsed exit_code
+
+    for node in $(clusterNodeContainers); do
+        if ! nodeContainerRunning "$node"; then
+            echo "Node '$node' is already stopped."
+            continue
+        fi
+
+        echo "Stopping node '$node' (waits up to ${timeout}s for its pods to shut down)..."
+        started=$(date +%s)
+        docker stop --time "$timeout" "$node" >/dev/null
+        elapsed=$(( $(date +%s) - started ))
+
+        exit_code=$(docker inspect --format '{{.State.ExitCode}}' "$node")
+        if [ "$exit_code" == "137" ]; then
+            echo "❌ Node '$node' was killed after ${elapsed}s: its shutdown did not finish within ${timeout}s."
+            echo "   Raise SANDBOX_STOP_TIMEOUT_SECONDS, and check PostgreSQL in services/blockscout/debugging.md on the next start."
+            exit 1
+        fi
+        echo "✅ Node '$node' stopped in ${elapsed}s. All state is kept; './sandbox.sh start' resumes it."
+    done
+}
+
+# Starts any stopped node containers of the cluster and waits for its API server.
+function startClusterNodes() {
+    local node started_any="false"
+
+    for node in $(clusterNodeContainers); do
+        if ! nodeContainerRunning "$node"; then
+            echo "Starting stopped node '$node'..."
+            docker start "$node" >/dev/null
+            started_any="true"
+        fi
+    done
+
+    if [ "$started_any" == "true" ]; then
+        waitForKubeApiServer
+    fi
+}
+
+# Stops one component without deleting anything: scales every Deployment and
+# StatefulSet in the given namespaces to zero and waits for their pods to go.
+# Releases, ConfigMaps, and volumes stay, and the component's `start` restores
+# the replica counts through `helm upgrade`. Completed job pods are left alone.
+function scaleNamespacesToZero() {
+    local namespace i
+    local timeout_seconds="${SANDBOX_STOP_TIMEOUT_SECONDS:-330}"
+
+    if [[ $(clusterExists) == "false" ]]; then
+        echo "Cluster '$CLUSTER_NAME' does not exist. Nothing to stop."
+        return 0
+    fi
+
+    for namespace in "$@"; do
+        if ! kubectl --context="kind-$CLUSTER_NAME" get namespace "$namespace" >/dev/null 2>&1; then
+            echo "Namespace '$namespace' does not exist. Nothing to stop there."
+            continue
+        fi
+
+        echo "Scaling workloads in '$namespace' to zero (volumes and releases are kept)..."
+        kubectl --context="kind-$CLUSTER_NAME" -n "$namespace" scale deployment,statefulset --all --replicas=0
+
+        i=0
+        while [ -n "$(kubectl --context="kind-$CLUSTER_NAME" -n "$namespace" get pods \
+                --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name)" ]; do
+            sleep 1
+            i=$(( i+1 ))
+            if [ "$i" -ge "$timeout_seconds" ]; then
+                echo "❌ Pods in '$namespace' did not stop within ${timeout_seconds}s."
+                exit 1
+            fi
+        done
+        echo "✅ '$namespace' stopped."
+    done
+}
+
+function waitForKubeApiServer() {
+    local msg="Waiting for the Kubernetes API server..."
+    local i
+    local timeout_seconds=120
+
+    # waitMsg assigns the caller's `i`, so reset it after the start message.
+    waitMsg "$msg" start
+    i=0
+    until kubectl --context="kind-$CLUSTER_NAME" get --raw /readyz >/dev/null 2>&1; do
+        waitMsg "$msg" $i
+        sleep 1
+        i=$(( i+1 ))
+        if [ "$i" -ge "$timeout_seconds" ]; then
+            echo
+            echo "❌ The API server of '$CLUSTER_NAME' was not ready after ${timeout_seconds}s."
+            exit 1
+        fi
+    done
+    waitMsg "$msg" end
 }
 
 function getImageValue() {
@@ -643,10 +755,6 @@ data:
 EOF
 }
 
-function clearContractsDeploymentMarker() {
-    kubectl --context=kind-$CLUSTER_NAME -n $CONTRACTS_DEPLOYMENT_NAMESPACE delete configmap $CONTRACTS_DEPLOYMENT_CONFIGMAP >/dev/null 2>&1 || true
-}
-
 function deployRegistryContractAddressToConfigmap() {
     registry_contract_address=$1
 
@@ -885,6 +993,7 @@ function createKindCluster() {
         kind create cluster --config $REPO_ROOT/infra/cluster/cluster-config.yaml --name $CLUSTER_NAME
     else
         echo "Cluster '$CLUSTER_NAME' already exists. Skipping cluster creation."
+        startClusterNodes
     fi
 
     # Ensure kubeconfig has the expected kind context (and fail fast if the cluster is unhealthy).
@@ -913,19 +1022,29 @@ function deployApiGateway() {
     # add gateway api resources
     kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=v${NGINX_GATEWAY_FABRIC_VERSION}" | kubectl --context=kind-$CLUSTER_NAME apply -f -
 
+    # NGF's own CRDs (gateway.nginx.org). Helm installs a chart's CRDs only on
+    # first install and never upgrades them, so without this a version bump
+    # runs the new controller against the old CRDs. Server-side because
+    # nginxproxies is too large for client-side apply's annotation;
+    # --force-conflicts because the first install left Helm as their field
+    # manager, and Helm never touches them again. On a fresh cluster Helm
+    # finds them present and skips its own copy.
+    kubectl --context=kind-$CLUSTER_NAME apply --server-side --force-conflicts \
+        -f "https://raw.githubusercontent.com/nginx/nginx-gateway-fabric/v${NGINX_GATEWAY_FABRIC_VERSION}/deploy/crds.yaml"
+
     # install api gateway
     # NOTE: no `--set service.create=false` here anymore — the value was
     # removed in the NGF 2.x chart (the data-plane Service is provisioned
     # per Gateway by the control plane; the local NodePort Service in
     # infra/gateway selects the provisioned data-plane pods directly).
-    helm upgrade ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric \
          --install \
          --version ${NGINX_GATEWAY_FABRIC_VERSION} \
          --kube-context kind-$CLUSTER_NAME \
          --namespace nginx-gateway \
          --create-namespace
 
-    helm upgrade gateway $REPO_ROOT/infra/gateway \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" gateway $REPO_ROOT/infra/gateway \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace nginx-gateway \
@@ -1006,7 +1125,7 @@ function getBlockscoutChartVersion() {
 }
 
 function getNginxGatewayFabricVersion() {
-    getVersionValue "charts.nginx_gateway_fabric" "2.6.6"
+    getVersionValue "charts.nginx_gateway_fabric" "2.8.0"
 }
 
 function getBlockscoutDbImage() {
@@ -1240,7 +1359,7 @@ function syncImagesToRegistry() {
 # no cluster. Always succeeds.
 function currentDeployedTagFor() {
     local repo="$1"
-    kubectl get pods --all-namespaces \
+    kubectl --context="kind-$CLUSTER_NAME" get pods --all-namespaces \
         -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
         | grep "/${repo}:" \
         | sed "s#.*/${repo}:##" \
@@ -1266,7 +1385,7 @@ function reportSandboxImages() {
 
     echo "=== Running sandbox pod images ==="
     if [ "$(clusterExists)" == "true" ]; then
-        kubectl get pods --all-namespaces \
+        kubectl --context="kind-$CLUSTER_NAME" get pods --all-namespaces \
             -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' 2>/dev/null \
             | grep -E "localhost:${KIND_REGISTRY_PORT}/(nb-ui|nb-bond-api|bens-microservice):" \
             | sort -u \
@@ -1412,7 +1531,7 @@ function deployBesu() {
     BESU_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BESU_IMAGE")
     echo "🔁 Using local registry image for Besu: $BESU_IMAGE_OVERRIDE"
 
-    helm upgrade besu $REPO_ROOT/infra/besu \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" besu $REPO_ROOT/infra/besu \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace besu \
@@ -1448,7 +1567,8 @@ function bensImageHash() {
     # Sources that affect the build output: generated server tree +
     # requirements.txt + Dockerfile. The swagger spec is the source for
     # the generator, but the generator output is what ships, so we hash
-    # only the output.
+    # only the output. The python stage base ref is an input too, so a
+    # Python pin bump rebuilds the image.
     {
         find "$BLOCKSCOUT_BENS_DIR/src/openapi_server" -type f \
             -not -path '*/__pycache__/*' -not -name '*.pyc' \
@@ -1456,6 +1576,7 @@ function bensImageHash() {
         shasum -a 256 \
             "$BLOCKSCOUT_BENS_DIR/requirements.txt" \
             "$BLOCKSCOUT_BENS_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getBensBaseImage)"
     } | shasum -a 256 | cut -c1-12
 }
 
@@ -1545,7 +1666,7 @@ function deployBlockscout() {
     BLOCKSCOUT_BACKEND_TAG_OVERRIDE=$(imageTag "$BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE")
 
     # deploy postgres db and blockscout
-    helm upgrade blockscout $BLOCKSCOUT_TMPDIR/blockscout-stack \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" blockscout $BLOCKSCOUT_TMPDIR/blockscout-stack \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $BLOCKSCOUT_NAMESPACE \
@@ -1639,7 +1760,9 @@ function nbBondApiBundleHash() {
     # Dockerfile + the root-level workspace metadata (package.json /
     # package-lock.json) since deps now resolve at the repo root.
     # Anything outside this list (tests, README, openapi.json snapshot,
-    # dev-only configs) legitimately doesn't bust the cache.
+    # dev-only configs) legitimately doesn't bust the cache. The stage base
+    # refs are inputs too: a Node pin bump changes no file listed here, and
+    # without them the build would be skipped and the old base kept.
     {
         find "$NB_BOND_API_DIR/src" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
@@ -1648,6 +1771,7 @@ function nbBondApiBundleHash() {
             "$NB_BOND_API_DIR/package.json" \
             "$NB_BOND_API_DIR/tsconfig.json" \
             "$NB_BOND_API_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getNBBondApiBuilderImage)" "$(getNBBondApiRuntimeImage)"
     } | shasum -a 256 | cut -c1-12
 }
 
@@ -1692,7 +1816,7 @@ function deployNBBondAPI() {
         return 1
     fi
 
-    helm upgrade nb-bond-api $REPO_ROOT/services/nb-bond-api/helm \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" nb-bond-api $REPO_ROOT/services/nb-bond-api/helm \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $NB_BOND_API_NAMESPACE \
@@ -1710,7 +1834,8 @@ function nbUIBundleHash() {
     # + Dockerfile + the root-level workspace metadata (package.json /
     # package-lock.json) since deps now resolve at the repo root.
     # Anything outside this list (tests, README, .dockerignore)
-    # legitimately doesn't bust the cache.
+    # legitimately doesn't bust the cache. The stage base refs are inputs
+    # too, so a Node or nginx pin bump rebuilds the image.
     {
         find "$NB_UI_DIR/src" "$NB_UI_DIR/public" -type f -print0 2>/dev/null | sort -z | xargs -0 shasum -a 256
         shasum -a 256 \
@@ -1720,6 +1845,7 @@ function nbUIBundleHash() {
             "$NB_UI_DIR/index.html" \
             "$NB_UI_DIR/vite.config.js" \
             "$NB_UI_DIR/Dockerfile" 2>/dev/null
+        printf 'base %s\n' "$(getNBUIBuilderImage)" "$(getNBUINginxImage)"
     } | shasum -a 256 | cut -c1-12
 }
 
@@ -1752,7 +1878,7 @@ function deployNBUI() {
         "NB_UI_BUILDER_IMAGE=${NB_UI_BUILDER_RESOLVED}" \
         "NB_UI_NGINX_IMAGE=${NB_UI_NGINX_RESOLVED}")" || return 1
 
-    helm upgrade nb-ui "$REPO_ROOT/services/nb-ui/helm" \
+    helm upgrade --kube-context "kind-$CLUSTER_NAME" nb-ui "$REPO_ROOT/services/nb-ui/helm" \
          --install \
          --kube-context kind-$CLUSTER_NAME \
          --namespace $NB_UI_NAMESPACE \

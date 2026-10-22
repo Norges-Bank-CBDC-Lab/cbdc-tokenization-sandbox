@@ -10,7 +10,7 @@ flowchart TB
 
     subgraph money["Money layer"]
         wnok["WNOK<br/>allowlisted wholesale cash token"]
-        tbdN["TBD instances per private bank<br/>Nordea is government-nominated"]
+        tbdN["TBD instances per private bank<br/>cctFrom by payer or bound DvP"]
     end
 
     subgraph primary["Primary bond market"]
@@ -55,7 +55,7 @@ flowchart TB
 
 The bond and stock token models shown here are current. ADR 0002 adopts a
 future migration to canonical ERC-3643 for securities, but that implementation
-has not landed. `OrderBookFactory`, `BondOrderBook`, and
-`BondOrderBookFactory` exist in source but are not instantiated by the default
-deployment scripts; the deployed secondary-market path uses a directly created
-`OrderBook` for the stock token.
+has not landed. `OrderBookFactory` exists in source but is not instantiated by
+the default deployment scripts; the deployed secondary-market path uses a
+directly created `OrderBook` for the stock token. There is no on-chain bond
+secondary market.

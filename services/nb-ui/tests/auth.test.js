@@ -24,13 +24,16 @@ describe('auth plugin resolver', () => {
     expect(await auth.getAuthHeader()).toBeNull();
   });
 
-  it('falls back to no-auth on an unknown AUTH_MODE (with a warning)', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('fails closed on an unknown AUTH_MODE (flagged, no account, no header)', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     window.__APP_CONFIG__.AUTH_MODE = 'pigeon-courier';
-    const { auth } = await import('../src/auth/index.js');
+    const { auth, authMode, isKnownAuthMode } = await import('../src/auth/index.js');
+    expect(authMode).toBe('pigeon-courier');
+    expect(isKnownAuthMode).toBe(false);
+    expect(auth.getAccount()).toBeNull();
     expect(await auth.getAuthHeader()).toBeNull();
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it('selects the Entra provider when AUTH_MODE is "entra"', async () => {

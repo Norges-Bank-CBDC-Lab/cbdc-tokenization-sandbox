@@ -112,6 +112,14 @@ export function stopIngestionLoop(): void {
 }
 
 /**
+ * Resolves once the queued ingestion work has settled. The queue never
+ * rejects, so graceful shutdown can await it after `stopIngestionLoop()`.
+ */
+export function waitForIngestionIdle(): Promise<void> {
+  return ingestionQueue;
+}
+
+/**
  * Test seam — admin.test.ts forces specific module state to validate
  * the reset path without spinning up a real loop. Not part of the
  * runtime API.

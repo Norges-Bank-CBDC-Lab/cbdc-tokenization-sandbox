@@ -86,6 +86,31 @@ describe('BondDetailPage disable affordance', () => {
     expect(await screen.findByRole('button', { name: /Disable bond/i })).toBeInTheDocument();
   });
 
+  it('hides the button for an account that cannot operate', async () => {
+    getBondMock.mockResolvedValue(BOND_DISABLE_ABLE);
+    const { BondDetailPage } = await import('../src/pages/BondDetailPage.jsx');
+    const { ToastProvider } = await import('../src/components/ui.jsx');
+    const { CapabilitiesContext } = await import('../src/auth/capabilitiesContext.js');
+
+    render(
+      <CapabilitiesContext.Provider
+        value={{
+          canUseApp: true,
+          canAccessCentralBank: false,
+          canAccessBanking: true,
+          canOperate: false,
+        }}
+      >
+        <ToastProvider>
+          <BondDetailPage isin={BOND_DISABLE_ABLE.isin} navigate={() => {}} />
+        </ToastProvider>
+      </CapabilitiesContext.Provider>,
+    );
+
+    await screen.findByRole('button', { name: 'Refresh' });
+    expect(screen.queryByRole('button', { name: /Disable bond/i })).toBeNull();
+  });
+
   it('hides the button when the bond has minted supply', async () => {
     getBondMock.mockResolvedValue(BOND_HAS_SUPPLY);
     const { BondDetailPage } = await import('../src/pages/BondDetailPage.jsx');

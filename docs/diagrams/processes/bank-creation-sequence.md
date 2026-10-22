@@ -23,7 +23,7 @@ sequenceDiagram
     API->>DB: Reject duplicate bank name or address
     API->>Registry: Check registry name and resolve WNOK + DvP
 
-    API->>Chain: Deploy TBD signed by bank key<br/>admin = bank, bank = bank, govReserve = zero
+    API->>Chain: Deploy TBD signed by bank key<br/>admin = bank, bank = bank, dvp = registered DvP
     Chain-->>API: TBD contract address
     API->>Registry: setContract("TBD name", address)<br/>signed by central-bank registry owner
 

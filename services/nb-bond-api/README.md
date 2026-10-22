@@ -29,7 +29,9 @@ Two sandbox-only resource families sit alongside the bond tree:
   sealed bid on the bidder's behalf — the API constructs the plaintext,
   signs the EIP-712 `BidIntent`, dual-wraps with the auctioneer sealing
   key, and submits on-chain from a wallet bound to the bidder's stored
-  key. Private keys are stored in plaintext in the local SQLite DB;
+  key. Private keys are stored in plaintext in the local SQLite DB and are
+  returned by the API only in local `none` auth mode, never for keys supplied
+  by the `PK_*` overrides (`privateKey` is `null` otherwise);
   see [`docs/plans/archive/bidders-and-central-bank-plan.md`](../../docs/plans/archive/bidders-and-central-bank-plan.md).
 - **`central-bank`** — Norges Bank operator surface against the WNOK
   contract. `GET /v1/central-bank` returns the CB summary (address,
@@ -42,11 +44,11 @@ Two sandbox-only resource families sit alongside the bond tree:
 - **`banking`** — surface over the per-bank TBD (tokenized bank
   deposit) tokens. `GET /v1/banking/banks` lists the configured banks (the
   signer selector); `GET /v1/banking/tbd[/{address}]` returns each TBD with its
-  owning bank, supply, WNOK reserve backing, government-nomination, and holders;
+  owning bank, supply, WNOK reserve backing, and holders;
   `PUT/DELETE /v1/banking/tbd/{address}/allowlist/{holder}` and
   `POST /v1/banking/tbd/{address}/{mint,burn,transfer}` mutate it, signed by the
   token's owning bank. Open to both operator and tester roles (Central Bank
-  is the only operator-locked surface).
+  is operator-only).
 - **`operations`** — the operator audit trail. Every operator-initiated
   on-chain operation attempted through this API (bond lifecycle, auctions,
   bids, WNOK and TBD operations) is recorded in the preserved
@@ -92,7 +94,8 @@ development.
 from `services/nb-bond-api/Dockerfile` (multi-stage: builder runs `npm ci` +
 `npm run build`, runtime ships only `dist/` plus production `node_modules`).
 The image is tagged with a content hash over `src/`, `package.json`,
-`package-lock.json`, `tsconfig.json`, and the `Dockerfile`, pushed to the
+`package-lock.json`, `tsconfig.json`, the `Dockerfile`, and the builder and
+runtime base image refs (from `common/node-version.env`), pushed to the
 local Kind registry at `localhost:5001/nb-bond-api:<hash>`, and the Helm
 chart is installed with `--set image=<that tag>`. Re-runs skip the build
 when the content hash matches an existing registry tag.
@@ -148,9 +151,11 @@ start.
   sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
 - `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` –
   comma-separated Entra App Role values for role-based access in `entra` mode.
-  Operator roles gate the Central Bank endpoints (`/v1/central-bank/*`) and are
-  required; any recognised role (operator or tester) is needed for other
-  authenticated endpoints. Must match the nb-ui `AUTH_OPERATOR_ROLES` /
+  Operator roles gate the issuer actions (bond create / disable, auction
+  create / close / cancel / finalise, coupon payments), `/v1/admin/*`, and the
+  Central Bank endpoints (`/v1/central-bank/*`) and are required; any
+  recognised role (operator or tester) is needed for other authenticated
+  endpoints (see DEVELOPMENT.md §7.7 for the route matrix). Must match the nb-ui `AUTH_OPERATOR_ROLES` /
   `AUTH_TESTER_ROLES`.
 
 ## Live updates

@@ -59,7 +59,7 @@ injects `Authorization: Bearer …` per request using whichever
 | `#/bonds/{isin}`  | Single bond — coupon, maturity, holders, auction history.                                                                  |
 | `#/auctions`      | Flat list of every auction across bonds.                                                                                   |
 | `#/auctions/{id}` | Single auction — bids, allocation, lifecycle actions. "Place bid" button is visible while the auction is in `BIDDING`.     |
-| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys, launch the impersonated-bid modal.                        |
+| `#/bidders`       | Sandbox bidder roster. Add / remove bidders, reveal stored keys (none mode), launch the impersonated-bid modal.            |
 | `#/central-bank`  | Norges Bank operator surface against WNOK — allowlist editor, mint / burn / transfer modals.                               |
 | `#/tbd`           | Banking — per-bank tokenized bank deposits (TBD): overview, "acting as bank" selector, allowlist / mint / burn / transfer. |
 
@@ -69,8 +69,10 @@ Banking). `#/bidders`, `#/central-bank`, and `#/tbd` carry a visible
 these pages must never be enabled outside the local sandbox.
 
 In Entra mode, Banking is available to authenticated users with a recognised
-operator or tester App Role. Central Bank and administrative operations remain
-operator-only. Local `none` mode keeps all sandbox surfaces open.
+operator or tester App Role. Central Bank, administrative operations, and the
+issuer actions (creating and disabling bonds; creating, closing, cancelling,
+and finalising auctions) remain operator-only, and their controls are hidden
+from testers. Local `none` mode keeps all sandbox surfaces open.
 
 See `docs/plans/archive/nb-ui-frontend-plan.md` for the original frontend plan
 and `docs/plans/archive/bidders-and-central-bank-plan.md` for the bidders +

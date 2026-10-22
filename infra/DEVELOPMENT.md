@@ -8,15 +8,26 @@ layer: Kind, the local registry workflow, Besu, and the gateway.
 From `infra/`:
 
 - start infra and create the Kind cluster if needed: `./infra.sh start`
-- stop infra workloads but keep the cluster and cached images:
-  `./infra.sh stop`
-- delete the Kind cluster while retaining the separate local-registry
-  container and its cached images: `./infra.sh delete`
+- stop Besu and the gateway (scaled to zero) and keep the chain, the cluster,
+  and cached images: `./infra.sh stop`
+- delete the Kind cluster and all sandbox state while retaining the separate
+  local-registry container and its cached images: `./infra.sh delete`
 - start the local registry container: `./infra.sh registry-start`
 - push pinned images into the local registry: `./infra.sh registry-sync`
 
-If you want to preserve the Kind node's own image cache, prefer `stop` over
-`delete`. The separate local-registry cache survives either command.
+`stop` keeps the chain and the Kind node's own image cache; `delete` loses
+both. The separate local-registry cache survives either command.
+
+## Gateway Version Bumps
+
+The NGINX Gateway Fabric chart version is pinned in `common/versions.yaml`
+(`charts.nginx_gateway_fabric`), and the same version is the `app.kubernetes.io/version`
+label in `infra/gateway/templates/nodeport-config.yaml`. On every `start`,
+`deployApiGateway` applies two CRD sets at that release before the chart
+upgrade: the Gateway API CRDs (client-side, from NGF's kustomize base) and
+NGF's own `gateway.nginx.org` CRDs (server-side with `--force-conflicts`). Helm
+installs a chart's CRDs only on first install, so the second apply is what
+moves an existing cluster's NGF CRDs to a new release.
 
 ## Local Registry Workflow
 
@@ -54,7 +65,7 @@ If sandbox startup fails with missing digest or image-pull errors, run
 Offline builds and `FORCE_IMAGE_PULL`:
 
 - When a locally-built service (nb-ui, nb-bond-api, bens-microservice) needs a
-  Dockerfile base image (e.g. `node:26.5.0`) that isn't in the host Docker
+  Dockerfile base image (e.g. `node:26.12.1`) that isn't in the host Docker
   cache, the build reuses the copy already in the local registry and retags it
   to the upstream ref — it does **not** pull from the internet. The Dockerfile
   `FROM` stays an upstream ref, so built images keep a portable lineage.
@@ -80,7 +91,7 @@ curl -X POST \
 
 The currently supported local Besu baseline is:
 
-- Besu 26.7.1 with QBFT consensus
+- Besu 26.10.0 with QBFT consensus
 - one validator using Bonsai and one non-validator archive/RPC node using
   `FULL` sync with Forest storage
 - 1-second transaction blocks and a 300-second idle empty-block period

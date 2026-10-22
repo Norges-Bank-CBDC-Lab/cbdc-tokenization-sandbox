@@ -88,13 +88,14 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
     }
 
     /**
-     * @notice Add new controller
-     * @dev To add dedicated manager role
-     * @param _controller of new controller
+     * @notice Add an ERC-1410 controller
+     * @dev A controller is an operator for every holder, so it can move any holder's units
+     *      through `operatorTransferByPartition`. This grants no lifecycle rights; those come
+     *      from BOND_CONTROLLER_ROLE, granted separately with `grantRole`.
+     * @param _controller Address of the new controller
      */
     function addController(address _controller) external onlyRole(Roles.BOND_ADMIN_ROLE) {
         if (_controller == address(0)) revert Errors.ControllerAddressZero();
-        _grantRole(Roles.BOND_CONTROLLER_ROLE, _controller);
 
         if (_isController[_controller]) {
             return;
@@ -105,6 +106,28 @@ contract BondToken is IBondToken, ERC1410, AccessControl {
             newControllers[i] = _controllers[i];
         }
         newControllers[_controllers.length] = _controller;
+
+        _setControllers(newControllers);
+    }
+
+    /**
+     * @notice Remove an ERC-1410 controller
+     * @dev Leaves BOND_CONTROLLER_ROLE untouched; a no-op when the address is not a controller.
+     * @param _controller Address of the controller to remove
+     */
+    function removeController(address _controller) external onlyRole(Roles.BOND_ADMIN_ROLE) {
+        if (!_isController[_controller]) {
+            return;
+        }
+
+        address[] memory newControllers = new address[](_controllers.length - 1);
+        uint256 j = 0;
+        for (uint256 i = 0; i < _controllers.length; i++) {
+            if (_controllers[i] != _controller) {
+                newControllers[j] = _controllers[i];
+                j++;
+            }
+        }
 
         _setControllers(newControllers);
     }

@@ -71,13 +71,5 @@ contract WnokSetupScript is RegistryScript {
         vm.startBroadcast(dnbKey);
         wnok.approve(tbdDnbAddr, type(uint256).max);
         vm.stopBroadcast();
-
-        /**
-         * @dev See {IERC20-approve}
-         * NOTE: grant nominated gov. bank infinite approval to reserve EOA
-         */
-        vm.startBroadcast(govReserveKey);
-        wnok.approve(tbdNordeaAddr, type(uint256).max);
-        vm.stopBroadcast();
     }
 }

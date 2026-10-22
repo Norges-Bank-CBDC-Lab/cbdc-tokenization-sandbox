@@ -364,6 +364,15 @@ function getSellOrders(address investorSecAddr) external view override returns (
 function getAllBuyOrders() external view override returns (Order[] memory);
 ```
 
+### getOrder
+
+Returns one order by id; every field is zero when the order does not exist.
+
+
+```solidity
+function getOrder(bytes32 orderId) external view override returns (Order memory);
+```
+
 ### getAllSellOrders
 
 

@@ -137,9 +137,11 @@ constructor(string memory _name, string memory _symbol)
 
 ### addController
 
-Add new controller
+Add an ERC-1410 controller
 
-To add dedicated manager role
+A controller is an operator for every holder, so it can move any holder's units
+through `operatorTransferByPartition`. This grants no lifecycle rights; those come
+from BOND_CONTROLLER_ROLE, granted separately with `grantRole`.
 
 
 ```solidity
@@ -149,7 +151,24 @@ function addController(address _controller) external onlyRole(Roles.BOND_ADMIN_R
 
 |Name|Type|Description|
 |----|----|-----------|
-|`_controller`|`address`|of new controller|
+|`_controller`|`address`|Address of the new controller|
+
+
+### removeController
+
+Remove an ERC-1410 controller
+
+Leaves BOND_CONTROLLER_ROLE untouched; a no-op when the address is not a controller.
+
+
+```solidity
+function removeController(address _controller) external onlyRole(Roles.BOND_ADMIN_ROLE);
+```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_controller`|`address`|Address of the controller to remove|
 
 
 ### supportsInterface

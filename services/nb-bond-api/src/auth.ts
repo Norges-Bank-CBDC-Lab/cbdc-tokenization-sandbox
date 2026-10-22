@@ -53,6 +53,26 @@ export const operatorRoles = parseRoleList(envVariables.NB_BOND_API_AUTH_ENTRA_O
 const testerRoles = parseRoleList(envVariables.NB_BOND_API_AUTH_ENTRA_TESTER_ROLES);
 export const recognizedRoles = Array.from(new Set([...operatorRoles, ...testerRoles]));
 
+/** The configured auth mode: `none` (local sandbox default) or `entra`. */
+export const authMode = envVariables.NB_BOND_API_AUTH_MODE;
+
+/** Roles captured by authMiddleware for this request (empty when none). */
+function requestRoles(res: Response): string[] {
+  return Array.isArray(res.locals.authRoles) ? res.locals.authRoles : [];
+}
+
+/**
+ * True when the request may use operator-only behaviour inside a route that
+ * is otherwise open to every recognised role (for example the `testMode`
+ * query flag). Always true in `none` mode, matching the unauthenticated
+ * sandbox; in `entra` mode true only when the token's roles intersect
+ * `operatorRoles`. Whole-route gates use `requireAnyRole(operatorRoles)`.
+ */
+export function isOperatorRequest(res: Response): boolean {
+  if (!entraConfig) return true;
+  return requestRoles(res).some((role) => operatorRoles.includes(role));
+}
+
 /**
  * Extracts the bearer token from the Authorization header, or null.
  *
@@ -126,8 +146,7 @@ export function requireAnyRole(allowed: string[]) {
       next();
       return;
     }
-    const roles: string[] = Array.isArray(res.locals.authRoles) ? res.locals.authRoles : [];
-    if (roles.some((role) => allowed.includes(role))) {
+    if (requestRoles(res).some((role) => allowed.includes(role))) {
       next();
       return;
     }

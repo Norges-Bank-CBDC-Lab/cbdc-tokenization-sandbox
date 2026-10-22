@@ -21,7 +21,7 @@ import helmet from 'helmet';
 import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 import { resetProjectionAndRestart, restartIngestionLoop } from './admin';
-import { authMiddleware, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
+import { authMiddleware, authMode, operatorRoles, recognizedRoles, requireAnyRole } from './auth';
 import {
   composeAllAuctions,
   composeAllBonds,
@@ -94,12 +94,15 @@ import {
   wnokMintBurnBodySchema,
   wnokTransferBodySchema,
 } from './schemas';
+import { parseTestMode } from './test-mode';
 import { validateRequest } from './validation';
 import {
   BidderConflictError,
   BidderValidationError,
+  type BidderRecord,
   createBidder,
   deleteBidder,
+  exposedBidderPrivateKey,
   getBidderByAddress,
   listBidders,
   reconcileFixtureBidderOverrides,
@@ -395,32 +398,12 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   // #region Bonds ──────────────────────────────────────────────────────
 
-  /**
-   * Sandbox-only umbrella "test mode" flag. The operator UI flips this
-   * from the top-bar toggle and propagates it on every bond / auction
-   * read as well as on close / finalise. Today it gates:
-   *
-   *  - composeBond / composeAuction unseal sealed bids on still-open
-   *    auctions (`revealOpenBids` internally).
-   *  - PATCH /v1/auctions/{id} (close) skips the end-time pre-check so
-   *    the operator can attempt close before the bidding window expires.
-   *    The on-chain contract still enforces `block.timestamp >
-   *    metadata.end` and will revert with `InBidPhase()` if it's early.
-   *
-   * Future test affordances should plumb through this same parameter so
-   * a single toggle controls them all.
-   */
-  function parseTestMode(req: express.Request): boolean {
-    const raw = req.query.testMode;
-    return raw === 'true' || raw === '1';
-  }
-
   app.get('/v1/bonds', async (req, res, next) => {
     try {
       const includeDisabled =
         req.query.includeDisabled === 'true' || req.query.includeDisabled === '1';
       const bonds = await composeAllBonds(historyDb, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
         includeDisabled,
       });
       okResponse(req, res, bonds);
@@ -433,7 +416,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
     try {
       const { isin } = req.params as { isin: string };
       const bond = await composeBond(historyDb, isin, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
       });
       if (!bond) throw notFound(`bond ${isin} not found`);
       okResponse(req, res, bond);
@@ -442,52 +425,63 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
     }
   });
 
+  // Issuer actions — creating and disabling bonds, and creating, closing,
+  // cancelling, and finalising auctions — are operator-only. Each route mounts
+  // requireAnyRole(operatorRoles) ahead of validation, so a tester gets 403
+  // before any input is inspected. No-op in `none` mode.
+
   // Pre-stage a bond without scheduling an auction. The first auction is
   // scheduled separately via POST /v1/bonds/{isin}/auctions.
-  app.post('/v1/bonds', validateRequest(createBondBodySchema), async (req, res, next) => {
-    try {
-      const body = req.body as CreateBondBody;
-
-      let maturitySeconds: bigint;
+  app.post(
+    '/v1/bonds',
+    requireAnyRole(operatorRoles),
+    validateRequest(createBondBodySchema),
+    async (req, res, next) => {
       try {
-        maturitySeconds = parseBigInt(body.maturityDuration, 'maturityDuration');
+        const body = req.body as CreateBondBody;
+
+        let maturitySeconds: bigint;
+        try {
+          maturitySeconds = parseBigInt(body.maturityDuration, 'maturityDuration');
+        } catch (err) {
+          throw badRequest((err as Error).message);
+        }
+        if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
+
+        const bondManager = await getBondManager();
+        const sent = await withOperationRecording(
+          {
+            db: biddersDb,
+            opType: 'BOND_CREATE',
+            target: body.isin,
+            detail: { maturityDuration: body.maturityDuration },
+            interfaces: [bondManager.interface],
+            txHashOf: (sent) => sent.tx.hash,
+          },
+          async () => {
+            await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
+            return sendWithManagedNonce(async (nonce) =>
+              bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
+            );
+          },
+        );
+        await awaitMutationProjection(sent, { type: 'bond', id: body.isin });
+
+        const bond = await composeBond(historyDb, body.isin);
+        if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
+        successResponse(req, res, bond, { status: 201 });
       } catch (err) {
-        throw badRequest((err as Error).message);
+        next(err);
       }
-      if (maturitySeconds <= 0n) throw badRequest('maturityDuration must be positive');
-
-      const bondManager = await getBondManager();
-      const sent = await withOperationRecording(
-        {
-          db: biddersDb,
-          opType: 'BOND_CREATE',
-          target: body.isin,
-          detail: { maturityDuration: body.maturityDuration },
-          interfaces: [bondManager.interface],
-          txHashOf: (sent) => sent.tx.hash,
-        },
-        async () => {
-          await bondManager.deployBond.staticCall(body.isin, maturitySeconds);
-          return sendWithManagedNonce(async (nonce) =>
-            bondManager.deployBond(body.isin, maturitySeconds, { nonce }),
-          );
-        },
-      );
-      await awaitMutationProjection(sent, { type: 'bond', id: body.isin });
-
-      const bond = await composeBond(historyDb, body.isin);
-      if (!bond) throw notFound(`bond ${body.isin} not found after creation`);
-      successResponse(req, res, bond, { status: 201 });
-    } catch (err) {
-      next(err);
-    }
-  });
+    },
+  );
 
   // Soft-delete a bond. Requires no minted supply, no in-flight auction,
   // and no FINALISED auction in history. Idempotent: 204 even if already
   // disabled (the contract's BondAlreadyDisabled is the no-op signal).
   app.delete(
     '/v1/bonds/:isin',
+    requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     async (req, res, next) => {
       try {
@@ -577,8 +571,8 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   app.post(
     '/v1/bonds/:isin/coupon-payments',
     // Operator-only — pays the coupon cash leg from the government
-    // reserve. The rest of /v1/bonds stays tester-accessible; no-op in
-    // `none` mode, 403 for non-operator roles in entra mode.
+    // reserve. Bond reads stay tester-accessible; no-op in `none` mode,
+    // 403 for non-operator roles in entra mode.
     requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     validateRequest(holdersBodySchema),
@@ -648,6 +642,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.post(
     '/v1/bonds/:isin/auctions',
+    requireAnyRole(operatorRoles),
     validateRequest(isinParamSchema, 'params'),
     validateRequest(createAuctionBodySchema),
     async (req, res, next) => {
@@ -669,7 +664,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   app.get('/v1/auctions', async (req, res, next) => {
     try {
       const auctions = await composeAllAuctions(historyDb, {
-        revealOpenBids: parseTestMode(req),
+        revealOpenBids: parseTestMode(req, res),
       });
       okResponse(req, res, auctions);
     } catch (err) {
@@ -684,7 +679,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       try {
         const { auctionId } = req.params as { auctionId: string };
         const auction = await composeAuction(historyDb, auctionId, {
-          revealOpenBids: parseTestMode(req),
+          revealOpenBids: parseTestMode(req, res),
         });
         if (!auction) throw notFound(`auction ${auctionId} not found`);
         okResponse(req, res, auction);
@@ -696,6 +691,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.patch(
     '/v1/auctions/:auctionId',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     validateRequest(closeAuctionBodySchema),
     async (req, res, next) => {
@@ -703,7 +699,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
         const { auctionId } = req.params as { auctionId: string };
         const body = req.body as CloseAuctionBody;
         if (body.status !== 'closed') throw badRequest('only status="closed" is supported today');
-        const auction = await auctionService.close(auctionId, parseTestMode(req));
+        const auction = await auctionService.close(auctionId, parseTestMode(req, res));
         okResponse(req, res, auction);
       } catch (err) {
         next(err);
@@ -713,6 +709,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.delete(
     '/v1/auctions/:auctionId',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     async (req, res, next) => {
       try {
@@ -727,6 +724,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   app.put(
     '/v1/auctions/:auctionId/finalisation',
+    requireAnyRole(operatorRoles),
     validateRequest(auctionIdParamSchema, 'params'),
     validateRequest(finaliseBodySchema),
     async (req, res, next) => {
@@ -745,13 +743,10 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
 
   // #region Bidders ────────────────────────────────────────────────────
 
-  async function composeBidderDto(record: {
-    address: string;
-    name: string;
-    publicKey: string;
-    privateKey: string;
-    createdAt: number;
-  }) {
+  // The private key leaves the server only in the unauthenticated local
+  // `none` mode and never for an env-override key (see
+  // exposedBidderPrivateKey); every other DTO carries `privateKey: null`.
+  async function composeBidderDto(record: BidderRecord) {
     const [ethBalance, wnok] = await Promise.all([
       provider.getBalance(record.address).catch(() => 0n),
       getWnok().catch(() => null),
@@ -763,7 +758,7 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
       address: record.address,
       name: record.name,
       publicKey: record.publicKey,
-      privateKey: record.privateKey,
+      privateKey: exposedBidderPrivateKey(record, authMode),
       ethBalance: ethBalance.toString(),
       wnokBalance: wnokBalanceRaw.toString(),
       createdAt: record.createdAt,
@@ -1214,8 +1209,8 @@ export function createApp(dependencies: AppDependencies = {}): express.Express {
   // #region Banking (TBD) ──────────────────────────────────────────────
 
   // Banking (TBD) is open to both operator and tester roles so testers can
-  // exercise bank-money flows; Central Bank stays the only operator-locked
-  // surface. No-op in `none` mode; 403 for unrecognised tokens in `entra`.
+  // exercise bank-money flows; Central Bank stays operator-only. No-op in
+  // `none` mode; 403 for unrecognised tokens in `entra`.
   app.use('/v1/banking', requireAnyRole(recognizedRoles));
 
   app.get('/v1/banking/tbd', async (req, res, next) => {

@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // Feature: the role -> capability policy in src/auth/capabilities.js. Role
 // lists come from runtime config (AUTH_OPERATOR_ROLES / AUTH_TESTER_ROLES),
 // read at module load — so each case re-imports against a fresh config.
-// Central Bank and Banking are both operator-only surfaces.
+// Central Bank and operator-only controls (canOperate) are operator-only;
+// Banking is open to testers.
 
 async function loadCapabilities(config) {
   vi.resetModules();
@@ -30,11 +31,13 @@ describe('capabilitiesForAccount', () => {
       canUseApp: true,
       canAccessCentralBank: true,
       canAccessBanking: true,
+      canOperate: true,
     });
     expect(cap({ roles: [] })).toEqual({
       canUseApp: true,
       canAccessCentralBank: true,
       canAccessBanking: true,
+      canOperate: true,
     });
   });
 
@@ -44,6 +47,7 @@ describe('capabilitiesForAccount', () => {
       canUseApp: true,
       canAccessCentralBank: true,
       canAccessBanking: true,
+      canOperate: true,
     });
   });
 
@@ -53,6 +57,7 @@ describe('capabilitiesForAccount', () => {
       canUseApp: true,
       canAccessCentralBank: false,
       canAccessBanking: true,
+      canOperate: false,
     });
   });
 
@@ -62,12 +67,26 @@ describe('capabilitiesForAccount', () => {
       canUseApp: false,
       canAccessCentralBank: false,
       canAccessBanking: false,
+      canOperate: false,
     });
     expect(cap(null)).toEqual({
       canUseApp: false,
       canAccessCentralBank: false,
       canAccessBanking: false,
+      canOperate: false,
     });
+  });
+
+  it('grants nothing on an unrecognised auth mode', async () => {
+    const cap = await loadCapabilities({ ...entra, AUTH_MODE: 'pigeon-courier' });
+    const none = {
+      canUseApp: false,
+      canAccessCentralBank: false,
+      canAccessBanking: false,
+      canOperate: false,
+    };
+    expect(cap(null)).toEqual(none);
+    expect(cap({ roles: ['Sandbox.Operator'] })).toEqual(none);
   });
 
   it('lets operator capabilities win when an account holds both roles', async () => {
@@ -76,6 +95,7 @@ describe('capabilitiesForAccount', () => {
       canUseApp: true,
       canAccessCentralBank: true,
       canAccessBanking: true,
+      canOperate: true,
     });
   });
 });

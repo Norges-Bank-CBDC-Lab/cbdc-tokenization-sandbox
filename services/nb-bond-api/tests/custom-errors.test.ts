@@ -95,6 +95,16 @@ describe('describeRevert', () => {
     expect(described).toContain('not allowed');
   });
 
+  it('decodes a TBD transfer rejected because the caller is not the payer', () => {
+    const payer = '0xe61a63Ef630b7B6FF9b9e595B61f641171a4eB97';
+    const caller = '0x5B38Da6a701c568545dCfcB03FcB875f56beddC4';
+    const data = tbdIface.encodeErrorResult('CctFromNotCaller', [payer, caller]);
+    const described = describeRevert({ data }, [tbdIface]);
+    expect(described).toContain('CctFromNotCaller');
+    expect(described).toContain(payer);
+    expect(described).toContain(caller);
+  });
+
   it('returns null when nothing matches', () => {
     expect(describeRevert({ data: '0xdeadbeef' }, [managerIface, tbdIface])).toBeNull();
     expect(describeRevert(new Error('boom'), [managerIface, tbdIface])).toBeNull();
