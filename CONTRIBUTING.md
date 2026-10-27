@@ -26,18 +26,54 @@ cd contracts
 forge soldeer install
 forge fmt --check
 forge build --sizes
+bash ./check-verify-latest-mapping.sh
 forge test -vvv
 ```
 
 ### NB Bond API
 
+From the repository root (the npm workspaces install once at the root, as in
+CI):
+
 ```console
-cd services/nb-bond-api
 npm ci
-npm run lint
-npm run format:check
-npm test
+npm run lint -w nb-bond-api
+npm run format:check -w nb-bond-api
+npm test -w nb-bond-api
 ```
+
+### NB UI
+
+From the repository root:
+
+```console
+npm ci
+npm run format:check -w nb-ui
+npm run lint -w nb-ui
+npm test -w nb-ui
+npm run build -w nb-ui
+```
+
+### Repository Checks
+
+Run these from the repository root for every change:
+
+```console
+python3 scripts/verification/check-public-repo-hygiene.py
+python3 scripts/verification/check-markdown-links.py
+```
+
+Run the matching check when you change the files it covers:
+
+```console
+python3 scripts/verification/check-third-party-licenses.py   # dependency manifests, lockfile, or third-party material
+python3 scripts/verification/check-node-version-consistency.py   # Node pin, Dockerfiles, common/ pins, or package manifests
+bash scripts/verification/check-image-hash-inputs.sh   # common/helpers.sh or a locally built image's inputs
+python3 scripts/verification/check-besu-qbft-baseline.py   # infra/besu/, common/images.yaml, or Foundry config
+```
+
+[`scripts/verification/README.md`](scripts/verification/README.md) describes
+each check.
 
 ### Documentation-Only Changes
 

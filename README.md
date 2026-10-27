@@ -50,6 +50,7 @@ also help human contributors understand repo-specific workflow and guardrails:
 - `infra/AGENTS.md`: infra and deployment guidance
 - `scripts/AGENTS.md`: script and CLI guidance
 - `services/AGENTS.md`: service-specific guidance
+- `services/nb-ui/AGENTS.md`: NB UI operator frontend guidance
 
 ## Current Local Chain
 
