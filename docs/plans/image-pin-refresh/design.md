@@ -243,9 +243,9 @@ note and nothing about any specific environment.
 | # | Decision | Recommendation | Rationale | Operator action required |
 |---|---|---|---|---|
 | D1 | How the hash fix lands | A separate first PR (`feature/image-hash-base-refs`) carrying the base-ref hash change from the pending Node pin bump plus nginx and BENS assertions; the Node pin bump drops its hash change on rebase | Unblocks the nginx fix; the Node pin is blocked upstream | Approved 2026-10-21 |
-| D2 | Blockscout backend target | `v12.0.3` with frontend `v2.12.1` in one PR; take the newest v12 patch on the day | Security fixes are v12-only; the DB already meets the gate | Approved 2026-10-21 (slice 6 still needs D4's second confirmation) |
+| D2 | Blockscout backend target | `v12.0.3` with frontend `v2.12.1` in one PR; take the newest v12 patch on the day | Security fixes are v12-only; the DB already meets the gate | Approved 2026-10-21 |
 | D3 | Registry pin rollout | Automatic recreate on image mismatch in `ensureKindRegistry` | A pin change otherwise never applies | Approved 2026-10-21; coordinate with scripts-hardening Phase 6 |
-| D4 | `ffmpeg` in the Blockscout v12 image | Accept: built and run locally, not redistributed; already a GPL-3.0 stack. Record it in `docs/THIRD_PARTY_NOTES.md` and `THIRD_PARTY_LICENSES.md` | Licence guardrail | Approved once 2026-10-21; **second confirmation required before slice 6** |
+| D4 | `ffmpeg` in the Blockscout v12 image | Accept: built and run locally, not redistributed; already a GPL-3.0 stack. Record it in `docs/THIRD_PARTY_NOTES.md` and `THIRD_PARTY_LICENSES.md` | Licence guardrail | Approved 2026-10-21; second confirmation given 2026-10-21 (recorded in `progress.md`) |
 | D5 | Data handling for one-way upgrades | Blockscout: in-place migration; rollback by wiping the explorer DB and reindexing (contracts are re-verified, not redeployed). Besu: in-place on the existing chain; rollback by `besu storage revert-code-format` on the validator, with `./sandbox.sh delete` (fresh chain, contracts redeploy) as the local last resort | Matches routine local practice; the local chain is disposable | Approved 2026-10-21 (local only) |
 | D6 | Python target | Newest 3.14.x with a published image on the implementation day (3.14.8 today, 3.14.9 likely soon) | Patch line; no behaviour change | Approved 2026-10-21 |
 
