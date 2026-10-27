@@ -38,8 +38,8 @@
   | Component (pin) | Store that still holds the root | Outbound TLS | Waiting for |
   |---|---|---|---|
   | `smart-contract-verifier` (`v1.11.0`) | Ubuntu 24.04 `ca-certificates 20260601~24.04.1`, used through OpenSSL | **Yes**: downloads Solidity compilers from `binaries.soliditylang.org` | An image built on the fixed Ubuntu `ca-certificates` |
-  | Blockscout backend (`v11.2.6`) | `castore` 1.0.20 and Erlang `certifi` 2.15.0 in the release, Alpine `ca-certificates 20250911-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22 (v12.0.3 still pins 1.0.21) |
-  | Blockscout frontend (`v2.10.3`) | Node 22.14.0 built-in roots (also "AAA Certificate Services") | No (in-cluster backend only) | A release on Node ≥ 22.23.4 / 24.22.1 (v2.12.1 uses 24.21.0) |
+  | Blockscout backend (`v12.0.3`) | `castore` 1.0.21 and Erlang `certifi` 2.17.0 in the release, Alpine 3.22.6 `ca-certificates 20260909-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22, `certifi` ≥ 2.18.0 and Alpine `ca-certificates 20261020-r0` (v12.0.3 is still the newest release; checked 2026-10-27) |
+  | Blockscout frontend (`v2.12.1`) | Node 24.21.0 built-in roots (its Alpine `ca-certificates 20261020-r0` bundle is clean) | No (in-cluster backend only) | A release on Node ≥ 24.22.1 (v2.12.1 is still the newest v2.12 patch; checked 2026-10-27) |
   | Kind node (`kindest/node:v1.32.11`) | Debian 12 `ca-certificates 20230311+deb12u1` (also "AAA Certificate Services"); containerd built with Go 1.25.5 | **Yes**: containerd pulls images that are not in the local registry | A kind node image built on the fixed Debian `ca-certificates` |
   | NGINX Gateway Fabric (`2.8.0`, control plane and nginx) | Distroless Debian bundle (also "AAA Certificate Services") with Go 1.27.2; Alpine `ca-certificates 20260909-r0` | No (Kubernetes API and in-cluster upstreams only) | A release on Go ≥ 1.27.3 and Alpine `ca-certificates 20261020-r0` |
   | `nginxinc/nginx-unprivileged` (`1.30.6-alpine`, NB UI runtime) | Alpine `ca-certificates 20260909-r0` | No (serves static files) | A tag rebuilt on Alpine `ca-certificates 20261020-r0` |
@@ -273,7 +273,8 @@
   and Docker Hub publication ended in April 2025. Release tags that were
   pullable earlier (including the previously pinned `v10.0.8` / `v2.7.3`)
   have since been removed from ghcr; only rolling `master` / `main` /
-  `prerelease-*` tags are still updated there.
+  `prerelease-*` tags are still updated there. Re-checked on 2026-10-27 for
+  the `v12.0.3` / `v2.12.1` pins: no release tag past `9.0.2` / `v2.3.5`.
 - The backend/frontend pins in `common/images.yaml` therefore name upstream
   refs that cannot be pulled. They are satisfied locally by
   `./sandbox.sh build-images`, which clones the pinned release tags, builds

@@ -163,6 +163,6 @@ this source repository.
 | `nginxinc/nginx-unprivileged` | BSD-2-Clause | Runtime stage of the NB UI image (pinned in `common/images.yaml` under `nb_ui.nginx`) |
 | PostgreSQL | PostgreSQL License | External database image for Blockscout/BENS |
 | Blockscout Helm charts | GPL-3.0 | Pulled at deploy time |
-| Blockscout application | GPL-3.0 | Built locally from pinned upstream source tags (`./sandbox.sh build-images`); upstream no longer publishes release images |
+| Blockscout application | GPL-3.0 | Built locally from pinned upstream source tags (`./sandbox.sh build-images`); upstream no longer publishes release images. The backend image (v12 and later) also contains Alpine's `ffmpeg` (GPL-2.0-or-later AND LGPL-2.1-or-later), built and run locally and not redistributed |
 | Blockscout smart-contract-verifier | GPL-3.0 | Contract-verification microservice; pulled at deploy time (pinned in `common/images.yaml` under `blockscout.smart_contract_verifier`) |
 | BusyBox image | GPL-2.0 | Referenced in `services/blockscout/templates/blockscout-migration-job.yaml` |
