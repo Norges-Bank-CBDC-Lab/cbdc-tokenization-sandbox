@@ -1,10 +1,10 @@
 # Documentation refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-27 — Phase 1 merged as #325; Phase 2 implemented on `feature/docs-plan-housekeeping`
-**Current phase:** Phase 2: Plan housekeeping (awaiting PR and merge)
-**Next action:** After slice 2 merges, branch slice 3 (removed behaviour, diagrams, known
-issues) from a fresh `development`; slices 3–5 are independent, merge them one at a time. Still open in `design.md` "Decisions": the three confirm-only rows
+**Last updated:** 2026-10-27 — Phase 2 merged as #326; Phase 3 implemented on `feature/docs-removed-behaviour-known-issues`
+**Current phase:** Phase 3: Removed behaviour, diagrams, and known issues (awaiting PR and merge)
+**Next action:** After slice 3 merges, branch slice 4 (NatSpec source links) from a fresh
+`development`; slices 4 and 5 are independent, merge them one at a time. Still open in `design.md` "Decisions": the three confirm-only rows
 (`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders, frozen records
 with cloud wording or tooling names).
 
@@ -14,13 +14,19 @@ with cloud wording or tooling names).
 |---|---|---|---|
 | 0 — Baseline | Done (2026-10-27) | re-run on `c5b93c4`; see "Phase 0 Baseline (2026-10-27)" | — |
 | 1 — Cloud wording and tooling names | Done (merged 2026-10-27) | self-check leaves only accepted classes; `openapi.json` unchanged by `regen:openapi`; nb-bond-api lint, format, 293 tests; nb-ui format, lint, 139 tests, build; CI green on a fresh `npm ci` | #325 |
-| 2 — Plan housekeeping | Done locally (2026-10-27) | `ls docs/plans` lists only `README.md`, `archive/`, and Proposed plans; link check passes after the move; ERC-3643 plan's relative links rewritten for its new depth | pending |
-| 3 — Removed behaviour and known issues | Not started | | |
+| 2 — Plan housekeeping | Done (merged 2026-10-27) | `ls docs/plans` lists only `README.md`, `archive/`, and Proposed plans; link check passes after the move; ERC-3643 plan's relative links rewritten for its new depth; CI green | #326 |
+| 3 — Removed behaviour and known issues | Done locally (2026-10-27) | Phase 0 step 4 grep leaves only frozen records, `docs/AZURE_BOUNDARY.md`, and nb-ui files owned by the nb-ui plan; corrections re-checked against `BondManager.sol`, `compose-projection.ts`, `sandbox.sh`, `contracts.sh`, `app.ts`, and `cluster-config.yaml`; Mermaid render checked on the PR rich diff | pending |
 | 4 — NatSpec source links | Not started | | |
 | 5 — License inventory and entrypoints | Not started | | |
 
 ## Deviations From the Plan
 
+- 2026-10-27, Phase 3: the replacement reopen entry keeps "reopen" in its heading ("Closed and
+  finalised auctions cannot be reopened"), so `docs/AZURE_BOUNDARY.md:212`, which names the old
+  entry, still points at the right item and that file stays untouched (operator decision).
+- 2026-10-27, Phase 3: no local Mermaid renderer is available and none was added; the two edited
+  diagrams are checked on the PR's rich diff, as the plan allows.
+- 2026-10-27, Phase 3: the transfer-eligibility entry is not added (operator decision, parked).
 - 2026-10-27, Phase 2: the closed-loop role grants moved again after planning (#302 changed
   `11_BondSetup.s.sol`); the drift note cites the current `:57` (`SETTLE_ROLE`) and `:67`
   (`TRANSFER_FROM_ROLE`), not the `:51,61` in `design.md` §D4.
@@ -160,5 +166,6 @@ on this plan:
   written; re-check their final scope in Phase 0 step 7.
 - 2026-10-27: Phase 0 re-run and Phase 1 merged as #325. The package gates ran against the existing workspace
   `node_modules` rather than a fresh `npm ci`; CI's `npm ci` run is the confirming gate.
-- 2026-10-27: Phase 2 committed on `feature/docs-plan-housekeeping` (local commit, not yet
-  pushed). The ERC-3643 plan is archived and frozen; the parked plans keep `Proposed` status.
+- 2026-10-27: Phase 2 committed on `feature/docs-plan-housekeeping`. The ERC-3643 plan is archived and frozen; the parked plans keep `Proposed` status.
+- 2026-10-27: Phase 2 merged as #326. Phase 3 committed on
+  `feature/docs-removed-behaviour-known-issues` (local commit, not yet pushed).

@@ -138,16 +138,12 @@
   silent renewal is build/lint/test-verified but runtime-unverified until a
   non-local deployment running `entra` mode exercises the timed renewal.
 
-## nb-ui: reopenAuction needs backend / on-chain support
-- The `services/nb-ui/` operator UI exposes a "Reopen…" action on closed
-  auctions (see `AuctionLifecyclePanel`), but there is no matching backend
-  endpoint and the `BondAuction` contract has no closed→open transition.
-- `AuctionsApi.reopenAuction()` throws a `NotImplementedError` (HTTP 501)
-  and the UI shows a toast.
-- Planned follow-up: either add a server-side endpoint that resets the
-  ingestion cache + clears the allocation, or extend `BondAuction` with an
-  on-chain reopen transition. The UI behaviour reverts to "just works" once
-  the endpoint exists.
+## Closed and finalised auctions cannot be reopened
+- `BondAuction` has no closed→open transition and the NB Bond API has no
+  reopen endpoint. The NB UI no longer offers a reopen action (removed in
+  #225).
+- Planned follow-up: none scheduled. Reopening would need an on-chain
+  transition in `BondAuction` and a matching API route.
 - Related: a *finalised* auction is terminal on-chain (no un-finalise and no
   closed→open transition). Correcting a bad outcome — e.g. a fat-finger bid
   that set the wrong clearing rate — means running a fresh auction for the
@@ -176,27 +172,14 @@
   `409 bidding window has closed` for expired auctions; the UI fix
   prevents the operator from triggering it by accident.
 
-## ~~nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable~~ — resolved
-
-Resolved by Plan B
-([`docs/plans/archive/health-indicator-and-self-healing-plan.md`](plans/archive/health-indicator-and-self-healing-plan.md)).
-`startIngestionLoopWithRetry()` in
-[`services/nb-bond-api/src/ingestion.ts`](../services/nb-bond-api/src/ingestion.ts)
-now wraps the boot in exponential backoff (1s → 2s → … → 30s, retries
-forever), so a transient `getaddrinfo EAI_AGAIN` at PC/Docker restart
-no longer leaves the API silently serving stale data. The same plan
-adds `chain` + `ingestion` blocks to `/v1/health` and a polling
-`HealthBadge` in the operator UI top bar so any future degradation is
-visible at a glance.
-
 ## nb-bond-api request-path chain reads bubble up as opaque 500s
-- Same root trigger as the ingestion bug above. When the operator runs
+- Triggered by a briefly unreachable Besu RPC. When the operator runs
   a request that needs a fresh chain read (auction create, close,
   finalise, central-bank tx, bidder bid submission, even GETs that
   resolve contract addresses), and the chain is unreachable, the
   request fails with `500 Internal Server Error` and a `detail` like
   `unhandled: RPC unavailable: request timeout (code=TIMEOUT,
-  version=6.16.0)`.
+  version=…)`.
 - The operator can't tell from the response whether the contract
   reverted (a real domain error worth understanding) or the chain
   is simply unreachable (a wait-and-retry condition). The UI surfaces
@@ -305,6 +288,29 @@ visible at a glance.
   and host them in its own registry.
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
+
+## Blockscout does not show BENS names
+- Blockscout returns `ens_domain_name: null` for transaction parties that
+  BENS resolves. BENS answers `addresses:batch-resolve-names` correctly, and
+  Blockscout calls it on reads, but the names do not reach Blockscout's API
+  responses. On 2026-10-27 the local sandbox's `GET /api/v2/transactions`
+  returned no name for any party of 50 transactions; BENS-side resolution was
+  not re-checked then.
+- Found during the catch-up indexer work and believed to predate it
+  ([`docs/plans/archive/blockscout-catchup-indexer/progress.md`](plans/archive/blockscout-catchup-indexer/progress.md),
+  "Follow-ups Found Along the Way").
+- Planned follow-up: investigate where the names are dropped between BENS and
+  the Blockscout API.
+
+## BENS returns 500 briefly on a fresh Blockscout namespace
+- On a newly created `blockscout` namespace the indexer can call BENS before
+  BENS has created its `mapping` table, so BENS answers `500` for the first
+  few seconds. The catch-up indexer work observed two such responses.
+- Evidence:
+  [`docs/plans/archive/blockscout-catchup-indexer/progress.md`](plans/archive/blockscout-catchup-indexer/progress.md),
+  "Follow-ups Found Along the Way".
+- Planned follow-up: investigate whether BENS should create the table before
+  it reports ready, or the indexer should retry.
 
 ## sandbox.sh build-images is Blockscout-only today
 - `./sandbox.sh build-images` only wraps
