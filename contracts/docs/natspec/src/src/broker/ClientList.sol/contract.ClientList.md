@@ -1,5 +1,5 @@
 # ClientList
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/broker/ClientList.sol)
+[Git Source](../../../../../../src/broker/ClientList.sol)
 
 **Inherits:**
 AccessControl
