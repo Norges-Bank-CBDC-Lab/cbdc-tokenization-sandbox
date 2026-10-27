@@ -78,14 +78,9 @@ Required backend/frontend build on a fresh registry:
 
 ### Blockscout Name Service
 
-The optional BENS microservice provides name-resolution support for Blockscout.
-
-Manual lifecycle from the repository root:
-
-```console
-cd services/blockscout/bens-microservice
-./bens-microservice.sh start
-```
+The BENS microservice provides name-resolution support for Blockscout. It is
+built and deployed by `./blockscout.sh start`; there is no separate start
+command (see `services/blockscout/bens-microservice/README.md`).
 
 URL:
 

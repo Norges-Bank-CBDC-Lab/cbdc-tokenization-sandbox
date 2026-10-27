@@ -16,7 +16,7 @@ flowchart TB
 
         subgraph features["Application services"]
             auctionSvc["Auction service<br/>create / close / cancel / finalise"]
-            lifecycle["Bond lifecycle handlers<br/>create / disable / coupon / redeem"]
+            lifecycle["Bond lifecycle handlers<br/>create / disable / coupon and closure"]
             banking["Banking and central-bank services"]
             bidder["Sandbox bidder and bid service"]
             operations["Operation-attempt recorder"]

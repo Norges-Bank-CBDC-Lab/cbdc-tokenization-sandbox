@@ -137,7 +137,7 @@ The sandbox has no secondary-market price discovery, so at par issuance the coup
 
 Base path is `/v1`. All request and response bodies are JSON. The full
 v2 design (rationale + DTO catalog) lives in
-[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md).
+[`docs/plans/archive/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md).
 
 Two architectural rules apply across the surface:
 
@@ -359,8 +359,9 @@ or sandbox diagnostics suitable for real funds.
 
 The service maintains an SQLite database (default `data/ingestion.sqlite`) which it writes to in-process. This is used for:
 
-- `GET /v1/bonds/{isin}/holders`
+- `GET /v1/bonds` and `GET /v1/bonds/{isin}`
 - `GET /v1/bonds/{isin}/history`
+- `GET /v1/auctions`
 
 If `DB_PATH` is unwritable, or ingestion cannot reach `RPC_URL`, these endpoints may return empty data or become stale, even if the on-chain contracts are operating correctly.
 

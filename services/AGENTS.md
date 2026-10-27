@@ -5,6 +5,7 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
 ### Structure
 - `services/blockscout/`: Blockscout explorer stack (backend + frontend).
 - `services/nb-bond-api/`: Express.js API that drives the on-chain bond lifecycle.
+- `services/nb-ui/`: React + Vite operator frontend; its own guidance is in `services/nb-ui/AGENTS.md`.
 - `services/DEVELOPMENT.md`: detailed run instructions and tooling notes.
 
 ### Commands (per service)
@@ -12,7 +13,7 @@ Inherits the root `AGENTS.md`. This file adds service-specific guidance.
   - Start: `./blockscout.sh start`
   - Stop: `./blockscout.sh stop` (scales to zero; keeps the database)
   - Delete: `./blockscout.sh delete` (removes the namespace and its database)
-  - Name service: `cd services/blockscout/bens-microservice && ./bens-microservice.sh start`
+  - Name service: BENS is built and deployed by `./blockscout.sh start`; there is no separate start command
   - BENS OpenAPI regen: `cd services/blockscout/bens-microservice && ./regen-openapi.sh`
   - Backend/frontend source tags: pinned in `common/images.yaml`; current
     release images must be built locally because upstream does not publish them
