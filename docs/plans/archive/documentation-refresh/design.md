@@ -3,8 +3,8 @@
 **Status:** Draft
 **Created:** 2026-09-28
 **Intent:** [`intent.md`](intent.md)
-**Builds on:** ADR 0003, [ADR 0004](../../decisions/0004-settle-all-bond-cash-legs-in-wnok.md),
-[ADR 0005](../../decisions/0005-redeem-principal-with-the-final-coupon.md), #225, #259, #276,
+**Builds on:** ADR 0003, [ADR 0004](../../../decisions/0004-settle-all-bond-cash-legs-in-wnok.md),
+[ADR 0005](../../../decisions/0005-redeem-principal-with-the-final-coupon.md), #225, #259, #276,
 #278, #291, #292, #293, #294.
 
 ## Decision Summary

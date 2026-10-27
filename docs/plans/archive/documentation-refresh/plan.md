@@ -1,6 +1,6 @@
 # Documentation refresh — Implementation Plan
 
-**Status:** Proposed
+**Status:** Implemented — shipped in #325–#329; archived 2026-10-27
 **Created:** 2026-09-28
 **Scope:** `docs/` (index, known issues, architecture, diagrams, plans tree), `services/AGENTS.md`, `services/DEVELOPMENT.md`, `services/nb-bond-api/{README,DEVELOPMENT}.md`, `services/nb-bond-api/helm/values.local.example.yaml`, `services/nb-bond-api/src/{env-vars,auth}.ts`, `services/nb-bond-api/src/contracts/{bonds,auctions}.ts`, `services/nb-bond-api/openapi.json` (generated), cloud-wording lines in `services/nb-ui/`, `contracts/docs/contracts-security.md`, `contracts/docs/natspec/` (script and generated pages), `THIRD_PARTY_LICENSES.md`, `README.md`, `CONTRIBUTING.md`
 **Intent:** [`intent.md`](intent.md) · **Design:** [`design.md`](design.md) · **Progress:** [`progress.md`](progress.md)
@@ -49,7 +49,7 @@ Confirm every finding in `design.md` still holds on the current `development` be
 
 ### Exit Criteria
 
-- [ ] Baseline counts recorded in `progress.md`.
+- [x] Baseline counts recorded in `progress.md`.
 
 ## Phase 1: Cloud wording and local tooling names (PR 1)
 
@@ -105,9 +105,9 @@ Every "To fix" row of `design.md` §D1 and every active row of §D2.
 
 ### Exit Criteria
 
-- [ ] Every D1 "To fix" row and D2 active row resolved.
-- [ ] `openapi.json` regenerated with only the description change.
-- [ ] Package gates, hygiene, and link checks pass.
+- [x] Every D1 "To fix" row and D2 active row resolved.
+- [x] `openapi.json` regenerated with only the description change (no diff; see `progress.md` Deviations).
+- [x] Package gates, hygiene, and link checks pass.
 
 ## Phase 2: Plan housekeeping (PR 2)
 
@@ -154,9 +154,9 @@ resolve by convention.
 
 ### Exit Criteria
 
-- [ ] Superseded plan archived and indexed as archived.
-- [ ] Convention line present.
-- [ ] Closed-loop plan parked with drift note; branch lines fixed.
+- [x] Superseded plan archived and indexed as archived.
+- [x] Convention line present.
+- [x] Closed-loop plan parked with drift note; branch lines fixed.
 
 ## Phase 3: Removed behaviour, diagrams, and known issues (PR 3)
 
@@ -178,7 +178,7 @@ contains the follow-ups that were only recorded in an archived plan.
    opening; generalise the sample version; replace the reopen entry with the short terminal-auction
    entry; add "Blockscout does not show BENS names" and "BENS returns 500 briefly on a fresh
    Blockscout namespace", each linking
-   [`docs/plans/archive/blockscout-catchup-indexer/progress.md`](../archive/blockscout-catchup-indexer/progress.md)
+   [`docs/plans/archive/blockscout-catchup-indexer/progress.md`](../blockscout-catchup-indexer/progress.md)
    with the observed evidence and "Planned follow-up: investigate" wording; add the transfer
    eligibility entry only per the operator's decision.
 5. Hygiene and link checks.
@@ -194,7 +194,7 @@ contains the follow-ups that were only recorded in an archived plan.
 
 ### Exit Criteria
 
-- [ ] All D6 and D7 rows resolved or explicitly deferred with a reason in `progress.md`.
+- [x] All D6 and D7 rows resolved or explicitly deferred with a reason in `progress.md`.
 
 ## Phase 4: NatSpec source links (PR 4)
 
@@ -236,7 +236,7 @@ and stays that way after future regenerations.
 
 ### Exit Criteria
 
-- [ ] Script fixed; pages regenerated; links resolve; README note updated.
+- [x] Script fixed; pages regenerated; links resolve; README note updated (pages not regenerated; see `progress.md` Deviations).
 
 ## Phase 5: License inventory and entrypoints (PR 5)
 
@@ -260,7 +260,7 @@ and stays that way after future regenerations.
 
 ### Exit Criteria
 
-- [ ] Inventory complete for pinned images; entrypoints list every area guide and CI check.
+- [x] Inventory complete for pinned images; entrypoints list every area guide and CI check.
 
 ## Test Matrix
 
@@ -316,8 +316,8 @@ python3 scripts/verification/check-third-party-licenses.py
 
 ## Done Criteria
 
-- [ ] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
-- [ ] Deferred items (transfer eligibility entry, archived headers, plan parking) are decided and
+- [x] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
+- [x] Deferred items (transfer eligibility entry, archived headers, plan parking) are decided and
       recorded.
-- [ ] Hygiene, link, and license checks pass on `development` after the last slice.
-- [ ] PR bodies contain no private environment information.
+- [x] Hygiene, link, and license checks pass on `development` after the last slice.
+- [x] PR bodies contain no private environment information.

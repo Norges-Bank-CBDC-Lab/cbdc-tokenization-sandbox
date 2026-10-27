@@ -1,12 +1,10 @@
 # Documentation refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-27 — Phase 4 merged as #328; Phase 5 implemented on `feature/docs-licences-entrypoints`
-**Current phase:** Phase 5: License inventory and entrypoints (awaiting PR and merge)
-**Next action:** After slice 5 merges, re-run the hygiene, link, and license checks on
-`development` (plan "Done Criteria"), then archive this folder with `Status: Implemented`. Still open in `design.md` "Decisions": the three confirm-only rows
-(`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders, frozen records
-with cloud wording or tooling names).
+**Last updated:** 2026-10-27 — Phase 5 merged as #329; checks re-run on `development`; plan archived
+**Current phase:** Complete — #329 merged
+**Next action:** None. The three confirm-only rows in `design.md` "Decisions" were not
+answered before archiving; their recommendations stand and no file was changed for them.
 
 ## Phase Log
 
@@ -17,7 +15,7 @@ with cloud wording or tooling names).
 | 2 — Plan housekeeping | Done (merged 2026-10-27) | `ls docs/plans` lists only `README.md`, `archive/`, and Proposed plans; link check passes after the move; ERC-3643 plan's relative links rewritten for its new depth; CI green | #326 |
 | 3 — Removed behaviour and known issues | Done (merged 2026-10-27) | Phase 0 step 4 grep leaves only frozen records, `docs/AZURE_BOUNDARY.md`, and nb-ui files owned by the nb-ui plan; corrections re-checked against `BondManager.sol`, `compose-projection.ts`, `sandbox.sh`, `contracts.sh`, `app.ts`, and `cluster-config.yaml`; Mermaid render checked by the operator on the PR rich diff; CI green | #327 |
 | 4 — NatSpec source links | Done (merged 2026-10-27) | `fix-links.py` rewrites all 30 Git Source links to repository-relative `contracts/src/` links (each resolves on disk); no `blob/` link left under `src/src`; second run changes 0 files; homepage rewrite reproduces the hand-fixed links from a fresh `contracts/README.md` copy; link check passes; CI green | #328 |
-| 5 — License inventory and entrypoints | Done locally (2026-10-27) | every image in `common/images.yaml` and `common/node-version.env` maps to a Deployment-Time row (new `nginxinc/nginx-unprivileged` row; Node.js row widened; Blockscout application row says source-built); license, hygiene, and link checks pass; every `CONTRIBUTING.md` command matches a CI workflow step | pending |
+| 5 — License inventory and entrypoints | Done (merged 2026-10-27) | every image in `common/images.yaml` and `common/node-version.env` maps to a Deployment-Time row (new `nginxinc/nginx-unprivileged` row; Node.js row widened; Blockscout application row says source-built); license, hygiene, and link checks pass; every `CONTRIBUTING.md` command matches a CI workflow step; after the merge, the hygiene, link, and license checks pass on `development` at `ce139fc` | #329 |
 
 ## Deviations From the Plan
 
@@ -142,7 +140,8 @@ removes nothing. Line references below are the current ones.
 
 ## Blocked / Waiting On
 
-- The three confirm-only rows in `design.md` "Decisions" — operator.
+- The three confirm-only rows in `design.md` "Decisions" — operator; open when the plan was
+  archived, recommendations unchanged.
 
 ## Follow-ups Found Along the Way
 
@@ -193,5 +192,6 @@ on this plan:
 - 2026-10-27: Phase 2 merged as #326. Phase 3 committed on
   `feature/docs-removed-behaviour-known-issues`.
 - 2026-10-27: Phase 3 merged as #327. Phase 4 committed on `feature/docs-natspec-source-links`.
-- 2026-10-27: Phase 4 merged as #328. Phase 5 committed on `feature/docs-licences-entrypoints`
-  (local commit, not yet pushed).
+- 2026-10-27: Phase 4 merged as #328. Phase 5 committed on `feature/docs-licences-entrypoints`.
+- 2026-10-27: Phase 5 merged as #329. Hygiene, link, and license checks pass on `development`;
+  the folder moved to `docs/plans/archive/` with `Status: Implemented`.
