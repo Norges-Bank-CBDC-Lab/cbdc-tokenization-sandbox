@@ -211,8 +211,8 @@ to the pod's Service like any other backend.
 
 - `services/nb-ui/Dockerfile`: multi-stage build. The Node.js builder from
   `common/node-version.env` runs `npm ci && npm run build`; the result is
-  COPYed into the `nginxinc/nginx-unprivileged:1.27-alpine` runtime image.
-  The nginx runtime base is pinned in `common/images.yaml` under `nb_ui.nginx`.
+  COPYed into the `nginxinc/nginx-unprivileged` Alpine runtime image, whose
+  tag is pinned in `common/images.yaml` under `nb_ui.nginx`.
 - `./nb-ui.sh start` (or `./sandbox.sh start`) calls `deployNBUI` in
   `common/helpers.sh`, which:
   1. Pulls both stage bases through Docker (`loadImageToKind`) so the

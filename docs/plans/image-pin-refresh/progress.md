@@ -1,10 +1,10 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 5 (Besu 26.10.0) implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 5: Besu 26.10.0 (awaiting PR and merge)
-**Next action:** After slice 5 merges, get D4's second confirmation (ffmpeg licence), then
-branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
+**Last updated:** 2026-10-27 — Phase 5 (Besu 26.10.0) merged as #312; D4 second confirmation recorded
+**Current phase:** Phase 6: Blockscout v12 + frontend v2.12 (not started)
+**Next action:** Branch `feature/blockscout-v12` from a fresh `development` and run the Phase 6
+baseline; the prerequisites (D2, D4, Phases 3 and 5 merged) are met.
 
 ## Phase Log
 
@@ -15,12 +15,15 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 | 2 — nginx 1.30.6 | Done (merged 2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served; CI green | #309 |
 | 3 — Blockscout supporting components | Done (merged 2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok; CI green | #310 |
 | 4 — NGINX Gateway Fabric 2.8.0 | Done (merged 2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer; fresh-cluster path covered by the Phase 5 fresh boot; CI green | #311 |
-| 5 — Besu 26.10.0 | Done locally (2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | pending |
+| 5 — Besu 26.10.0 | Done (merged 2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | #312 |
 | 6 — Blockscout v12 + frontend v2.12 | Not started | | |
 | 7 — Local registry 3.1.2 | Not started | | |
 
 ## Deviations From the Plan
 
+- 2026-10-21: the operator gave D4's second confirmation (accept `ffmpeg` in the locally built
+  Blockscout v12 image). Phase 6 records it in `docs/THIRD_PARTY_NOTES.md` and
+  `THIRD_PARTY_LICENSES.md`.
 - 2026-10-21, Phase 5: the rollback rehearsal covered only the Bonsai validator. The Forest
   archive's downgrade needs a safety override that was not run (see Verified So Far). `plan.md`
   now documents both halves and the Helm field-manager cleanup.
@@ -135,7 +138,6 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 
 ## Blocked / Waiting On
 
-- D4 second confirmation (ffmpeg licence) — operator, before Phase 6.
 - The later non-local rollout — operator; out of scope here, see `plan.md` "Deferred Non-Local Rollout".
 - Phase 7 — the status of scripts-hardening Phase 6 (who owns `ensureKindRegistry`).
 
@@ -160,9 +162,10 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 
 ## Session Handoff
 
-Phases 1–4 merged as #308, #309, #310 and #311. Phase 5 is on `feature/besu-26-10`, rebased onto
-`development` after #311 merged. The local sandbox now runs a fresh chain (new contract
-addresses) on all slice 1–5 pins. The local sandbox now runs the
+Phases 1–5 merged as #308, #309, #310, #311 and #312, and shipped in release v0.10.0 (#316).
+Outside this plan, #315 moved BENS to `python:3.14.9` (the D6 target once its image was
+published) and #313 moved the Node pin to 26.12.1. Phase 6 is next; no branch exists for it yet.
+The local sandbox runs a fresh chain (new contract addresses) on all slice 1–5 pins. It runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that
