@@ -107,7 +107,7 @@ only a page naming the bad value (`src/components/ConfigErrorPage.jsx`) and
 - `noneAuth` — no `Authorization` header, no sign-in UI. Default; the
   local sandbox runs this way because the NB Bond API has no auth (per
   `docs/ARCHITECTURE.md` "Trust Boundaries And Security Notes").
-- `entraAuth` — Microsoft Entra (Azure AD) OIDC via MSAL Browser. Reads
+- `entraAuth` — Microsoft Entra ID OIDC via MSAL Browser. Reads
   `AUTH_TENANT_ID`, `AUTH_CLIENT_ID`, `AUTH_AUTHORITY`, `AUTH_SCOPES`,
   `AUTH_REDIRECT_URI` from runtime config. **Tenant / client / scopes
   are never committed to this repo** — they come from the runtime
@@ -264,7 +264,7 @@ Local-acceptable defaults a non-local deployment must set explicitly:
   roles, sign-in lands on the access-denied screen.
 - **CSP** — see "Known gotchas"; a non-local deployment should tighten the nginx
   CSP (also flagged in `docs/plans/archive/nb-ui-frontend-plan.md`).
-- **Authenticated SSE** — `LIVE_UPDATES` defaults to `true`. The Azure gateway
+- **Authenticated SSE** — `LIVE_UPDATES` defaults to `true`. A non-local gateway
   must forward Authorization, disable response buffering, and use an idle
   timeout above the API heartbeat interval. Keep the API at one replica until
   shared event fan-out exists. See `docs/AZURE_BOUNDARY.md`.

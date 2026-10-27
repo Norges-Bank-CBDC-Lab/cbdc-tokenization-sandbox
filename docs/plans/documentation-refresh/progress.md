@@ -1,19 +1,19 @@
 # Documentation refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-27 — operator decisions recorded (closed-loop, wallet, entity-directory parked; transfer-eligibility entry parked; archived headers approved)
-**Current phase:** Not started
-**Next action:** Run Phase 0 on a fresh `development`, then open slice 1 as
-`feature/docs-neutral-deployment-wording`. Still open in `design.md` "Decisions": the three
-confirm-only rows (`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders,
-frozen records with cloud wording or tooling names).
+**Last updated:** 2026-10-27 — Phase 0 baseline re-run on `development` at `c5b93c4`; Phase 1 implemented on `feature/docs-neutral-deployment-wording`
+**Current phase:** Phase 1: Cloud wording and tooling names (awaiting PR and merge)
+**Next action:** After slice 1 merges, branch slice 2 (plan housekeeping) from a fresh
+`development`. Still open in `design.md` "Decisions": the three confirm-only rows
+(`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders, frozen records
+with cloud wording or tooling names).
 
 ## Phase Log
 
 | Phase | Status | Evidence | PR |
 |---|---|---|---|
-| 0 — Baseline | Not started | | |
-| 1 — Cloud wording and tooling names | Not started | | |
+| 0 — Baseline | Done (2026-10-27) | re-run on `c5b93c4`; see "Phase 0 Baseline (2026-10-27)" | — |
+| 1 — Cloud wording and tooling names | Done locally (2026-10-27) | self-check leaves only accepted classes; `openapi.json` unchanged by `regen:openapi`; nb-bond-api lint, format, 293 tests; nb-ui format, lint, 139 tests, build | pending |
 | 2 — Plan housekeeping | Not started | | |
 | 3 — Removed behaviour and known issues | Not started | | |
 | 4 — NatSpec source links | Not started | | |
@@ -21,6 +21,14 @@ frozen records with cloud wording or tooling names).
 
 ## Deviations From the Plan
 
+- 2026-10-27, Phase 1: the `testMode` description rows (`src/contracts/{bonds,auctions}.ts`,
+  `openapi.json`) and the `services/nb-ui/src/utils/debugSettings.js` row were already fixed by
+  #304, so slice 1 does not touch them and `regen:openapi` produces no diff.
+- 2026-10-27, Phase 1: added `docs/plans/erc-3643-incremental-adoption-plan.md:80` (a
+  non-goal naming a deployment tooling approach), found by the Phase 0 baseline. It is fixed in slice 1
+  because slice 2 archives that plan.
+- 2026-10-27, Phase 1: the ERC-3643 plan's tooling references now point at `CONTRIBUTING.md`
+  (lines 7 and 380) and `docs/plans/README.md` (line 411).
 - 2026-10-27, operator decisions on the `design.md` "Decisions" table:
   - Closed-loop settlement plan: park it, as recommended (Phase 2 step 3).
   - Wallet and entity-directory plans: park both. Phase 2 step 4 applies the D4 status phrasing
@@ -73,6 +81,38 @@ Corrections made to the review findings while writing the plan:
 - `check-third-party-licenses.py` passes; it does not inspect image pins — verified on
   2026-09-28.
 
+## Phase 0 Baseline (2026-10-27)
+
+Re-run on `development` at `c5b93c4`. None of the other 2026-09-28 plans has started, so step 7
+removes nothing. Line references below are the current ones.
+
+- **D1 cloud wording:** 13 of the 15 "To fix" rows still apply; the two #304 rows are fixed
+  (see Deviations). One new row, the ERC-3643 plan `:80`. Frozen records: 10 archived plans; no
+  ADR or post-mortem. Moved lines: nb-bond-api `DEVELOPMENT.md` 507 → 528 and 521–524 → 542,
+  nb-bond-api `README.md` 147 → 150, nb-ui `DEVELOPMENT.md` 107 → 110 and 247–250 → 267,
+  `docs/DOCUMENTATION_INDEX.md` 62 → 72, `docs/KNOWN_ISSUES.md` 97 → 139.
+- **D2 tooling names:** unchanged counts: 1 in `docs/KNOWN_ISSUES.md` (now `:254`), 3 in the
+  ERC-3643 plan (`:7,380,411`), 13 archived plans.
+- **D3–D5 plan tree:** hold. The ERC-3643 plan is still in the active folder; both `imp/…`
+  branch lines are still present.
+- **D6 removed behaviour:** all 12 rows hold. Moved lines: `docs/KNOWN_ISSUES.md` reopen entry
+  100–114 → 142–150, `docs/ARCHITECTURE.md` 157–160 → 159, `contracts/docs/contracts-security.md`
+  44 → 45, `services/DEVELOPMENT.md` 80–88 → 87, `docs/DOCUMENTATION_INDEX.md` 101 → 111.
+- **D7 known issues:** hold. Resolved ingestion entry now `:180` (next entry `:194`), sample
+  `version=6.16.0` now `:200`; `ethers` is 6.17.0 in all three manifests. Neither BENS entry
+  exists. The live sandbox's `/api/v2/transactions` returned no ENS name for any party of 50
+  transactions (BENS-side resolution still not re-checked).
+- **D8 NatSpec:** 30 Git Source links (32 before #302 removed two pages), all still at
+  `e1ad139` without the `contracts/` prefix.
+- **D9 licences and entrypoints:** hold. The snapshot date is still September 4 although
+  #307 and #313–#315 changed rows since; the Blockscout application row is now `:164`.
+- **Checks:** `check-third-party-licenses.py`, `check-public-repo-hygiene.py`, and
+  `check-markdown-links.py` pass.
+- **New for later phases:** `docs/AZURE_BOUNDARY.md:212` names the reopen-auction known issue by
+  its heading, which Phase 3 replaces (operator decision, since that file keeps its established
+  scope). The `nb-ui-correctness-and-hardening` verification grep (`plan.md:545`) includes the
+  nginx tag that #323 already removed.
+
 ## Blocked / Waiting On
 
 - The three confirm-only rows in `design.md` "Decisions" — operator.
@@ -113,3 +153,6 @@ on this plan:
   under `contracts/docs/` was modified.
 - The other plan folders written on 2026-09-28 were not yet committed when this plan was
   written; re-check their final scope in Phase 0 step 7.
+- 2026-10-27: Phase 0 re-run and Phase 1 committed on `feature/docs-neutral-deployment-wording`
+  (local commit, not yet pushed). The package gates ran against the existing workspace
+  `node_modules` rather than a fresh `npm ci`; CI's `npm ci` run is the confirming gate.

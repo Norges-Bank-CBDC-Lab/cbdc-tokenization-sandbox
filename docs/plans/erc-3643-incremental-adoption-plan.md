@@ -4,7 +4,7 @@
 > The operator decided on a **full migration** to canonical ERC-3643 for both bonds and equities — retiring the partitioned `BondToken` and the bespoke ERC-20 `StockToken` — rather than the *incremental, keep-the-partitioned-bond* approach (Path B) this plan describes. This document is retained as the record of the incremental option that was **considered and rejected**: its mechanics (shared identity registry, modular compliance, agent powers) and its bond transfer-eligibility-gap analysis remain a useful reference for the migration, but its core **Non-Goals no longer hold** — full migration *does* move to one ERC-3643 token per ISIN, does *not* keep `BondToken` as a learning artifact, and *does* pursue a greenfield ERC-3643 equity token. A fresh implementation plan for the full migration is future work.
 
 **Status:** Superseded in direction by `docs/decisions/0002-adopt-erc-3643-for-tokenized-securities.md` (2026-06-22) — see banner above. No contract code has changed; implementing the full migration needs a fresh plan and an explicit go-ahead. *(Original status: Proposed — roadmap / meeting-prep; Phase 1 keystone, Phases 2–4 roadmap executed from this same document.)*
-**Branch suggestion:** `feature/erc3643-identity-compliance` (Phase 1 only; later phases get their own `feature/<kebab>` branches). Branch / commit / PR / CI-gate workflow is owned by `sandbox-pr-workflow`.
+**Branch suggestion:** `feature/erc3643-identity-compliance` (Phase 1 only; later phases get their own `feature/<kebab>` branches). Branch / commit / PR / CI-gate workflow follows [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 **Components touched (across all phases):** `contracts/src/norges-bank/BondToken.sol`, `contracts/src/norges-bank/Wnok.sol`, `contracts/src/norges-bank/ERC1410/ERC1410.sol`, `contracts/src/common/Roles.sol`, `contracts/src/common/Errors.sol`, new `contracts/src/common/identity/*` + `contracts/src/common/compliance/*` (and their interfaces), `contracts/script/norges-bank/03_Wnok.s.sol` + `10_Bond.s.sol` + the bond/wnok setup scripts, `contracts/contracts.sh` (verify-latest mapping), tests under `contracts/test/`, and contracts docs. Consumers (`services/nb-bond-api`, `services/nb-ui`) re-ingest the redeployed addresses but get no behavioural change in Phase 1.
 
 ## Goal
@@ -77,7 +77,7 @@ What was inspected and what was actually verified in this session (2026-06-05).
 
 ### Out Of Scope
 
-- One-token-per-ISIN (Path A) for the existing bond; byte-for-byte `IERC3643` ABI conformance; real ONCHAINID before Phase 4; vendoring `@T-REX` / `@onchain-id` by default; a Path-A greenfield pilot asset; settlement-model changes; any non-local / GitOps promotion. (See Non-Goals and Decisions.)
+- One-token-per-ISIN (Path A) for the existing bond; byte-for-byte `IERC3643` ABI conformance; real ONCHAINID before Phase 4; vendoring `@T-REX` / `@onchain-id` by default; a Path-A greenfield pilot asset; settlement-model changes; any non-local promotion. (See Non-Goals and Decisions.)
 
 ## Folder And File Placement
 
@@ -377,7 +377,7 @@ This repo is **public**. Before each PR:
 
 ## Documentation And PR Plan
 
-Branch naming (`feature/<kebab>` → `development`), commit / PR style, and CI gates are owned by `sandbox-pr-workflow` — point to it rather than restating here. Per repo policy: **no AI attribution** in commits or PR bodies; branch targets `development`, not `main`.
+Branch naming (`feature/<kebab>` → `development`), commit / PR style, and CI gates follow [`CONTRIBUTING.md`](../../CONTRIBUTING.md) — point to it rather than restating here. Per repo policy: **no AI attribution** in commits or PR bodies; branch targets `development`, not `main`.
 
 Recommended split — one PR per phase (Phase 1 is the keystone and ships first):
 
@@ -408,5 +408,5 @@ Evidence to capture in each PR body:
 ## Done Criteria
 
 - **Phase 1:** unverified bond transfers revert, verified transfers succeed, compliance veto reverts, `Wnok` behaviour preserved, shared registry gates both tokens, one-time redeploy + consumer re-ingest complete; all Phase-1 acceptance rows pass; `Contracts CI` gates green; plan status updated and Phase 2 ready to execute from this same doc.
-- **Phases 2–4:** each phase's exit criteria met when executed; the doc's status line advances; on full completion the file moves to `docs/plans/archive/` with PR links (per `sandbox-doc-maintainer` conventions).
+- **Phases 2–4:** each phase's exit criteria met when executed; the doc's status line advances; on full completion the file moves to `docs/plans/archive/` with PR links (per [`docs/plans/README.md`](README.md)).
 - The `docs/DOCUMENTATION_INDEX.md` entry (listed above) is added when this plan is committed.

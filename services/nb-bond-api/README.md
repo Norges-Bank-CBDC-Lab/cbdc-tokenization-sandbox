@@ -147,7 +147,7 @@ start.
 - `NB_BOND_API_AUTH_MODE` – `none` (sandbox default, header accepted but
   ignored) or `entra` (JWT validated against the configured Entra ID tenant).
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE` –
-  required when `NB_BOND_API_AUTH_MODE=entra`. ArgoCD must keep these in
+  required when `NB_BOND_API_AUTH_MODE=entra`. The deployment must keep these in
   sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
 - `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` –
   comma-separated Entra App Role values for role-based access in `entra` mode.

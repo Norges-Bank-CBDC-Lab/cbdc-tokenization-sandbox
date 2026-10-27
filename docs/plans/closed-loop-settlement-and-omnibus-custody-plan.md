@@ -15,7 +15,7 @@ The closed-loop model: **wNOK is central-bank money; only allowlisted entities h
 - **No locking / escrow of bidder funds.** Nothing is reserved during the multi-day bidding window — only winning dealers are debited at finalisation. (Locking would also distort the corridor-style nightly interest-on-holdings model.)
 - **No change to plain ERC-20 `transferFrom`** — it stays allowance-respecting for any future open-loop (secondary-market) use. The authority path is a *separate, explicit* function.
 - **No Diamond pattern.** Specialized contracts + interfaces + factory + minimal-proxy clones; per-contract UUPS only if upgradeability is needed.
-- **No Azure / infra change.** Everything runs on the existing Besu-on-AKS runtime; deployment is the existing Foundry scripts against the Besu RPC.
+- **No infrastructure change.** The plan runs on the existing sandbox runtime; deployment is the existing Foundry scripts against the Besu RPC.
 
 ## Guiding Invariants (agreed)
 
@@ -224,4 +224,4 @@ PrimaryDealerRegistry (Phase 2), any custody/broker change (Phase 3+), coupon/re
 
 ## Boundary / Ownership
 
-This plan targets the **`cbdc-tokenization-sandbox`** repo (contracts + broker software). It requires **no Azure/Bicep change** — the existing Besu-on-AKS runtime hosts it; deployment is the existing Foundry scripts against the Besu RPC. The plan was authored read-only; implementing any contract change here is a separate, explicitly-authorized step.
+This plan targets the **`cbdc-tokenization-sandbox`** repo (contracts + broker software). It requires **no infrastructure change** — the existing Besu runtime hosts it; deployment is the existing Foundry scripts against the Besu RPC. The plan was authored read-only; implementing any contract change here is a separate, explicitly-authorized step.
