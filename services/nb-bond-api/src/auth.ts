@@ -7,8 +7,8 @@
  *     Entra ID. Signature verified against the tenant's JWKS, `aud` and
  *     `iss` claims checked.
  *
- * Frontend (nb-ui) configures the matching AUTH_MODE; ArgoCD keeps the
- * two in sync. See docs/plans/archive/openapi-v2-plan.md §3.7.
+ * Frontend (nb-ui) configures the matching AUTH_MODE; the deployment keeps
+ * the two in sync. See docs/plans/archive/openapi-v2-plan.md §3.7.
  */
 import type { NextFunction, Request, Response } from 'express';
 import { createRemoteJWKSet, jwtVerify } from 'jose';

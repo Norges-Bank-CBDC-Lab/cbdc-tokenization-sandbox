@@ -68,8 +68,9 @@ const envSchema = z.object({
 
   // Auth mode. `none` (sandbox default) accepts and ignores the
   // Authorization header. `entra` validates the bearer token as a JWT
-  // issued by Microsoft Entra ID. ArgoCD must keep this in sync with
-  // the nb-ui AUTH_MODE — mismatches fail fast at startup, not silently.
+  // issued by Microsoft Entra ID. A non-local deployment must keep this in
+  // sync with the nb-ui AUTH_MODE — mismatches fail fast at startup, not
+  // silently.
   NB_BOND_API_AUTH_MODE: z.enum(['none', 'entra']).default('none'),
   NB_BOND_API_AUTH_ENTRA_TENANT_ID: z
     .string()
@@ -117,7 +118,7 @@ if (parsedEnv.data.NB_BOND_API_AUTH_MODE === 'entra') {
   if (missing.length) {
     throw new Error(
       `NB_BOND_API_AUTH_MODE=entra requires: ${missing.join(', ')}. ` +
-        'Mode and config must be kept in sync by ArgoCD.',
+        'Mode and config must be kept in sync by the deployment.',
     );
   }
 }

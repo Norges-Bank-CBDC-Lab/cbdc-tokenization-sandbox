@@ -72,7 +72,7 @@ env:
   # Auth mode. `none` (sandbox default) accepts the Authorization header but
   # does not validate it. `entra` validates the bearer token as a JWT issued
   # by Microsoft Entra ID and requires NB_BOND_API_AUTH_ENTRA_* below.
-  # ArgoCD-managed deployments MUST keep this in sync with nb-ui AUTH_MODE.
+  # Non-local deployments MUST keep this in sync with nb-ui AUTH_MODE.
   NB_BOND_API_AUTH_MODE: "none"
   # Comment heartbeat interval for authenticated /v1/events subscribers.
   # Keep any gateway idle timeout comfortably above this value.

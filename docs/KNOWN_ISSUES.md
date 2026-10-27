@@ -136,8 +136,7 @@
 - The Entra auth path (`services/nb-ui/src/auth/entraAuth.js`) remains dormant
   in the local sandbox (`AUTH_MODE=none`) and cannot be exercised here, so
   silent renewal is build/lint/test-verified but runtime-unverified until a
-  real Entra deployment runs the timed renewal check. Owned by the cloud
-  deployment work.
+  non-local deployment running `entra` mode exercises the timed renewal.
 
 ## nb-ui: reopenAuction needs backend / on-chain support
 - The `services/nb-ui/` operator UI exposes a "Reopen…" action on closed
@@ -250,8 +249,8 @@ visible at a glance.
     proceeds without one.
 - Touches `BondAuction.sol`, `IBondAuction.sol`, `BondManager`,
   `nb-bond-api` ingestion + schemas, `nb-ui` `AuctionLifecyclePanel`,
-  and tests across all four layers. Warrants its own iteration plan
-  via the `sandbox-implementation-planner` skill before implementation.
+  and tests across all four layers. Warrants its own implementation plan
+  under `docs/plans/` before implementation.
 
 ## BondAuction has no `cancelBid` — bids are final once sealed
 - `contracts/src/norges-bank/BondAuction.sol` does not expose a
