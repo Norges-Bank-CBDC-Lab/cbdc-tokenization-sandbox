@@ -1,5 +1,5 @@
 # BondToken
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondToken.sol)
+[Git Source](../../../../../../src/norges-bank/BondToken.sol)
 
 **Inherits:**
 [IBondToken](../interfaces/IBondToken.sol/interface.IBondToken.md), ERC1410, AccessControl

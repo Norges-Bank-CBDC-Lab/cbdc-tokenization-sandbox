@@ -1,5 +1,5 @@
 # ERC1410Minimal
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/ERC1410/ERC1410.sol)
+[Git Source](../../../../../../../src/norges-bank/ERC1410/ERC1410.sol)
 
 **Inherits:**
 [IERC1410](../IERC1410.sol/interface.IERC1410.md), ERC165

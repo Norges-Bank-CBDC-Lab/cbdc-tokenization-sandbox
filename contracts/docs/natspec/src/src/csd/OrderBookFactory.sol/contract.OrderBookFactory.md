@@ -1,5 +1,5 @@
 # OrderBookFactory
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/csd/OrderBookFactory.sol)
+[Git Source](../../../../../../src/csd/OrderBookFactory.sol)
 
 **Inherits:**
 AccessControl

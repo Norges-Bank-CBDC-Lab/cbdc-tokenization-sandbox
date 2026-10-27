@@ -1,5 +1,5 @@
 # BondManager
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondManager.sol)
+[Git Source](../../../../../../src/norges-bank/BondManager.sol)
 
 **Inherits:**
 [IBondManager](../interfaces/IBondManager.sol/interface.IBondManager.md), AccessControl

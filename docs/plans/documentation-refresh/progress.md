@@ -1,10 +1,10 @@
 # Documentation refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-27 — Phase 2 merged as #326; Phase 3 implemented on `feature/docs-removed-behaviour-known-issues`
-**Current phase:** Phase 3: Removed behaviour, diagrams, and known issues (awaiting PR and merge)
-**Next action:** After slice 3 merges, branch slice 4 (NatSpec source links) from a fresh
-`development`; slices 4 and 5 are independent, merge them one at a time. Still open in `design.md` "Decisions": the three confirm-only rows
+**Last updated:** 2026-10-27 — Phase 3 merged as #327; Phase 4 implemented on `feature/docs-natspec-source-links`
+**Current phase:** Phase 4: NatSpec source links (awaiting PR and merge)
+**Next action:** After slice 4 merges, branch slice 5 (licence inventory and entrypoints) from a
+fresh `development`. Still open in `design.md` "Decisions": the three confirm-only rows
 (`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders, frozen records
 with cloud wording or tooling names).
 
@@ -15,12 +15,22 @@ with cloud wording or tooling names).
 | 0 — Baseline | Done (2026-10-27) | re-run on `c5b93c4`; see "Phase 0 Baseline (2026-10-27)" | — |
 | 1 — Cloud wording and tooling names | Done (merged 2026-10-27) | self-check leaves only accepted classes; `openapi.json` unchanged by `regen:openapi`; nb-bond-api lint, format, 293 tests; nb-ui format, lint, 139 tests, build; CI green on a fresh `npm ci` | #325 |
 | 2 — Plan housekeeping | Done (merged 2026-10-27) | `ls docs/plans` lists only `README.md`, `archive/`, and Proposed plans; link check passes after the move; ERC-3643 plan's relative links rewritten for its new depth; CI green | #326 |
-| 3 — Removed behaviour and known issues | Done locally (2026-10-27) | Phase 0 step 4 grep leaves only frozen records, `docs/AZURE_BOUNDARY.md`, and nb-ui files owned by the nb-ui plan; corrections re-checked against `BondManager.sol`, `compose-projection.ts`, `sandbox.sh`, `contracts.sh`, `app.ts`, and `cluster-config.yaml`; Mermaid render checked on the PR rich diff | pending |
-| 4 — NatSpec source links | Not started | | |
+| 3 — Removed behaviour and known issues | Done (merged 2026-10-27) | Phase 0 step 4 grep leaves only frozen records, `docs/AZURE_BOUNDARY.md`, and nb-ui files owned by the nb-ui plan; corrections re-checked against `BondManager.sol`, `compose-projection.ts`, `sandbox.sh`, `contracts.sh`, `app.ts`, and `cluster-config.yaml`; Mermaid render checked by the operator on the PR rich diff; CI green | #327 |
+| 4 — NatSpec source links | Done locally (2026-10-27) | `fix-links.py` rewrites all 30 Git Source links to repository-relative `contracts/src/` links (each resolves on disk); no `blob/` link left under `src/src`; second run changes 0 files; homepage rewrite reproduces the hand-fixed links from a fresh `contracts/README.md` copy; link check passes | pending |
 | 5 — License inventory and entrypoints | Not started | | |
 
 ## Deviations From the Plan
 
+- 2026-10-27, Phase 4: Foundry 1.8.6 (the Contracts CI pin since #315) no longer emits mdBook
+  Markdown. `forge doc --out docs/natspec` writes a Vocs site scaffold (`src/pages/*.mdx`,
+  `package.json` with an unpinned pre-release `vocs`, `vocs.config.ts`, `vocs.sidebar.ts`) and
+  leaves the committed mdBook tree untouched. The operator chose to keep the mdBook pages: the
+  Vocs output was deleted, `fix-links.py` was run on the committed pages instead of a
+  regeneration (30 one-line Git Source changes), and the expected homepage, `BondManager`, and
+  `IBondManager` refreshes did not happen. The natspec README, `contracts/README.md`, and the
+  homepage copy no longer tell readers to run `forge doc`; pages are updated by hand when a
+  contract changes.
+- 2026-10-27, Phase 4: the 30 Git Source links (not 32) reflect the two pages #302 removed.
 - 2026-10-27, Phase 3: the replacement reopen entry keeps "reopen" in its heading ("Closed and
   finalised auctions cannot be reopened"), so `docs/AZURE_BOUNDARY.md:212`, which names the old
   entry, still points at the right item and that file stays untouched (operator decision).
@@ -130,6 +140,11 @@ removes nothing. Line references below are the current ones.
 
 ## Follow-ups Found Along the Way
 
+- `docs/plans/bond-coupon-maturity-correctness/plan.md:45` says not to run `forge doc` because it
+  regenerates every page; the advice still holds, but the reason is now that Foundry 1.8.6 emits
+  a Vocs site instead (Phase 4 deviation). Update that line when the plan starts.
+- The committed NatSpec pages now need hand edits whenever a contract changes; a later decision
+  could adopt the Vocs output once it can be pinned, or drop the generated reference.
 - `ERC1410.transferByPartition` documents that 32-byte `data` selects the destination partition,
   but passes the source partition as destination —
   `contracts/src/norges-bank/ERC1410/ERC1410.sol:174-184` — contract behaviour, outside this plan;
@@ -168,4 +183,6 @@ on this plan:
   `node_modules` rather than a fresh `npm ci`; CI's `npm ci` run is the confirming gate.
 - 2026-10-27: Phase 2 committed on `feature/docs-plan-housekeeping`. The ERC-3643 plan is archived and frozen; the parked plans keep `Proposed` status.
 - 2026-10-27: Phase 2 merged as #326. Phase 3 committed on
-  `feature/docs-removed-behaviour-known-issues` (local commit, not yet pushed).
+  `feature/docs-removed-behaviour-known-issues`.
+- 2026-10-27: Phase 3 merged as #327. Phase 4 committed on `feature/docs-natspec-source-links`
+  (local commit, not yet pushed).

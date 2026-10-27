@@ -1,5 +1,5 @@
 # BondAuction
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/BondAuction.sol)
+[Git Source](../../../../../../src/norges-bank/BondAuction.sol)
 
 **Inherits:**
 [IBondAuction](../interfaces/IBondAuction.sol/interface.IBondAuction.md), AccessControl, EIP712
