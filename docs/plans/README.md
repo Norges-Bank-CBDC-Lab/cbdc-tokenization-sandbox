@@ -29,6 +29,8 @@ Conventions:
 - Reference the folder from `docs/DOCUMENTATION_INDEX.md` with a one-line summary.
 - When the plan ships or is superseded, move the whole folder to `docs/plans/archive/`, update
   the `Status:` line, and update the index. Archived folders are frozen records.
+- ADR plan pointers name the plan's original path; archived plans are found under `archive/`
+  with the same name.
 - Plans are public: no secrets, no private infrastructure identifiers, no absolute
   home-directory paths, no references to local-only tooling.
 

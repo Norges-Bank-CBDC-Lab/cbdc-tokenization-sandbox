@@ -2,8 +2,8 @@
 
 **Plan:** [`plan.md`](plan.md)
 **Last updated:** 2026-09-25 — Phases 1–3 done; PR opened with the plan archived in it
-**Current phase:** Phase 4: PR
-**Next action:** Operator reviews and merges the PR
+**Current phase:** Complete — #294 merged
+**Next action:** None
 
 ## Phase Log
 
