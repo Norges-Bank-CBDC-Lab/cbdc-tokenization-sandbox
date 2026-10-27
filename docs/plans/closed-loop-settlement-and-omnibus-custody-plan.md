@@ -1,8 +1,23 @@
 # Closed-Loop Auction Settlement & Omnibus Custody — Implementation Plan
 
-**Status:** Proposed — design agreed in a design session. **Phase 1 is diff-level and implementation-ready**; Phases 2–6 are roadmap. No contract code changed yet — implementation needs a separate explicit go-ahead.
+**Status:** Proposed — parked 2026-10-27, not scheduled. Design agreed in a design session. **Phase 1 is diff-level and implementation-ready**; Phases 2–6 are roadmap. No contract code changed yet — implementation needs a separate explicit go-ahead.
 **Branch suggestion:** `feature/closed-loop-settlement-authority` (Phase 1 only; later phases get their own branches).
 **Components touched (Phase 1):** `contracts/src/common/Roles.sol`, `contracts/src/norges-bank/Wnok.sol`, `contracts/src/norges-bank/BondDvP.sol`, new `contracts/src/norges-bank/interfaces/ISettlementToken.sol`, `contracts/script/norges-bank/11_BondSetup.s.sol`, tests under `contracts/test/norges-bank/`, and `docs/DOCUMENTATION_INDEX.md`.
+
+**Drift since authoring (recorded 2026-10-27; refresh before implementing):**
+
+- The motivating transaction in "Current-State Evidence" is from the chain that ADR 0003
+  reset; that transaction and block no longer exist, although the chain id is still 2018.
+- Every bond cash leg now settles through `BondDvP._settleCashLeg` → `transferFrom`
+  (`contracts/src/norges-bank/BondDvP.sol:97-98`): issuance (the bidder pays), buyback, interim
+  coupons, and the final coupon with principal (all paid from `GOV_RESERVE`, ADR 0004 and
+  ADR 0005). Phase 1 changes only the issuance and buyback legs, so Phase 1 and decision D2
+  (drop `TRANSFER_FROM_ROLE` on BondDvP) need a redesign covering all four legs and both payers.
+- The role grants this plan cites at `11_BondSetup.s.sol:54` and `:64` are now `:57`
+  (`SETTLE_ROLE`) and `:67` (`TRANSFER_FROM_ROLE`).
+- Phase 6 is largely delivered: coupons and principal settle in wNOK from the reserve, and
+  maturity burns units through `BondDvP` → `redeemFor`. What remains is the two-tier broker
+  fan-out, which depends on Phase 3.
 
 ## Goal
 
