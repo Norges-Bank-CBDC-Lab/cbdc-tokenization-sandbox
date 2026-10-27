@@ -1,9 +1,12 @@
 # Documentation refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-09-28 — plan folder written; findings re-verified against `development` at `db92409`
+**Last updated:** 2026-10-27 — operator decisions recorded (closed-loop, wallet, entity-directory parked; transfer-eligibility entry parked; archived headers approved)
 **Current phase:** Not started
-**Next action:** Operator reviews `intent.md` and answers the decisions in `design.md` (closed-loop park, wallet and entity-directory keep or park, transfer-eligibility entry, archived progress headers); then run Phase 0 on a fresh `development` and open slice 1 as `feature/docs-neutral-deployment-wording`.
+**Next action:** Run Phase 0 on a fresh `development`, then open slice 1 as
+`feature/docs-neutral-deployment-wording`. Still open in `design.md` "Decisions": the three
+confirm-only rows (`docs/AZURE_BOUNDARY.md` title, `entra` mentions outside the service folders,
+frozen records with cloud wording or tooling names).
 
 ## Phase Log
 
@@ -17,6 +20,15 @@
 | 5 — License inventory and entrypoints | Not started | | |
 
 ## Deviations From the Plan
+
+- 2026-10-27, operator decisions on the `design.md` "Decisions" table:
+  - Closed-loop settlement plan: park it, as recommended (Phase 2 step 3).
+  - Wallet and entity-directory plans: park both. Phase 2 step 4 applies the D4 status phrasing
+    and index note to them as well as fixing their branch lines.
+  - Transfer-eligibility known issue: parked. No `docs/KNOWN_ISSUES.md` entry is added in this
+    plan; the eligibility gap stays with `docs/plans/bond-coupon-maturity-correctness/`.
+  - Archived progress headers: approved. Phase 2 step 5 changes only the `Current phase` and
+    `Next action` lines of the two archived `progress.md` files.
 
 Corrections made to the review findings while writing the plan:
 
@@ -63,10 +75,7 @@ Corrections made to the review findings while writing the plan:
 
 ## Blocked / Waiting On
 
-- Transfer eligibility known-issue entry — waits on the operator's decision on the eligibility
-  rule in `docs/plans/bond-coupon-maturity-correctness/`.
-- Archived progress header lines — wait on explicit operator approval (frozen records).
-- Keep or park the wallet and entity-directory plans — operator.
+- The three confirm-only rows in `design.md` "Decisions" — operator.
 
 ## Follow-ups Found Along the Way
 
