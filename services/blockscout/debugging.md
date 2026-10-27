@@ -136,7 +136,7 @@ indexer re-indexes the whole chain from block 0.
 
 ## Contract verification
 
-Modern Blockscout (v10 and later; this sandbox runs a v11 backend) does
+Modern Blockscout (v10 and later; this sandbox runs a v12 backend) does
 **not** verify contracts in-process — it delegates source compilation and
 bytecode matching to a standalone **smart-contract-verifier** microservice (`sc-verifier-deployment` /
 `sc-verifier-service`, pinned in `common/images.yaml` under
