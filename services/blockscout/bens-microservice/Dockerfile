@@ -13,8 +13,8 @@
 # and pre-pulled by `./infra/infra.sh registry-sync` so an offline build
 # works.
 
-ARG BENS_BUILDER_IMAGE=python:3.14.9
-ARG BENS_RUNTIME_IMAGE=python:3.14.9
+ARG BENS_BUILDER_IMAGE=python:3.14.10
+ARG BENS_RUNTIME_IMAGE=python:3.14.10
 
 FROM ${BENS_BUILDER_IMAGE} AS builder
 WORKDIR /build
