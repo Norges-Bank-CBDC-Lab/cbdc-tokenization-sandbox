@@ -31,8 +31,10 @@
   Debian `ca-certificates 20250419+deb13u1`, pip 26.2.2 with certifi
   2026.10.19, and an `ssl` module that blocks the intermediates' keys), Besu
   (`26.10.2`: the image's Temurin 25.0.3 `cacerts` no longer holds "emSign ECC
-  Root CA - G3" or "emSign Root CA - G1"; checked 2026-10-27), and Foundry in
-  Contracts CI (v1.8.6: `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10).
+  Root CA - G3" or "emSign Root CA - G1"; checked 2026-10-27), the local registry
+  (`registry:3.1.2` as rebuilt on 2026-10-26: Alpine 3.24.3 `ca-certificates
+  20261020-r0`; checked 2026-10-28), and Foundry in Contracts CI (v1.8.6:
+  `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10).
 - Still exposed, waiting on upstream releases (checked 2026-10-22):
 
   | Component (pin) | Store that still holds the root | Outbound TLS | Waiting for |
@@ -43,7 +45,6 @@
   | Kind node (`kindest/node:v1.32.11`) | Debian 12 `ca-certificates 20230311+deb12u1` (also "AAA Certificate Services"); containerd built with Go 1.25.5 | **Yes**: containerd pulls images that are not in the local registry | A kind node image built on the fixed Debian `ca-certificates` |
   | NGINX Gateway Fabric (`2.8.0`, control plane and nginx) | Distroless Debian bundle (also "AAA Certificate Services") with Go 1.27.2; Alpine `ca-certificates 20260909-r0` | No (Kubernetes API and in-cluster upstreams only) | A release on Go ≥ 1.27.3 and Alpine `ca-certificates 20261020-r0` |
   | `nginxinc/nginx-unprivileged` (`1.30.6-alpine`, NB UI runtime) | Alpine `ca-certificates 20260909-r0` | No (serves static files) | A tag rebuilt on Alpine `ca-certificates 20261020-r0` |
-  | Local registry (`registry:2.8.3`) | Alpine 3.18 `ca-certificates 20241121-r1` (also "AAA Certificate Services") | No (no pull-through proxy) | A `registry` image on Alpine `ca-certificates 20261020-r0` (3.1.2 is not yet) |
   | `crytic/slither-action` (Contracts CI) | Not checked (image not inspected) | Yes: downloads `solc` | Check when the action next releases |
 
 - To re-check a bundle, count it as exposed only when it contains one of the
