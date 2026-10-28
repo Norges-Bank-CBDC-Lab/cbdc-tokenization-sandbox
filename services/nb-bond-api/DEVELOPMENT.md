@@ -137,7 +137,7 @@ The sandbox has no secondary-market price discovery, so at par issuance the coup
 
 Base path is `/v1`. All request and response bodies are JSON. The full
 v2 design (rationale + DTO catalog) lives in
-[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md).
+[`docs/plans/archive/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md).
 
 Two architectural rules apply across the surface:
 
@@ -359,8 +359,9 @@ or sandbox diagnostics suitable for real funds.
 
 The service maintains an SQLite database (default `data/ingestion.sqlite`) which it writes to in-process. This is used for:
 
-- `GET /v1/bonds/{isin}/holders`
+- `GET /v1/bonds` and `GET /v1/bonds/{isin}`
 - `GET /v1/bonds/{isin}/history`
+- `GET /v1/auctions`
 
 If `DB_PATH` is unwritable, or ingestion cannot reach `RPC_URL`, these endpoints may return empty data or become stale, even if the on-chain contracts are operating correctly.
 
@@ -525,7 +526,7 @@ token, `entra` mode authorizes it against the `roles` claim (Entra App Roles):
 auth gate and stay public in both modes. Every other endpoint goes
 through the middleware.
 
-ArgoCD-managed deployments must keep `NB_BOND_API_AUTH_MODE` and the
+A non-local deployment must keep `NB_BOND_API_AUTH_MODE` and the
 nb-ui `AUTH_MODE` in sync. A mismatch (e.g. backend `entra`, frontend
 `none`) produces clear 401s rather than silent partial behaviour.
 
@@ -539,7 +540,7 @@ heartbeats at `NB_BOND_API_SSE_HEARTBEAT_MS`; it never sends domain data or a
 health snapshot. There is no replay buffer, so clients reconcile mounted
 queries whenever a new connection opens.
 
-For Azure, response buffering must be disabled, the gateway idle timeout must
+Behind a non-local gateway, response buffering must be disabled, the idle timeout must
 exceed the heartbeat interval, and the bearer header must reach the API. Keep
 one API replica until shared fan-out is designed; the broadcaster is
 in-process. See [`docs/AZURE_BOUNDARY.md`](../../docs/AZURE_BOUNDARY.md).

@@ -1,5 +1,5 @@
 /**
- * entraAuth — Microsoft Entra (Azure AD) OIDC plugin via MSAL Browser.
+ * entraAuth — Microsoft Entra ID OIDC plugin via MSAL Browser.
  *
  * Activated only when window.__APP_CONFIG__.AUTH_MODE === "entra". MSAL is
  * loaded with a dynamic import so the no-auth bundle path doesn't pay the

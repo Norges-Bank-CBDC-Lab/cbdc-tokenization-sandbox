@@ -94,7 +94,7 @@ and operational views.
 
 The currently documented local chain baseline is:
 
-- Besu 26.10.0 with one QBFT validator and one non-validator archive/RPC node
+- Besu 26.10.2 with one QBFT validator and one non-validator archive/RPC node
 - Osaka active from genesis
 - Solidity 0.8.36 and OpenZeppelin 5.6.1
 - 1-second transaction blocks and a 5-minute idle empty-block period
@@ -156,8 +156,9 @@ Simplified trust model:
 Each `BondDvP.settle` call is atomic, but auction finalisation is not atomic
 across all allocations. `BondManager` catches individual allocation failures,
 emits `BondAllocationFailed`, and continues. A RATE/PRICE finalisation may
-therefore leave failed-issuance units in `BondManager` for explicit withdrawal
-while the auction is already `FINALISED`.
+therefore leave unsold units on `BondManager` while the auction is already
+`FINALISED`; they earn no coupon, and the final `payCoupon` burns them without
+payment (ADR 0005).
 
 ## Off-Chain Architecture
 

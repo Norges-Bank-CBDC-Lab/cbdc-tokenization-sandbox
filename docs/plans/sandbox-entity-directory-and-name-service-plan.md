@@ -1,8 +1,8 @@
 # Sandbox Entity Directory & Name Service — Implementation Plan
 
-**Status:** Proposed — design captured for review; no implementation has started.
+**Status:** Proposed — parked 2026-10-27, not scheduled. Design captured for review; no implementation has started.
 **Date:** 2026-07-15
-**Branch suggestion:** `imp/entity-directory-service`
+**Branch suggestion:** `feature/entity-directory-service`
 **Components touched:** new standalone directory service and UI, its own persistent
 database and Helm deployment, optional on-chain source adapters, Blockscout/BENS
 compatibility, client integration, tests, and docs.

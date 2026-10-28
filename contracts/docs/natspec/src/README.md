@@ -73,7 +73,6 @@ From `contracts/`:
 forge build
 forge test
 forge fmt
-forge doc --out docs/natspec
 anvil
 ```
 
@@ -82,7 +81,8 @@ Use these when iterating locally:
 - `forge build` builds the contracts.
 - `forge test` runs the Foundry test suite.
 - `forge fmt` formats Solidity sources.
-- `forge doc --out docs/natspec` regenerates the NatSpec reference pages.
+- `python3 docs/natspec/fix-links.py` normalises links in the committed NatSpec
+  reference pages; `docs/natspec/README.md` explains how they are maintained.
 - `anvil` starts a local EVM node outside the sandbox.
 
 Recent coverage additions include:

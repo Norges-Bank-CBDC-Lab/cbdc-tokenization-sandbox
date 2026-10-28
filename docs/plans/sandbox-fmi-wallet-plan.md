@@ -1,8 +1,8 @@
 # Sandbox FMI Participant Wallet — Implementation Plan
 
-**Status:** Proposed — design captured for review; no implementation has started.
+**Status:** Proposed — parked 2026-10-27, not scheduled. Design captured for review; no implementation has started.
 **Date:** 2026-07-15
-**Branch suggestion:** `imp/sandbox-fmi-wallet`
+**Branch suggestion:** `feature/sandbox-fmi-wallet`
 **Components touched:** new participant-wallet API and UI services, shared bid
 library, NB Bond API bidder-flow migration, deployment wiring, tests, and docs.
 **External sandbox dependency:**

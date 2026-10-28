@@ -42,7 +42,7 @@ in [`contracts/src/common/Roles.sol`](../src/common/Roles.sol).
 | --- | --- | --- |
 | `DEFAULT_ADMIN_ROLE` | multiple contracts | Can grant and revoke other roles. This is the highest-trust role and should be tightly controlled. On `BondManager`, `BondAuction`, `BondToken`, and `BondDvP` the deploy scripts hand it to the Norges Bank owner key and the deployer key renounces it. |
 | `BOND_ADMIN_ROLE` | `BondToken` | Can add and remove ERC-1410 controllers, which act as operators over every holder's units. Only `BondDvP` is made a controller, because it moves units during settlement. |
-| `BOND_MANAGER_ROLE` | `BondManager` | Can open, close, cancel, and finalise auctions, recover failed issuance, pay coupons, and redeem bonds. |
+| `BOND_MANAGER_ROLE` | `BondManager` | Can deploy bonds; open issuance, extension, and buyback auctions; close, cancel, and finalise them; disable unissued bonds; and pay coupons, where the final payment also pays principal and closes the bond. |
 | `BOND_AUCTION_ADMIN_ROLE` | `BondAuction` | Can create, close, cancel, and finalise auctions. In practice this should align with the `BondManager` control path. |
 | `BOND_CONTROLLER_ROLE` | `BondToken` | Can create partitions, extend or reduce offering, mint by ISIN, update coupon state, and mark bonds matured. Held by `BondManager` and by `BondDvP` (for redemption and buyback burns); granted separately from controller status. |
 | `SUBMIT_ORDER_ROLE` | `OrderBook` | Can submit buy and sell orders. Granted only to the `Broker` contracts, which let a client revoke only its own orders. |

@@ -1,10 +1,10 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-21 — Phase 5 (Besu 26.10.0) implemented and verified on the local sandbox; PR pending
-**Current phase:** Phase 5: Besu 26.10.0 (awaiting PR and merge)
-**Next action:** After slice 5 merges, get D4's second confirmation (ffmpeg licence), then
-branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
+**Last updated:** 2026-10-28 — all seven phases implemented; Phase 7 and the archive ship in #333
+**Current phase:** Done (archived 2026-10-28)
+**Next action:** None in this plan. The non-local rollout stays with the operator (see `plan.md`
+"Deferred Non-Local Rollout"), and the follow-ups below are open.
 
 ## Phase Log
 
@@ -15,12 +15,32 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 | 2 — nginx 1.30.6 | Done (merged 2026-10-21) | nb-ui pod `nginx -v` = 1.30.6, HTTP 200, `config.js` overlay served; CI green | #309 |
 | 3 — Blockscout supporting components | Done (merged 2026-10-21) | Postgres 18.6 in place, BENS on Python 3.14.8, chart 4.5.3 renders identically, verifier v1.11.0 re-verifies Wnok; CI green | #310 |
 | 4 — NGINX Gateway Fabric 2.8.0 | Done (merged 2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer; fresh-cluster path covered by the Phase 5 fresh boot; CI green | #311 |
-| 5 — Besu 26.10.0 | Done locally (2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | pending |
-| 6 — Blockscout v12 + frontend v2.12 | Not started | | |
-| 7 — Local registry 3.1.2 | Not started | | |
+| 5 — Besu 26.10.0 | Done (merged 2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | #312 |
+| 6 — Blockscout v12 + frontend v2.12 | Done (merged 2026-10-27) | backend v12.0.3 and frontend v2.12.1 built from source; in-place migration on the existing explorer database; indexing, realtime, catch-up, verification, BENS and nb-ui links checked (see Verified So Far) | #332 |
+| 7 — Local registry 3.1.2 | Done (2026-10-28) | probe container checks; one `registry-start` recreated the registry on 3.1.2 and re-synced it; second run idempotent; `./sandbox.sh start` pulled every pod from it; `image-report` and `cleanup-images --keep 1` work (see Verified So Far) | #333 |
 
 ## Deviations From the Plan
 
+- 2026-10-28, archive: two pins moved past the plan's targets outside it, so the Phase 5 exit
+  criterion and the intent's Besu baseline row were met on 26.10.0 and are now carried by later
+  versions: #331 moved Besu to 26.10.2 (the baseline constant moved with it) and BENS to
+  `python:3.14.10`. The Phase 1 criterion on the Node pin bump was met by #313, which landed
+  without its own hash change after #308. The plan was archived in the slice 7 PR, as its Done
+  Criteria ask, rather than in a separate PR after merge.
+- 2026-10-28, Phase 7: the operator decided that this plan owns `ensureKindRegistry`;
+  scripts-hardening Phase 6 (slice F) has not started and rebases onto this change. The
+  presence and digest probes were widened to accept OCI manifests and indexes, the case step 1
+  anticipated (see Verified So Far). Registry 3 enables API deletes by default, so the two
+  `image-report` / `cleanup-images` messages that said deletes are disabled now only point at
+  `registry-reset`.
+- 2026-10-27, Phase 6: every deployed contract was already verified, so `verify-latest` only
+  proves forge's is-verified lookup. Wnok was also resubmitted through forge with
+  `--skip-is-verified-check` to exercise the submission path, and re-verified directly against
+  the verifier as in Phase 3 (see Verified So Far).
+
+- 2026-10-21: the operator gave D4's second confirmation (accept `ffmpeg` in the locally built
+  Blockscout v12 image). Phase 6 records it in `docs/THIRD_PARTY_NOTES.md` and
+  `THIRD_PARTY_LICENSES.md`.
 - 2026-10-21, Phase 5: the rollback rehearsal covered only the Bonsai validator. The Forest
   archive's downgrade needs a safety override that was not run (see Verified So Far). `plan.md`
   now documents both halves and the Helm field-manager cleanup.
@@ -133,11 +153,82 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
   - `contracts.sh verify-latest` verified all 12 contracts through forge, Blockscout and
     verifier v1.11.0 (`Pass - Verified`).
 
+- Phase 6 live check (2026-10-27): upstream's newest tags were still backend `v12.0.3` (no
+  v12.0.4 or v12.1) and frontend `v2.12.1`; ghcr still has no release image past `9.0.2` /
+  `v2.3.5`. The env files set none of the variables v12 or v11.3 deprecated.
+  - `./sandbox.sh build-images` took 7 minutes 11 seconds on the host platform (linux/arm64).
+    The backend build pulled `hexpm/elixir:1.20.4-erlang-28.5.0.7-alpine-3.22.6`; the frontend
+    builds on `node:24.21.0-alpine`. The backend image's apk database lists `ffmpeg` 6.1.2-r2
+    with licence `GPL-2.0-or-later AND LGPL-2.1-or-later` (D4).
+  - eMudhra re-check (`docs/KNOWN_ISSUES.md`): the backend's `castore` 1.0.21, `certifi` 2.17.0
+    and Alpine 3.22.6 `ca-certificates 20260909-r0` bundles all still hold "emSign ECC Root CA -
+    G3". The frontend's Alpine bundle (`20261020-r0`) is clean, but Node 24.21.0's built-in roots
+    still hold that root. Both rows stay in the exposed table with the new pins.
+  - Before: `fill_internal_transactions_address_ids` = `completed`, 292 blocks, 12 verified
+    contracts, latest schema migration `20260724144709`.
+  - `registry-sync` then `blockscout.sh start` on the existing database (Helm revision 4). The
+    `init-migrations` container on v12.0.3 printed `Validating version upgrade..`, applied 18
+    schema migrations (latest `20261014120000`) and exited 0. Twelve new background migrations
+    in `migrations_status` reached `completed` within a second of startup. The redeploy also
+    rolled BENS to `bens-microservice:8bfdac32f1c7` (`python -V` 3.14.10, from #331).
+  - The backend logged one `ArgumentError` each from two counters and
+    `RealtimeEventHandlers.Main` at startup (the endpoint's ETS table not created yet); none
+    recurred.
+  - `/api/v2/config/backend-version` = `v12.0.3`. The home, block, transaction and address pages
+    answer 200 with the right titles, and so do their API calls.
+  - `indexing-status`: `finished_indexing_blocks: true`, `indexed_blocks_ratio` 1.00 (0.98
+    before this slice). `finished_indexing` stays false because
+    `INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER` is `true` in the sandbox values. The latest
+    indexed block equals the chain head.
+  - Realtime: a new transaction (block 298) appeared in the Blockscout API 1 second after its
+    receipt.
+  - Catch-up: `blockscout.sh stop`, three transactions mined in blocks 295–297, then `start`.
+    The catch-up fetcher logged `Index had to catch up.` and all three were indexed.
+  - Verification: `contracts.sh verify-latest` (the `make verify-contracts` target) reported
+    13/13 as already verified. A forced forge resubmission of Wnok reached the v12 publisher
+    worker and the verifier, which matched it partially; v12 then declined to replace the
+    stored partial match (`Cannot update partially verified smart contract with another
+    partially verified contract`). Sent directly to verifier v1.11.0, Wnok's stored
+    standard-JSON input (14 sources, solc 0.8.36) returned `SUCCESS`, a partial match.
+    `is_verified: true` for Wnok.
+  - BENS: address pages and searches with three or more characters made v12 call
+    `domains:lookup` and `addresses:batch-resolve-names`; every BENS response was 200. Names
+    still do not show (existing "Blockscout does not show BENS names" entry).
+  - nb-ui serves `EXPLORER_BASE_URL` `http://blockscout.cbdc-sandbox.local`, and its
+    `/tx/<hash>` link pattern opens the transaction page.
+  - The frontend's startup sitemap generator cannot reach the public hostname from inside the
+    pod (`ECONNREFUSED 127.0.0.1:80`); v2.10.3 ran the same script. Cosmetic.
+
+- Phase 7 live check (2026-10-28): `registry:3.1.2` is still the newest tag (amd64 and arm64).
+  Docker Hub rebuilt it on 2026-10-26 on Alpine 3.24.3 with `ca-certificates 20261020-r0`; its
+  bundle holds none of the affected eMudhra roots, so `docs/KNOWN_ISSUES.md` moves the registry
+  to the fixed list. Its default config (`/etc/distribution/config.yml`) enables
+  `storage.delete`, keeps `/var/lib/registry`, and serves debug on container port 5001, which is
+  not published.
+  - Probe on `127.0.0.1:5099` (removed afterwards): one OCI image and one Docker v2 image pushed.
+    With the Docker-v2-only `Accept` header, `kindRegistryHasImage` and `registryManifestDigest`
+    found only the Docker v2 image. Registry 2.8.3 behaved the same: every image in the live
+    registry was OCI, so both probes always reported "not cached" and `registry-sync` re-pushed
+    every image on every run. With the widened header both images are found, the OCI digest
+    matches `docker buildx imagetools inspect`, and a missing tag still reports false. The
+    `tags/list` probe works unchanged.
+  - Before: `kind-registry` on `registry:2.8.3`, attached to `kind`, bound to `127.0.0.1:5001`;
+    the host cache held the source-built Blockscout v12.0.3 and v2.12.1 images.
+  - `./sandbox.sh registry-start` (9 seconds): printed the recreate, re-attached the container
+    to `kind`, and re-synced the base and third-party images from the host cache with registry
+    digests printed. The container runs `registry:3.1.2` (`distribution/v3 3.1.2`), still on
+    `127.0.0.1:5001` with `restart=always`. A second `registry-start` did not recreate.
+  - `./sandbox.sh start`: third-party images were cache hits ("Using cached registry image"),
+    the verifier was mirrored at deploy time, BENS, NB Bond API and nb-ui rebuilt and pushed,
+    and contracts were skipped as already deployed. Every pod pulled from `localhost:5001` and
+    is Ready; no image-pull failures. `/v1/health` `ok`, chain 2018, ingestion lag 0;
+    nb-ui 200; Blockscout `backend-version` `v12.0.3`.
+  - `image-report` lists one tag per repo-owned image (current build = deployed).
+    `cleanup-images --keep 1` kept the deployed tags, and a second run removed nothing.
+
 ## Blocked / Waiting On
 
-- D4 second confirmation (ffmpeg licence) — operator, before Phase 6.
 - The later non-local rollout — operator; out of scope here, see `plan.md` "Deferred Non-Local Rollout".
-- Phase 7 — the status of scripts-hardening Phase 6 (who owns `ensureKindRegistry`).
 
 ## Follow-ups Found Along the Way
 
@@ -160,9 +251,14 @@ branch `feature/blockscout-v12` from a fresh `development` for Phase 6.
 
 ## Session Handoff
 
-Phases 1–4 merged as #308, #309, #310 and #311. Phase 5 is on `feature/besu-26-10`, rebased onto
-`development` after #311 merged. The local sandbox now runs a fresh chain (new contract
-addresses) on all slice 1–5 pins. The local sandbox now runs the
+Phases 1–5 merged as #308, #309, #310, #311 and #312, and shipped in release v0.10.0 (#316).
+Outside this plan, #315 moved BENS to `python:3.14.9` (the D6 target once its image was
+published) and #313 moved the Node pin to 26.12.1. #331 (merged 2026-10-27) then moved Besu to
+26.10.2 and BENS to `python:3.14.10`. Phase 6 merged as #332, and Phase 7 ships with the
+archive of this folder in #333. The plan is complete. The local sandbox now runs Blockscout
+v12.0.3 with frontend v2.12.1 on a migrated explorer database, and pulls everything through
+`registry:3.1.2`.
+The local sandbox runs a fresh chain (new contract addresses) on all slice 1–5 pins. It runs the
 nb-ui and nb-bond-api images from `development` at `f9e9b0a`; before this they were built from an
 older tree, so the restart also deployed the changes in that commit. The new hashes match the
 stage base refs that Node, nginx and Python pin bumps will move. A later Node pin bump that

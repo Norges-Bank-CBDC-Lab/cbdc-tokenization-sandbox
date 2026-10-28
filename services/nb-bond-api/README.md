@@ -10,7 +10,7 @@ service-layer overview.
 When running inside the sandbox, the API is reachable via the gateway at `http://bond-api.cbdc-sandbox.local/` (the start scripts add the `/etc/hosts` entry).
 
 The HTTP surface is the v2 bulky-tree contract described in
-[`docs/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md): a single
+[`docs/plans/archive/openapi-v2-plan.md`](../../docs/plans/archive/openapi-v2-plan.md): a single
 `GET /v1/bonds` returns every bond with its nested auctions, bids,
 allocations, and holders, and mutations return the updated parent
 resource so the UI can swap its cache atomically. Each cacheable DTO
@@ -147,7 +147,7 @@ start.
 - `NB_BOND_API_AUTH_MODE` – `none` (sandbox default, header accepted but
   ignored) or `entra` (JWT validated against the configured Entra ID tenant).
 - `NB_BOND_API_AUTH_ENTRA_TENANT_ID` / `NB_BOND_API_AUTH_ENTRA_AUDIENCE` –
-  required when `NB_BOND_API_AUTH_MODE=entra`. ArgoCD must keep these in
+  required when `NB_BOND_API_AUTH_MODE=entra`. The deployment must keep these in
   sync with the nb-ui frontend AUTH_MODE; mismatches fail fast at startup.
 - `NB_BOND_API_AUTH_ENTRA_OPERATOR_ROLES` / `NB_BOND_API_AUTH_ENTRA_TESTER_ROLES` –
   comma-separated Entra App Role values for role-based access in `entra` mode.

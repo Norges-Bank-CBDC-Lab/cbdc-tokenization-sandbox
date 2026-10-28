@@ -44,6 +44,11 @@ Important behavior:
 
 - `./infra.sh registry-start` creates or reuses the persistent registry
   container;
+- a change to the registry pin recreates that container on the next
+  `registry-start`, `registry-sync`, `build-images` or cluster start, then
+  re-syncs the pinned images into the empty registry (repo-owned images rebuild
+  on the next service start; the Blockscout images come from the host Docker
+  cache, or need `./sandbox.sh build-images`);
 - `./infra.sh registry-sync` pushes the image versions referenced by the
   sandbox;
 - sandbox deploy/build image pins live in `common/images.yaml`, including
@@ -91,7 +96,7 @@ curl -X POST \
 
 The currently supported local Besu baseline is:
 
-- Besu 26.10.0 with QBFT consensus
+- Besu 26.10.2 with QBFT consensus
 - one validator using Bonsai and one non-validator archive/RPC node using
   `FULL` sync with Forest storage
 - 1-second transaction blocks and a 300-second idle empty-block period

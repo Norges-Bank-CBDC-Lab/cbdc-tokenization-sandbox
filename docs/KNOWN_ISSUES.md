@@ -27,22 +27,24 @@
   distrusted that root. A trust store that still holds either root accepts
   certificates from the compromised intermediates.
 - Fixed in this repository: the Node pin (26.12.1, built-in roots from NSS 3.131.1
-  plus a block on the intermediates' keys), the BENS base image (`python:3.14.9`:
-  Debian `ca-certificates 20250419+deb13u1` and pip 26.2.2 with certifi
-  2026.10.19), and Foundry in Contracts CI (v1.8.6: `rustls-webpki` 0.103.16,
-  `webpki-roots` 1.0.10).
+  plus a block on the intermediates' keys), the BENS base image (`python:3.14.10`:
+  Debian `ca-certificates 20250419+deb13u1`, pip 26.2.2 with certifi
+  2026.10.19, and an `ssl` module that blocks the intermediates' keys), Besu
+  (`26.10.2`: the image's Temurin 25.0.3 `cacerts` no longer holds "emSign ECC
+  Root CA - G3" or "emSign Root CA - G1"; checked 2026-10-27), the local registry
+  (`registry:3.1.2` as rebuilt on 2026-10-26: Alpine 3.24.3 `ca-certificates
+  20261020-r0`; checked 2026-10-28), and Foundry in Contracts CI (v1.8.6:
+  `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10).
 - Still exposed, waiting on upstream releases (checked 2026-10-22):
 
   | Component (pin) | Store that still holds the root | Outbound TLS | Waiting for |
   |---|---|---|---|
   | `smart-contract-verifier` (`v1.11.0`) | Ubuntu 24.04 `ca-certificates 20260601~24.04.1`, used through OpenSSL | **Yes**: downloads Solidity compilers from `binaries.soliditylang.org` | An image built on the fixed Ubuntu `ca-certificates` |
-  | Blockscout backend (`v11.2.6`) | `castore` 1.0.20 and Erlang `certifi` 2.15.0 in the release, Alpine `ca-certificates 20250911-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22 (v12.0.3 still pins 1.0.21) |
-  | Blockscout frontend (`v2.10.3`) | Node 22.14.0 built-in roots (also "AAA Certificate Services") | No (in-cluster backend only) | A release on Node ≥ 22.23.4 / 24.22.1 (v2.12.1 uses 24.21.0) |
-  | Besu (`26.10.0`) | Temurin 25.0.3 `cacerts` | No (P2P is not TLS; discovery is off) | A JDK update that blocks the intermediates; the October 2026 JDK updates do not |
+  | Blockscout backend (`v12.0.3`) | `castore` 1.0.21 and Erlang `certifi` 2.17.0 in the release, Alpine 3.22.6 `ca-certificates 20260909-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22, `certifi` ≥ 2.18.0 and Alpine `ca-certificates 20261020-r0` (v12.0.3 is still the newest release; checked 2026-10-27) |
+  | Blockscout frontend (`v2.12.1`) | Node 24.21.0 built-in roots (its Alpine `ca-certificates 20261020-r0` bundle is clean) | No (in-cluster backend only) | A release on Node ≥ 24.22.1 (v2.12.1 is still the newest v2.12 patch; checked 2026-10-27) |
   | Kind node (`kindest/node:v1.32.11`) | Debian 12 `ca-certificates 20230311+deb12u1` (also "AAA Certificate Services"); containerd built with Go 1.25.5 | **Yes**: containerd pulls images that are not in the local registry | A kind node image built on the fixed Debian `ca-certificates` |
   | NGINX Gateway Fabric (`2.8.0`, control plane and nginx) | Distroless Debian bundle (also "AAA Certificate Services") with Go 1.27.2; Alpine `ca-certificates 20260909-r0` | No (Kubernetes API and in-cluster upstreams only) | A release on Go ≥ 1.27.3 and Alpine `ca-certificates 20261020-r0` |
   | `nginxinc/nginx-unprivileged` (`1.30.6-alpine`, NB UI runtime) | Alpine `ca-certificates 20260909-r0` | No (serves static files) | A tag rebuilt on Alpine `ca-certificates 20261020-r0` |
-  | Local registry (`registry:2.8.3`) | Alpine 3.18 `ca-certificates 20241121-r1` (also "AAA Certificate Services") | No (no pull-through proxy) | A `registry` image on Alpine `ca-certificates 20261020-r0` (3.1.2 is not yet) |
   | `crytic/slither-action` (Contracts CI) | Not checked (image not inspected) | Yes: downloads `solc` | Check when the action next releases |
 
 - To re-check a bundle, count it as exposed only when it contains one of the
@@ -136,19 +138,14 @@
 - The Entra auth path (`services/nb-ui/src/auth/entraAuth.js`) remains dormant
   in the local sandbox (`AUTH_MODE=none`) and cannot be exercised here, so
   silent renewal is build/lint/test-verified but runtime-unverified until a
-  real Entra deployment runs the timed renewal check. Owned by the cloud
-  deployment work.
+  non-local deployment running `entra` mode exercises the timed renewal.
 
-## nb-ui: reopenAuction needs backend / on-chain support
-- The `services/nb-ui/` operator UI exposes a "Reopen…" action on closed
-  auctions (see `AuctionLifecyclePanel`), but there is no matching backend
-  endpoint and the `BondAuction` contract has no closed→open transition.
-- `AuctionsApi.reopenAuction()` throws a `NotImplementedError` (HTTP 501)
-  and the UI shows a toast.
-- Planned follow-up: either add a server-side endpoint that resets the
-  ingestion cache + clears the allocation, or extend `BondAuction` with an
-  on-chain reopen transition. The UI behaviour reverts to "just works" once
-  the endpoint exists.
+## Closed and finalised auctions cannot be reopened
+- `BondAuction` has no closed→open transition and the NB Bond API has no
+  reopen endpoint. The NB UI no longer offers a reopen action (removed in
+  #225).
+- Planned follow-up: none scheduled. Reopening would need an on-chain
+  transition in `BondAuction` and a matching API route.
 - Related: a *finalised* auction is terminal on-chain (no un-finalise and no
   closed→open transition). Correcting a bad outcome — e.g. a fat-finger bid
   that set the wrong clearing rate — means running a fresh auction for the
@@ -177,27 +174,14 @@
   `409 bidding window has closed` for expired auctions; the UI fix
   prevents the operator from triggering it by accident.
 
-## ~~nb-bond-api ingestion loop doesn't self-heal when Besu is briefly unreachable~~ — resolved
-
-Resolved by Plan B
-([`docs/plans/archive/health-indicator-and-self-healing-plan.md`](plans/archive/health-indicator-and-self-healing-plan.md)).
-`startIngestionLoopWithRetry()` in
-[`services/nb-bond-api/src/ingestion.ts`](../services/nb-bond-api/src/ingestion.ts)
-now wraps the boot in exponential backoff (1s → 2s → … → 30s, retries
-forever), so a transient `getaddrinfo EAI_AGAIN` at PC/Docker restart
-no longer leaves the API silently serving stale data. The same plan
-adds `chain` + `ingestion` blocks to `/v1/health` and a polling
-`HealthBadge` in the operator UI top bar so any future degradation is
-visible at a glance.
-
 ## nb-bond-api request-path chain reads bubble up as opaque 500s
-- Same root trigger as the ingestion bug above. When the operator runs
+- Triggered by a briefly unreachable Besu RPC. When the operator runs
   a request that needs a fresh chain read (auction create, close,
   finalise, central-bank tx, bidder bid submission, even GETs that
   resolve contract addresses), and the chain is unreachable, the
   request fails with `500 Internal Server Error` and a `detail` like
   `unhandled: RPC unavailable: request timeout (code=TIMEOUT,
-  version=6.16.0)`.
+  version=…)`.
 - The operator can't tell from the response whether the contract
   reverted (a real domain error worth understanding) or the chain
   is simply unreachable (a wait-and-retry condition). The UI surfaces
@@ -250,8 +234,8 @@ visible at a glance.
     proceeds without one.
 - Touches `BondAuction.sol`, `IBondAuction.sol`, `BondManager`,
   `nb-bond-api` ingestion + schemas, `nb-ui` `AuctionLifecyclePanel`,
-  and tests across all four layers. Warrants its own iteration plan
-  via the `sandbox-implementation-planner` skill before implementation.
+  and tests across all four layers. Warrants its own implementation plan
+  under `docs/plans/` before implementation.
 
 ## BondAuction has no `cancelBid` — bids are final once sealed
 - `contracts/src/norges-bank/BondAuction.sol` does not expose a
@@ -290,7 +274,8 @@ visible at a glance.
   and Docker Hub publication ended in April 2025. Release tags that were
   pullable earlier (including the previously pinned `v10.0.8` / `v2.7.3`)
   have since been removed from ghcr; only rolling `master` / `main` /
-  `prerelease-*` tags are still updated there.
+  `prerelease-*` tags are still updated there. Re-checked on 2026-10-27 for
+  the `v12.0.3` / `v2.12.1` pins: no release tag past `9.0.2` / `v2.3.5`.
 - The backend/frontend pins in `common/images.yaml` therefore name upstream
   refs that cannot be pulled. They are satisfied locally by
   `./sandbox.sh build-images`, which clones the pinned release tags, builds
@@ -306,6 +291,29 @@ visible at a glance.
   and host them in its own registry.
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
+
+## Blockscout does not show BENS names
+- Blockscout returns `ens_domain_name: null` for transaction parties that
+  BENS resolves. BENS answers `addresses:batch-resolve-names` correctly, and
+  Blockscout calls it on reads, but the names do not reach Blockscout's API
+  responses. On 2026-10-27 the local sandbox's `GET /api/v2/transactions`
+  returned no name for any party of 50 transactions; BENS-side resolution was
+  not re-checked then.
+- Found during the catch-up indexer work and believed to predate it
+  ([`docs/plans/archive/blockscout-catchup-indexer/progress.md`](plans/archive/blockscout-catchup-indexer/progress.md),
+  "Follow-ups Found Along the Way").
+- Planned follow-up: investigate where the names are dropped between BENS and
+  the Blockscout API.
+
+## BENS returns 500 briefly on a fresh Blockscout namespace
+- On a newly created `blockscout` namespace the indexer can call BENS before
+  BENS has created its `mapping` table, so BENS answers `500` for the first
+  few seconds. The catch-up indexer work observed two such responses.
+- Evidence:
+  [`docs/plans/archive/blockscout-catchup-indexer/progress.md`](plans/archive/blockscout-catchup-indexer/progress.md),
+  "Follow-ups Found Along the Way".
+- Planned follow-up: investigate whether BENS should create the table before
+  it reports ready, or the indexer should retry.
 
 ## sandbox.sh build-images is Blockscout-only today
 - `./sandbox.sh build-images` only wraps

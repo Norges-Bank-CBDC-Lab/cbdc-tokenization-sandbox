@@ -1,5 +1,5 @@
 # IERC1410
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/norges-bank/ERC1410/IERC1410.sol)
+[Git Source](../../../../../../../src/norges-bank/ERC1410/IERC1410.sol)
 
 **Inherits:**
 IERC165

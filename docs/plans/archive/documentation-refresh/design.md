@@ -3,8 +3,8 @@
 **Status:** Draft
 **Created:** 2026-09-28
 **Intent:** [`intent.md`](intent.md)
-**Builds on:** ADR 0003, [ADR 0004](../../decisions/0004-settle-all-bond-cash-legs-in-wnok.md),
-[ADR 0005](../../decisions/0005-redeem-principal-with-the-final-coupon.md), #225, #259, #276,
+**Builds on:** ADR 0003, [ADR 0004](../../../decisions/0004-settle-all-bond-cash-legs-in-wnok.md),
+[ADR 0005](../../../decisions/0005-redeem-principal-with-the-final-coupon.md), #225, #259, #276,
 #278, #291, #292, #293, #294.
 
 ## Decision Summary
@@ -214,11 +214,11 @@ missing image row is manual drift.
 
 | Decision | Recommendation | Rationale | Operator action required |
 |---|---|---|---|
-| Closed-loop plan | Park with drift note, keep Proposed | Refresh is design work nobody scheduled | Confirm |
-| Wallet and entity-directory plans | Fix branch lines; keep or park | No implementation since 2026-07-15 | Decide keep / park |
-| Transfer eligibility known issue | Add only if the bond coupon and maturity plan defers its eligibility rule | Avoid an entry that one PR later becomes wrong | Decide with that plan |
+| Closed-loop plan | Park with drift note, keep Proposed | Refresh is design work nobody scheduled | Parked (operator, 2026-10-27) |
+| Wallet and entity-directory plans | Fix branch lines; keep or park | No implementation since 2026-07-15 | Both parked (operator, 2026-10-27) |
+| Transfer eligibility known issue | Add only if the bond coupon and maturity plan defers its eligibility rule | Avoid an entry that one PR later becomes wrong | Parked: no entry in this plan (operator, 2026-10-27) |
 | NatSpec links | Relative links rewritten by `fix-links.py`, one regeneration PR | Durable, checked by CI | None |
-| Archived progress headers | Update the two header lines | Status-line-only change allowed | Explicit approval (frozen records) |
+| Archived progress headers | Update the two header lines | Status-line-only change allowed | Approved (operator, 2026-10-27) |
 | `docs/AZURE_BOUNDARY.md` title | Leave as existing text | Rule accepts existing text | Operator may decide otherwise |
 | Entra mentions in `docs/` outside the service folders | Accept as auth-mode descriptions | They describe the public `entra` surface | Confirm the interpretation |
 | Frozen records with cloud wording or tooling names | Leave | Frozen-record rule | Confirm |

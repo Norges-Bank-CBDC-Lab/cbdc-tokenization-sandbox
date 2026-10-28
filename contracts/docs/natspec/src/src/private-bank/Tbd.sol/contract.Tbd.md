@@ -1,5 +1,5 @@
 # Tbd
-[Git Source](https://github.com/Norges-Bank-CBDC-Lab/cbdc-tokenization-sandbox/blob/e1ad13913c0726f3f8165cafaa1413435020decc/src/private-bank/Tbd.sol)
+[Git Source](../../../../../../src/private-bank/Tbd.sol)
 
 **Inherits:**
 [ITbd](../ITbd.sol/interface.ITbd.md), IERC1363Receiver, ERC20, AccessControl, [Allowlist](../../common/Allowlist.sol/abstract.Allowlist.md)

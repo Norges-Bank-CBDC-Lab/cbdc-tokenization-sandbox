@@ -11,6 +11,8 @@ flowchart TD
     config["Load .env.sandbox overrides<br/>and require generated local fixtures"]
     hosts["Ensure *.cbdc-sandbox.local host entries"]
     registry["Require local Kind registry"]
+    clusterQ{"Kind cluster exists?"}
+    resume["Start stopped node containers<br/>(resume after ./sandbox.sh stop)"]
     infraQ{"DEPLOY_INFRA?"}
     infra["Start/reuse Kind cluster<br/>deploy Gateway + Besu"]
     blockQ{"DEPLOY_BLOCKSCOUT?"}
@@ -18,7 +20,7 @@ flowchart TD
     infraReady["If infra enabled:<br/>wait for Besu and Gateway readiness"]
     blockReady["If Blockscout enabled:<br/>wait for explorer readiness"]
     contractsQ{"DEPLOY_CONTRACTS?"}
-    contracts["Deploy and configure contracts<br/>register addresses"]
+    contracts["Deploy and configure contracts<br/>unless already deployed on this chain<br/>register addresses"]
     verifyQ{"DEPLOY_VERIFY_CONTRACTS?"}
     verify["Verify contracts against Blockscout"]
     apiQ{"DEPLOY_NB_BOND_API?"}
@@ -28,7 +30,9 @@ flowchart TD
     finalReady["Wait for enabled endpoints"]
     done(["Print service URLs and finish"])
 
-    start --> prereq --> config --> hosts --> registry --> infraQ
+    start --> prereq --> config --> hosts --> registry --> clusterQ
+    clusterQ -->|"yes"| resume --> infraQ
+    clusterQ -->|"no"| infraQ
     infraQ -->|"yes"| infra --> blockQ
     infraQ -->|"no"| blockQ
     blockQ -->|"yes"| block --> infraReady

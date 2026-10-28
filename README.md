@@ -50,10 +50,11 @@ also help human contributors understand repo-specific workflow and guardrails:
 - `infra/AGENTS.md`: infra and deployment guidance
 - `scripts/AGENTS.md`: script and CLI guidance
 - `services/AGENTS.md`: service-specific guidance
+- `services/nb-ui/AGENTS.md`: NB UI operator frontend guidance
 
 ## Current Local Chain
 
-The validated local baseline is Besu 26.10.0 with Osaka active from genesis,
+The validated local baseline is Besu 26.10.2 with Osaka active from genesis,
 one QBFT validator, and one separate non-validator archive/RPC node. Solidity
 0.8.36 and OpenZeppelin 5.6.1 are pinned to that execution baseline. All local
 application, Blockscout, Foundry, and gateway traffic uses the archive/RPC
@@ -197,7 +198,7 @@ Use `/etc/hosts` on Linux/macOS or
 | `./sandbox.sh stop` | Stop the whole sandbox gracefully and keep all state: the chain, Blockscout's index and contract verifications, and the NB Bond API database. `start` brings it back as it was. Run it before quitting Docker or rebooting; see [unclean shutdowns](docs/KNOWN_ISSUES.md#sandbox-must-be-stopped-before-docker-quits-or-the-host-reboots). The Kind node gets `SANDBOX_STOP_TIMEOUT_SECONDS` (default 330) to shut down; a stop takes about 90 seconds |
 | `./sandbox.sh delete` | Tear down the Kind cluster and **all sandbox state**; `delete` then `start` gives a fresh sandbox. The local registry container and its cached images are kept (they live in the `kind-registry` Docker container, which is independent of the Kind cluster lifecycle). To reclaim that space, run `./sandbox.sh registry-reset` (or `docker rm -f kind-registry`). |
 | `./sandbox.sh generate-config` | Create `.env.sandbox` with deploy toggles |
-| `./infra/infra.sh registry-start` | Start the local registry container (one-time setup; no-op if already running) |
+| `./infra/infra.sh registry-start` | Start the local registry container (one-time setup; no-op if already running, unless the registry pin in `common/images.yaml` changed, which recreates it and re-syncs images) |
 | `./infra/infra.sh registry-sync` | Optional pre-warm: push every pinned third-party image into the local registry up front so `sandbox.sh start` doesn't pull them on demand |
 | `./sandbox.sh image-report` | Read-only report: running pod images, local registry tags per service, and which tag is the current build / deployed |
 | `./sandbox.sh cleanup-images` | Prune old content-hash images for `nb-ui` / `nb-bond-api` / `bens-microservice` (keeps current + 2 newest and the deployed tag; never removes shared base images). `--keep N` changes retention; `--prune-build-cache` also clears the global Docker build cache |
