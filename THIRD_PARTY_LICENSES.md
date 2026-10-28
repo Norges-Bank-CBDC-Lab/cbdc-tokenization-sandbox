@@ -56,7 +56,7 @@ License labels and deployment-time notes remain curated review items.
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
 | `ethers` | `6.17.0` | MIT |
-| `express` | `5.2.1` | MIT |
+| `express` | `5.3.0` | MIT |
 | `express-rate-limit` | `8.7.1` | MIT |
 | `helmet` | `8.3.0` | MIT |
 | `jose` | `6.2.13` | MIT |
@@ -75,7 +75,7 @@ License labels and deployment-time notes remain curated review items.
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.13.0` | MIT |
-| `jest` | `30.4.2` | MIT |
+| `jest` | `30.5.2` | MIT |
 | `prettier` | `3.9.10` | MIT |
 | `tsx` | `4.23.11` | MIT |
 | `typescript` | `7.0.2` | Apache-2.0 |
@@ -111,7 +111,7 @@ License labels and deployment-time notes remain curated review items.
 | `@testing-library/jest-dom` | `7.0.1` | MIT |
 | `@testing-library/react` | `16.3.3` | MIT |
 | `@testing-library/user-event` | `14.6.1` | MIT |
-| `@vitejs/plugin-react` | `6.1.1` | MIT |
+| `@vitejs/plugin-react` | `6.1.2` | MIT |
 | `eslint` | `9.39.5` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `eslint-plugin-react` | `7.37.5` | MIT |
