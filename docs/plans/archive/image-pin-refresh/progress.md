@@ -1,10 +1,10 @@
 # Image and chart pin refresh — Progress
 
 **Plan:** [`plan.md`](plan.md)
-**Last updated:** 2026-10-28 — Phase 6 merged as #332; Phase 7 (registry 3.1.2) verified locally
-**Current phase:** Phase 7: Local registry 3.1.2 (in review)
-**Next action:** Merge the Phase 7 PR from `feature/local-registry-3`, then archive the plan
-folder (the last exit criterion).
+**Last updated:** 2026-10-28 — all seven phases implemented; Phase 7 and the archive ship in #333
+**Current phase:** Done (archived 2026-10-28)
+**Next action:** None in this plan. The non-local rollout stays with the operator (see `plan.md`
+"Deferred Non-Local Rollout"), and the follow-ups below are open.
 
 ## Phase Log
 
@@ -17,10 +17,16 @@ folder (the last exit criterion).
 | 4 — NGINX Gateway Fabric 2.8.0 | Done (merged 2026-10-21) | Gateway API CRDs v1.6.3, NGF CRDs incl. three new kinds, data plane nginx 1.31.7, four hostnames answer; fresh-cluster path covered by the Phase 5 fresh boot; CI green | #311 |
 | 5 — Besu 26.10.0 | Done (merged 2026-10-21) | in-place upgrade, validator rollback rehearsal, fresh-chain boot with contracts redeployed and verified | #312 |
 | 6 — Blockscout v12 + frontend v2.12 | Done (merged 2026-10-27) | backend v12.0.3 and frontend v2.12.1 built from source; in-place migration on the existing explorer database; indexing, realtime, catch-up, verification, BENS and nb-ui links checked (see Verified So Far) | #332 |
-| 7 — Local registry 3.1.2 | Done locally (2026-10-28); PR pending | probe container checks; one `registry-start` recreated the registry on 3.1.2 and re-synced it; second run idempotent; `./sandbox.sh start` pulled every pod from it; `image-report` and `cleanup-images --keep 1` work (see Verified So Far) | |
+| 7 — Local registry 3.1.2 | Done (2026-10-28) | probe container checks; one `registry-start` recreated the registry on 3.1.2 and re-synced it; second run idempotent; `./sandbox.sh start` pulled every pod from it; `image-report` and `cleanup-images --keep 1` work (see Verified So Far) | #333 |
 
 ## Deviations From the Plan
 
+- 2026-10-28, archive: two pins moved past the plan's targets outside it, so the Phase 5 exit
+  criterion and the intent's Besu baseline row were met on 26.10.0 and are now carried by later
+  versions: #331 moved Besu to 26.10.2 (the baseline constant moved with it) and BENS to
+  `python:3.14.10`. The Phase 1 criterion on the Node pin bump was met by #313, which landed
+  without its own hash change after #308. The plan was archived in the slice 7 PR, as its Done
+  Criteria ask, rather than in a separate PR after merge.
 - 2026-10-28, Phase 7: the operator decided that this plan owns `ensureKindRegistry`;
   scripts-hardening Phase 6 (slice F) has not started and rebases onto this change. The
   presence and digest probes were widened to accept OCI manifests and indexes, the case step 1
@@ -248,8 +254,8 @@ folder (the last exit criterion).
 Phases 1–5 merged as #308, #309, #310, #311 and #312, and shipped in release v0.10.0 (#316).
 Outside this plan, #315 moved BENS to `python:3.14.9` (the D6 target once its image was
 published) and #313 moved the Node pin to 26.12.1. #331 (merged 2026-10-27) then moved Besu to
-26.10.2 and BENS to `python:3.14.10`. Phase 6 merged as #332. Phase 7 is verified locally on
-`feature/local-registry-3`; its PR is not open yet. The local sandbox now runs Blockscout
+26.10.2 and BENS to `python:3.14.10`. Phase 6 merged as #332, and Phase 7 ships with the
+archive of this folder in #333. The plan is complete. The local sandbox now runs Blockscout
 v12.0.3 with frontend v2.12.1 on a migrated explorer database, and pulls everything through
 `registry:3.1.2`.
 The local sandbox runs a fresh chain (new contract addresses) on all slice 1–5 pins. It runs the

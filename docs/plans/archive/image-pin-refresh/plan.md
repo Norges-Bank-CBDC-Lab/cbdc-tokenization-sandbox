@@ -1,6 +1,6 @@
 # Image and chart pin refresh — Implementation Plan
 
-**Status:** In progress (local scope; approved 2026-10-21)
+**Status:** Implemented — shipped in #308–#312, #332 and #333 (local scope; approved 2026-10-21); archived 2026-10-28
 **Created:** 2026-10-21
 **Scope:** `common/images.yaml`, `common/versions.yaml`, `common/helpers.sh`,
 `services/nb-ui/Dockerfile`, `services/blockscout/{values.yaml,values.local.yaml,debugging.md,bens-microservice/Dockerfile,templates/sc-verifier-deployment.yaml}`,
@@ -67,7 +67,7 @@ docker buildx imagetools inspect <image>:<tag>
 
 ### Exit Criteria
 
-- [ ] Baseline written to `progress.md` "Verified So Far" with the date.
+- [x] Baseline written to `progress.md` "Verified So Far" with the date.
 
 ## Phase 1: Image Hash Base Refs (slice 1)
 
@@ -109,8 +109,8 @@ on the next start.
 
 ### Exit Criteria
 
-- [ ] All three hashes react to their base refs, asserted in CI (`Image Hash Inputs`).
-- [ ] The pending Node pin bump drops its now-duplicate hash change on rebase.
+- [x] All three hashes react to their base refs, asserted in CI (`Image Hash Inputs`).
+- [x] The pending Node pin bump drops its now-duplicate hash change on rebase.
 
 ## Phase 2: nginx-unprivileged 1.30.6 (slice 2)
 
@@ -142,7 +142,7 @@ registry unless `cleanup-images` pruned it.
 
 ### Exit Criteria
 
-- [ ] The running nb-ui reports nginx 1.30.6; the UI loads through the gateway.
+- [x] The running nb-ui reports nginx 1.30.6; the UI loads through the gateway.
 
 ## Phase 3: Blockscout Supporting Components (slice 3)
 
@@ -188,7 +188,7 @@ which is cheap here.
 
 ### Exit Criteria
 
-- [ ] Explorer, BENS, and contract verification work on the new pins.
+- [x] Explorer, BENS, and contract verification work on the new pins.
 
 ## Phase 4: NGINX Gateway Fabric 2.8.0 (slice 4)
 
@@ -225,7 +225,7 @@ recreated by their component charts on the next start.
 
 ### Exit Criteria
 
-- [ ] Gateway on 2.8.0 with CRDs v1.6.3; every hostname routes.
+- [x] Gateway on 2.8.0 with CRDs v1.6.3; every hostname routes.
 
 ## Phase 5: Besu 26.10.0 (slice 5)
 
@@ -288,7 +288,7 @@ D5).
 
 ### Exit Criteria
 
-- [ ] The baseline check passes on 26.10.0; in-place and fresh boots both produce blocks and
+- [x] The baseline check passes on 26.10.0; in-place and fresh boots both produce blocks and
       index.
 
 ## Phase 6: Blockscout Backend v12 + Frontend v2.12 (slice 6)
@@ -345,7 +345,7 @@ if they are no longer in the registry. Reindexing 160+ blocks is cheap.
 
 ### Exit Criteria
 
-- [ ] Explorer, indexers, BENS and verification all work on v12; licence notes updated.
+- [x] Explorer, indexers, BENS and verification all work on v12; licence notes updated.
 
 ## Phase 7: Local Registry 3.1.2 (slice 7)
 
@@ -397,7 +397,7 @@ and re-syncs.
 
 ### Exit Criteria
 
-- [ ] An existing machine moves to registry 3.1.2 with one command; the stack starts from it.
+- [x] An existing machine moves to registry 3.1.2 with one command; the stack starts from it.
 
 ## Test Matrix
 
@@ -485,7 +485,7 @@ image and chart changes that can be rolled back.
 
 ## Done Criteria
 
-- [ ] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
-- [ ] All seven slices merged, or explicitly deferred with a reason.
-- [ ] Gates pass on each PR; no old version left outside archived or dated text.
-- [ ] Plan folder archived with the last slice.
+- [x] Every acceptance criterion in `intent.md` has evidence in `progress.md`.
+- [x] All seven slices merged, or explicitly deferred with a reason.
+- [x] Gates pass on each PR; no old version left outside archived or dated text.
+- [x] Plan folder archived with the last slice.
