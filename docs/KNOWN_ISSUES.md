@@ -26,26 +26,26 @@
   the intermediates' cross-signs from "AAA Certificate Services". Debian also
   distrusted that root. A trust store that still holds either root accepts
   certificates from the compromised intermediates.
-- Fixed in this repository: the Node pin (26.12.1, built-in roots from NSS 3.131.1
-  plus a block on the intermediates' keys), the BENS base image (`python:3.14.10`:
-  Debian `ca-certificates 20250419+deb13u1`, pip 26.2.2 with certifi
-  2026.10.19, and an `ssl` module that blocks the intermediates' keys), Besu
-  (`26.10.2`: the image's Temurin 25.0.3 `cacerts` no longer holds "emSign ECC
-  Root CA - G3" or "emSign Root CA - G1"; checked 2026-10-27), the local registry
-  (`registry:3.1.2` as rebuilt on 2026-10-26: Alpine 3.24.3 `ca-certificates
-  20261020-r0`; checked 2026-10-28), and Foundry in Contracts CI (v1.8.6:
-  `rustls-webpki` 0.103.16, `webpki-roots` 1.0.10).
-- Still exposed, waiting on upstream releases (checked 2026-10-22):
+- Register of the images this sandbox pins, as of sandbox v0.12.0. The distrusted roots are
+  "emSign ECC Root CA - G3" and "AAA Certificate Services". A deployment that rebuilds or
+  mirrors these images should copy the rows by sandbox release.
 
-  | Component (pin) | Store that still holds the root | Outbound TLS | Waiting for |
-  |---|---|---|---|
-  | `smart-contract-verifier` (`v1.11.0`) | Ubuntu 24.04 `ca-certificates 20260601~24.04.1`, used through OpenSSL | **Yes**: downloads Solidity compilers from `binaries.soliditylang.org` | An image built on the fixed Ubuntu `ca-certificates` |
-  | Blockscout backend (`v12.0.3`) | `castore` 1.0.21 and Erlang `certifi` 2.17.0 in the release, Alpine 3.22.6 `ca-certificates 20260909-r0` | Little: market data is disabled; token metadata fetches can leave the cluster | A Blockscout release with `castore` ≥ 1.0.22, `certifi` ≥ 2.18.0 and Alpine `ca-certificates 20261020-r0` (v12.0.3 is still the newest release; checked 2026-10-27) |
-  | Blockscout frontend (`v2.12.1`) | Node 24.21.0 built-in roots (its Alpine `ca-certificates 20261020-r0` bundle is clean) | No (in-cluster backend only) | A release on Node ≥ 24.22.1 (v2.12.1 is still the newest v2.12 patch; checked 2026-10-27) |
-  | Kind node (`kindest/node:v1.36.4`) | Debian 13 `ca-certificates 20250419` (not the fixed `20250419+deb13u1`; its bundle holds "emSign ECC Root CA - G3" and "AAA Certificate Services"); containerd 2.3.4. Checked 2026-10-28 against the image built for Kind v0.33.0 | **Yes**: containerd pulls images that are not in the local registry | A kind node image built on the fixed Debian `ca-certificates` |
-  | NGINX Gateway Fabric (`2.8.0`, control plane and nginx) | Distroless Debian bundle (also "AAA Certificate Services") with Go 1.27.2; Alpine `ca-certificates 20260909-r0` | No (Kubernetes API and in-cluster upstreams only) | A release on Go ≥ 1.27.3 and Alpine `ca-certificates 20261020-r0` |
-  | `nginxinc/nginx-unprivileged` (`1.30.6-alpine`, NB UI runtime) | Alpine `ca-certificates 20260909-r0` | No (serves static files) | A tag rebuilt on Alpine `ca-certificates 20261020-r0` |
-  | `crytic/slither-action` (Contracts CI) | Not checked (image not inspected) | Yes: downloads `solc` | Check when the action next releases |
+| Image (repository:tag) | Component | Distrusted roots present | Trust store source | Outbound TLS relevance | Upstream fix | Status | Last checked | Origin |
+|---|---|---|---|---|---|---|---|---|
+| `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (needs a node image built on the fixed Debian ca-certificates) | open | 2026-10-28, bundle read in image | sandbox |
+| `ghcr.io/blockscout/smart-contract-verifier:v1.11.0` | Contract verifier | emSign ECC Root CA - G3 | Ubuntu 24.04 ca-certificates 20260601~24.04.1, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | none yet (needs an image built on the fixed Ubuntu ca-certificates) | open | 2026-10-28, bundle read in image | sandbox |
+| `ghcr.io/blockscout/blockscout:v12.0.3` | Explorer backend | emSign ECC Root CA - G3 | app bundle: castore 1.0.21 and certifi 2.17.0; Alpine ca-certificates 20260909-r0 | yes: token metadata fetches can leave the cluster (market data is disabled) | none yet (v12.0.3 is the newest release; needs castore ≥ 1.0.22, certifi ≥ 2.18.0 and Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
+| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend | emSign ECC Root CA - G3 (Node built-in roots only; the Alpine ca-certificates-bundle 20261020-r0 is clean) | app bundle: Node 24.21.0 built-in roots | no: in-cluster backend only | none yet (v2.12.1 is the newest v2.12 patch; needs Node ≥ 24.22.1) | open | 2026-10-28, bundle and Node roots read in image | sandbox |
+| NGINX Gateway Fabric `2.8.0` (control plane and nginx data plane) | Gateway controller and proxy | AAA Certificate Services (distroless Debian bundle); Alpine 20260909-r0 bundle not separately read | Distroless Debian bundle with Go 1.27.2; Alpine ca-certificates 20260909-r0 | no: Kubernetes API and in-cluster upstreams only | none yet (needs a release on Go ≥ 1.27.3 and Alpine ca-certificates 20261020-r0) | open | 2026-10-22, carried over (image not in the local cache) | sandbox |
+| `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (needs a tag rebuilt on Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
+| `crytic/slither-action` (Contracts CI) | Static analysis in CI | not checked | not checked | yes: downloads `solc` | none yet | open | not checked | sandbox |
+| `busybox:1.37.0` | Blockscout migration init container | not checked | not checked | no: inbound only | none yet | open | not checked | sandbox |
+| `hyperledger/besu:26.10.2` | Chain nodes | none | JDK cacerts (Temurin 25.0.3) on Ubuntu 24.04; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 | fixed (adopted v0.11.0, 2026-10-27) | 2026-10-28, keytool listing of cacerts in image | sandbox |
+| `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
+| `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
+| `node:26.12.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle and Node roots read in image | sandbox |
+| `postgres:18.6` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21) | 2026-10-28, image filesystem read | sandbox |
+| Foundry `v1.8.6` (Contracts CI) | Contract build and test toolchain | none | app bundle: rustls-webpki 0.103.16, webpki-roots 1.0.10 | build-time only | Foundry v1.8.6 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-22, carried over | sandbox |
 
 - To re-check a bundle, count it as exposed only when it contains one of the
   affected roots:
