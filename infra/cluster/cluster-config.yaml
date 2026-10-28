@@ -12,7 +12,7 @@ containerdConfigPatches:
       config_path = "/etc/containerd/certs.d/kind"
 nodes:
   - role: control-plane
-    image: kindest/node:v1.32.11@sha256:5fc52d52a7b9574015299724bd68f183702956aa4a2116ae75a63cb574b35af8
+    image: kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
     # Each published port pairs a fixed nodePort in the gateway chart's
     # NodePort Service (infra/gateway/templates/nodeport-config.yaml) with
     # the host port that scripts, docs, and browser URLs assume (80 for the
