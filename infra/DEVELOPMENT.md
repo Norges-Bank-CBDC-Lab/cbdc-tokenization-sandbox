@@ -63,6 +63,11 @@ Mount behavior worth keeping explicit:
 - the mount path is relative to `infra/`, because the sandbox helper invokes
   `kind create cluster` from that directory.
 
+The Kind node image is pinned by digest in `infra/cluster/cluster-config.yaml`, and each
+digest is built for one Kind release (the pin currently matches Kind v0.33.0, the version the
+root `README.md` installs). `createKindCluster` skips an existing cluster, so a node-image
+change reaches a machine only after `./sandbox.sh delete` and a fresh `./sandbox.sh start`.
+
 If sandbox startup fails with missing digest or image-pull errors, run
 `registry-start`, populate missing Blockscout source-built images with
 `./sandbox.sh build-images`, and then run `registry-sync` before retrying.
