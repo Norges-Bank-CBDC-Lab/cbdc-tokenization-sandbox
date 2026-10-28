@@ -44,6 +44,11 @@ Important behavior:
 
 - `./infra.sh registry-start` creates or reuses the persistent registry
   container;
+- a change to the registry pin recreates that container on the next
+  `registry-start`, `registry-sync`, `build-images` or cluster start, then
+  re-syncs the pinned images into the empty registry (repo-owned images rebuild
+  on the next service start; the Blockscout images come from the host Docker
+  cache, or need `./sandbox.sh build-images`);
 - `./infra.sh registry-sync` pushes the image versions referenced by the
   sandbox;
 - sandbox deploy/build image pins live in `common/images.yaml`, including

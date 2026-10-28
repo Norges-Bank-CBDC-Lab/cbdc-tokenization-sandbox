@@ -56,8 +56,12 @@ NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
-KIND_REGISTRY_IMAGE=registry:2.8.3
+KIND_REGISTRY_IMAGE=registry:3.1.2
 KIND_REGISTRY_ENDPOINT="http://localhost:${KIND_REGISTRY_PORT}"
+# Manifest types the presence and digest probes accept. The sandbox pushes
+# OCI manifests and indexes (containerd image store), so a Docker-v2-only
+# Accept header 404s on every cached image.
+KIND_REGISTRY_MANIFEST_ACCEPT="application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json"
 
 OS_NAME=$(uname)
 
@@ -497,8 +501,22 @@ function toKindImageTag() {
 }
 
 function ensureKindRegistry() {
-    local registry_image
+    local registry_image current_image
+    local recreated="false"
     registry_image="$(getLocalRegistryImage)"
+
+    # A pin change in common/images.yaml would otherwise never reach a machine
+    # that already has the container: `docker start` keeps the old image.
+    # Recreate it instead; the new registry is empty, so the base and
+    # third-party images are re-synced below, as registry-reset does.
+    if docker ps -a --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
+        current_image="$(docker inspect --format '{{.Config.Image}}' "${KIND_REGISTRY_NAME}")"
+        if [ "$current_image" != "$registry_image" ]; then
+            echo "🔁 '${KIND_REGISTRY_NAME}' runs ${current_image} but the pin is ${registry_image}: recreating it (its cached tags are lost and re-synced)."
+            docker rm -f "${KIND_REGISTRY_NAME}" >/dev/null
+            recreated="true"
+        fi
+    fi
 
     if ! docker ps --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
         if docker ps -a --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
@@ -546,6 +564,12 @@ EOF
     fi
 
     echo "✅ Local registry is running: ${KIND_REGISTRY_NAME} (localhost:${KIND_REGISTRY_PORT})"
+
+    if [ "$recreated" == "true" ]; then
+        echo "🔄 Repopulating base / third-party images into the recreated registry..."
+        syncImagesToRegistry
+        echo "ℹ️  Repo-owned images (nb-ui / nb-bond-api / bens-microservice) rebuild and re-push on the next service start."
+    fi
 }
 
 function isKindRegistryRunning() {
@@ -588,7 +612,7 @@ function registryManifestDigest() {
     fi
 
     digest=$(curl -fsSI 2>/dev/null \
-        -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+        -H "Accept: ${KIND_REGISTRY_MANIFEST_ACCEPT}" \
         "${KIND_REGISTRY_ENDPOINT}/v2/${registry_repo}/manifests/${registry_tag}" \
         | awk -F': ' '/Docker-Content-Digest/ {print $2}' \
         | tr -d '\r')
@@ -609,7 +633,7 @@ function kindRegistryHasImage() {
     fi
 
     if curl -fsSL -o /dev/null 2>/dev/null \
-        -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+        -H "Accept: ${KIND_REGISTRY_MANIFEST_ACCEPT}" \
         "${KIND_REGISTRY_ENDPOINT}/v2/${registry_repo}/manifests/${registry_tag}"; then
         echo "true"
     else
@@ -1418,7 +1442,7 @@ function reportSandboxImages() {
     echo
     echo "ℹ️  '<repo>:<tag>' and 'localhost:${KIND_REGISTRY_PORT}/<repo>:<tag>' are aliases of one image id (negligible disk cost)."
     echo "ℹ️  Reclaim host disk with: ./sandbox.sh cleanup-images   |   Wipe registry tags with: ./sandbox.sh registry-reset"
-    echo "ℹ️  Registry deletes are disabled, so individual registry tags cannot be removed via the API — use registry-reset."
+    echo "ℹ️  Deleting a tag through the registry API does not free its layers without garbage collection — use registry-reset to reclaim registry space."
 }
 
 # Host-side prune of the repo-owned content-hash images: keep the KEEP
@@ -1464,7 +1488,7 @@ function cleanupSandboxImages() {
     fi
 
     echo "✅ Cleanup complete. Shared base images and the deployed tags were left intact."
-    echo "ℹ️  The kind-registry container still holds its pushed tags (registry deletes are disabled). Use ./sandbox.sh registry-reset to reclaim that space."
+    echo "ℹ️  The kind-registry container still holds its pushed tags. Use ./sandbox.sh registry-reset to reclaim that space."
 }
 
 # Recreate the local registry container from scratch — the safe, disposable
