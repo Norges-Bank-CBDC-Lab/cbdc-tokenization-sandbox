@@ -66,7 +66,7 @@ License labels and deployment-time notes remain curated review items.
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
-| `@types/better-sqlite3` | `7.6.13` | MIT |
+| `@types/better-sqlite3` | `9.6.0` | MIT |
 | `@types/cors` | `2.8.19` | MIT |
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
@@ -120,7 +120,7 @@ License labels and deployment-time notes remain curated review items.
 | `jsdom` | `30.0.1` | MIT |
 | `prettier` | `3.9.10` | MIT |
 | `vite` | `8.2.4` | MIT |
-| `vitest` | `4.1.12` | MIT |
+| `vitest` | `5.0.5` | MIT |
 
 ### `services/blockscout/bens-microservice`
 
