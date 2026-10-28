@@ -12,9 +12,9 @@
   ],
   "overrides": {
     "ws": "8.21.0",
-    "undici": "8.10.2",
+    "undici": "8.12.3",
     "js-yaml": "4.3.2",
-    "qs": "6.16.0",
+    "qs": "6.17.0",
     "minimatch@3.1.5": {
       "brace-expansion": "1.1.21"
     },
