@@ -61,7 +61,7 @@ License labels and deployment-time notes remain curated review items.
 | `helmet` | `8.3.0` | MIT |
 | `jose` | `6.2.13` | MIT |
 | `winston` | `3.19.0` | MIT |
-| `zod` | `4.6.5` | MIT |
+| `zod` | `4.6.7` | MIT |
 | `zod-openapi` | `6.0.1` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
