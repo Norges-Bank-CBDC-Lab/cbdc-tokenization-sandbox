@@ -42,7 +42,7 @@ pulled at build/deploy time. Current examples include:
 - Python runtime images
 - PostgreSQL images
 - Blockscout charts and images, including the GPL-3.0 smart-contract-verifier
-  v1.11.0 image explicitly enabled for source verification
+  v1.11.1 image explicitly enabled for source verification
 - Alpine's `ffmpeg` package (GPL-2.0-or-later AND LGPL-2.1-or-later), which
   the upstream Dockerfile installs into the Blockscout backend image from
   v12 on. `./sandbox.sh build-images` builds that image locally and runs it
