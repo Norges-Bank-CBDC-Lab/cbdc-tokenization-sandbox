@@ -45,7 +45,7 @@ blockscout:
   # source compilation / bytecode matching to this standalone service; the
   # backend (v10 and later) does not verify in-process. GPL-3.0, same as the
   # rest of the Blockscout stack.
-  smart_contract_verifier: ghcr.io/blockscout/smart-contract-verifier:v1.11.0
+  smart_contract_verifier: ghcr.io/blockscout/smart-contract-verifier:v1.11.1
 
 # nb-ui ships as a self-contained image built locally from services/nb-ui/Dockerfile.
 # Node.js build/runtime stage bases are centralized in common/node-version.env.
