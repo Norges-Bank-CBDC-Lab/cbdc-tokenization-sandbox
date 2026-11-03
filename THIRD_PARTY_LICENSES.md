@@ -71,7 +71,7 @@ License labels and deployment-time notes remain curated review items.
 | `@types/express` | `5.0.6` | MIT |
 | `@types/jest` | `30.0.0` | MIT |
 | `@types/node` | `26.6.5` | MIT |
-| `babel-jest` | `30.4.1` | MIT |
+| `babel-jest` | `30.5.2` | MIT |
 | `eslint` | `10.4.0` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
 | `globals` | `17.13.0` | MIT |
