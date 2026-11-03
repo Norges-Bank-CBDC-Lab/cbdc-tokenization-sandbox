@@ -51,7 +51,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.1.0` | MIT |
+| `@noble/secp256k1` | `3.2.0` | MIT |
 | `better-sqlite3` | `13.0.3` | MIT |
 | `cors` | `2.8.6` | MIT |
 | `dotenv` | `17.4.2` | BSD-2-Clause |
@@ -62,7 +62,7 @@ License labels and deployment-time notes remain curated review items.
 | `jose` | `6.2.13` | MIT |
 | `winston` | `3.19.0` | MIT |
 | `zod` | `4.6.7` | MIT |
-| `zod-openapi` | `6.0.1` | MIT |
+| `zod-openapi` | `6.0.2` | MIT |
 | `@babel/core` | `7.29.7` | MIT |
 | `@babel/preset-env` | `7.29.5` | MIT |
 | `@eslint/js` | `10.0.1` | MIT |
@@ -85,7 +85,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.1.0` | MIT |
+| `@noble/secp256k1` | `3.2.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.6.5` | MIT |
 | `tsx` | `4.23.11` | MIT |
@@ -95,7 +95,7 @@ License labels and deployment-time notes remain curated review items.
 
 | Package | Version | License |
 | --- | --- | --- |
-| `@noble/secp256k1` | `3.1.0` | MIT |
+| `@noble/secp256k1` | `3.2.0` | MIT |
 | `ethers` | `6.17.0` | MIT |
 | `@types/node` | `26.6.5` | MIT |
 | `tsx` | `4.23.11` | MIT |
@@ -110,7 +110,7 @@ License labels and deployment-time notes remain curated review items.
 | `react-dom` | `19.3.1` | MIT |
 | `@testing-library/jest-dom` | `7.0.1` | MIT |
 | `@testing-library/react` | `16.3.3` | MIT |
-| `@testing-library/user-event` | `14.6.1` | MIT |
+| `@testing-library/user-event` | `14.6.8` | MIT |
 | `@vitejs/plugin-react` | `6.1.2` | MIT |
 | `eslint` | `9.39.5` | MIT |
 | `eslint-config-prettier` | `10.1.8` | MIT |
@@ -119,7 +119,7 @@ License labels and deployment-time notes remain curated review items.
 | `globals` | `17.13.0` | MIT |
 | `jsdom` | `30.0.1` | MIT |
 | `prettier` | `3.9.10` | MIT |
-| `vite` | `8.2.4` | MIT |
+| `vite` | `8.3.5` | MIT |
 | `vitest` | `5.0.5` | MIT |
 
 ### `services/blockscout/bens-microservice`
