@@ -64,6 +64,27 @@ echo "🔧 Building Blockscout frontend ($frontend_tag)"
 git clone --depth 1 --branch "$frontend_tag" https://github.com/blockscout/frontend.git "$frontend_tmp"
 frontend_sha=$(git -C "$frontend_tmp" rev-parse HEAD)
 
+# The upstream frontend tag locks Next.js at a version with published
+# advisories; pin a fixed release on top of upstream's frozen install. The
+# version must be at least a week old, because upstream's pnpm config sets
+# minimumReleaseAge to one week. The Node heap is raised because re-resolving
+# the workspace with `pnpm add` is memory-bound. See docs/KNOWN_ISSUES.md.
+frontend_next_version="16.4.3"
+frontend_install_line="RUN pnpm install --frozen-lockfile"
+frontend_dockerfile="$frontend_tmp/Dockerfile"
+
+if [[ "$(grep -cxF "$frontend_install_line" "$frontend_dockerfile")" != "1" ]]; then
+    echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the Next.js pin in $(basename "$0")"
+    exit 1
+fi
+
+awk -v install_line="$frontend_install_line" -v next_version="$frontend_next_version" '
+    { print }
+    $0 == install_line { print "RUN NODE_OPTIONS=--max-old-space-size=6144 pnpm add -w next@" next_version " --save-exact" }
+' "$frontend_dockerfile" > "$frontend_dockerfile.patched"
+mv "$frontend_dockerfile.patched" "$frontend_dockerfile"
+echo "🔧 Pinned Next.js $frontend_next_version in the frontend deps stage"
+
 docker build \
     --platform "$platform" \
     -f "$frontend_tmp/Dockerfile" \

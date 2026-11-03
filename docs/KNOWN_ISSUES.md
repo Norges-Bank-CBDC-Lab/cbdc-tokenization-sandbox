@@ -44,7 +44,7 @@
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (needs a node image built on the fixed Debian ca-certificates) | open | 2026-10-28, bundle read in image | sandbox |
 | `ghcr.io/blockscout/smart-contract-verifier:v1.11.1` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.1, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1) | fixed (adopted v0.13.0, 2026-10-29) | 2026-10-29, bundle read in image | sandbox |
 | `ghcr.io/blockscout/blockscout:v12.0.3` | Explorer backend | emSign ECC Root CA - G3 | app bundle: castore 1.0.21 and certifi 2.17.0; Alpine ca-certificates 20260909-r0 | yes: token metadata fetches can leave the cluster (market data is disabled) | none yet (v12.0.3 is the newest release; needs castore ≥ 1.0.22, certifi ≥ 2.18.0 and Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
-| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend | emSign ECC Root CA - G3 (Node built-in roots only; the Alpine ca-certificates-bundle 20261020-r0 is clean) | app bundle: Node 24.21.0 built-in roots | no: in-cluster backend only | none yet (v2.12.1 is the newest v2.12 patch; needs Node ≥ 24.22.1) | open | 2026-10-28, bundle and Node roots read in image | sandbox |
+| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (Node built-in roots only; the Alpine ca-certificates-bundle 20261020-r0 is clean) | app bundle: Node 24.21.0 built-in roots | no: in-cluster backend only | none yet (v2.12.1 is the newest v2.12 patch; needs Node ≥ 24.22.1) | open | 2026-11-03, bundle and Node roots read in the rebuilt image | sandbox |
 | NGINX Gateway Fabric `2.8.0` (control plane and nginx data plane) | Gateway controller and proxy | AAA Certificate Services (distroless Debian bundle); Alpine 20260909-r0 bundle not separately read | Distroless Debian bundle with Go 1.27.2; Alpine ca-certificates 20260909-r0 | no: Kubernetes API and in-cluster upstreams only | none yet (needs a release on Go ≥ 1.27.3 and Alpine ca-certificates 20261020-r0) | open | 2026-10-22, carried over (image not in the local cache) | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (needs a tag rebuilt on Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI | not checked | not checked | yes: downloads `solc` | none yet | open | not checked | sandbox |
@@ -298,6 +298,20 @@
 - Consequence for any non-local reuse of this stack: that deployment must
   build the two Blockscout images itself (for its own target CPU platform)
   and host them in its own registry.
+- The frontend tag `v2.12.1` locks Next.js 16.3.5, which is affected by the
+  Next.js advisories fixed in 16.3.6 to 16.4.1 (among them
+  [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) and
+  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)).
+  `services/blockscout/build-images.sh` therefore adds one step to upstream's
+  Dockerfile after its frozen install, `pnpm add -w next@16.4.3 --save-exact`,
+  and stops if that install line is not found. The version is kept at least a
+  week old, because upstream's pnpm config sets `minimumReleaseAge` to one
+  week. Remove the step once a frontend release tag locks Next.js 16.4.1 or
+  later.
+- `build-images` rebuilds under the same tag, and the registry push is skipped
+  when the `-kind` tag is already present, so a sandbox that already holds the
+  frontend image keeps the old build until its registry copy is replaced (for
+  example after `./sandbox.sh registry-reset`).
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
 
