@@ -2,10 +2,19 @@
 
 ## Root `overrides` security pins go stale silently
 - The root `package.json` `overrides` block pins transitive packages
-  (currently `ws`, `undici`, `js-yaml`, `qs`, and two scoped
-  `brace-expansion` pins) as security floors. Nothing in CI flags when a newer patched
+  (currently `ws`, `undici`, `js-yaml`, `qs`, `minimatch`, and `glob`, plus a
+  scoped `minimatch` hold-back for `eslint-plugin-react`) as security floors.
+  Nothing in CI flags when a newer patched
   version supersedes a pin, so the floors themselves become the reason
   Dependabot alerts stay open.
+- `eslint-plugin-react` (nb-ui) is held on `minimatch` 3.1.5 and `brace-expansion`
+  1.1.21 by a scoped override. Its newest release (7.37.5) calls `minimatch(...)` as a
+  function, which `minimatch` 11 no longer exports, so five of its rules would
+  throw on the forced version. `npm audit` therefore keeps reporting the 3.1.5 copy
+  (GHSA-g3hv-75wg-m249) until `eslint-plugin-react` ships a release that takes
+  `minimatch` 11; then delete the scoped override and re-resolve. The `deepmerge`
+  advisory (GHSA-gcqx-w48m-w2h4, via `jest-config`) also has no upstream fix. The
+  plan is `docs/plans/archive/npm-audit-minimatch-glob-2026-11/`.
 - Treat every Dependabot alert against an overridden package as an
   override-bump task: update the pin in the `overrides` block and
   regenerate the affected lockfile entries via a scratch full-resolve
