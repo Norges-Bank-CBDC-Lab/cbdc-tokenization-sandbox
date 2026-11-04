@@ -25,8 +25,10 @@ open-source license terms.
 
 ## Third-Party License Inventory
 
-This file is a curated snapshot of direct dependencies and notable
-deployment-time components used by this repository as of October 27, 2026.
+This file is a curated list of direct dependencies and notable deployment-time
+components used by this repository, with their licenses. It deliberately does
+not list versions: those live in the manifests and the lockfile, so a version
+bump does not need an edit here.
 
 It is not legal advice and it is not a complete transitive SBOM. For copied or
 adapted files kept in-tree, generated code provenance, and related notes, see
@@ -34,10 +36,22 @@ adapted files kept in-tree, generated code provenance, and related notes, see
 inventory should still be preferred over hand-maintained documentation.
 
 The direct dependency tables below are validated in CI with
-`python3 scripts/verification/check-third-party-licenses.py`. That check verifies the
-package/version inventory against the tracked `package.json`,
-`package-lock.json`, `requirements.txt`, and `contracts/foundry.toml` files.
-License labels and deployment-time notes remain curated review items.
+`python3 scripts/verification/check-third-party-licenses.py`. That check verifies
+that:
+
+- each direct dependency in the tracked `package.json`, `requirements.txt`, and
+  `contracts/foundry.toml` files has exactly one row, so adding or removing a
+  dependency means editing this file;
+- each npm row carries the license recorded in `package-lock.json`, so a bump
+  that changes a package's license fails until the row is reviewed;
+- direct npm dependencies are exact versions, with no range operators;
+- every license in the lockfile and in the tables is on a permissive allowlist
+  (Apache-2.0, MIT, MIT-0, ISC, BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0,
+  CC0-1.0, PSF-2.0, Unlicense, Zlib) or is covered by a row under "Approved
+  License Exceptions".
+
+Python and Solidity license labels are curated by hand, and deployment-time
+notes remain curated review items.
 
 ## In-Tree Third-Party Material
 
@@ -49,78 +63,78 @@ License labels and deployment-time notes remain curated review items.
 
 ### `services/nb-bond-api`
 
-| Package | Version | License |
-| --- | --- | --- |
-| `@noble/secp256k1` | `3.2.0` | MIT |
-| `better-sqlite3` | `13.0.3` | MIT |
-| `cors` | `2.8.6` | MIT |
-| `dotenv` | `17.4.2` | BSD-2-Clause |
-| `ethers` | `6.17.0` | MIT |
-| `express` | `5.3.0` | MIT |
-| `express-rate-limit` | `8.7.1` | MIT |
-| `helmet` | `8.3.0` | MIT |
-| `jose` | `6.2.13` | MIT |
-| `winston` | `3.19.0` | MIT |
-| `zod` | `4.6.7` | MIT |
-| `zod-openapi` | `6.0.2` | MIT |
-| `@babel/core` | `7.29.7` | MIT |
-| `@babel/preset-env` | `7.29.5` | MIT |
-| `@eslint/js` | `10.0.1` | MIT |
-| `@types/better-sqlite3` | `9.6.0` | MIT |
-| `@types/cors` | `2.8.19` | MIT |
-| `@types/express` | `5.0.6` | MIT |
-| `@types/jest` | `30.0.0` | MIT |
-| `@types/node` | `26.6.5` | MIT |
-| `babel-jest` | `30.5.2` | MIT |
-| `eslint` | `10.4.0` | MIT |
-| `eslint-config-prettier` | `10.1.8` | MIT |
-| `globals` | `17.13.0` | MIT |
-| `jest` | `30.5.2` | MIT |
-| `prettier` | `3.9.10` | MIT |
-| `tsx` | `4.23.11` | MIT |
-| `typescript` | `7.0.2` | Apache-2.0 |
-| `typescript-eslint` | `8.70.1` | MIT |
+| Package | License |
+| --- | --- |
+| `@noble/secp256k1` | MIT |
+| `better-sqlite3` | MIT |
+| `cors` | MIT |
+| `dotenv` | BSD-2-Clause |
+| `ethers` | MIT |
+| `express` | MIT |
+| `express-rate-limit` | MIT |
+| `helmet` | MIT |
+| `jose` | MIT |
+| `winston` | MIT |
+| `zod` | MIT |
+| `zod-openapi` | MIT |
+| `@babel/core` | MIT |
+| `@babel/preset-env` | MIT |
+| `@eslint/js` | MIT |
+| `@types/better-sqlite3` | MIT |
+| `@types/cors` | MIT |
+| `@types/express` | MIT |
+| `@types/jest` | MIT |
+| `@types/node` | MIT |
+| `babel-jest` | MIT |
+| `eslint` | MIT |
+| `eslint-config-prettier` | MIT |
+| `globals` | MIT |
+| `jest` | MIT |
+| `prettier` | MIT |
+| `tsx` | MIT |
+| `typescript` | Apache-2.0 |
+| `typescript-eslint` | MIT |
 
 ### `scripts/bid-encryption`
 
-| Package | Version | License |
-| --- | --- | --- |
-| `@noble/secp256k1` | `3.2.0` | MIT |
-| `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.6.5` | MIT |
-| `tsx` | `4.23.11` | MIT |
-| `typescript` | `7.0.2` | Apache-2.0 |
+| Package | License |
+| --- | --- |
+| `@noble/secp256k1` | MIT |
+| `ethers` | MIT |
+| `@types/node` | MIT |
+| `tsx` | MIT |
+| `typescript` | Apache-2.0 |
 
 ### `scripts/bid-submitter`
 
-| Package | Version | License |
-| --- | --- | --- |
-| `@noble/secp256k1` | `3.2.0` | MIT |
-| `ethers` | `6.17.0` | MIT |
-| `@types/node` | `26.6.5` | MIT |
-| `tsx` | `4.23.11` | MIT |
-| `typescript` | `7.0.2` | Apache-2.0 |
+| Package | License |
+| --- | --- |
+| `@noble/secp256k1` | MIT |
+| `ethers` | MIT |
+| `@types/node` | MIT |
+| `tsx` | MIT |
+| `typescript` | Apache-2.0 |
 
 ### `services/nb-ui`
 
-| Package | Version | License |
-| --- | --- | --- |
-| `@azure/msal-browser` | `5.18.0` | MIT |
-| `react` | `19.3.1` | MIT |
-| `react-dom` | `19.3.1` | MIT |
-| `@testing-library/jest-dom` | `7.0.1` | MIT |
-| `@testing-library/react` | `16.3.3` | MIT |
-| `@testing-library/user-event` | `14.6.8` | MIT |
-| `@vitejs/plugin-react` | `6.1.2` | MIT |
-| `eslint` | `9.39.5` | MIT |
-| `eslint-config-prettier` | `10.1.8` | MIT |
-| `eslint-plugin-react` | `7.37.5` | MIT |
-| `eslint-plugin-react-hooks` | `7.1.1` | MIT |
-| `globals` | `17.13.0` | MIT |
-| `jsdom` | `30.0.1` | MIT |
-| `prettier` | `3.9.10` | MIT |
-| `vite` | `8.3.5` | MIT |
-| `vitest` | `5.0.5` | MIT |
+| Package | License |
+| --- | --- |
+| `@azure/msal-browser` | MIT |
+| `react` | MIT |
+| `react-dom` | MIT |
+| `@testing-library/jest-dom` | MIT |
+| `@testing-library/react` | MIT |
+| `@testing-library/user-event` | MIT |
+| `@vitejs/plugin-react` | MIT |
+| `eslint` | MIT |
+| `eslint-config-prettier` | MIT |
+| `eslint-plugin-react` | MIT |
+| `eslint-plugin-react-hooks` | MIT |
+| `globals` | MIT |
+| `jsdom` | MIT |
+| `prettier` | MIT |
+| `vite` | MIT |
+| `vitest` | MIT |
 
 ### `services/blockscout/bens-microservice`
 
@@ -131,21 +145,35 @@ output and does not declare third-party npm dependencies.
 
 ### `services/blockscout/bens-microservice`
 
-| Package | Version | License |
-| --- | --- | --- |
-| `fastapi` | `0.136.1` | MIT |
-| `uvicorn[standard]` | `0.47.0` | BSD-3-Clause |
-| `asyncpg` | `0.31.0` | Apache-2.0 |
-| `pydantic` | `2.13.4` | MIT |
-| `typing-extensions` | `4.15.0` | PSF-2.0 |
+| Package | License |
+| --- | --- |
+| `fastapi` | MIT |
+| `uvicorn[standard]` | BSD-3-Clause |
+| `asyncpg` | Apache-2.0 |
+| `pydantic` | MIT |
+| `typing-extensions` | PSF-2.0 |
 
 ## Direct Solidity Dependencies
 
-| Package | Version | License |
-| --- | --- | --- |
-| `forge-std` | `1.16.1` | MIT |
-| `@openzeppelin-contracts` | `5.6.1` | MIT |
-| `@openzeppelin-contracts-upgradeable` | `5.6.1` | MIT |
+| Package | License |
+| --- | --- |
+| `forge-std` | MIT |
+| `@openzeppelin-contracts` | MIT |
+| `@openzeppelin-contracts-upgradeable` | MIT |
+
+## Approved License Exceptions
+
+Licenses outside the allowlist described above. Adding a row needs the
+operator's explicit, double confirmation. `Package` is an exact name or a
+prefix pattern ending in `*`. Scope `dev` means the lockfile must mark the
+package as development-only; the check fails if it becomes a runtime
+dependency. A row that matches nothing is reported as stale.
+
+| Package | License | Scope | Reason |
+| --- | --- | --- | --- |
+| `lightningcss*` | MPL-2.0 | dev | File-level copyleft; installed for Vite (UI build tooling), development-only in the lockfile |
+| `argparse` | Python-2.0 | dev | Permissive PSF-style terms; dependency of `js-yaml`, development-only in the lockfile |
+| `caniuse-lite` | CC-BY-4.0 | dev | Browser-support data read by `browserslist`; attribution-only terms, development-only in the lockfile |
 
 ## Deployment-Time Components
 

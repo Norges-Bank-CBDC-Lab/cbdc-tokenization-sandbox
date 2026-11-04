@@ -10,7 +10,9 @@ integrators.
 ## Scripts In This Folder
 
 - `check-third-party-licenses.py`: validates the curated direct-dependency
-  inventory in `THIRD_PARTY_LICENSES.md` against the current manifests
+  license inventory in `THIRD_PARTY_LICENSES.md` against the current manifests
+  and lockfile, requires exact-version npm pins, and rejects licenses outside
+  the permissive allowlist unless they are listed as approved exceptions
 - `check-public-repo-hygiene.py`: validates the guardrails around local-only
   example files and required `.gitignore` entries
 - `check-markdown-links.py`: validates local links inside tracked Markdown
