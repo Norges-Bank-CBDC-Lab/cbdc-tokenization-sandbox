@@ -1,14 +1,51 @@
 #!/usr/bin/env python3
-"""Validate the curated third-party license inventory against repo manifests."""
+"""Validate the curated third-party license inventory against repo manifests.
+
+The inventory lists which direct dependencies exist and under which license;
+versions live only in the manifests and the lockfile. The check enforces:
+
+- every direct dependency has exactly one inventory row, and npm rows carry the
+  license recorded in the lockfile;
+- direct npm dependencies are exact versions (no range operators);
+- every license in the lockfile and in the inventory is on the permissive
+  allowlist, or the package is listed under "Approved License Exceptions".
+"""
 
 from __future__ import annotations
 
+import fnmatch
 import json
+import re
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_PATH = REPO_ROOT / "THIRD_PARTY_LICENSES.md"
+
+# SPDX identifiers that need no review. Anything else must be recorded in the
+# inventory's "Approved License Exceptions" table, which requires the operator's
+# explicit double confirmation (root AGENTS.md, "Licensing guardrails").
+ALLOWED_LICENSES = frozenset(
+    {
+        "0BSD",
+        "Apache-2.0",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "BlueOak-1.0.0",
+        "CC0-1.0",
+        "ISC",
+        "MIT",
+        "MIT-0",
+        "PSF-2.0",
+        "Unlicense",
+        "Zlib",
+    }
+)
+
+EXACT_VERSION = re.compile(
+    r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
+)
+MISSING_LICENSE = "<missing>"
 
 
 def read_text(path: Path) -> str:
@@ -186,18 +223,11 @@ def build_expected_node_section(
 
     expected: dict[str, dict[str, str]] = {}
     for field_name in ("dependencies", "devDependencies"):
-        for package_name, version in package_json.get(field_name, {}).items():
+        for package_name in package_json.get(field_name, {}):
             lock_entry = resolve_lock_entry(package_name)
             if lock_entry is None:
                 raise ValueError(
                     f"Direct dependency {package_name} is missing from {lockfile_path}"
-                )
-
-            lock_version = lock_entry.get("version")
-            if lock_version != version:
-                raise ValueError(
-                    f"Lockfile version mismatch for {package_name}: "
-                    f"package.json has {version}, lockfile has {lock_version}"
                 )
 
             license_name = lock_entry.get("license")
@@ -206,12 +236,122 @@ def build_expected_node_section(
                     f"Missing license metadata for {package_name} in {lockfile_path}"
                 )
 
-            expected[package_name] = {
-                "Version": version,
-                "License": license_name,
-            }
+            expected[package_name] = {"License": license_name}
 
     return expected
+
+
+def check_exact_pins(section_name: str, package_json_path: Path) -> list[str]:
+    """Direct dependencies are exact versions; `npm ci` keeps the lockfile in step."""
+    package_json = json.loads(read_text(package_json_path))
+    errors: list[str] = []
+    for field_name in ("dependencies", "devDependencies"):
+        for package_name, spec in package_json.get(field_name, {}).items():
+            if not EXACT_VERSION.match(spec):
+                errors.append(
+                    f"{section_name}: {package_name} is declared as '{spec}'; "
+                    "direct dependencies must be exact versions"
+                )
+    return errors
+
+
+def license_allowed(expression: str) -> bool:
+    """Evaluate a simple SPDX expression; anything not understood fails closed."""
+    expression = expression.strip()
+    if expression.startswith("(") and expression.endswith(")"):
+        inner = expression[1:-1]
+        if "(" not in inner and ")" not in inner:
+            expression = inner.strip()
+    if "(" in expression or ")" in expression:
+        return False
+    return any(
+        all(term.strip() in ALLOWED_LICENSES for term in alternative.split(" AND "))
+        for alternative in expression.split(" OR ")
+    )
+
+
+def find_exception(
+    exceptions: list[dict[str, str]], package_name: str, license_name: str
+) -> dict[str, str] | None:
+    return next(
+        (
+            row
+            for row in exceptions
+            if row["License"] == license_name
+            and fnmatch.fnmatchcase(package_name, row["Package"])
+        ),
+        None,
+    )
+
+
+def lockfile_package_name(key: str, entry: dict) -> str:
+    if "node_modules/" in key:
+        return key.rsplit("node_modules/", 1)[1]
+    return entry.get("name", key)
+
+
+def check_lockfile_licenses(
+    lockfile_path: Path,
+    exceptions: list[dict[str, str]],
+    used_exceptions: set[str],
+) -> list[str]:
+    """Every lockfile entry is on the allowlist or covered by an approved exception."""
+    lock_packages = json.loads(read_text(lockfile_path)).get("packages", {})
+    errors: list[str] = []
+    reported: set[tuple[str, str]] = set()
+
+    for key, entry in lock_packages.items():
+        if not key or entry.get("link"):
+            continue
+        name = lockfile_package_name(key, entry)
+        license_name = entry.get("license") or MISSING_LICENSE
+        if license_name != MISSING_LICENSE and license_allowed(license_name):
+            continue
+
+        exception = find_exception(exceptions, name, license_name)
+        if exception is None:
+            if (name, license_name) not in reported:
+                reported.add((name, license_name))
+                errors.append(
+                    f"package-lock.json: {name} is licensed {license_name}, which is not on "
+                    "the permissive allowlist; needs an operator-approved row under "
+                    "'Approved License Exceptions' in THIRD_PARTY_LICENSES.md"
+                )
+            continue
+
+        used_exceptions.add(exception["Package"])
+        is_dev = bool(entry.get("dev") or entry.get("devOptional"))
+        if exception["Scope"] == "dev" and not is_dev:
+            errors.append(
+                f"package-lock.json: {name} ({license_name}) is approved for dev use only "
+                "but is now a runtime dependency"
+            )
+
+    return errors
+
+
+def check_inventory_licenses(
+    section_name: str,
+    rows: dict[str, dict[str, str]],
+    exceptions: list[dict[str, str]],
+    used_exceptions: set[str],
+) -> list[str]:
+    """Hand-maintained rows (Python, Solidity) get the same allowlist treatment."""
+    errors: list[str] = []
+    for package_name, row in sorted(rows.items()):
+        license_name = row.get("License", "").strip()
+        if license_name and license_allowed(license_name):
+            continue
+        exception = find_exception(exceptions, package_name, license_name)
+        if exception is None or exception["Scope"] != "any":
+            errors.append(
+                f"{section_name}: {package_name} is licensed {license_name or '<blank>'}, "
+                "which is not on the permissive allowlist; needs an operator-approved "
+                "row with scope 'any' under 'Approved License Exceptions'"
+            )
+        else:
+            used_exceptions.add(exception["Package"])
+    return errors
 
 
 def assert_rows_match(
@@ -278,6 +418,10 @@ def validate_bens_node_metadata() -> list[str]:
 def main() -> int:
     inventory_lines = read_lines(INVENTORY_PATH)
     errors: list[str] = []
+    exceptions = parse_markdown_table_after_heading(
+        inventory_lines, "## Approved License Exceptions"
+    )
+    used_exceptions: set[str] = set()
 
     # All four npm packages are workspaces of the repo-root package.json,
     # so deps resolve against the single root lockfile. Each tuple is
@@ -320,10 +464,14 @@ def main() -> int:
                 section_name,
                 actual_rows,
                 expected_rows,
-                ("Version", "License"),
+                ("License",),
             )
         )
+        errors.extend(check_exact_pins(section_name, package_json_path))
 
+    errors.extend(
+        check_lockfile_licenses(root_lockfile, exceptions, used_exceptions)
+    )
     errors.extend(validate_bens_node_metadata())
 
     bens_requirements = parse_requirements(
@@ -350,38 +498,47 @@ def main() -> int:
             f"### `{section_name}`",
             parent_heading="## Direct Python Dependencies",
         )
-        expected_rows = {
-            package_name: {"Version": version}
-            for package_name, version in expected_versions.items()
-        }
+        expected_rows = {package_name: {} for package_name in expected_versions}
+        errors.extend(assert_rows_match(section_name, actual_rows, expected_rows, ()))
+        errors.extend(assert_non_empty_licenses(section_name, actual_rows))
         errors.extend(
-            assert_rows_match(
-                section_name,
-                actual_rows,
-                expected_rows,
-                ("Version",),
+            check_inventory_licenses(
+                section_name, actual_rows, exceptions, used_exceptions
             )
         )
-        errors.extend(assert_non_empty_licenses(section_name, actual_rows))
 
     solidity_rows = parse_simple_inventory_section(
         inventory_lines, "## Direct Solidity Dependencies"
     )
     expected_solidity_rows = {
-        package_name: {"Version": version}
-        for package_name, version in parse_foundry_dependencies(
+        package_name: {}
+        for package_name in parse_foundry_dependencies(
             REPO_ROOT / "contracts/foundry.toml"
-        ).items()
+        )
     }
     errors.extend(
         assert_rows_match(
-            "contracts/foundry.toml",
-            solidity_rows,
-            expected_solidity_rows,
-            ("Version",),
+            "contracts/foundry.toml", solidity_rows, expected_solidity_rows, ()
         )
     )
     errors.extend(assert_non_empty_licenses("contracts/foundry.toml", solidity_rows))
+    errors.extend(
+        check_inventory_licenses(
+            "contracts/foundry.toml", solidity_rows, exceptions, used_exceptions
+        )
+    )
+
+    for row in exceptions:
+        if row["Package"] not in used_exceptions:
+            errors.append(
+                f"Approved License Exceptions: {row['Package']} ({row['License']}) "
+                "matches nothing in the lockfile or inventory; remove the stale row"
+            )
+        if row["Scope"] not in ("dev", "any"):
+            errors.append(
+                f"Approved License Exceptions: {row['Package']} has scope "
+                f"'{row['Scope']}'; use 'dev' or 'any'"
+            )
 
     if errors:
         print("Third-party license inventory check failed:", file=sys.stderr)

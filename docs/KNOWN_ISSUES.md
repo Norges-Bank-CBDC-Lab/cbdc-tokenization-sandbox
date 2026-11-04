@@ -387,8 +387,9 @@
     peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
     keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
     8 peer-requires core 8, so the two bumps are coupled and must land together.
-  - The raw Dependabot PRs also fail the `validate-inventory` check because they
-    do not update `THIRD_PARTY_LICENSES.md`.
+  - The raw Dependabot PRs also failed the `validate-inventory` check, which then
+    compared versions in `THIRD_PARTY_LICENSES.md`; the inventory no longer lists
+    versions.
   - With the dual tree in place, a full `npm install` re-serialises
     `package-lock.json` by ~18k lines (only ~18 entries are genuinely new; the
     rest is npm reordering identical entries) — an unreviewable diff for a
@@ -397,8 +398,9 @@
   security advisory on Babel 7, or `@vitejs/plugin-react` moving to Babel 8 so
   the dual tree collapses). The work is: bump both in
   `services/nb-bond-api/package.json`, let npm build the dual tree, update the
-  `@babel/core` + `@babel/preset-env` rows in `THIRD_PARTY_LICENSES.md`, and
-  verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
+  `@babel/core` + `@babel/preset-env` licenses in `THIRD_PARTY_LICENSES.md` if
+  they changed, and verify both `nb-bond-api` and `nb-ui` build. The Dependabot
+  PRs were closed
   (not merged) with this rationale.
 
 ## Every bond holder must be on the WNOK allowlist or the whole coupon payment reverts
