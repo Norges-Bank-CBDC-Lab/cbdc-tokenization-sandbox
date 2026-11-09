@@ -37,7 +37,7 @@ blockscout:
   # tag by ./sandbox.sh build-images and served from the local kind registry —
   # run build-images once on a fresh machine or after registry-reset.
   # See docs/KNOWN_ISSUES.md.
-  backend: ghcr.io/blockscout/blockscout:v12.0.3
+  backend: ghcr.io/blockscout/blockscout:v12.0.4
   frontend: ghcr.io/blockscout/frontend:v2.12.1
   db: postgres:18.6
   bens: python:3.14.10
