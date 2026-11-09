@@ -44,7 +44,7 @@ blockscout:
     pullPolicy: IfNotPresent
     # Fallback pin for direct Helm usage. Sandbox scripts use common/images.yaml.
     repository: ghcr.io/blockscout/blockscout
-    tag: "v12.0.3"
+    tag: "v12.0.4"
   ## Init container configuration (used to run DB migrations)
   ##
   init:

@@ -2,10 +2,19 @@
 
 ## Root `overrides` security pins go stale silently
 - The root `package.json` `overrides` block pins transitive packages
-  (currently `ws`, `undici`, `js-yaml`, `qs`, and two scoped
-  `brace-expansion` pins) as security floors. Nothing in CI flags when a newer patched
+  (currently `ws`, `undici`, `js-yaml`, `qs`, `minimatch`, and `glob`, plus a
+  scoped `minimatch` hold-back for `eslint-plugin-react`) as security floors.
+  Nothing in CI flags when a newer patched
   version supersedes a pin, so the floors themselves become the reason
   Dependabot alerts stay open.
+- `eslint-plugin-react` (nb-ui) is held on `minimatch` 3.1.5 and `brace-expansion`
+  1.1.21 by a scoped override. Its newest release (7.37.5) calls `minimatch(...)` as a
+  function, which `minimatch` 11 no longer exports, so five of its rules would
+  throw on the forced version. `npm audit` therefore keeps reporting the 3.1.5 copy
+  (GHSA-g3hv-75wg-m249) until `eslint-plugin-react` ships a release that takes
+  `minimatch` 11; then delete the scoped override and re-resolve. The `deepmerge`
+  advisory (GHSA-gcqx-w48m-w2h4, via `jest-config`) also has no upstream fix. The
+  plan is `docs/plans/archive/npm-audit-minimatch-glob-2026-11/`.
 - Treat every Dependabot alert against an overridden package as an
   override-bump task: update the pin in the `overrides` block and
   regenerate the affected lockfile entries via a scratch full-resolve
@@ -33,14 +42,14 @@
 | Image (repository:tag) | Component | Distrusted roots present | Trust store source | Outbound TLS relevance | Upstream fix | Status | Last checked | Origin |
 |---|---|---|---|---|---|---|---|---|
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (needs a node image built on the fixed Debian ca-certificates) | open | 2026-10-28, bundle read in image | sandbox |
-| `ghcr.io/blockscout/smart-contract-verifier:v1.11.1` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.1, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1) | fixed (adopted v0.13.0, 2026-10-29) | 2026-10-29, bundle read in image | sandbox |
-| `ghcr.io/blockscout/blockscout:v12.0.3` | Explorer backend | emSign ECC Root CA - G3 | app bundle: castore 1.0.21 and certifi 2.17.0; Alpine ca-certificates 20260909-r0 | yes: token metadata fetches can leave the cluster (market data is disabled) | none yet (v12.0.3 is the newest release; needs castore ≥ 1.0.22, certifi ≥ 2.18.0 and Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
-| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend | emSign ECC Root CA - G3 (Node built-in roots only; the Alpine ca-certificates-bundle 20261020-r0 is clean) | app bundle: Node 24.21.0 built-in roots | no: in-cluster backend only | none yet (v2.12.1 is the newest v2.12 patch; needs Node ≥ 24.22.1) | open | 2026-10-28, bundle and Node roots read in image | sandbox |
+| `ghcr.io/blockscout/smart-contract-verifier:v1.11.2` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.2, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1); v1.11.2 (published 2026-11-09) keeps the clean bundle | fixed (adopted v0.13.0, 2026-10-29) | 2026-11-09, bundle read in image | sandbox |
+| `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend | emSign ECC Root CA - G3 (certifi 2.17.0 and the Alpine bundle; castore 1.0.22 is clean) | app bundle: castore 1.0.22 and certifi 2.17.0; Alpine ca-certificates 20260909-r0 | yes: token metadata fetches can leave the cluster (market data is disabled) | none yet (v12.0.4 moves castore to 1.0.22; needs certifi ≥ 2.18.0 and Alpine ca-certificates 20261020-r0) | open | 2026-11-09, bundle read in image | sandbox |
+| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (Node built-in roots only; the Alpine ca-certificates-bundle 20261020-r0 is clean) | app bundle: Node 24.21.0 built-in roots | no: in-cluster backend only | none yet (v2.12.1 is the newest v2.12 patch; needs Node ≥ 24.22.1) | open | 2026-11-03, bundle and Node roots read in the rebuilt image | sandbox |
 | NGINX Gateway Fabric `2.8.0` (control plane and nginx data plane) | Gateway controller and proxy | AAA Certificate Services (distroless Debian bundle); Alpine 20260909-r0 bundle not separately read | Distroless Debian bundle with Go 1.27.2; Alpine ca-certificates 20260909-r0 | no: Kubernetes API and in-cluster upstreams only | none yet (needs a release on Go ≥ 1.27.3 and Alpine ca-certificates 20261020-r0) | open | 2026-10-22, carried over (image not in the local cache) | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (needs a tag rebuilt on Alpine ca-certificates 20261020-r0) | open | 2026-10-28, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI | not checked | not checked | yes: downloads `solc` | none yet | open | not checked | sandbox |
 | `busybox:1.38.0` | Blockscout migration init container (waits for Postgres with `nc -z`) | none | no CA store in the image (no `/etc/ssl`; the 1.37.0 image had none either) | no: inbound only (port probe, no TLS) | not affected (no CA store) | fixed (adopted v0.13.0, 2026-10-29) | 2026-10-29, image filesystem read | sandbox |
-| `hyperledger/besu:26.10.2` | Chain nodes | none | JDK cacerts (Temurin 25.0.3) on Ubuntu 24.04; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 | fixed (adopted v0.11.0, 2026-10-27) | 2026-10-28, keytool listing of cacerts in image | sandbox |
+| `hyperledger/besu:26.11.0` | Chain nodes | none | JDK cacerts (Temurin 25.0.3, 142 certificates) on Ubuntu 24.04.5; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.0, 2026-11-03) | 2026-11-03, keytool listing of cacerts in image | sandbox |
 | `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
 | `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
 | `node:26.12.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle and Node roots read in image | sandbox |
@@ -289,6 +298,20 @@
 - Consequence for any non-local reuse of this stack: that deployment must
   build the two Blockscout images itself (for its own target CPU platform)
   and host them in its own registry.
+- The frontend tag `v2.12.1` locks Next.js 16.3.5, which is affected by the
+  Next.js advisories fixed in 16.3.6 to 16.4.1 (among them
+  [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) and
+  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)).
+  `services/blockscout/build-images.sh` therefore adds one step to upstream's
+  Dockerfile after its frozen install, `pnpm add -w next@16.4.3 --save-exact`,
+  and stops if that install line is not found. The version is kept at least a
+  week old, because upstream's pnpm config sets `minimumReleaseAge` to one
+  week. Remove the step once a frontend release tag locks Next.js 16.4.1 or
+  later.
+- `build-images` rebuilds under the same tag, and the registry push is skipped
+  when the `-kind` tag is already present, so a sandbox that already holds the
+  frontend image keeps the old build until its registry copy is replaced (for
+  example after `./sandbox.sh registry-reset`).
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
 
@@ -364,8 +387,9 @@
     peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
     keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
     8 peer-requires core 8, so the two bumps are coupled and must land together.
-  - The raw Dependabot PRs also fail the `validate-inventory` check because they
-    do not update `THIRD_PARTY_LICENSES.md`.
+  - The raw Dependabot PRs also failed the `validate-inventory` check, which then
+    compared versions in `THIRD_PARTY_LICENSES.md`; the inventory no longer lists
+    versions.
   - With the dual tree in place, a full `npm install` re-serialises
     `package-lock.json` by ~18k lines (only ~18 entries are genuinely new; the
     rest is npm reordering identical entries) — an unreviewable diff for a
@@ -374,8 +398,9 @@
   security advisory on Babel 7, or `@vitejs/plugin-react` moving to Babel 8 so
   the dual tree collapses). The work is: bump both in
   `services/nb-bond-api/package.json`, let npm build the dual tree, update the
-  `@babel/core` + `@babel/preset-env` rows in `THIRD_PARTY_LICENSES.md`, and
-  verify both `nb-bond-api` and `nb-ui` build. The Dependabot PRs were closed
+  `@babel/core` + `@babel/preset-env` licenses in `THIRD_PARTY_LICENSES.md` if
+  they changed, and verify both `nb-bond-api` and `nb-ui` build. The Dependabot
+  PRs were closed
   (not merged) with this rationale.
 
 ## Every bond holder must be on the WNOK allowlist or the whole coupon payment reverts

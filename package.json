@@ -15,11 +15,13 @@
     "undici": "8.12.3",
     "js-yaml": "4.3.2",
     "qs": "6.17.0",
-    "minimatch@3.1.5": {
-      "brace-expansion": "1.1.21"
-    },
-    "minimatch@10.2.5": {
-      "brace-expansion": "5.0.12"
+    "minimatch": "11.0.4",
+    "glob": "14.0.3",
+    "eslint-plugin-react": {
+      "minimatch": {
+        ".": "3.1.5",
+        "brace-expansion": "1.1.21"
+      }
     }
   }
 }

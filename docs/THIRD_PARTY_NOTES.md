@@ -35,14 +35,14 @@ metadata change.
 This source repository does not relicense software that is only referenced or
 pulled at build/deploy time. Current examples include:
 
-- Hyperledger Besu 26.10.2 (Apache-2.0), pinned in `common/images.yaml`
+- Hyperledger Besu 26.11.0 (Apache-2.0), pinned in `common/images.yaml`
 - NGINX Gateway Fabric
 - Docker Distribution Registry
 - Node.js runtime images
 - Python runtime images
 - PostgreSQL images
 - Blockscout charts and images, including the GPL-3.0 smart-contract-verifier
-  v1.11.1 image explicitly enabled for source verification
+  v1.11.2 image explicitly enabled for source verification
 - Alpine's `ffmpeg` package (GPL-2.0-or-later AND LGPL-2.1-or-later), which
   the upstream Dockerfile installs into the Blockscout backend image from
   v12 on. `./sandbox.sh build-images` builds that image locally and runs it
