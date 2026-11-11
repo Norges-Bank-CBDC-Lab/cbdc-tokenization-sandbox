@@ -1149,7 +1149,7 @@ function getBlockscoutChartVersion() {
 }
 
 function getNginxGatewayFabricVersion() {
-    getVersionValue "charts.nginx_gateway_fabric" "2.8.0"
+    getVersionValue "charts.nginx_gateway_fabric" "2.8.1"
 }
 
 function getBlockscoutDbImage() {
