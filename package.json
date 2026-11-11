@@ -10,6 +10,9 @@
     "scripts/bid-encryption",
     "scripts/bid-submitter"
   ],
+  "devDependencies": {
+    "@babel/core": "8.1.0"
+  },
   "overrides": {
     "ws": "8.21.0",
     "undici": "8.12.3",
