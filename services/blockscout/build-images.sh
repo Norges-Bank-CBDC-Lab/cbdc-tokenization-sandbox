@@ -51,6 +51,22 @@ echo "🔧 Building Blockscout backend ($backend_tag)"
 git clone --depth 1 --branch "$backend_tag" https://github.com/blockscout/blockscout.git "$backend_tmp"
 backend_release_version="${backend_tag#v}"
 
+# Upstream's runtime stage installs its packages without upgrading the ones the
+# hexpm base image already carries, which leaves an Alpine ca-certificates
+# bundle older than the one Alpine 3.22 now publishes. Upgrade the two CA
+# packages in the same install step. See docs/KNOWN_ISSUES.md.
+backend_apk_text="add jq curl ffmpeg"
+backend_dockerfile="$backend_tmp/docker/Dockerfile"
+
+if [[ "$(grep -cF -- "$backend_apk_text" "$backend_dockerfile")" != "1" ]]; then
+    echo "❌ Expected exactly one '$backend_apk_text' in the upstream backend Dockerfile ($backend_tag); review the CA package upgrade in $(basename "$0")"
+    exit 1
+fi
+
+sed "s|$backend_apk_text|add --upgrade jq curl ffmpeg ca-certificates ca-certificates-bundle|" "$backend_dockerfile" > "$backend_dockerfile.patched"
+mv "$backend_dockerfile.patched" "$backend_dockerfile"
+echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
+
 docker build \
     --platform "$platform" \
     -f "$backend_tmp/docker/Dockerfile" \
@@ -72,9 +88,19 @@ frontend_sha=$(git -C "$frontend_tmp" rev-parse HEAD)
 frontend_next_version="16.4.3"
 frontend_install_line="RUN pnpm install --frozen-lockfile"
 frontend_dockerfile="$frontend_tmp/Dockerfile"
+# Upstream's Node base (24.21.0) still ships the distrusted eMudhra root in its
+# built-in list; 24.22.1 and later removed it. Move every stage to a newer
+# Node 24 Alpine image. See docs/KNOWN_ISSUES.md.
+frontend_node_from="node:24.21.0-alpine"
+frontend_node_to="node:24.22.2-alpine"
 
 if [[ "$(grep -cxF "$frontend_install_line" "$frontend_dockerfile")" != "1" ]]; then
     echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the Next.js pin in $(basename "$0")"
+    exit 1
+fi
+
+if [[ "$(grep -cF -- "$frontend_node_from" "$frontend_dockerfile")" != "2" ]]; then
+    echo "❌ Expected exactly two '$frontend_node_from' stages in the upstream frontend Dockerfile ($frontend_tag); review the Node base in $(basename "$0")"
     exit 1
 fi
 
@@ -84,6 +110,10 @@ awk -v install_line="$frontend_install_line" -v next_version="$frontend_next_ver
 ' "$frontend_dockerfile" > "$frontend_dockerfile.patched"
 mv "$frontend_dockerfile.patched" "$frontend_dockerfile"
 echo "🔧 Pinned Next.js $frontend_next_version in the frontend deps stage"
+
+sed "s|$frontend_node_from|$frontend_node_to|g" "$frontend_dockerfile" > "$frontend_dockerfile.patched"
+mv "$frontend_dockerfile.patched" "$frontend_dockerfile"
+echo "🔧 Moved the frontend stages to $frontend_node_to"
 
 docker build \
     --platform "$platform" \
