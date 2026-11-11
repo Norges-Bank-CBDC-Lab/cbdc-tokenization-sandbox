@@ -67,6 +67,41 @@ sed "s|$backend_apk_text|add --upgrade jq curl ffmpeg ca-certificates ca-certifi
 mv "$backend_dockerfile.patched" "$backend_dockerfile"
 echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 
+# Upstream's lockfile resolves certifi 2.17.0, whose bundled root list still
+# carries the distrusted eMudhra root, and hackney 4.8.5 pins certifi to
+# ~> 2.17.0. Re-resolve hackney and certifi in the deps stage; hackney's own
+# dependencies move with them. The step then asserts the resulting lock
+# entries, so the build fails if a newer release changes what gets resolved.
+# See docs/KNOWN_ISSUES.md.
+backend_hex_line="RUN mix local.hex --force"
+backend_hackney_update="RUN mix deps.update hackney certifi"
+backend_expected_locks=(
+    '"certifi": {:hex, :certifi, "2.18.0"'
+    '"h2": {:hex, :h2, "0.15.1"'
+    '"hackney": {:hex, :hackney, "4.10.2"'
+    '"quic": {:hex, :quic, "2.6.1"'
+    '"ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9"'
+    '"webtransport": {:hex, :webtransport, "0.5.5"'
+)
+
+if [[ "$(grep -cxF "$backend_hex_line" "$backend_dockerfile")" != "1" ]]; then
+    echo "❌ Expected exactly one '$backend_hex_line' line in the upstream backend Dockerfile ($backend_tag); review the hackney/certifi update in $(basename "$0")"
+    exit 1
+fi
+
+backend_lock_checks=""
+for lock_entry in "${backend_expected_locks[@]}"; do
+    backend_lock_checks="$backend_lock_checks && grep -qF '$lock_entry' mix.lock"
+done
+backend_lock_message="hackney/certifi re-resolve did not produce the expected mix.lock entries; review the update in build-images.sh"
+
+awk -v hex_line="$backend_hex_line" -v update_line="$backend_hackney_update" -v checks="$backend_lock_checks" -v message="$backend_lock_message" '
+    { print }
+    $0 == hex_line { print update_line " " checks " || { echo \"" message "\" >&2; exit 1; }" }
+' "$backend_dockerfile" > "$backend_dockerfile.patched"
+mv "$backend_dockerfile.patched" "$backend_dockerfile"
+echo "🔧 Re-resolving hackney and certifi in the backend deps stage"
+
 docker build \
     --platform "$platform" \
     -f "$backend_tmp/docker/Dockerfile" \

@@ -43,7 +43,7 @@
 |---|---|---|---|---|---|---|---|---|
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (v1.36.4 is still the newest 1.36 node image, the pinned digest is unchanged, and Kind v0.33.0 is the newest Kind release; needs a node image built on the fixed Debian ca-certificates) | open | 2026-11-11, bundle read in image | sandbox |
 | `ghcr.io/blockscout/smart-contract-verifier:v1.11.2` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.2, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1); v1.11.2 (published 2026-11-09) keeps the clean bundle | fixed (adopted v0.13.0, 2026-10-29) | 2026-11-09, bundle read in image | sandbox |
-| `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages) | emSign ECC Root CA - G3 (certifi 2.17.0 only; castore 1.0.22 and the upgraded Alpine bundle are clean) | app bundle: castore 1.0.22 and certifi 2.17.0; Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none yet in a release (certifi 2.18.0 needs hackney ≥ 4.8.6, but v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; a build with `mix deps.update hackney certifi` produced hackney 4.10.2 and certifi 2.18.0 with clean bundles, but its runtime behaviour is untested) | open | 2026-11-11, bundle read in image built with the new step | sandbox |
+| `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages and re-resolves hackney and certifi) | none (castore 1.0.22, certifi 2.18.0 and the Alpine bundle hold 118 certificates each; the only emSign root left is "emSign Root CA - G1", which is not distrusted) | app bundle: castore 1.0.22 and certifi 2.18.0 (hackney 4.10.2); Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none upstream: v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; certifi 2.18.0 needs hackney 4.8.6 or later, so `build-images.sh` runs `mix deps.update hackney certifi` | fixed (adopted on development, 2026-11-11) | 2026-11-11, all three stores read in the running pod by openssl and certificate DER match | sandbox |
 | `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5, on Node 24.22.2; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.2 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-11, bundle, Node roots and every `.node` binary read in the running image (public-key and DER match for the SWC binary) | sandbox |
 | NGINX Gateway Fabric `2.8.1` (control plane and nginx data plane) | Gateway controller and proxy | none | Distroless Debian bundle (148 certificates) with Go 1.27.3; Alpine ca-certificates 20261020-r0 (nginx image, 118 certificates) | no: Kubernetes API and in-cluster upstreams only | v2.8.1 (published 2026-11-03; v2.8.0 held "AAA Certificate Services" in the control plane and "emSign ECC Root CA - G3" in the nginx image) | fixed (adopted v0.14.1, 2026-11-11) | 2026-11-11, bundle read in both images | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
@@ -315,18 +315,23 @@
   and by full certificate DER in `@next/swc-linux-arm64-musl` 16.4.3 and 16.4.6). It
   is not loaded by the running server or the startup sitemap tool, so the row stays
   `open` until a Next.js release drops the root.
-- `build-images.sh` also patches two trust-store inputs in the cloned Dockerfiles
+- `build-images.sh` also patches three trust-store inputs in the cloned Dockerfiles
   and stops if their text is not found exactly as expected: the backend's
   runtime stage installs with `apk add --upgrade ... ca-certificates
   ca-certificates-bundle`, so the Alpine bundle matches what Alpine 3.22
-  publishes (the hexpm base image carries an older one), and every frontend stage
+  publishes (the hexpm base image carries an older one); the backend's deps
+  stage runs `mix deps.update hackney certifi` and then asserts the resulting
+  `mix.lock` entries (hackney 4.10.2, certifi 2.18.0, h2 0.15.1, quic 2.6.1,
+  ssl_verify_fun 1.1.9, webtransport 0.5.5), so the build stops if a newer
+  release resolves differently; and every frontend stage
   moves from `node:24.21.0-alpine` to `node:24.22.2-alpine`, whose built-in root
-  list no longer holds "emSign ECC Root CA - G3". Both steps need network access
+  list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
-  once upstream's base image carries the newer bundle or Node release.
+  once upstream's base image carries the newer bundle or Node release, or its
+  lockfile resolves hackney 4.8.6 or later.
 - `build-images` rebuilds under the same tag, and the registry push is skipped
   when the `-kind` tag is already present, so a sandbox that already holds the
-  frontend image keeps the old build until its registry copy is replaced (for
+  backend or frontend image keeps the old build until its registry copy is replaced (for
   example after `./sandbox.sh registry-reset`).
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
