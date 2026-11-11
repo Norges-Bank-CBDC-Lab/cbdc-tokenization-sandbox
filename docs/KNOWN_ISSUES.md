@@ -395,34 +395,23 @@
   the next start. This is preferred over enabling registry delete + GC for a
   disposable local registry.
 
-## Babel 8 (`@babel/core`, `@babel/preset-env`) upgrade deferred
-- Dependabot proposed bumping `@babel/core` 7.29.7 → 8.0.1 and
-  `@babel/preset-env` 7.29.5 → 8.0.2 — `nb-bond-api` dev dependencies used only
-  by `babel-jest` to transform `.js` / `.mjs` test inputs (including the ESM
-  `@noble/secp256k1`). The bump is **functionally fine** (under Babel 8 the
-  `nb-bond-api` suite stays green: jest, lint, build), but it was held.
-- Why deferred — a correct upgrade is more than a version bump:
-  - Babel 8 requires Node `^22.18.0 || >=24.11.0`. That is satisfied (the repo
-    pins Node 26 via `common/node-version.env`), but `@babel/core` 8 hoisted to
-    the workspace root breaks `nb-ui`'s `@vitejs/plugin-react`, which
-    peer-requires `@babel/core ^7`. A correct upgrade needs a **dual tree** —
-    keep core 7 for `nb-ui`, pin core 8 for `nb-bond-api`. `@babel/preset-env`
-    8 peer-requires core 8, so the two bumps are coupled and must land together.
-  - The raw Dependabot PRs also failed the `validate-inventory` check, which then
-    compared versions in `THIRD_PARTY_LICENSES.md`; the inventory no longer lists
-    versions.
-  - With the dual tree in place, a full `npm install` re-serialises
-    `package-lock.json` by ~18k lines (only ~18 entries are genuinely new; the
-    rest is npm reordering identical entries) — an unreviewable diff for a
-    dev-only transform dependency.
-- Planned follow-up: revisit deliberately if there is a concrete reason (a
-  security advisory on Babel 7, or `@vitejs/plugin-react` moving to Babel 8 so
-  the dual tree collapses). The work is: bump both in
-  `services/nb-bond-api/package.json`, let npm build the dual tree, update the
-  `@babel/core` + `@babel/preset-env` licenses in `THIRD_PARTY_LICENSES.md` if
-  they changed, and verify both `nb-bond-api` and `nb-ui` build. The Dependabot
-  PRs were closed
-  (not merged) with this rationale.
+## Babel 8 for `nb-bond-api` runs beside Babel 7 inside jest and ESLint
+- `nb-bond-api` runs `@babel/core` 8 and `@babel/preset-env` 8 through
+  `babel-jest` (dev only: it transforms the compiled `.js` / `.mjs` test inputs,
+  including the ESM `@noble/secp256k1`). Babel 8 needs Node `^22.18.0 || >=24.11.0`,
+  which the Node 26 pin in `common/node-version.env` satisfies. The two packages
+  are coupled: `@babel/preset-env` 8 peer-requires core 8.
+- The root `package.json` pins `@babel/core` 8.1.0 as a dev dependency on purpose.
+  Without it npm hoists jest's own `@babel/core` 7 to the root, `babel-jest`
+  resolves that copy, and the Babel 8 preset would load under core 7. With it,
+  `babel-jest` and the workspace share the root core 8. An `overrides` entry on
+  `babel-jest` does not work: it cascades into `@jest/transform`, which would then
+  run on core 8 without being supported there.
+- Jest 30's internals (`@jest/transform`, `jest-config`, `jest-snapshot`,
+  `istanbul-lib-instrument`) and `eslint-plugin-react-hooks` depend on
+  `@babel/core` 7 directly, so each keeps a nested Babel 7 copy. That is the
+  expected duplicate tree, and `npm ls` reports it clean. It collapses when those
+  packages support Babel 8; then the root dev dependency can go.
 
 ## Every bond holder must be on the WNOK allowlist or the whole coupon payment reverts
 - `BondManager.payCoupon` settles every holder in one transaction and does not
