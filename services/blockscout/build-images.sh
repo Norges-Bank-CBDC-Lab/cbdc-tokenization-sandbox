@@ -69,23 +69,33 @@ echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 
 # Upstream's lockfile resolves certifi 2.17.0, whose bundled root list still
 # carries the distrusted eMudhra root, and hackney 4.8.5 pins certifi to
-# ~> 2.17.0. Re-resolve hackney and certifi in the deps stage; hackney's own
-# dependencies move with them. The step then asserts the resulting lock
-# entries, so the build fails if a newer release changes what gets resolved.
+# ~> 2.17.0. It also locks cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12, which
+# have published advisories fixed in cowboy 2.21.0, cowlib 2.22.0 and jose
+# 1.11.13 (minor releases inside upstream's own version constraints).
+# Re-resolve those five packages in the deps stage (jose is only a transitive
+# dependency, so mix can update it only after the dependencies are fetched,
+# hence the preceding `mix deps.get`); hackney's own dependencies move with it.
+# The step then asserts the resulting lock entries and that no other package
+# changed, so the build fails if a newer release changes what gets resolved.
 # See docs/KNOWN_ISSUES.md.
 backend_hex_line="RUN mix local.hex --force"
-backend_hackney_update="RUN mix deps.update hackney certifi"
+backend_update_line="RUN cp mix.lock /tmp/mix.lock.upstream && mix deps.get && mix deps.update hackney certifi cowboy cowlib jose"
 backend_expected_locks=(
     '"certifi": {:hex, :certifi, "2.18.0"'
+    '"cowboy": {:hex, :cowboy, "2.21.0"'
+    '"cowlib": {:hex, :cowlib, "2.22.0"'
     '"h2": {:hex, :h2, "0.15.1"'
     '"hackney": {:hex, :hackney, "4.10.2"'
+    '"jose": {:hex, :jose, "1.11.13"'
     '"quic": {:hex, :quic, "2.6.1"'
     '"ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9"'
     '"webtransport": {:hex, :webtransport, "0.5.5"'
 )
+# Every package whose lock line the step may add, change or remove.
+backend_expected_changed="certifi cowboy cowlib h2 hackney jose quic ssl_verify_fun webtransport"
 
 if [[ "$(grep -cxF "$backend_hex_line" "$backend_dockerfile")" != "1" ]]; then
-    echo "❌ Expected exactly one '$backend_hex_line' line in the upstream backend Dockerfile ($backend_tag); review the hackney/certifi update in $(basename "$0")"
+    echo "❌ Expected exactly one '$backend_hex_line' line in the upstream backend Dockerfile ($backend_tag); review the dependency re-resolve in $(basename "$0")"
     exit 1
 fi
 
@@ -93,14 +103,15 @@ backend_lock_checks=""
 for lock_entry in "${backend_expected_locks[@]}"; do
     backend_lock_checks="$backend_lock_checks && grep -qF '$lock_entry' mix.lock"
 done
-backend_lock_message="hackney/certifi re-resolve did not produce the expected mix.lock entries; review the update in build-images.sh"
+backend_lock_checks="$backend_lock_checks && test \"\$(diff -u /tmp/mix.lock.upstream mix.lock | grep '^[-+] ' | cut -d'\"' -f2 | sort -u | tr '\\n' ' ' | sed 's/ \$//')\" = '$backend_expected_changed'"
+backend_lock_message="dependency re-resolve did not produce the expected mix.lock changes; review the update in build-images.sh"
 
-awk -v hex_line="$backend_hex_line" -v update_line="$backend_hackney_update" -v checks="$backend_lock_checks" -v message="$backend_lock_message" '
+BACKEND_UPDATE_LINE="$backend_update_line" BACKEND_LOCK_CHECKS="$backend_lock_checks" BACKEND_LOCK_MESSAGE="$backend_lock_message" BACKEND_HEX_LINE="$backend_hex_line" awk '
     { print }
-    $0 == hex_line { print update_line " " checks " || { echo \"" message "\" >&2; exit 1; }" }
+    $0 == ENVIRON["BACKEND_HEX_LINE"] { print ENVIRON["BACKEND_UPDATE_LINE"] ENVIRON["BACKEND_LOCK_CHECKS"] " || { echo \"" ENVIRON["BACKEND_LOCK_MESSAGE"] "\" >&2; exit 1; }" }
 ' "$backend_dockerfile" > "$backend_dockerfile.patched"
 mv "$backend_dockerfile.patched" "$backend_dockerfile"
-echo "🔧 Re-resolving hackney and certifi in the backend deps stage"
+echo "🔧 Re-resolving hackney, certifi, cowboy, cowlib and jose in the backend deps stage"
 
 docker build \
     --platform "$platform" \
@@ -109,6 +120,17 @@ docker build \
     --build-arg BLOCKSCOUT_VERSION="$backend_tag" \
     --build-arg RELEASE_VERSION="$backend_release_version" \
     "$backend_tmp"
+
+# List the advisories that remain in the resolved backend lock. This is
+# informational only: it reuses the cached deps stage, needs network access to
+# fetch Hex's advisory data, and never fails the build.
+echo "🔎 Remaining Hex advisories in the backend lock (informational)"
+if backend_deps_image=$(docker build -q --platform "$platform" --target builder-deps -f "$backend_tmp/docker/Dockerfile" "$backend_tmp"); then
+    docker run --rm "$backend_deps_image" mix hex.audit || echo "ℹ️  Advisories were reported above, or the audit could not run; the build continues"
+    docker rmi "$backend_deps_image" >/dev/null 2>&1 || true
+else
+    echo "ℹ️  Could not build the deps stage for the advisory listing; skipping"
+fi
 
 echo "🔧 Building Blockscout frontend ($frontend_tag)"
 
