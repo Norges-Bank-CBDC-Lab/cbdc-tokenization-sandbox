@@ -320,15 +320,38 @@
   runtime stage installs with `apk add --upgrade ... ca-certificates
   ca-certificates-bundle`, so the Alpine bundle matches what Alpine 3.22
   publishes (the hexpm base image carries an older one); the backend's deps
-  stage runs `mix deps.update hackney certifi` and then asserts the resulting
-  `mix.lock` entries (hackney 4.10.2, certifi 2.18.0, h2 0.15.1, quic 2.6.1,
-  ssl_verify_fun 1.1.9, webtransport 0.5.5), so the build stops if a newer
-  release resolves differently; and every frontend stage
+  stage runs `mix deps.update hackney certifi cowboy cowlib jose` and then
+  asserts the resulting `mix.lock` entries (hackney 4.10.2, certifi 2.18.0,
+  cowboy 2.21.0, cowlib 2.22.0, jose 1.11.13, h2 0.15.1, quic 2.6.1,
+  ssl_verify_fun 1.1.9, webtransport 0.5.5) and that no other package's lock
+  line changed, so the build stops if a newer release resolves differently; and every frontend stage
   moves from `node:24.21.0-alpine` to `node:24.22.2-alpine`, whose built-in root
   list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
   once upstream's base image carries the newer bundle or Node release, or its
-  lockfile resolves hackney 4.8.6 or later.
+  lockfile resolves hackney 4.8.6 or later and cowboy 2.21.0, cowlib 2.22.0 and
+  jose 1.11.13 or later.
+- The backend lockfile also carries Hex package advisories. The re-resolve above
+  clears eleven of them (cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12 are the
+  affected versions it replaces, all inside upstream's own version
+  constraints). After `build-images.sh` builds the backend it lists what is
+  left with `mix hex.audit`; the listing is informational and never fails the
+  build. What remains for v12.0.4:
+  - Waiting on upstream: ecto 3.13.6 (high; fixed in 3.14.3, which needs
+    decimal 3, while upstream constrains decimal to `~> 2.0` and its `number`
+    dependency allows only decimal 1 or 2), decimal 2.4.1 (two medium; fixed in
+    3.x), plug_crypto 1.2.5 (medium; fixed in 2.2.1, which needs a newer Phoenix
+    than upstream's exact 1.6.17 pin), and phoenix_html 4.2.1 (medium; upstream's
+    development branch already locks 4.4.0, so the next release should carry it).
+  - No fixed version exists: cloak 1.1.4 (high) and cloak_ecto 1.3.0 (medium).
+    Only the explorer's account features use them, and the sandbox does not
+    configure those.
+  - Reported but not in the release image: brotli 0.3.2 (high).
+
+  Dependabot and the repository scans do not see these, because upstream's
+  `mix.lock` is cloned at build time and is not in this repository. Re-check the
+  list when the Blockscout pin moves, and drop a package from the re-resolve
+  once upstream's lockfile reaches the fixed version.
 - `build-images` rebuilds under the same tag, and the registry push is skipped
   when the `-kind` tag is already present, so a sandbox that already holds the
   backend or frontend image keeps the old build until its registry copy is replaced (for
