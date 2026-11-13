@@ -683,6 +683,22 @@ function requireBlockscoutSourceImage() {
     echo "$pull_ref"
 }
 
+# Fail early, before anything is created or deployed, when the registry does
+# not hold the source-built Blockscout images for the current recipe. Used at
+# the top of `start`: the deploy step checks again, but by then the cluster and
+# the other services would already have been touched. A registry that is up
+# but not answering is reported as that, rather than as missing images, so a
+# registry that is merely starting does not send anyone into a rebuild.
+function requireBlockscoutSourceImages() {
+    if ! curl -fsS -o /dev/null --max-time 5 "${KIND_REGISTRY_ENDPOINT}/v2/" 2>/dev/null; then
+        echo "❌ The local registry at ${KIND_REGISTRY_ENDPOINT#http://} is not answering." >&2
+        echo "   Check the '${KIND_REGISTRY_NAME}' container (docker logs ${KIND_REGISTRY_NAME}), then start again." >&2
+        return 1
+    fi
+    requireBlockscoutSourceImage "$(getBlockscoutFrontendImage)" >/dev/null || return 1
+    requireBlockscoutSourceImage "$(getBlockscoutBackendImage)" >/dev/null || return 1
+}
+
 function pushRegistryTag() {
     registry_image=$1
     docker push --quiet "$registry_image" >/dev/null

@@ -291,8 +291,8 @@
   both images from source, and pushes them to the local kind registry under a
   content-hash tag (`<tag>-<hash>`; the hash covers `build-images.sh` and the
   pinned refs, as nb-ui, nb-bond-api and bens-microservice do). `./sandbox.sh
-  start` deploys exactly that tag and stops with the command to run if the
-  registry does not hold it.
+  start` deploys exactly that tag and, if the registry does not hold it, stops
+  with the command to run before it creates or changes anything.
 - On a fresh machine, after `./sandbox.sh registry-reset`, and after upgrading
   to a release that changes the Blockscout build, run
   `./sandbox.sh build-images` before `./sandbox.sh start`. Because the tag

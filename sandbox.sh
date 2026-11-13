@@ -167,10 +167,17 @@ if [ "$CMD" == "start" ]; then
         requireNBBondApiHelmValues
     fi
 
+    requireKindRegistry
+
+    # The Blockscout backend and frontend are built from source: stop before
+    # anything is created or changed if `build-images` has not run for this
+    # recipe yet (the deploy step keeps its own check as a safety net).
+    if [ "$DEPLOY_BLOCKSCOUT" == "true" ]; then
+        requireBlockscoutSourceImages || exit 1
+    fi
+
     ensureLocalhostHostEntries
     deployedSomething="false"
-
-    requireKindRegistry
 
     # resume a sandbox that `stop` left with its node container stopped
     if [[ $(clusterExists) == "true" ]]; then
