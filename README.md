@@ -133,8 +133,12 @@ pulls and pushes any missing images into this registry on demand via
 `loadImageToKind`.
 
 Current Blockscout backend/frontend release tags are not published as pullable
-images upstream. On a fresh machine or after `registry-reset`, build the pinned
-sources into the local registry before `registry-sync` or `start`:
+images upstream. On a fresh machine, after `registry-reset`, and after
+upgrading to a release that changes the Blockscout build, build the pinned
+sources into the local registry before `start` (`start` stops with this command
+when the images are missing). The images are tagged by content, so an upgrade
+in place rolls the pods to the new build without any clean-up, and a repeat run
+with nothing changed builds nothing:
 
 ```console
 ./sandbox.sh build-images
@@ -203,10 +207,10 @@ Use `/etc/hosts` on Linux/macOS or
 | `./sandbox.sh image-report` | Read-only report: running pod images, local registry tags per service, and which tag is the current build / deployed |
 | `./sandbox.sh cleanup-images` | Prune old content-hash images for `nb-ui` / `nb-bond-api` / `bens-microservice` (keeps current + 2 newest and the deployed tag; never removes shared base images). `--keep N` changes retention; `--prune-build-cache` also clears the global Docker build cache |
 | `./sandbox.sh registry-reset` | Recreate the `kind-registry` container and re-sync base images, clearing accumulated registry tags. Repo-owned images rebuild on the next start |
-| `./sandbox.sh build-images` | Build the pinned Blockscout backend/frontend source tags and push them into the local registry; required once on a fresh machine or after `registry-reset` |
+| `./sandbox.sh build-images` | Build the pinned Blockscout backend/frontend source tags and push them into the local registry under a content-hash tag; required on a fresh machine, after `registry-reset`, and after upgrading to a release that changes the Blockscout build (`start` tells you); a repeat run with nothing changed builds nothing |
 
-If startup fails with missing content digest errors, run `build-images` when
-the Blockscout backend/frontend tags are absent, then run `registry-sync`.
+If startup stops because the Blockscout backend/frontend images are not in the
+registry, run `build-images`, then start again.
 This avoids image preparation racing the deploy steps on slow links and is the
 common fix when `kind` image imports look flaky on Docker Desktop.
 

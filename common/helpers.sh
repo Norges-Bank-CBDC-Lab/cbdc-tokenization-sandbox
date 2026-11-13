@@ -648,6 +648,41 @@ function kindRegistryHasImage() {
     fi
 }
 
+# ── Source-built Blockscout images (backend, frontend) ───────────────────
+# Upstream publishes no release images, so services/blockscout/build-images.sh
+# builds them from source. Their identity is a content hash, like nb-ui,
+# nb-bond-api and bens-microservice: the registry tag is <tag>-<hash>, where
+# the hash covers the build recipe and the pinned refs. A change to the recipe
+# or a pin moves the tag, which makes the node pull and the pod roll; an
+# unchanged recipe keeps the tag, so nothing is rebuilt, re-pushed or restarted.
+# (A rebuild of identical inputs yields a different image id every time, so the
+# image id cannot be the identity.)
+function blockscoutSourceBuildHash() {
+    {
+        shasum -a 256 "$BLOCKSCOUT_DIR/build-images.sh"
+        printf 'backend %s\nfrontend %s\n' "$(getBlockscoutBackendImage)" "$(getBlockscoutFrontendImage)"
+    } | shasum -a 256 | cut -c1-12
+}
+
+# Registry pull ref of a source-built image: localhost:5001/<repo>:<tag>-<hash>.
+function blockscoutSourceImageRef() {
+    local image_ref=$1
+    echo "localhost:${KIND_REGISTRY_PORT}/$(imageRepo "$image_ref"):$(imageTag "$image_ref")-$(blockscoutSourceBuildHash)"
+}
+
+# Echo the registry pull ref of a source-built image, or fail with the command
+# that builds it when the registry does not hold this content yet.
+function requireBlockscoutSourceImage() {
+    local image_ref=$1 pull_ref
+    pull_ref="$(blockscoutSourceImageRef "$image_ref")"
+    if [ "$(kindRegistryHasImage "${pull_ref#localhost:${KIND_REGISTRY_PORT}/}")" != "true" ]; then
+        echo "❌ ${pull_ref} is not in the local registry." >&2
+        echo "   The Blockscout backend and frontend are built from source: run ./sandbox.sh build-images, then start again." >&2
+        return 1
+    fi
+    echo "$pull_ref"
+}
+
 function pushRegistryTag() {
     registry_image=$1
     docker push --quiet "$registry_image" >/dev/null
@@ -657,6 +692,16 @@ function pushRegistryTag() {
     else
         echo "✅ Pushed $registry_image to local registry"
     fi
+}
+
+# Tag the freshly built source image with its content-hash registry tag and
+# push it. Always tags from the image just built, never from a leftover local
+# tag, so a stale local image cannot be pushed in its place.
+function pushBlockscoutSourceImage() {
+    local image_ref=$1 pull_ref
+    pull_ref="$(blockscoutSourceImageRef "$image_ref")"
+    docker tag "$image_ref" "$pull_ref"
+    pushRegistryTag "$pull_ref"
 }
 
 function pushImageToKindRegistry() {
@@ -1360,8 +1405,8 @@ function prepNBUIBases() {
 function syncImagesToRegistry() {
     images=()
     images+=("$(getBesuImage)")
-    images+=("$(getBlockscoutFrontendImage)")
-    images+=("$(getBlockscoutBackendImage)")
+    # The Blockscout frontend and backend are not synced: they are built from
+    # source and pushed by `build-images` under a content-hash tag.
     images+=("$(getBlockscoutDbImage)")
     images+=("$(getBensBaseImage)")
     # nb-bond-api Dockerfile stages: builder + runtime (both node).
@@ -1673,8 +1718,10 @@ function deployBlockscout() {
     SC_VERIFIER_IMAGE=$(getBlockscoutScVerifierImage)
     echo "🔍 Using smart-contract-verifier image: $SC_VERIFIER_IMAGE"
 
-    loadImageToKind $BLOCKSCOUT_FRONTEND_IMAGE
-    loadImageToKind $BLOCKSCOUT_BACKEND_IMAGE
+    # The frontend and backend are built from source by `build-images` and
+    # referenced by a content-hash tag, so they are not loaded from upstream.
+    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(requireBlockscoutSourceImage "$BLOCKSCOUT_FRONTEND_IMAGE") || return 1
+    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(requireBlockscoutSourceImage "$BLOCKSCOUT_BACKEND_IMAGE") || return 1
     loadImageToKind $POSTGRES_IMAGE
     loadImageToKind $SC_VERIFIER_IMAGE
 
@@ -1684,8 +1731,6 @@ function deployBlockscout() {
     BENS_IMAGE_OVERRIDE="$(prepareBensImage)"
     echo "🔁 Using locally-built BENS image: $BENS_IMAGE_OVERRIDE"
 
-    BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_FRONTEND_IMAGE")
-    BLOCKSCOUT_BACKEND_IMAGE_OVERRIDE=$(kindRegistryImageFor "$BLOCKSCOUT_BACKEND_IMAGE")
     POSTGRES_IMAGE_OVERRIDE=$(kindRegistryImageFor "$POSTGRES_IMAGE")
     SC_VERIFIER_IMAGE_OVERRIDE=$(kindRegistryImageFor "$SC_VERIFIER_IMAGE")
     echo "🔁 Using local registry image for blockscout frontend: $BLOCKSCOUT_FRONTEND_IMAGE_OVERRIDE"
