@@ -75,10 +75,16 @@ If sandbox startup fails with missing digest or image-pull errors, run
 Offline builds and `FORCE_IMAGE_PULL`:
 
 - When a locally-built service (nb-ui, nb-bond-api, bens-microservice) needs a
-  Dockerfile base image (e.g. `node:26.12.1`) that isn't in the host Docker
+  Dockerfile base image (e.g. `nginxinc/nginx-unprivileged:1.30.6-alpine`) that isn't in the host Docker
   cache, the build reuses the copy already in the local registry and retags it
   to the upstream ref — it does **not** pull from the internet. The Dockerfile
   `FROM` stays an upstream ref, so built images keep a portable lineage.
+- The Node base is the exception: it is pinned as
+  `node:<version>@sha256:<multi-arch index digest>` in
+  `common/node-version.env`, and a digest ref cannot be a retag target. Once
+  pulled it stays in the host cache, so builds keep working offline; after the
+  Docker cache is wiped (prune, new machine) one upstream pull of the Node base
+  is needed.
 - `FORCE_IMAGE_PULL=true` forces base and third-party images to be re-pulled
   from upstream (requires network), bypassing the registry/local cache; the run
   prints a warning when it does so. This affects only the base/third-party

@@ -18,8 +18,9 @@ integrators.
 - `check-markdown-links.py`: validates local links inside tracked Markdown
   files
 - `check-node-version-consistency.py`: validates that the shared Node.js
-  toolchain pin in `common/node-version.env` matches CI, Docker build inputs,
-  and direct `@types/node` manifests
+  toolchain pin in `common/node-version.env` matches CI, Docker build inputs
+  (the Node image must be `node:<version>@sha256:<digest>`), and direct
+  `@types/node` manifests
 - `check-besu-qbft-baseline.py`: validates Besu image pins, QBFT/Osaka genesis,
   split validator/archive topology, archive-only consumers, Foundry/OZ versions,
   and (when built) genesis `GlobalRegistry` bytecode
