@@ -136,7 +136,7 @@ Current Blockscout backend/frontend release tags are not published as pullable
 images upstream. On a fresh machine, after `registry-reset`, and after
 upgrading to a release that changes the Blockscout build, build the pinned
 sources into the local registry before `start` (`start` stops with this command
-when the images are missing). The images are tagged by content, so an upgrade
+before it creates or changes anything when the images are missing). The images are tagged by content, so an upgrade
 in place rolls the pods to the new build without any clean-up, and a repeat run
 with nothing changed builds nothing:
 
