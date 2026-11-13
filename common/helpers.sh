@@ -486,7 +486,14 @@ function toKindImageTag() {
     image_ref=$1
     if [[ "$image_ref" == *@* ]]; then
         base="${image_ref%@*}"
-        echo "${base}:kind"
+        # tag@digest keeps the tag in the Kind tag, so a version bump gets a
+        # new registry tag instead of reusing a stale one. A bare repo@digest
+        # has no tag to keep.
+        if [[ "${base##*/}" == *:* ]]; then
+            echo "${base}-kind"
+        else
+            echo "${base}:kind"
+        fi
         return
     fi
 
@@ -1241,7 +1248,9 @@ function ensureLocalDockerImage() {
     fi
 
     # Digest-pinned refs can't be a `docker tag` target, so skip the reuse
-    # path for them. The repo-owned builds all use tag-based bases.
+    # path for them. The Node bases are digest-pinned: once pulled by
+    # loadImageToKind they stay in the host cache, and only a cache wipe
+    # needs one upstream pull.
     if [[ "$image_ref" != *@* ]]; then
         local kind_ref
         kind_ref="$(kindRegistryImageFor "$image_ref")"
