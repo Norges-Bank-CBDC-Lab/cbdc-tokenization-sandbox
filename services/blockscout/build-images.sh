@@ -149,7 +149,7 @@ frontend_dockerfile="$frontend_tmp/Dockerfile"
 # built-in list; 24.22.1 and later removed it. Move every stage to a newer
 # Node 24 Alpine image. See docs/KNOWN_ISSUES.md.
 frontend_node_from="node:24.21.0-alpine"
-frontend_node_to="node:24.22.2-alpine"
+frontend_node_to="node:24.22.3-alpine"
 
 if [[ "$(grep -cxF "$frontend_install_line" "$frontend_dockerfile")" != "1" ]]; then
     echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the Next.js pin in $(basename "$0")"
