@@ -38,6 +38,21 @@ fi
 
 platform=$(getKindTargetPlatform)
 
+# The registry tags are <tag>-<hash>, with the hash over this script and the pinned
+# refs (see blockscoutSourceBuildHash in common/helpers.sh). Any change to the
+# recipe or a pin builds new images and moves the tags the deployment uses, so the
+# node pulls them and the pods roll. When the registry already holds both tags for
+# the current recipe, nothing is built, pushed or restarted. Base images named by
+# tag inside the recipe are not part of the hash; pin a moved base by editing the
+# recipe (for example to a digest).
+backend_pull_ref="$(blockscoutSourceImageRef "$backend_image")"
+frontend_pull_ref="$(blockscoutSourceImageRef "$frontend_image")"
+if [[ "$(kindRegistryHasImage "${backend_pull_ref#localhost:${KIND_REGISTRY_PORT}/}")" == "true" ]] \
+    && [[ "$(kindRegistryHasImage "${frontend_pull_ref#localhost:${KIND_REGISTRY_PORT}/}")" == "true" ]]; then
+    echo "✅ ${backend_pull_ref} and ${frontend_pull_ref} are already in the local registry; nothing to build."
+    exit 0
+fi
+
 backend_tmp=$(mktemp -d /tmp/blockscout-build.XXXXXX)
 frontend_tmp=$(mktemp -d /tmp/blockscout-frontend-build.XXXXXX)
 
@@ -182,7 +197,7 @@ docker build \
 
 ensureKindRegistry
 
-loadImageToKind "$frontend_image"
-loadImageToKind "$backend_image"
+pushBlockscoutSourceImage "$frontend_image"
+pushBlockscoutSourceImage "$backend_image"
 
 echo "✅ Blockscout images built and pushed to local registry."

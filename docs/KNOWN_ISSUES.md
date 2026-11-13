@@ -288,11 +288,18 @@
 - The backend/frontend pins in `common/images.yaml` therefore name upstream
   refs that cannot be pulled. They are satisfied locally by
   `./sandbox.sh build-images`, which clones the pinned release tags, builds
-  both images from source, and pushes them to the local kind registry;
-  `./sandbox.sh start` reuses registry images before attempting an upstream
-  pull, so subsequent starts need no rebuild.
-- On a fresh machine (or after `./sandbox.sh registry-reset`), run
-  `./sandbox.sh build-images` once before `./sandbox.sh start`. The
+  both images from source, and pushes them to the local kind registry under a
+  content-hash tag (`<tag>-<hash>`; the hash covers `build-images.sh` and the
+  pinned refs, as nb-ui, nb-bond-api and bens-microservice do). `./sandbox.sh
+  start` deploys exactly that tag and stops with the command to run if the
+  registry does not hold it.
+- On a fresh machine, after `./sandbox.sh registry-reset`, and after upgrading
+  to a release that changes the Blockscout build, run
+  `./sandbox.sh build-images` before `./sandbox.sh start`. Because the tag
+  follows the content, an in-place upgrade needs no clean-up: the new tag is
+  pulled by the node and the pods roll, with the database and chain data
+  untouched. A repeat run with nothing changed builds, pushes and restarts
+  nothing. Old tags stay in the registry until `registry-reset`. The
   smart-contract-verifier image is still published upstream
   (`ghcr.io/blockscout/smart-contract-verifier`) and pulls normally.
 - Consequence for any non-local reuse of this stack: that deployment must
@@ -352,10 +359,10 @@
   `mix.lock` is cloned at build time and is not in this repository. Re-check the
   list when the Blockscout pin moves, and drop a package from the re-resolve
   once upstream's lockfile reaches the fixed version.
-- `build-images` rebuilds under the same tag, and the registry push is skipped
-  when the `-kind` tag is already present, so a sandbox that already holds the
-  backend or frontend image keeps the old build until its registry copy is replaced (for
-  example after `./sandbox.sh registry-reset`).
+- The hash does not cover base images that the recipe names by tag
+  (`node:24.22.3-alpine`, the hexpm Elixir image), so a base that moves under an
+  unchanged tag is not picked up until the recipe changes. Pinning those bases
+  by digest would close that gap.
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
 

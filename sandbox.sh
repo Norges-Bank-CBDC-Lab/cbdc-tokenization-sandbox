@@ -33,7 +33,7 @@ function printHelp() {
     echo "      registry-reset: Recreate the local registry container and re-sync base images (reclaims registry disk)"
     echo "      cleanup-images: Prune old content-hash images for nb-ui/nb-bond-api/bens-microservice (keeps current + 2)"
     echo "      image-report: Read-only report of running pod images, registry tags, and current/deployed markers"
-    echo "      build-images: Build pinned Blockscout backend/frontend sources for a fresh local registry"
+    echo "      build-images: Build pinned Blockscout backend/frontend sources into the local registry (fresh machine, registry-reset, or after an upgrade that changes the build)"
 }
 
 ################################################################################
@@ -324,7 +324,7 @@ elif [ "$CMD" == "registry-sync" ]; then
 elif [ "$CMD" == "build-images" ]; then
     checkPrereqs
     echo "ℹ️ Blockscout backend/frontend images are built from source at the tags pinned in common/images.yaml."
-    echo "ℹ️ Upstream stopped publishing release images (see docs/KNOWN_ISSUES.md); run this once before start on a fresh machine or after registry-reset."
+    echo "ℹ️ Upstream stopped publishing release images (see docs/KNOWN_ISSUES.md); run it before start on a fresh machine, after registry-reset, and after upgrading to a release that changes the Blockscout build (start tells you when it is needed). A repeat run with nothing changed builds nothing."
     cd $SCRIPT_DIR/services/blockscout
     ./build-images.sh
 elif [ "$CMD" == "generate-config" ]; then
