@@ -431,7 +431,7 @@
   including the ESM `@noble/secp256k1`). Babel 8 needs Node `^22.18.0 || >=24.11.0`,
   which the Node 26 pin in `common/node-version.env` satisfies. The two packages
   are coupled: `@babel/preset-env` 8 peer-requires core 8.
-- The root `package.json` pins `@babel/core` 8.1.0 as a dev dependency on purpose.
+- The root `package.json` pins `@babel/core` 8.1.2 as a dev dependency on purpose.
   Without it npm hoists jest's own `@babel/core` 7 to the root, `babel-jest`
   resolves that copy, and the Babel 8 preset would load under core 7. With it,
   `babel-jest` and the workspace share the root core 8. An `overrides` entry on
