@@ -86,47 +86,89 @@ echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 # carries the distrusted eMudhra root, and hackney 4.8.5 pins certifi to
 # ~> 2.17.0. It also locks cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12, which
 # have published advisories fixed in cowboy 2.21.0, cowlib 2.22.0 and jose
-# 1.11.13 (minor releases inside upstream's own version constraints).
-# Re-resolve those five packages in the deps stage (jose is only a transitive
-# dependency, so mix can update it only after the dependencies are fetched,
-# hence the preceding `mix deps.get`); hackney's own dependencies move with it.
-# The step then asserts the resulting lock entries and that no other package
-# changed, so the build fails if a newer release changes what gets resolved.
-# See docs/KNOWN_ISSUES.md.
-backend_hex_line="RUN mix local.hex --force"
-backend_update_line="RUN cp mix.lock /tmp/mix.lock.upstream && mix deps.get && mix deps.update hackney certifi cowboy cowlib jose"
-backend_expected_locks=(
-    '"certifi": {:hex, :certifi, "2.18.0"'
-    '"cowboy": {:hex, :cowboy, "2.21.0"'
-    '"cowlib": {:hex, :cowlib, "2.22.0"'
-    '"h2": {:hex, :h2, "0.15.1"'
-    '"hackney": {:hex, :hackney, "4.10.2"'
-    '"jose": {:hex, :jose, "1.11.13"'
-    '"quic": {:hex, :quic, "2.6.1"'
-    '"ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9"'
-    '"webtransport": {:hex, :webtransport, "0.5.5"'
+# 1.11.13. The deps stage therefore swaps the mix.lock entries below,
+# checksums included, into upstream's lock by package name and then runs
+# `mix deps.get`, which fetches exactly those releases. Nothing floats to the
+# newest release at build time, so the same recipe always builds the same
+# dependency set; a plain `mix deps.update` moved hackney, certifi, h2, quic,
+# idna and webtransport between 2026-11-10 and 2026-11-15 and broke fresh builds.
+# The step fails closed if upstream's lock no longer has exactly one entry for a
+# pinned package, if the lock after `mix deps.get` differs from the pins, if
+# anything other than the pinned packages changed, or if Hex has retired a
+# pinned release.
+#
+# To re-pin (an advisory on a pinned package, a certifi root-list change, a new
+# upstream Blockscout tag): in a throwaway container from the deps stage, add
+# `{:name, "== x.y.z", override: true}` entries for the packages to mix.exs, run
+# `mix deps.get` against upstream's lock, copy the changed lock lines here, and
+# soak the resulting image before releasing it. certifi and the others do not
+# update by themselves. See docs/KNOWN_ISSUES.md.
+backend_lock_pins=(
+    '  "certifi": {:hex, :certifi, "2.18.0", "bd5f34eb8fe7c3eee3c705c1f9472174e8d4c353fc9c09a4cb937b891e80e329", [:rebar3], [], "hexpm", "a8b61115e393a2298b20451a36beffdabe08e61bc16cc1926d7991f6721103bf"},'
+    '  "cowboy": {:hex, :cowboy, "2.21.0", "16befcb9b60e81119c2aa5864d33b1494855138c71a2d0c95e4d878d850fde71", [:make, :rebar3], [{:cowlib, ">= 2.22.0 and < 3.0.0", [hex: :cowlib, repo: "hexpm", optional: false]}, {:ranch, ">= 1.8.0 and < 3.0.0", [hex: :ranch, repo: "hexpm", optional: false]}], "hexpm", "90b4d6fe91806054538349dbeabcac86315a3fdaec4eb491f5445259668398f6"},'
+    '  "cowlib": {:hex, :cowlib, "2.22.0", "ed32663b11e0b96c4fc2e7d42cf627cd095f006e78a24d0c6b98a91f2e532cd3", [:make, :rebar3], [], "hexpm", "b1ea5995d8f1ab5086ae7afe710c2075c7872c7e1acaf45dd0db7595e900c0fc"},'
+    '  "h2": {:hex, :h2, "0.15.1", "471e3e2db4d7edae8c8263c402f5f6f126a5a8bf6adc9d6b2a0c74942ff488d9", [:rebar3], [], "hexpm", "47863ce75a6c7eb81a677dd527f5eeaa0c1fb3bcdc575864fd61e77bee2c9857"},'
+    '  "hackney": {:hex, :hackney, "4.10.2", "ea3514d4c8a591a228e30e67d89cbf59288fe11e34fafd3206e9694f08ff2804", [:rebar3], [{:certifi, "~> 2.18.0", [hex: :certifi, repo: "hexpm", optional: false]}, {:h2, "~> 0.15.0", [hex: :h2, repo: "hexpm", optional: false]}, {:idna, "~> 7.1.0", [hex: :idna, repo: "hexpm", optional: false]}, {:mimerl, "~> 1.5", [hex: :mimerl, repo: "hexpm", optional: false]}, {:parse_trans, "3.4.2", [hex: :parse_trans, repo: "hexpm", optional: false]}, {:quic, "~> 2.6.1", [hex: :quic, repo: "hexpm", optional: false]}, {:ssl_verify_fun, "~> 1.1.0", [hex: :ssl_verify_fun, repo: "hexpm", optional: false]}, {:webtransport, "~> 0.5.3", [hex: :webtransport, repo: "hexpm", optional: false]}], "hexpm", "1225636fa9ea37c2996312ff1b80e88c0d1176d1c094a59984d2e16a8a108583"},'
+    '  "jose": {:hex, :jose, "1.11.13", "94abcd8bf98eb9f007272918bd3f5ffb613e8d250567de233e6c2b2456319005", [:mix, :rebar3], [], "hexpm", "15d8bd0f01ab29d1771e8da1f60f9c98725b23a17f7312cdd40e8e2757bd98c7"},'
+    '  "quic": {:hex, :quic, "2.6.1", "ba18b003f58f538a67fd4fab6566dc05e483dd3a21fccadaf1ae4b5b9cbdc8c0", [:rebar3], [], "hexpm", "6657e3fd6ac1720b243402421a9ea1b7293a98dbd1e58374f57c72a4dcbe7a9c"},'
+    '  "ssl_verify_fun": {:hex, :ssl_verify_fun, "1.1.9", "4ff292dc16e728fde1235cf5fa6bcd3ca01864004526f71a4a70935509d1a7f1", [:make, :mix, :rebar3], [], "hexpm", "19f24ad715ef6255d530b2f0db8b2d2191ae435b6527234e943f523e84ed0895"},'
+    '  "webtransport": {:hex, :webtransport, "0.5.5", "fdc0f5ddf004465caea8370fc4af1d955ad9f3f545ac91131fa20cb02d6f196e", [:rebar3], [{:h2, "~> 0.15.1", [hex: :h2, repo: "hexpm", optional: false]}, {:quic, "~> 2.6.1", [hex: :quic, repo: "hexpm", optional: false]}], "hexpm", "6825b53829c122f34a14e099384f860fa625de1d825dfd17c2fa67e8cfbc4080"},'
 )
-# Every package whose lock line the step may add, change or remove.
-backend_expected_changed="certifi cowboy cowlib h2 hackney jose quic ssl_verify_fun webtransport"
+backend_pinned_names="$(printf '%s\n' "${backend_lock_pins[@]}" | cut -d'"' -f2 | tr '\n' ' ' | sed 's/ $//')"
+
+backend_hex_line="RUN mix local.hex --force"
 
 if [[ "$(grep -cxF "$backend_hex_line" "$backend_dockerfile")" != "1" ]]; then
-    echo "❌ Expected exactly one '$backend_hex_line' line in the upstream backend Dockerfile ($backend_tag); review the dependency re-resolve in $(basename "$0")"
+    echo "❌ Expected exactly one '$backend_hex_line' line in the upstream backend Dockerfile ($backend_tag); review the dependency pins in $(basename "$0")"
     exit 1
 fi
 
-backend_lock_checks=""
-for lock_entry in "${backend_expected_locks[@]}"; do
-    backend_lock_checks="$backend_lock_checks && grep -qF '$lock_entry' mix.lock"
-done
-backend_lock_checks="$backend_lock_checks && test \"\$(diff -u /tmp/mix.lock.upstream mix.lock | grep '^[-+] ' | cut -d'\"' -f2 | sort -u | tr '\\n' ' ' | sed 's/ \$//')\" = '$backend_expected_changed'"
-backend_lock_message="dependency re-resolve did not produce the expected mix.lock changes; review the update in build-images.sh"
+printf '%s\n' "${backend_lock_pins[@]}" > "$backend_tmp/blockscout-lock-pins.txt"
+cat > "$backend_tmp/blockscout-pin-lock.sh" <<'PINSCRIPT'
+#!/bin/sh
+# Runs in the backend deps stage, in the umbrella root. Fails closed.
+set -eu
+fail() { echo "❌ $1" >&2; exit 1; }
 
-BACKEND_UPDATE_LINE="$backend_update_line" BACKEND_LOCK_CHECKS="$backend_lock_checks" BACKEND_LOCK_MESSAGE="$backend_lock_message" BACKEND_HEX_LINE="$backend_hex_line" awk '
+cp mix.lock /tmp/mix.lock.upstream
+
+while IFS= read -r pin; do
+    name=$(printf '%s\n' "$pin" | cut -d'"' -f2)
+    count=$(grep -c "^  \"$name\": {:hex, :$name, " mix.lock || true)
+    [ "$count" = "1" ] || fail "upstream's mix.lock has $count entries for $name (expected 1): its lock format or package set changed; review the pins in build-images.sh"
+done < /tmp/blockscout-lock-pins.txt
+
+awk 'NR == FNR { pin[$1] = $0; next } ($1 in pin) && /^  "[^"]+": \{:hex, / { print pin[$1]; next } { print }' \
+    /tmp/blockscout-lock-pins.txt mix.lock > mix.lock.pinned
+mv mix.lock.pinned mix.lock
+
+mix deps.get
+
+while IFS= read -r pin; do
+    name=$(printf '%s\n' "$pin" | cut -d'"' -f2)
+    [ "$(grep -cxF -- "$pin" mix.lock)" = "1" ] || fail "after mix deps.get the lock no longer holds the pinned entry for $name; review the pins in build-images.sh"
+done < /tmp/blockscout-lock-pins.txt
+
+expected=$(cut -d'"' -f2 /tmp/blockscout-lock-pins.txt | sort -u | tr '\n' ' ' | sed 's/ $//')
+changed=$(diff -u /tmp/mix.lock.upstream mix.lock | grep '^[-+] ' | cut -d'"' -f2 | sort -u | tr '\n' ' ' | sed 's/ $//')
+[ "$changed" = "$expected" ] || fail "the lock changed for [$changed], expected exactly [$expected]; review the pins in build-images.sh"
+
+audit=$(mix hex.audit 2>&1 || true)
+printf '%s\n' "$audit" | grep -qE '^(No retired or security advisory packages found|Found retired packages|Found packages with security advisories)' \
+    || fail "mix hex.audit did not produce a report, so retired releases could not be ruled out"
+retired=$(printf '%s\n' "$audit" | awk '/^Retired:/ { f = 1; next } f && /^$/ { exit } f')
+for name in $expected; do
+    ! printf '%s\n' "$retired" | grep -qE "^  $name " || fail "Hex has retired the pinned $name release: $(printf '%s\n' "$retired" | grep -E "^  $name ")"
+done
+echo "✅ The pinned mix.lock entries are in place and none is retired"
+PINSCRIPT
+
+BACKEND_PIN_COPY='COPY blockscout-lock-pins.txt blockscout-pin-lock.sh /tmp/' BACKEND_PIN_RUN='RUN sh /tmp/blockscout-pin-lock.sh' BACKEND_HEX_LINE="$backend_hex_line" awk '
     { print }
-    $0 == ENVIRON["BACKEND_HEX_LINE"] { print ENVIRON["BACKEND_UPDATE_LINE"] ENVIRON["BACKEND_LOCK_CHECKS"] " || { echo \"" ENVIRON["BACKEND_LOCK_MESSAGE"] "\" >&2; exit 1; }" }
+    $0 == ENVIRON["BACKEND_HEX_LINE"] { print ENVIRON["BACKEND_PIN_COPY"]; print ENVIRON["BACKEND_PIN_RUN"] }
 ' "$backend_dockerfile" > "$backend_dockerfile.patched"
 mv "$backend_dockerfile.patched" "$backend_dockerfile"
-echo "🔧 Re-resolving hackney, certifi, cowboy, cowlib and jose in the backend deps stage"
+echo "🔧 Pinning the backend lock entries (${backend_pinned_names}) in the deps stage"
 
 docker build \
     --platform "$platform" \
@@ -136,12 +178,16 @@ docker build \
     --build-arg RELEASE_VERSION="$backend_release_version" \
     "$backend_tmp"
 
-# List the advisories that remain in the resolved backend lock. This is
-# informational only: it reuses the cached deps stage, needs network access to
-# fetch Hex's advisory data, and never fails the build.
+# List the advisories that remain in the resolved backend lock, and the newer
+# releases of the pinned packages. This is informational only: it reuses the
+# cached deps stage, needs network access to fetch Hex's data, and never fails
+# the build.
 echo "🔎 Remaining Hex advisories in the backend lock (informational)"
 if backend_deps_image=$(docker build -q --platform "$platform" --target builder-deps -f "$backend_tmp/docker/Dockerfile" "$backend_tmp"); then
     docker run --rm "$backend_deps_image" mix hex.audit || echo "ℹ️  Advisories were reported above, or the audit could not run; the build continues"
+    echo "🔎 Newer Hex releases than the pinned backend set (informational; pins only move when edited here)"
+    echo "   Dependency  Environments  Pinned  Latest  Status"
+    docker run --rm "$backend_deps_image" sh -c "mix hex.outdated --all 2>&1 | grep -E '^($(printf '%s' "$backend_pinned_names" | tr ' ' '|')) ' | sed 's/^/   /'" || true
     docker rmi "$backend_deps_image" >/dev/null 2>&1 || true
 else
     echo "ℹ️  Could not build the deps stage for the advisory listing; skipping"
