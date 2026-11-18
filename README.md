@@ -151,7 +151,7 @@ the first deploy doesn't pay the pull cost mid-flight:
 ./infra/infra.sh registry-sync
 ```
 
-Sandbox deploy/build image pins are centralized in `common/images.yaml`.
+Sandbox deploy/build image pins are centralized in `common/images.yaml`; third-party images are pinned by tag and multi-arch index digest, and the file header says how to bump one.
 The shared Node.js toolchain pin is centralized in `common/node-version.env`.
 
 7. Optional: generate the sandbox config file and edit deploy flags in

@@ -38,7 +38,6 @@ BLOCKSCOUT_DIR=$REPO_ROOT/services/blockscout
 BLOCKSCOUT_TMPDIR=$BLOCKSCOUT_DIR/.tmp
 BLOCKSCOUT_CHART_VERSION=4.5.3
 BLOCKSCOUT_BENS_DIR=$BLOCKSCOUT_DIR/bens-microservice
-BENS_BASEIMAGE=python:3.14.10
 
 NB_BOND_API_NAMESPACE=nb-bond-api
 NB_BOND_API_DIR=$REPO_ROOT/services/nb-bond-api
@@ -49,14 +48,14 @@ NB_BOND_API_HELM_VALUES_EXAMPLE_FILE=$REPO_ROOT/services/nb-bond-api/helm/values
 NB_UI_NAMESPACE=nb-ui
 NB_UI_DIR=$REPO_ROOT/services/nb-ui
 NB_UI_BUILDER_BASEIMAGE=$SANDBOX_NODE_IMAGE
-NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine
+NB_UI_NGINX_BASEIMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 # Backwards-compat alias; older code paths and external callers may still
 # reference NB_UI_BASEIMAGE expecting the nginx runtime base.
 NB_UI_BASEIMAGE=$NB_UI_NGINX_BASEIMAGE
 
 KIND_REGISTRY_NAME=kind-registry
 KIND_REGISTRY_PORT=5001
-KIND_REGISTRY_IMAGE=registry:3.1.2
+KIND_REGISTRY_IMAGE=registry:3.1.2@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
 KIND_REGISTRY_ENDPOINT="http://localhost:${KIND_REGISTRY_PORT}"
 # Manifest types the presence and digest probes accept. The sandbox pushes
 # OCI manifests and indexes (containerd image store), so a Docker-v2-only
@@ -519,9 +518,25 @@ function ensureKindRegistry() {
     if docker ps -a --format '{{.Names}}' | grep -q "^${KIND_REGISTRY_NAME}$"; then
         current_image="$(docker inspect --format '{{.Config.Image}}' "${KIND_REGISTRY_NAME}")"
         if [ "$current_image" != "$registry_image" ]; then
-            echo "🔁 '${KIND_REGISTRY_NAME}' runs ${current_image} but the pin is ${registry_image}: recreating it (its cached tags are lost and re-synced)."
-            docker rm -f "${KIND_REGISTRY_NAME}" >/dev/null
-            recreated="true"
+            # The pin is <tag>@<digest>, so a container created from the bare
+            # tag always reads as different. Compare the image content instead:
+            # the same content under a new spelling is not a pin change, and
+            # recreating it would empty the registry for nothing. The pinned
+            # image is read (pulled if needed) before the container is removed,
+            # so a failed pull never leaves the sandbox without its registry.
+            if ! docker image inspect "$registry_image" >/dev/null 2>&1 \
+                && ! docker pull --quiet "$registry_image" >/dev/null 2>&1; then
+                echo "❌ '${KIND_REGISTRY_NAME}' runs ${current_image} but the pin is ${registry_image}, and the pinned image cannot be pulled."
+                echo "   Not recreating the registry (its cached tags would be lost). Check the network, then start again."
+                exit 1
+            fi
+            if [ "$(docker image inspect --format '{{.Id}}' "$registry_image")" == "$(docker inspect --format '{{.Image}}' "${KIND_REGISTRY_NAME}")" ]; then
+                echo "ℹ️  '${KIND_REGISTRY_NAME}' already runs the pinned content (${registry_image}); keeping it."
+            else
+                echo "🔁 '${KIND_REGISTRY_NAME}' runs ${current_image} but the pin is ${registry_image}: recreating it (its cached tags are lost and re-synced)."
+                docker rm -f "${KIND_REGISTRY_NAME}" >/dev/null
+                recreated="true"
+            fi
         fi
     fi
 

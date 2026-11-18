@@ -1,0 +1,36 @@
+name: Image Pin Consistency
+
+on:
+  pull_request:
+    paths:
+      - "common/images.yaml"
+      - "common/node-version.env"
+      - "common/helpers.sh"
+      - "infra/besu/values.yaml"
+      - "infra/cluster/cluster-config.yaml"
+      - "services/blockscout/values.yaml"
+      - "services/blockscout/build-images.sh"
+      - "services/blockscout/bens-microservice/Dockerfile"
+      - "services/nb-bond-api/Dockerfile"
+      - "services/nb-ui/Dockerfile"
+      - ".github/workflows/image-pins.yml"
+      - "scripts/verification/check-image-pins.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-image-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Validate image digest pins
+        run: python3 scripts/verification/check-image-pins.py

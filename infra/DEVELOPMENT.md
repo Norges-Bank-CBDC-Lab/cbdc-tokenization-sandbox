@@ -52,7 +52,9 @@ Important behavior:
 - `./infra.sh registry-sync` pushes the image versions referenced by the
   sandbox;
 - sandbox deploy/build image pins live in `common/images.yaml`, including
-  Blockscout backend/frontend and shared base images;
+  Blockscout backend/frontend and shared base images; third-party images are
+  pinned by tag and multi-arch index digest, and the node pulls the local
+  registry copy by tag, so the digest governs only the upstream pull;
 - chart versions are pinned separately in `common/versions.yaml`;
 - deleting the Kind cluster does not delete the registry container.
 
