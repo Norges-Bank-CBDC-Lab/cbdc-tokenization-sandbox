@@ -333,7 +333,10 @@
   package name and runs `mix deps.get`, which fetches exactly those releases. It
   stops if upstream's lock no longer has exactly one entry for a pinned package,
   if the lock after `mix deps.get` differs from the pins, if any other package's
-  lock line changed, or if Hex has retired a pinned release. Every frontend stage
+  lock line changed, or if Hex has retired a pinned release with the reason
+  `security` or `invalid` (or a reason the script does not recognise). A release
+  retired as `deprecated`, `renamed` or `other`, and an audit service that gives
+  no report, print a loud warning and the build continues. Every frontend stage
   moves from `node:24.21.0-alpine` to `node:24.22.3-alpine`, whose built-in root
   list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
@@ -351,8 +354,8 @@
   not affected. Because the pins are inside `build-images.sh`, which the
   content hash covers, a pin change always moves the image tags. After
   building the backend the script also lists newer releases of the pinned
-  packages (`mix hex.outdated`) next to the advisory listing; it is informational
-  and never fails the build.
+  packages (`mix hex.outdated`) and repeats the retirement check next to the
+  advisory listing; the summary is informational and never fails the build.
   Re-pin when a pinned package gets an advisory (the `mix hex.audit` listing
   shows it), when `certifi` changes its default root list, or when the
   Blockscout pin moves. To re-pin, start a throwaway container from the backend

@@ -95,7 +95,10 @@ echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 # The step fails closed if upstream's lock no longer has exactly one entry for a
 # pinned package, if the lock after `mix deps.get` differs from the pins, if
 # anything other than the pinned packages changed, or if Hex has retired a
-# pinned release.
+# pinned release with the reason security or invalid (or a reason this script
+# does not recognise). A release retired as deprecated, renamed or other, and an
+# audit service that gives no report, print a loud warning and the build
+# continues; the summary after the build repeats the check.
 #
 # To re-pin (an advisory on a pinned package, a certifi root-list change, a new
 # upstream Blockscout tag): in a throwaway container from the deps stage, add
@@ -126,9 +129,64 @@ fi
 printf '%s\n' "${backend_lock_pins[@]}" > "$backend_tmp/blockscout-lock-pins.txt"
 cat > "$backend_tmp/blockscout-pin-lock.sh" <<'PINSCRIPT'
 #!/bin/sh
-# Runs in the backend deps stage, in the umbrella root. Fails closed.
+# Runs in the backend deps stage, in the umbrella root.
+#   no argument  swap the pins in, verify the result, check for retired releases;
+#                fails closed
+#   report       only repeat the retirement check and never fail; used by the
+#                summary that build-images.sh prints after the build
 set -eu
 fail() { echo "❌ $1" >&2; exit 1; }
+
+# Retirement check for the pinned packages. Hex lets a release stay fetchable
+# after its maintainers retire it, with a reason. security and invalid fail the
+# build, and so does a reason this script does not recognise; deprecated,
+# renamed and other print a loud warning and the build continues. If
+# `mix hex.audit` gives no report, that is a loud warning too: the pins are
+# checksum-verified by `mix deps.get` either way.
+check_retired() {
+    mode=$1
+    names=$(cut -d'"' -f2 /tmp/blockscout-lock-pins.txt | sort -u | tr '\n' ' ' | sed 's/ $//')
+    audit=$(mix hex.audit 2>&1 || true)
+    if ! printf '%s\n' "$audit" | grep -qE '^(No retired or security advisory packages found|Found retired packages|Found packages with security advisories)'; then
+        echo "⚠️  WARNING ⚠️  mix hex.audit gave no report, so retired releases of the pinned packages could not be checked."
+        echo "    The build continues; mix deps.get still verifies every pinned checksum."
+        return 0
+    fi
+    retired=$(printf '%s\n' "$audit" | awk '/^Retired:/ { f = 1; next } f && /^$/ { exit } f')
+    found=0
+    blocked=0
+    for name in $names; do
+        line=$(printf '%s\n' "$retired" | grep -E "^  $name " || true)
+        [ -n "$line" ] || continue
+        found=1
+        version=$(printf '%s\n' "$line" | awk '{ print $2 }')
+        reason=$(printf '%s\n' "$line" | sed -n 's/^[^(]*- (\([^)]*\)).*/\1/p')
+        message=$(printf '%s\n' "$line" | sed 's/^[^)]*) *//')
+        case "$reason" in
+            deprecated|renamed|other)
+                echo "⚠️  WARNING ⚠️  Hex has retired the pinned $name $version (reason: $reason): $message"
+                echo "    The build continues. Decide whether to re-pin; see docs/KNOWN_ISSUES.md." ;;
+            security|invalid)
+                echo "❌ Hex has retired the pinned $name $version (reason: $reason): $message"
+                blocked=1 ;;
+            *)
+                echo "❌ Hex has retired the pinned $name $version with a reason this script does not recognise ('$reason'): $message"
+                blocked=1 ;;
+        esac
+    done
+    if [ "$blocked" = "1" ]; then
+        echo "   A pinned release retired as security or invalid, or for an unrecognised reason, fails the build." >&2
+        [ "$mode" = "report" ] || exit 1
+    fi
+    if [ "$mode" = "report" ] && [ "$found" = "0" ]; then
+        echo "   none of the pinned packages is retired"
+    fi
+}
+
+if [ "${1:-}" = "report" ]; then
+    check_retired report
+    exit 0
+fi
 
 cp mix.lock /tmp/mix.lock.upstream
 
@@ -153,14 +211,8 @@ expected=$(cut -d'"' -f2 /tmp/blockscout-lock-pins.txt | sort -u | tr '\n' ' ' |
 changed=$(diff -u /tmp/mix.lock.upstream mix.lock | grep '^[-+] ' | cut -d'"' -f2 | sort -u | tr '\n' ' ' | sed 's/ $//')
 [ "$changed" = "$expected" ] || fail "the lock changed for [$changed], expected exactly [$expected]; review the pins in build-images.sh"
 
-audit=$(mix hex.audit 2>&1 || true)
-printf '%s\n' "$audit" | grep -qE '^(No retired or security advisory packages found|Found retired packages|Found packages with security advisories)' \
-    || fail "mix hex.audit did not produce a report, so retired releases could not be ruled out"
-retired=$(printf '%s\n' "$audit" | awk '/^Retired:/ { f = 1; next } f && /^$/ { exit } f')
-for name in $expected; do
-    ! printf '%s\n' "$retired" | grep -qE "^  $name " || fail "Hex has retired the pinned $name release: $(printf '%s\n' "$retired" | grep -E "^  $name ")"
-done
-echo "✅ The pinned mix.lock entries are in place and none is retired"
+check_retired build
+echo "✅ The pinned mix.lock entries are in place and verified"
 PINSCRIPT
 
 BACKEND_PIN_COPY='COPY blockscout-lock-pins.txt blockscout-pin-lock.sh /tmp/' BACKEND_PIN_RUN='RUN sh /tmp/blockscout-pin-lock.sh' BACKEND_HEX_LINE="$backend_hex_line" awk '
@@ -188,6 +240,8 @@ if backend_deps_image=$(docker build -q --platform "$platform" --target builder-
     echo "🔎 Newer Hex releases than the pinned backend set (informational; pins only move when edited here)"
     echo "   Dependency  Environments  Pinned  Latest  Status"
     docker run --rm "$backend_deps_image" sh -c "mix hex.outdated --all 2>&1 | grep -E '^($(printf '%s' "$backend_pinned_names" | tr ' ' '|')) ' | sed 's/^/   /'" || true
+    echo "🔎 Retired releases among the pinned backend packages (informational; repeats the build-time check)"
+    docker run --rm "$backend_deps_image" sh /tmp/blockscout-pin-lock.sh report || true
     docker rmi "$backend_deps_image" >/dev/null 2>&1 || true
 else
     echo "ℹ️  Could not build the deps stage for the advisory listing; skipping"
