@@ -363,7 +363,8 @@ For concrete sequences and state/data flows, see:
 ## Configuration And Versioning
 
 - sandbox deploy/build image tags are pinned in `common/images.yaml`
-- Node.js toolchain and image tags are pinned in `common/node-version.env`
+- Node.js toolchain is pinned in `common/node-version.env`; the Node Docker base
+  is pinned there by tag and multi-arch index digest
 - Blockscout backend/frontend source tags are pinned in `common/images.yaml`;
   fallback refs for direct Helm use live in `services/blockscout/values.yaml`
 - chart versions are centralized in `common/versions.yaml`

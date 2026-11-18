@@ -43,8 +43,8 @@
 |---|---|---|---|---|---|---|---|---|
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (v1.36.4 is still the newest 1.36 node image, the pinned digest is unchanged, and Kind v0.33.0 is the newest Kind release; needs a node image built on the fixed Debian ca-certificates) | open | 2026-11-11, bundle read in image | sandbox |
 | `ghcr.io/blockscout/smart-contract-verifier:v1.11.2` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.2, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1); v1.11.2 (published 2026-11-09) keeps the clean bundle | fixed (adopted v0.13.0, 2026-10-29) | 2026-11-09, bundle read in image | sandbox |
-| `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages and re-resolves hackney and certifi) | none (castore 1.0.22, certifi 2.18.0 and the Alpine bundle hold 118 certificates each; the only emSign root left is "emSign Root CA - G1", which is not distrusted) | app bundle: castore 1.0.22 and certifi 2.18.0 (hackney 4.10.2); Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none upstream: v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; certifi 2.18.0 needs hackney 4.8.6 or later, so `build-images.sh` runs `mix deps.update hackney certifi` | fixed (adopted on development, 2026-11-11) | 2026-11-11, all three stores read in the running pod by openssl and certificate DER match | sandbox |
-| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5, on Node 24.22.2; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.2 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-11, bundle, Node roots and every `.node` binary read in the running image (public-key and DER match for the SWC binary) | sandbox |
+| `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages and pins nine exact Hex lock entries, among them hackney and certifi) | none (castore 1.0.22, certifi 2.18.0 and the Alpine bundle hold 118 certificates each; the only emSign root left is "emSign Root CA - G1", which is not distrusted) | app bundle: castore 1.0.22 and certifi 2.18.0 (hackney 4.10.2); Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none upstream: v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; certifi 2.18.0 needs hackney 4.8.6 or later, so `build-images.sh` swaps exact, checksummed lock entries for hackney 4.10.2 and certifi 2.18.0 (and seven more) into upstream's lock | fixed (adopted on development, 2026-11-11) | 2026-11-11, all three stores read in the running pod by openssl and certificate DER match | sandbox |
+| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5, on Node 24.22.3; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.3 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-13, Node roots (118) and OS bundle (118) re-read in the running image on Node 24.22.3 (neither distrusted root present); the SWC binary was not re-read: Next.js stays pinned at 16.4.3, so it is the build read on 2026-11-11 (public-key and DER match) | sandbox |
 | NGINX Gateway Fabric `2.8.1` (control plane and nginx data plane) | Gateway controller and proxy | none | Distroless Debian bundle (148 certificates) with Go 1.27.3; Alpine ca-certificates 20261020-r0 (nginx image, 118 certificates) | no: Kubernetes API and in-cluster upstreams only | v2.8.1 (published 2026-11-03; v2.8.0 held "AAA Certificate Services" in the control plane and "emSign ECC Root CA - G3" in the nginx image) | fixed (adopted v0.14.1, 2026-11-11) | 2026-11-11, bundle read in both images | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI (the action builds its image `FROM python:3.10`) | AAA Certificate Services; emSign ECC Root CA - G3 (system store of the `python:3.10` base) | Debian 13 ca-certificates 20250419 in `python:3.10` (pushed 2026-10-06); `solc-select` fetches through the pip-installed certifi, which was not read | yes: downloads `solc` (and `wget` installs in the action's entrypoint) | none yet (action v0.4.2 from 2026-01-16 is the newest release, and the `python:3.10` tag has not been rebuilt since 2026-10-06; Python 3.10 reached end of life in October 2026) | open | 2026-11-11, bundle read in the `python:3.10` image | sandbox |
@@ -52,7 +52,7 @@
 | `hyperledger/besu:26.11.0` | Chain nodes | none | JDK cacerts (Temurin 25.0.3, 142 certificates) on Ubuntu 24.04.5; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.0, 2026-11-03) | 2026-11-03, keytool listing of cacerts in image | sandbox |
 | `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
 | `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
-| `node:26.12.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle and Node roots read in image | sandbox |
+| `node:26.13.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22; pin moved to 26.13.1, 2026-11-13) | 2026-11-13, bundle and Node roots read in image (unchanged: ca-certificates 20250419+deb13u1, 118 Node roots) | sandbox |
 | `postgres:18.6` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21) | 2026-10-28, image filesystem read | sandbox |
 | Foundry `v1.8.6` (Contracts CI) | Contract build and test toolchain | none | app bundle: rustls-webpki 0.103.16, webpki-roots 1.0.10 | build-time only | Foundry v1.8.6 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-22, carried over | sandbox |
 
@@ -288,11 +288,18 @@
 - The backend/frontend pins in `common/images.yaml` therefore name upstream
   refs that cannot be pulled. They are satisfied locally by
   `./sandbox.sh build-images`, which clones the pinned release tags, builds
-  both images from source, and pushes them to the local kind registry;
-  `./sandbox.sh start` reuses registry images before attempting an upstream
-  pull, so subsequent starts need no rebuild.
-- On a fresh machine (or after `./sandbox.sh registry-reset`), run
-  `./sandbox.sh build-images` once before `./sandbox.sh start`. The
+  both images from source, and pushes them to the local kind registry under a
+  content-hash tag (`<tag>-<hash>`; the hash covers `build-images.sh` and the
+  pinned refs, as nb-ui, nb-bond-api and bens-microservice do). `./sandbox.sh
+  start` deploys exactly that tag and, if the registry does not hold it, stops
+  with the command to run before it creates or changes anything.
+- On a fresh machine, after `./sandbox.sh registry-reset`, and after upgrading
+  to a release that changes the Blockscout build, run
+  `./sandbox.sh build-images` before `./sandbox.sh start`. Because the tag
+  follows the content, an in-place upgrade needs no clean-up: the new tag is
+  pulled by the node and the pods roll, with the database and chain data
+  untouched. A repeat run with nothing changed builds, pushes and restarts
+  nothing. Old tags stay in the registry until `registry-reset`. The
   smart-contract-verifier image is still published upstream
   (`ghcr.io/blockscout/smart-contract-verifier`) and pulls normally.
 - Consequence for any non-local reuse of this stack: that deployment must
@@ -320,19 +327,67 @@
   runtime stage installs with `apk add --upgrade ... ca-certificates
   ca-certificates-bundle`, so the Alpine bundle matches what Alpine 3.22
   publishes (the hexpm base image carries an older one); the backend's deps
-  stage runs `mix deps.update hackney certifi` and then asserts the resulting
-  `mix.lock` entries (hackney 4.10.2, certifi 2.18.0, h2 0.15.1, quic 2.6.1,
-  ssl_verify_fun 1.1.9, webtransport 0.5.5), so the build stops if a newer
-  release resolves differently; and every frontend stage
-  moves from `node:24.21.0-alpine` to `node:24.22.2-alpine`, whose built-in root
+  stage swaps nine exact, checksummed `mix.lock` entries (hackney 4.10.2,
+  certifi 2.18.0, cowboy 2.21.0, cowlib 2.22.0, jose 1.11.13, h2 0.15.1,
+  quic 2.6.1, ssl_verify_fun 1.1.9, webtransport 0.5.5) into upstream's lock by
+  package name and runs `mix deps.get`, which fetches exactly those releases. It
+  stops if upstream's lock no longer has exactly one entry for a pinned package,
+  if the lock after `mix deps.get` differs from the pins, if any other package's
+  lock line changed, or if Hex has retired a pinned release with the reason
+  `security` or `invalid` (or a reason the script does not recognise). A release
+  retired as `deprecated`, `renamed` or `other`, and an audit service that gives
+  no report, print a loud warning and the build continues. Every frontend stage
+  moves from `node:24.21.0-alpine` to `node:24.22.3-alpine`, whose built-in root
   list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
   once upstream's base image carries the newer bundle or Node release, or its
-  lockfile resolves hackney 4.8.6 or later.
-- `build-images` rebuilds under the same tag, and the registry push is skipped
-  when the `-kind` tag is already present, so a sandbox that already holds the
-  backend or frontend image keeps the old build until its registry copy is replaced (for
-  example after `./sandbox.sh registry-reset`).
+  lockfile reaches hackney 4.8.6 or later and cowboy 2.21.0, cowlib 2.22.0 and
+  jose 1.11.13 or later.
+- The backend dependency pins do not move by themselves, and this matters most
+  for `certifi`: the build never takes a newer `certifi`, so a later change to
+  the root list reaches the sandbox only when someone re-pins. The pins replace a
+  floating `mix deps.update`, which took the newest release at build time; that
+  moved hackney, certifi, h2, quic, idna and webtransport between 2026-11-10 and
+  2026-11-15, so fresh builds of v0.14.2 and of development before the change
+  that introduced the pins failed their own lock assertions. Images that were
+  already built, and machines whose registry already held the content tag, were
+  not affected. Because the pins are inside `build-images.sh`, which the
+  content hash covers, a pin change always moves the image tags. After
+  building the backend the script also lists newer releases of the pinned
+  packages (`mix hex.outdated`) and repeats the retirement check next to the
+  advisory listing; the summary is informational and never fails the build.
+  Re-pin when a pinned package gets an advisory (the `mix hex.audit` listing
+  shows it), when `certifi` changes its default root list, or when the
+  Blockscout pin moves. To re-pin, start a throwaway container from the backend
+  deps stage, add `{:name, "== x.y.z", override: true}` entries for the packages
+  to the umbrella `mix.exs`, run `mix deps.get` against upstream's lock, copy the
+  changed lock lines into `backend_lock_pins` in `build-images.sh`, and soak the
+  resulting image before releasing it.
+- The backend lockfile also carries Hex package advisories. The pins above
+  clear eleven of them (cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12 are the
+  affected versions it replaces, all inside upstream's own version
+  constraints). After `build-images.sh` builds the backend it lists what is
+  left with `mix hex.audit`; the listing is informational and never fails the
+  build. What remains for v12.0.4:
+  - Waiting on upstream: ecto 3.13.6 (high; fixed in 3.14.3, which needs
+    decimal 3, while upstream constrains decimal to `~> 2.0` and its `number`
+    dependency allows only decimal 1 or 2), decimal 2.4.1 (two medium; fixed in
+    3.x), plug_crypto 1.2.5 (medium; fixed in 2.2.1, which needs a newer Phoenix
+    than upstream's exact 1.6.17 pin), and phoenix_html 4.2.1 (medium; upstream's
+    development branch already locks 4.4.0, so the next release should carry it).
+  - No fixed version exists: cloak 1.1.4 (high) and cloak_ecto 1.3.0 (medium).
+    Only the explorer's account features use them, and the sandbox does not
+    configure those.
+  - Reported but not in the release image: brotli 0.3.2 (high).
+
+  Dependabot and the repository scans do not see these, because upstream's
+  `mix.lock` is cloned at build time and is not in this repository. Re-check the
+  list when the Blockscout pin moves, and drop a pin
+  once upstream's lockfile reaches the fixed version.
+- The hash does not cover base images that the recipe names by tag
+  (`node:24.22.3-alpine`, the hexpm Elixir image), so a base that moves under an
+  unchanged tag is not picked up until the recipe changes. Pinning those bases
+  by digest would close that gap.
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
 
@@ -401,7 +456,7 @@
   including the ESM `@noble/secp256k1`). Babel 8 needs Node `^22.18.0 || >=24.11.0`,
   which the Node 26 pin in `common/node-version.env` satisfies. The two packages
   are coupled: `@babel/preset-env` 8 peer-requires core 8.
-- The root `package.json` pins `@babel/core` 8.1.0 as a dev dependency on purpose.
+- The root `package.json` pins `@babel/core` 8.1.2 as a dev dependency on purpose.
   Without it npm hoists jest's own `@babel/core` 7 to the root, `babel-jest`
   resolves that copy, and the Babel 8 preset would load under core 7. With it,
   `babel-jest` and the workspace share the root core 8. An `overrides` entry on

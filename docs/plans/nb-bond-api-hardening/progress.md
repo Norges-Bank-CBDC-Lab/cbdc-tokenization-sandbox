@@ -130,6 +130,8 @@ Effects on this plan:
   and Phase 4b is now `node:26.12.1-slim`. The 2.0 GB image measurement in `design.md` was
   taken on 26.5.0 and is kept as recorded. The repo-owned image hashes now include their base
   image refs, so the Phase 4b runtime-base switch rebuilds the API image by itself.
+- The Node pin then moved to 26.13.1 (2026-11-13, a security release), so the slim runtime base
+  is now `node:26.13.1-slim`; the instruction lines in `plan.md` and `design.md` follow it.
 
 ## Session Handoff
 

@@ -147,6 +147,8 @@ main() {
     assert_base_image_sensitivity "nb-bond-api" nbBondApiBundleHash NB_BOND_API_RUNTIME_BASEIMAGE
     assert_images_key_sensitivity "nb-ui"             nbUIBundleHash nb_ui.nginx
     assert_images_key_sensitivity "bens-microservice" bensImageHash  blockscout.bens
+    assert_images_key_sensitivity "blockscout-source" blockscoutSourceBuildHash blockscout.backend
+    assert_images_key_sensitivity "blockscout-source" blockscoutSourceBuildHash blockscout.frontend
 
     echo
     if [ "$FAILURES" -gt 0 ]; then

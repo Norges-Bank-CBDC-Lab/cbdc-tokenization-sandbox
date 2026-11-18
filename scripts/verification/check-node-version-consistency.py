@@ -189,10 +189,13 @@ def main() -> int:
     if not node_major:
         errors.append("common/node-version.env: missing SANDBOX_NODE_MAJOR")
 
-    if node_version and node_image and node_image != f"node:{node_version}":
+    if node_version and node_image and not re.fullmatch(
+        rf"node:{re.escape(node_version)}@sha256:[0-9a-f]{{64}}", node_image
+    ):
         errors.append(
             f"common/node-version.env: SANDBOX_NODE_IMAGE is {node_image!r}, "
-            f"expected 'node:{node_version}'"
+            f"expected 'node:{node_version}@sha256:<64 hex digest>' (the "
+            "multi-arch index digest)"
         )
     if node_version and types_node_version:
         # DefinitelyTyped publishing trails Node.js runtime releases, so
