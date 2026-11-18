@@ -337,7 +337,8 @@
   `security` or `invalid` (or a reason the script does not recognise). A release
   retired as `deprecated`, `renamed` or `other`, and an audit service that gives
   no report, print a loud warning and the build continues. Every frontend stage
-  moves from `node:24.21.0-alpine` to `node:24.22.3-alpine`, whose built-in root
+  moves from `node:24.21.0-alpine` to `node:24.22.3-alpine` (pinned by index
+  digest), whose built-in root
   list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
   once upstream's base image carries the newer bundle or Node release, or its
@@ -384,12 +385,64 @@
   `mix.lock` is cloned at build time and is not in this repository. Re-check the
   list when the Blockscout pin moves, and drop a pin
   once upstream's lockfile reaches the fixed version.
-- The hash does not cover base images that the recipe names by tag
-  (`node:24.22.3-alpine`, the hexpm Elixir image), so a base that moves under an
-  unchanged tag is not picked up until the recipe changes. Pinning those bases
-  by digest would close that gap.
+- The hash covers `build-images.sh`, which names every build base by tag and
+  index digest (`node:24.22.3-alpine` for the frontend stages, the hexpm Elixir
+  Alpine image for both backend stages), so a base that moves under its tag is
+  not picked up silently: the pin changes only by an edit that moves the hash.
+  The pinned digests are the ones the v0.14.3 images were built from (the
+  built images' layers start with exactly those base layers). Both digest pins
+  stop the build when upstream's `FROM` lines change, which is the reminder to
+  re-read the base on a new Blockscout tag. The `apk add --upgrade` steps inside
+  the stages still resolve at build time, by design (they bring the CA bundle
+  forward).
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
+
+## Third-party images are pinned by tag and digest
+
+- Every third-party image in `common/images.yaml` (Besu, Postgres, the Python
+  base of BENS, the smart-contract verifier, the nginx base of the NB UI, the
+  local registry), the Node base in `common/node-version.env`, the Kind node
+  image, and the Blockscout build bases in `services/blockscout/build-images.sh`
+  is pinned as `<repo>:<tag>@sha256:<multi-arch index digest>`, so amd64 and
+  arm64 hosts resolve the same content and a re-pushed tag changes nothing
+  until the pin is edited. The two Blockscout source-built refs name upstream
+  release tags, not images, and stay tag-only.
+  `python3 scripts/verification/check-image-pins.py` (CI: `validate-image-pins`)
+  fails on a missing or malformed digest, on a Dockerfile base or image `ARG`
+  default without one, and on any file that repeats a reference from
+  `common/images.yaml` with a different value. The header of `common/images.yaml`
+  says how to bump a pin.
+- The digest governs the upstream pull only. The Kind node pulls
+  `localhost:5001/<repo>:<tag>-kind` by tag from the local registry, and that
+  tag is kept. A digest refresh under an unchanged tag is therefore not picked
+  up by a registry or node that already holds the tag; bump the tag where the
+  publisher offers one, otherwise run `./infra/infra.sh registry-reset`.
+- The pins were taken from the content the sandbox was running, not from the
+  newest build of each tag. One tag had moved by then: `registry:3.1.2` was
+  re-pushed after the sandbox registry was created, and the pin keeps the
+  earlier content (the one the CA-bundle register row was read from). Changing
+  to the newer content recreates the registry container, which empties the
+  registry (the base images re-sync, the repo-owned and Blockscout images
+  rebuild); the registry is only recreated when the image content differs from
+  the pin, not when the same content is spelled with a digest.
+- Pins do not update themselves, and Dependabot cannot read these files.
+  `python3 scripts/verification/report-image-pin-updates.py` lists pins whose
+  tag now points at a different digest and newer tags in the same line; a weekly
+  workflow (`image-pin-report`) runs it and writes the job summary. It never
+  fails a build and opens no pull requests.
+- Not pinned by digest: GitHub Actions (major-version tags that Dependabot
+  tracks, except the two that are pinned by commit); the optional local tools
+  `contracts/slither.sh` (`trailofbits/eth-security-toolbox:latest`, amd64-only)
+  and `services/blockscout/bens-microservice/regen-openapi.sh`
+  (`openapitools/openapi-generator-cli`, no tag); the NGINX Gateway Fabric
+  images, which the chart tags by its version (`common/versions.yaml`); and the
+  system images inside the Kind node, which the pinned node image carries.
+- Offline builds: a digest reference cannot be a retag target, so the NB UI,
+  NB Bond API and BENS builds cannot reuse the local registry's copy of their
+  bases the way a tag-only reference could. After a host Docker cache wipe, one
+  upstream pull by digest brings each base back; until then those builds need
+  the network. The sandbox's own pods still pull from the local registry only.
 
 ## Blockscout does not show BENS names
 - Blockscout returns `ens_domain_name: null` for transaction parties that

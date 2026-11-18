@@ -70,6 +70,7 @@ python3 scripts/verification/check-third-party-licenses.py   # dependency manife
 python3 scripts/verification/check-node-version-consistency.py   # Node pin, Dockerfiles, common/ pins, or package manifests
 bash scripts/verification/check-image-hash-inputs.sh   # common/helpers.sh or a locally built image's inputs
 python3 scripts/verification/check-besu-qbft-baseline.py   # infra/besu/, common/images.yaml, or Foundry config
+python3 scripts/verification/check-image-pins.py   # an image reference, a Dockerfile base, or common/images.yaml
 ```
 
 [`scripts/verification/README.md`](scripts/verification/README.md) describes

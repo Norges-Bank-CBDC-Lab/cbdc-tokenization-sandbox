@@ -16,7 +16,7 @@
 # works.
 
 ARG NB_UI_BUILDER_IMAGE
-ARG NB_UI_NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine
+ARG NB_UI_NGINX_IMAGE=nginxinc/nginx-unprivileged:1.30.6-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
 
 FROM ${NB_UI_BUILDER_IMAGE} AS builder
 WORKDIR /app

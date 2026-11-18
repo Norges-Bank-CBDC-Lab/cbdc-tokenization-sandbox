@@ -82,6 +82,27 @@ sed "s|$backend_apk_text|add --upgrade jq curl ffmpeg ca-certificates ca-certifi
 mv "$backend_dockerfile.patched" "$backend_dockerfile"
 echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 
+# Upstream names its Elixir/Alpine base by tag only (both stages, builder-deps
+# and runtime), and a tag can be re-pushed. Pin the index digest of the image
+# the released builds were made from, so the build base cannot move without a
+# visible edit here. The digest is the multi-arch index digest, as for
+# SANDBOX_NODE_IMAGE in common/node-version.env. The step stops if upstream's
+# FROM lines are not exactly these two. To bump (a new upstream tag names a new
+# base): set the tag, read `docker buildx imagetools inspect <tag>` for the
+# index digest, edit both lines below, and run scripts/verification/
+# check-image-pins.py. See docs/KNOWN_ISSUES.md.
+backend_base_tag="hexpm/elixir:1.20.4-erlang-28.5.0.7-alpine-3.22.6"
+backend_base_pinned="${backend_base_tag}@sha256:2dde7b063115d2d91fdb7d070cd3d5c97572a0119167f3327741a88096276b1a"
+
+if [[ "$(awk -v ref="$backend_base_tag" '$1 == "FROM" && $2 == ref { n++ } END { print n + 0 }' "$backend_dockerfile")" != "2" ]]; then
+    echo "❌ Expected exactly two 'FROM $backend_base_tag' stages in the upstream backend Dockerfile ($backend_tag); review the base pin in $(basename "$0")"
+    exit 1
+fi
+
+awk -v ref="$backend_base_tag" -v pinned="$backend_base_pinned" '$1 == "FROM" && $2 == ref { $2 = pinned } { print }' "$backend_dockerfile" > "$backend_dockerfile.patched"
+mv "$backend_dockerfile.patched" "$backend_dockerfile"
+echo "🔧 Pinned the backend stages to ${backend_base_pinned}"
+
 # Upstream's lockfile resolves certifi 2.17.0, whose bundled root list still
 # carries the distrusted eMudhra root, and hackney 4.8.5 pins certifi to
 # ~> 2.17.0. It also locks cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12, which
@@ -262,9 +283,11 @@ frontend_install_line="RUN pnpm install --frozen-lockfile"
 frontend_dockerfile="$frontend_tmp/Dockerfile"
 # Upstream's Node base (24.21.0) still ships the distrusted eMudhra root in its
 # built-in list; 24.22.1 and later removed it. Move every stage to a newer
-# Node 24 Alpine image. See docs/KNOWN_ISSUES.md.
+# Node 24 Alpine image, pinned by tag and multi-arch index digest like the
+# other bases (see the backend base above for how to bump).
+# See docs/KNOWN_ISSUES.md.
 frontend_node_from="node:24.21.0-alpine"
-frontend_node_to="node:24.22.3-alpine"
+frontend_node_to="node:24.22.3-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5"
 
 if [[ "$(grep -cxF "$frontend_install_line" "$frontend_dockerfile")" != "1" ]]; then
     echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the Next.js pin in $(basename "$0")"

@@ -24,6 +24,17 @@ integrators.
 - `check-besu-qbft-baseline.py`: validates Besu image pins, QBFT/Osaka genesis,
   split validator/archive topology, archive-only consumers, Foundry/OZ versions,
   and (when built) genesis `GlobalRegistry` bytecode
+- `check-image-pins.py`: validates that every third-party image is pinned as
+  `<repo>:<tag>@sha256:<multi-arch index digest>` (`common/images.yaml`, the
+  kind node image, the Blockscout build bases, every Dockerfile base), that
+  each file repeating a reference from `common/images.yaml` carries the same
+  value, and names the file when it does not. Offline; the two Blockscout
+  source-built refs are release tags and stay tag-only
+- `report-image-pin-updates.py`: non-blocking staleness report for those pins.
+  It lists pins whose tag now resolves to a different digest (`MOVED`) and newer
+  tags in the same line (`NEWER`), and always exits 0. Needs the network; a
+  weekly workflow (`image-pin-report.yml`) runs it and writes the job summary,
+  because Dependabot cannot read these files
 - `check-image-hash-inputs.sh`: guards the content-hash cache keys for the
   repo-owned images (`nb-ui`, `nb-bond-api`, `bens-microservice`) — asserts each
   `*BundleHash` is sensitive to files inside its hashed input set and insensitive
@@ -44,5 +55,7 @@ python3 scripts/verification/check-public-repo-hygiene.py
 python3 scripts/verification/check-markdown-links.py
 python3 scripts/verification/check-node-version-consistency.py
 python3 scripts/verification/check-besu-qbft-baseline.py
+python3 scripts/verification/check-image-pins.py
 bash scripts/verification/check-image-hash-inputs.sh
+python3 scripts/verification/report-image-pin-updates.py   # report only, needs network
 ```
