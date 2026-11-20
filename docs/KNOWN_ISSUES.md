@@ -105,6 +105,22 @@
   once it runs again, so an outage like this one leaves no permanent gap in
   the explorer.
 
+## `*.cbdc-sandbox.local` lookups can take 5 seconds on macOS
+- The hosts entries map the four sandbox names to `127.0.0.1` only. On some
+  macOS setups the system resolver still sends the AAAA (IPv6) query for a
+  `.local` name to multicast DNS, which has no answer and gives up after 5
+  seconds. Every new lookup then takes 5 seconds in every client that uses the
+  system resolver (observed with `curl`, `cast`, Node.js `fetch` and Python);
+  the IPv4 lookup itself is instant. `scutil --dns` shows the `local` domain
+  routed to mDNS on an affected machine.
+- `waitForApiGateway` asks `curl` for IPv4 only (`-4`), so its readiness probe
+  no longer spends its whole 5-second budget on the lookup. Without that, the
+  "Testing gateway..." step never finishes on an affected machine even though
+  the gateway answers.
+- Other tools you run by hand against these names pay the delay on each new
+  connection. Use an IPv4-only option where the tool has one (`curl -4`), or
+  `kubectl port-forward` against the specific service (see the README).
+
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
   finality but no Byzantine fault tolerance.

@@ -1058,8 +1058,13 @@ function waitForApiGateway() {
     local rpc_url="http://besu.cbdc-sandbox.local:8545/"
     local rpc_body='{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 
+    # `-4`: the hosts entries are IPv4 only. On some macOS setups the system
+    # resolver sends the AAAA query for a `.local` name to mDNS, which answers
+    # only after a 5 s timeout, and that alone exhausts --max-time 5, so the
+    # probe would never succeed even though the gateway answers. Asking for
+    # IPv4 only skips that query (see docs/KNOWN_ISSUES.md).
     while true; do
-        response=$(curl -fsS -X POST -H "Content-Type: application/json" \
+        response=$(curl -4 -fsS -X POST -H "Content-Type: application/json" \
             --max-time 5 \
             --data "$rpc_body" \
             "$rpc_url" 2>/dev/null || true)
