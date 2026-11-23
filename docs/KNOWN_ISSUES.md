@@ -335,14 +335,25 @@
   future tag cannot bring an affected Next.js back unnoticed. Raise the minimum
   when a newer Next.js advisory is fixed.
 - Frontend `v2.13.0` replaced `v2.12.1` on 2026-11-18 for two reasons found in a
-  real browser (a headless Chromium render of every page type; HTTP 200 alone
-  did not show either). First, `v2.12.1`'s production pages returned 200 but did
-  not render: the body stayed empty and the browser logged an inline script that
-  violated the page's own Content-Security-Policy; the `v2.13.0` release notes
-  list a fix for production pages failing the CSP, and every page type renders
-  on it. Second, `v2.13.0` sends a 3.2 KB `Content-Security-Policy` header, which
-  with the other response headers is 4097 bytes on an HTML request, one byte over
-  NGINX's default 4 KB `proxy_buffer_size`. The gateway then answered 502
+  headless Chromium render of every page type (HTTP 200 alone did not show
+  either). First, in the sandbox the `v2.12.1` pages returned 200 but stayed
+  empty: the body had no content and the browser logged an inline script that
+  violated the page's own `script-src` Content-Security-Policy. That build ran
+  Next.js 16.4.3, which `build-images.sh` had added on top of `v2.12.1`'s own
+  lock (16.3.5; see the previous bullet). The `v2.13.0` release notes describe
+  a matching cause: Next.js 16.4 turns on a Turbopack shared runtime that, in a
+  production build, emits an inline bootstrap script with neither hash nor
+  nonce, which a strict `script-src` blocks; `v2.13.0` switches it off. So this
+  was most likely a property of the sandbox's build (Next.js 16.4.3 with the
+  policy enforced), not of every `v2.12.1` deployment: the same upstream
+  version has been seen rendering normally in another deployment served over
+  HTTPS. Not established: that the blocked script was that bootstrap script (the
+  browser message was not traced to a script), and whether a regular browser
+  shows the same (only the headless render was run, on a plain-HTTP hostname).
+  Every page type renders on `v2.13.0` in the sandbox. Second, `v2.13.0` sends a
+  3.2 KB `Content-Security-Policy` header, which with the other response
+  headers is 4097 bytes on an HTML request, one byte over NGINX's default 4 KB
+  `proxy_buffer_size`. The gateway then answered 502
   ("upstream sent too big header") to every browser page request while a request
   without an HTML `Accept` header still worked. `services/blockscout/templates/
   proxy-settings-policy.yaml` raises the buffer to 8k for the Blockscout route.
