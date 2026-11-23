@@ -1,0 +1,18 @@
+# The Blockscout frontend sends its Content-Security-Policy header (3.2 KB with
+# every allowed source) on HTML responses, which together with the other
+# response headers is larger than NGINX's default 4 KB proxy_buffer_size. The
+# gateway then answers 502 ("upstream sent too big header") to every browser
+# page request, while a request without an HTML Accept header still works.
+# Raise the buffer for this route. 8k is room for the header plus a longer
+# hostname; the default busy-buffers size stays valid at this value.
+apiVersion: gateway.nginx.org/v1alpha1
+kind: ProxySettingsPolicy
+metadata:
+  name: blockscout-proxy-settings
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: blockscout
+  buffering:
+    bufferSize: 8k

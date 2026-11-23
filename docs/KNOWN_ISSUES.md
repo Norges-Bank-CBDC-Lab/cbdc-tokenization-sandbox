@@ -44,7 +44,7 @@
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (v1.36.4 is still the newest 1.36 node image, the pinned digest is unchanged, and Kind v0.33.0 is the newest Kind release; needs a node image built on the fixed Debian ca-certificates) | open | 2026-11-11, bundle read in image | sandbox |
 | `ghcr.io/blockscout/smart-contract-verifier:v1.11.2` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.2, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1); v1.11.2 (published 2026-11-09) keeps the clean bundle | fixed (adopted v0.13.0, 2026-10-29) | 2026-11-09, bundle read in image | sandbox |
 | `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages and pins nine exact Hex lock entries, among them hackney and certifi) | none (castore 1.0.22, certifi 2.18.0 and the Alpine bundle hold 118 certificates each; the only emSign root left is "emSign Root CA - G1", which is not distrusted) | app bundle: castore 1.0.22 and certifi 2.18.0 (hackney 4.10.2); Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none upstream: v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; certifi 2.18.0 needs hackney 4.8.6 or later, so `build-images.sh` swaps exact, checksummed lock entries for hackney 4.10.2 and certifi 2.18.0 (and seven more) into upstream's lock | fixed (adopted on development, 2026-11-11) | 2026-11-11, all three stores read in the running pod by openssl and certificate DER match | sandbox |
-| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5, on Node 24.22.3; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.3 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-13, Node roots (118) and OS bundle (118) re-read in the running image on Node 24.22.3 (neither distrusted root present); the SWC binary was not re-read: Next.js stays pinned at 16.4.3, so it is the build read on 2026-11-11 (public-key and DER match) | sandbox |
+| `ghcr.io/blockscout/frontend:v2.13.0` | Explorer frontend (source-built with the Next.js 16.4.3 that upstream's lockfile carries, on Node 24.22.3; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.3 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list (the same package version as before) | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-18, Node roots (118) and OS bundle (118) re-read in the built v2.13.0 image on Node 24.22.3 (neither distrusted root present); the full certificate of "emSign ECC Root CA - G3" is present in the `@next/swc-linux-arm64-musl` 16.4.3 binary under the sitemap generator and nowhere else, unchanged from the v2.12.1 image | sandbox |
 | NGINX Gateway Fabric `2.8.1` (control plane and nginx data plane) | Gateway controller and proxy | none | Distroless Debian bundle (148 certificates) with Go 1.27.3; Alpine ca-certificates 20261020-r0 (nginx image, 118 certificates) | no: Kubernetes API and in-cluster upstreams only | v2.8.1 (published 2026-11-03; v2.8.0 held "AAA Certificate Services" in the control plane and "emSign ECC Root CA - G3" in the nginx image) | fixed (adopted v0.14.1, 2026-11-11) | 2026-11-11, bundle read in both images | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI (the action builds its image `FROM python:3.10`) | AAA Certificate Services; emSign ECC Root CA - G3 (system store of the `python:3.10` base) | Debian 13 ca-certificates 20250419 in `python:3.10` (pushed 2026-10-06); `solc-select` fetches through the pip-installed certifi, which was not read | yes: downloads `solc` (and `wget` installs in the action's entrypoint) | none yet (action v0.4.2 from 2026-01-16 is the newest release, and the `python:3.10` tag has not been rebuilt since 2026-10-06; Python 3.10 reached end of life in October 2026) | open | 2026-11-11, bundle read in the `python:3.10` image | sandbox |
@@ -321,16 +321,36 @@
 - Consequence for any non-local reuse of this stack: that deployment must
   build the two Blockscout images itself (for its own target CPU platform)
   and host them in its own registry.
-- The frontend tag `v2.12.1` locks Next.js 16.3.5, which is affected by the
+- The frontend build resolves no dependency version at build time: upstream's
+  Dockerfile installs with `pnpm install --frozen-lockfile` from the tag's
+  `pnpm-lock.yaml`, and `build-images.sh` stops if that install line is not
+  exactly that. The tag `v2.12.1` locked Next.js 16.3.5, which is affected by the
   Next.js advisories fixed in 16.3.6 to 16.4.1 (among them
   [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) and
-  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)).
-  `services/blockscout/build-images.sh` therefore adds one step to upstream's
-  Dockerfile after its frozen install, `pnpm add -w next@16.4.3 --save-exact`,
-  and stops if that install line is not found. The version is kept at least a
-  week old, because upstream's pnpm config sets `minimumReleaseAge` to one
-  week. Remove the step once a frontend release tag locks Next.js 16.4.1 or
-  later.
+  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)), so
+  that build added `pnpm add -w next@16.4.3` on top of the frozen install. From
+  `v2.13.0` the lock carries Next.js 16.4.3 itself, the step is gone, and the
+  script instead reads every `next@<version>` entry of the cloned lockfile and
+  stops the build when one is older than the minimum it names (16.4.3), so a
+  future tag cannot bring an affected Next.js back unnoticed. Raise the minimum
+  when a newer Next.js advisory is fixed.
+- Frontend `v2.13.0` replaced `v2.12.1` on 2026-11-18 for two reasons found in a
+  real browser (a headless Chromium render of every page type; HTTP 200 alone
+  did not show either). First, `v2.12.1`'s production pages returned 200 but did
+  not render: the body stayed empty and the browser logged an inline script that
+  violated the page's own Content-Security-Policy; the `v2.13.0` release notes
+  list a fix for production pages failing the CSP, and every page type renders
+  on it. Second, `v2.13.0` sends a 3.2 KB `Content-Security-Policy` header, which
+  with the other response headers is 4097 bytes on an HTML request, one byte over
+  NGINX's default 4 KB `proxy_buffer_size`. The gateway then answered 502
+  ("upstream sent too big header") to every browser page request while a request
+  without an HTML `Accept` header still worked. `services/blockscout/templates/
+  proxy-settings-policy.yaml` raises the buffer to 8k for the Blockscout route.
+  The header grows with the length of the app hostname, so any other reverse
+  proxy or ingress in front of the frontend must accept response headers larger
+  than 4 KB. With `NEXT_PUBLIC_COLOR_THEME_DEFAULT` unset the explorer follows
+  the operating system's colour scheme in both versions (`v2.13.0` calls it
+  "Auto (System)"), so no theme variable is set.
 - Correction: the v0.14.1 release notes and the register called the frontend row
   `fixed`; that overstated it. The Node base and the OS bundle are clean, but the
   `@next/swc` binary that the image ships for the sitemap generator embeds its own
@@ -338,6 +358,8 @@
   and by full certificate DER in `@next/swc-linux-arm64-musl` 16.4.3 and 16.4.6). It
   is not loaded by the running server or the startup sitemap tool, so the row stays
   `open` until a Next.js release drops the root.
+  The v2.13.0 lockfile locks `@next/swc` 16.4.3 as well, so adopting that tag changed
+  nothing here; the 2026-11-18 re-read of the built image confirms it.
 - `build-images.sh` also patches three trust-store inputs in the cloned Dockerfiles
   and stops if their text is not found exactly as expected: the backend's
   runtime stage installs with `apk add --upgrade ... ca-certificates
