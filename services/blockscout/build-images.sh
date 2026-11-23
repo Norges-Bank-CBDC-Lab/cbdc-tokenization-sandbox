@@ -82,6 +82,27 @@ sed "s|$backend_apk_text|add --upgrade jq curl ffmpeg ca-certificates ca-certifi
 mv "$backend_dockerfile.patched" "$backend_dockerfile"
 echo "🔧 Upgrading the Alpine CA packages in the backend runtime stage"
 
+# Upstream names its Elixir/Alpine base by tag only (both stages, builder-deps
+# and runtime), and a tag can be re-pushed. Pin the index digest of the image
+# the released builds were made from, so the build base cannot move without a
+# visible edit here. The digest is the multi-arch index digest, as for
+# SANDBOX_NODE_IMAGE in common/node-version.env. The step stops if upstream's
+# FROM lines are not exactly these two. To bump (a new upstream tag names a new
+# base): set the tag, read `docker buildx imagetools inspect <tag>` for the
+# index digest, edit both lines below, and run scripts/verification/
+# check-image-pins.py. See docs/KNOWN_ISSUES.md.
+backend_base_tag="hexpm/elixir:1.20.4-erlang-28.5.0.7-alpine-3.22.6"
+backend_base_pinned="${backend_base_tag}@sha256:2dde7b063115d2d91fdb7d070cd3d5c97572a0119167f3327741a88096276b1a"
+
+if [[ "$(awk -v ref="$backend_base_tag" '$1 == "FROM" && $2 == ref { n++ } END { print n + 0 }' "$backend_dockerfile")" != "2" ]]; then
+    echo "❌ Expected exactly two 'FROM $backend_base_tag' stages in the upstream backend Dockerfile ($backend_tag); review the base pin in $(basename "$0")"
+    exit 1
+fi
+
+awk -v ref="$backend_base_tag" -v pinned="$backend_base_pinned" '$1 == "FROM" && $2 == ref { $2 = pinned } { print }' "$backend_dockerfile" > "$backend_dockerfile.patched"
+mv "$backend_dockerfile.patched" "$backend_dockerfile"
+echo "🔧 Pinned the backend stages to ${backend_base_pinned}"
+
 # Upstream's lockfile resolves certifi 2.17.0, whose bundled root list still
 # carries the distrusted eMudhra root, and hackney 4.8.5 pins certifi to
 # ~> 2.17.0. It also locks cowboy 2.20.0, cowlib 2.21.0 and jose 1.11.12, which
@@ -252,22 +273,27 @@ echo "🔧 Building Blockscout frontend ($frontend_tag)"
 git clone --depth 1 --branch "$frontend_tag" https://github.com/blockscout/frontend.git "$frontend_tmp"
 frontend_sha=$(git -C "$frontend_tmp" rev-parse HEAD)
 
-# The upstream frontend tag locks Next.js at a version with published
-# advisories; pin a fixed release on top of upstream's frozen install. The
-# version must be at least a week old, because upstream's pnpm config sets
-# minimumReleaseAge to one week. The Node heap is raised because re-resolving
-# the workspace with `pnpm add` is memory-bound. See docs/KNOWN_ISSUES.md.
-frontend_next_version="16.4.3"
+# The frontend tag's pnpm-lock.yaml decides the Next.js version, and the Docker
+# build installs from it with `pnpm install --frozen-lockfile`, so nothing in
+# the frontend build resolves a dependency version at build time. v2.12.1 locked
+# a Next.js with published advisories and this script used to add a newer one on
+# top; v2.13.0 and later lock 16.4.3 themselves. A tag whose lock holds a Next.js
+# older than the minimum below fails the build here instead of shipping it.
+# Raise the minimum when a Next.js advisory is fixed in a newer release. See
+# docs/KNOWN_ISSUES.md.
+frontend_next_minimum="16.4.3"
 frontend_install_line="RUN pnpm install --frozen-lockfile"
 frontend_dockerfile="$frontend_tmp/Dockerfile"
 # Upstream's Node base (24.21.0) still ships the distrusted eMudhra root in its
 # built-in list; 24.22.1 and later removed it. Move every stage to a newer
-# Node 24 Alpine image. See docs/KNOWN_ISSUES.md.
+# Node 24 Alpine image, pinned by tag and multi-arch index digest like the
+# other bases (see the backend base above for how to bump).
+# See docs/KNOWN_ISSUES.md.
 frontend_node_from="node:24.21.0-alpine"
-frontend_node_to="node:24.22.3-alpine"
+frontend_node_to="node:24.22.3-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5"
 
 if [[ "$(grep -cxF "$frontend_install_line" "$frontend_dockerfile")" != "1" ]]; then
-    echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the Next.js pin in $(basename "$0")"
+    echo "❌ Expected exactly one '$frontend_install_line' line in the upstream frontend Dockerfile ($frontend_tag); review the frozen install check in $(basename "$0")"
     exit 1
 fi
 
@@ -276,12 +302,18 @@ if [[ "$(grep -cF -- "$frontend_node_from" "$frontend_dockerfile")" != "2" ]]; t
     exit 1
 fi
 
-awk -v install_line="$frontend_install_line" -v next_version="$frontend_next_version" '
-    { print }
-    $0 == install_line { print "RUN NODE_OPTIONS=--max-old-space-size=6144 pnpm add -w next@" next_version " --save-exact" }
-' "$frontend_dockerfile" > "$frontend_dockerfile.patched"
-mv "$frontend_dockerfile.patched" "$frontend_dockerfile"
-echo "🔧 Pinned Next.js $frontend_next_version in the frontend deps stage"
+frontend_next_locked="$(sed -nE 's/^  next@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' "$frontend_tmp/pnpm-lock.yaml")"
+if [[ -z "$frontend_next_locked" ]]; then
+    echo "❌ Found no 'next@<version>' entry in the upstream frontend lockfile ($frontend_tag); review the Next.js check in $(basename "$0")"
+    exit 1
+fi
+for locked_version in $frontend_next_locked; do
+    if [[ "$(printf '%s\n%s\n' "$frontend_next_minimum" "$locked_version" | sort -V | head -n1)" != "$frontend_next_minimum" ]]; then
+        echo "❌ The upstream frontend lockfile ($frontend_tag) locks Next.js $locked_version, below the required $frontend_next_minimum (published advisories); pin a newer frontend tag or add a step that installs a fixed Next.js, then review $(basename "$0")"
+        exit 1
+    fi
+done
+echo "🔧 The frontend lockfile locks Next.js ${frontend_next_locked//$'\n'/, } (minimum $frontend_next_minimum); the install is frozen"
 
 sed "s|$frontend_node_from|$frontend_node_to|g" "$frontend_dockerfile" > "$frontend_dockerfile.patched"
 mv "$frontend_dockerfile.patched" "$frontend_dockerfile"

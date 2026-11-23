@@ -1,0 +1,28 @@
+name: Image Pin Report
+
+# Reports pinned images whose tag moved or that have newer releases. Dependabot
+# cannot read the pin files, so this is how a pin is noticed going stale. It
+# opens no pull requests and never fails; read the job summary.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report-image-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Report stale image pins
+        run: python3 scripts/verification/report-image-pin-updates.py

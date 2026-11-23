@@ -44,7 +44,7 @@
 | `kindest/node:v1.36.4` | Kind node (containerd, kubelet) | AAA Certificate Services; emSign ECC Root CA - G3 | Debian 13 ca-certificates 20250419 (the fixed build is 20250419+deb13u1); containerd 2.3.4 | yes: containerd pulls images that are not in the local registry | none yet (v1.36.4 is still the newest 1.36 node image, the pinned digest is unchanged, and Kind v0.33.0 is the newest Kind release; needs a node image built on the fixed Debian ca-certificates) | open | 2026-11-11, bundle read in image | sandbox |
 | `ghcr.io/blockscout/smart-contract-verifier:v1.11.2` | Contract verifier | none | Ubuntu 24.04 ca-certificates 20260816ubuntu0.24.04.2, used through OpenSSL | yes: downloads Solidity compilers from `binaries.soliditylang.org` | v1.11.1 (published 2026-10-28; v1.11.0 held "emSign ECC Root CA - G3" on Ubuntu ca-certificates 20260601~24.04.1); v1.11.2 (published 2026-11-09) keeps the clean bundle | fixed (adopted v0.13.0, 2026-10-29) | 2026-11-09, bundle read in image | sandbox |
 | `ghcr.io/blockscout/blockscout:v12.0.4` | Explorer backend (source-built; the build upgrades the Alpine CA packages and pins nine exact Hex lock entries, among them hackney and certifi) | none (castore 1.0.22, certifi 2.18.0 and the Alpine bundle hold 118 certificates each; the only emSign root left is "emSign Root CA - G1", which is not distrusted) | app bundle: castore 1.0.22 and certifi 2.18.0 (hackney 4.10.2); Alpine ca-certificates 20261020-r0 (upgraded by `build-images.sh`; the hexpm base ships 20260909-r0) | yes: token metadata fetches can leave the cluster (market data is disabled) | none upstream: v12.0.4 locks hackney 4.8.5, which requires certifi ~> 2.17.0; certifi 2.18.0 needs hackney 4.8.6 or later, so `build-images.sh` swaps exact, checksummed lock entries for hackney 4.10.2 and certifi 2.18.0 (and seven more) into upstream's lock | fixed (adopted on development, 2026-11-11) | 2026-11-11, all three stores read in the running pod by openssl and certificate DER match | sandbox |
-| `ghcr.io/blockscout/frontend:v2.12.1` | Explorer frontend (source-built with Next.js 16.4.3 in place of the tag's 16.3.5, on Node 24.22.3; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.3 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-13, Node roots (118) and OS bundle (118) re-read in the running image on Node 24.22.3 (neither distrusted root present); the SWC binary was not re-read: Next.js stays pinned at 16.4.3, so it is the build read on 2026-11-11 (public-key and DER match) | sandbox |
+| `ghcr.io/blockscout/frontend:v2.13.0` | Explorer frontend (source-built with the Next.js 16.4.3 that upstream's lockfile carries, on Node 24.22.3; see the Blockscout source-build item below) | emSign ECC Root CA - G3 (embedded in the `@next/swc-linux-arm64-musl` binary under `/app/deploy/tools/sitemap-generator` only; Node's built-in roots and the OS bundle are clean) | app bundle: Node 24.22.3 built-in roots (118 certificates); Alpine ca-certificates-bundle 20261020-r0; the `@next/swc` 16.4.3 binary carries its own root list (the same package version as before) | no: in-cluster backend only; the SWC binary is not loaded at runtime (the `next-server` process maps only `node_datachannel.node`, and the startup sitemap tool maps no native module) | none yet (the `@next/swc` 16.4.6 binary, the newest, embeds the root as well) | open | 2026-11-18, Node roots (118) and OS bundle (118) re-read in the built v2.13.0 image on Node 24.22.3 (neither distrusted root present); the full certificate of "emSign ECC Root CA - G3" is present in the `@next/swc-linux-arm64-musl` 16.4.3 binary under the sitemap generator and nowhere else, unchanged from the v2.12.1 image | sandbox |
 | NGINX Gateway Fabric `2.8.1` (control plane and nginx data plane) | Gateway controller and proxy | none | Distroless Debian bundle (148 certificates) with Go 1.27.3; Alpine ca-certificates 20261020-r0 (nginx image, 118 certificates) | no: Kubernetes API and in-cluster upstreams only | v2.8.1 (published 2026-11-03; v2.8.0 held "AAA Certificate Services" in the control plane and "emSign ECC Root CA - G3" in the nginx image) | fixed (adopted v0.14.1, 2026-11-11) | 2026-11-11, bundle read in both images | sandbox |
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI (the action builds its image `FROM python:3.10`) | AAA Certificate Services; emSign ECC Root CA - G3 (system store of the `python:3.10` base) | Debian 13 ca-certificates 20250419 in `python:3.10` (pushed 2026-10-06); `solc-select` fetches through the pip-installed certifi, which was not read | yes: downloads `solc` (and `wget` installs in the action's entrypoint) | none yet (action v0.4.2 from 2026-01-16 is the newest release, and the `python:3.10` tag has not been rebuilt since 2026-10-06; Python 3.10 reached end of life in October 2026) | open | 2026-11-11, bundle read in the `python:3.10` image | sandbox |
@@ -104,6 +104,22 @@
 - Blocks mined while Blockscout was down are filled in by its catch-up indexer
   once it runs again, so an outage like this one leaves no permanent gap in
   the explorer.
+
+## `*.cbdc-sandbox.local` lookups can take 5 seconds on macOS
+- The hosts entries map the four sandbox names to `127.0.0.1` only. On some
+  macOS setups the system resolver still sends the AAAA (IPv6) query for a
+  `.local` name to multicast DNS, which has no answer and gives up after 5
+  seconds. Every new lookup then takes 5 seconds in every client that uses the
+  system resolver (observed with `curl`, `cast`, Node.js `fetch` and Python);
+  the IPv4 lookup itself is instant. `scutil --dns` shows the `local` domain
+  routed to mDNS on an affected machine.
+- `waitForApiGateway` asks `curl` for IPv4 only (`-4`), so its readiness probe
+  no longer spends its whole 5-second budget on the lookup. Without that, the
+  "Testing gateway..." step never finishes on an affected machine even though
+  the gateway answers.
+- Other tools you run by hand against these names pay the delay on each new
+  connection. Use an IPv4-only option where the tool has one (`curl -4`), or
+  `kubectl port-forward` against the specific service (see the README).
 
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
@@ -305,16 +321,36 @@
 - Consequence for any non-local reuse of this stack: that deployment must
   build the two Blockscout images itself (for its own target CPU platform)
   and host them in its own registry.
-- The frontend tag `v2.12.1` locks Next.js 16.3.5, which is affected by the
+- The frontend build resolves no dependency version at build time: upstream's
+  Dockerfile installs with `pnpm install --frozen-lockfile` from the tag's
+  `pnpm-lock.yaml`, and `build-images.sh` stops if that install line is not
+  exactly that. The tag `v2.12.1` locked Next.js 16.3.5, which is affected by the
   Next.js advisories fixed in 16.3.6 to 16.4.1 (among them
   [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) and
-  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)).
-  `services/blockscout/build-images.sh` therefore adds one step to upstream's
-  Dockerfile after its frozen install, `pnpm add -w next@16.4.3 --save-exact`,
-  and stops if that install line is not found. The version is kept at least a
-  week old, because upstream's pnpm config sets `minimumReleaseAge` to one
-  week. Remove the step once a frontend release tag locks Next.js 16.4.1 or
-  later.
+  [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr)), so
+  that build added `pnpm add -w next@16.4.3` on top of the frozen install. From
+  `v2.13.0` the lock carries Next.js 16.4.3 itself, the step is gone, and the
+  script instead reads every `next@<version>` entry of the cloned lockfile and
+  stops the build when one is older than the minimum it names (16.4.3), so a
+  future tag cannot bring an affected Next.js back unnoticed. Raise the minimum
+  when a newer Next.js advisory is fixed.
+- Frontend `v2.13.0` replaced `v2.12.1` on 2026-11-18 for two reasons found in a
+  real browser (a headless Chromium render of every page type; HTTP 200 alone
+  did not show either). First, `v2.12.1`'s production pages returned 200 but did
+  not render: the body stayed empty and the browser logged an inline script that
+  violated the page's own Content-Security-Policy; the `v2.13.0` release notes
+  list a fix for production pages failing the CSP, and every page type renders
+  on it. Second, `v2.13.0` sends a 3.2 KB `Content-Security-Policy` header, which
+  with the other response headers is 4097 bytes on an HTML request, one byte over
+  NGINX's default 4 KB `proxy_buffer_size`. The gateway then answered 502
+  ("upstream sent too big header") to every browser page request while a request
+  without an HTML `Accept` header still worked. `services/blockscout/templates/
+  proxy-settings-policy.yaml` raises the buffer to 8k for the Blockscout route.
+  The header grows with the length of the app hostname, so any other reverse
+  proxy or ingress in front of the frontend must accept response headers larger
+  than 4 KB. With `NEXT_PUBLIC_COLOR_THEME_DEFAULT` unset the explorer follows
+  the operating system's colour scheme in both versions (`v2.13.0` calls it
+  "Auto (System)"), so no theme variable is set.
 - Correction: the v0.14.1 release notes and the register called the frontend row
   `fixed`; that overstated it. The Node base and the OS bundle are clean, but the
   `@next/swc` binary that the image ships for the sitemap generator embeds its own
@@ -322,6 +358,8 @@
   and by full certificate DER in `@next/swc-linux-arm64-musl` 16.4.3 and 16.4.6). It
   is not loaded by the running server or the startup sitemap tool, so the row stays
   `open` until a Next.js release drops the root.
+  The v2.13.0 lockfile locks `@next/swc` 16.4.3 as well, so adopting that tag changed
+  nothing here; the 2026-11-18 re-read of the built image confirms it.
 - `build-images.sh` also patches three trust-store inputs in the cloned Dockerfiles
   and stops if their text is not found exactly as expected: the backend's
   runtime stage installs with `apk add --upgrade ... ca-certificates
@@ -337,7 +375,8 @@
   `security` or `invalid` (or a reason the script does not recognise). A release
   retired as `deprecated`, `renamed` or `other`, and an audit service that gives
   no report, print a loud warning and the build continues. Every frontend stage
-  moves from `node:24.21.0-alpine` to `node:24.22.3-alpine`, whose built-in root
+  moves from `node:24.21.0-alpine` to `node:24.22.3-alpine` (pinned by index
+  digest), whose built-in root
   list no longer holds "emSign ECC Root CA - G3". All three steps need network access
   at build time, as the rest of the source build already does. Remove each one
   once upstream's base image carries the newer bundle or Node release, or its
@@ -384,12 +423,64 @@
   `mix.lock` is cloned at build time and is not in this repository. Re-check the
   list when the Blockscout pin moves, and drop a pin
   once upstream's lockfile reaches the fixed version.
-- The hash does not cover base images that the recipe names by tag
-  (`node:24.22.3-alpine`, the hexpm Elixir image), so a base that moves under an
-  unchanged tag is not picked up until the recipe changes. Pinning those bases
-  by digest would close that gap.
+- The hash covers `build-images.sh`, which names every build base by tag and
+  index digest (`node:24.22.3-alpine` for the frontend stages, the hexpm Elixir
+  Alpine image for both backend stages), so a base that moves under its tag is
+  not picked up silently: the pin changes only by an edit that moves the hash.
+  The pinned digests are the ones the v0.14.3 images were built from (the
+  built images' layers start with exactly those base layers). Both digest pins
+  stop the build when upstream's `FROM` lines change, which is the reminder to
+  re-read the base on a new Blockscout tag. The `apk add --upgrade` steps inside
+  the stages still resolve at build time, by design (they bring the CA bundle
+  forward).
 - Follow-up: watch upstream for a restored publication channel and switch
   back to pulled images when release tags reappear.
+
+## Third-party images are pinned by tag and digest
+
+- Every third-party image in `common/images.yaml` (Besu, Postgres, the Python
+  base of BENS, the smart-contract verifier, the nginx base of the NB UI, the
+  local registry), the Node base in `common/node-version.env`, the Kind node
+  image, and the Blockscout build bases in `services/blockscout/build-images.sh`
+  is pinned as `<repo>:<tag>@sha256:<multi-arch index digest>`, so amd64 and
+  arm64 hosts resolve the same content and a re-pushed tag changes nothing
+  until the pin is edited. The two Blockscout source-built refs name upstream
+  release tags, not images, and stay tag-only.
+  `python3 scripts/verification/check-image-pins.py` (CI: `validate-image-pins`)
+  fails on a missing or malformed digest, on a Dockerfile base or image `ARG`
+  default without one, and on any file that repeats a reference from
+  `common/images.yaml` with a different value. The header of `common/images.yaml`
+  says how to bump a pin.
+- The digest governs the upstream pull only. The Kind node pulls
+  `localhost:5001/<repo>:<tag>-kind` by tag from the local registry, and that
+  tag is kept. A digest refresh under an unchanged tag is therefore not picked
+  up by a registry or node that already holds the tag; bump the tag where the
+  publisher offers one, otherwise run `./infra/infra.sh registry-reset`.
+- The pins were taken from the content the sandbox was running, not from the
+  newest build of each tag. One tag had moved by then: `registry:3.1.2` was
+  re-pushed after the sandbox registry was created, and the pin keeps the
+  earlier content (the one the CA-bundle register row was read from). Changing
+  to the newer content recreates the registry container, which empties the
+  registry (the base images re-sync, the repo-owned and Blockscout images
+  rebuild); the registry is only recreated when the image content differs from
+  the pin, not when the same content is spelled with a digest.
+- Pins do not update themselves, and Dependabot cannot read these files.
+  `python3 scripts/verification/report-image-pin-updates.py` lists pins whose
+  tag now points at a different digest and newer tags in the same line; a weekly
+  workflow (`image-pin-report`) runs it and writes the job summary. It never
+  fails a build and opens no pull requests.
+- Not pinned by digest: GitHub Actions (major-version tags that Dependabot
+  tracks, except the two that are pinned by commit); the optional local tools
+  `contracts/slither.sh` (`trailofbits/eth-security-toolbox:latest`, amd64-only)
+  and `services/blockscout/bens-microservice/regen-openapi.sh`
+  (`openapitools/openapi-generator-cli`, no tag); the NGINX Gateway Fabric
+  images, which the chart tags by its version (`common/versions.yaml`); and the
+  system images inside the Kind node, which the pinned node image carries.
+- Offline builds: a digest reference cannot be a retag target, so the NB UI,
+  NB Bond API and BENS builds cannot reuse the local registry's copy of their
+  bases the way a tag-only reference could. After a host Docker cache wipe, one
+  upstream pull by digest brings each base back; until then those builds need
+  the network. The sandbox's own pods still pull from the local registry only.
 
 ## Blockscout does not show BENS names
 - Blockscout returns `ens_domain_name: null` for transaction parties that
