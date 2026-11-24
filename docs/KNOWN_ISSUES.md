@@ -53,7 +53,7 @@
 | `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
 | `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
 | `node:26.13.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22; pin moved to 26.13.1, 2026-11-13) | 2026-11-13, bundle and Node roots read in image (unchanged: ca-certificates 20250419+deb13u1, 118 Node roots) | sandbox |
-| `postgres:18.6` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21) | 2026-10-28, image filesystem read | sandbox |
+| `postgres:18.7` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package; `/etc/ssl/certs` holds only the snake-oil certificate) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21; pin moved to 18.7, 2026-11-24) | 2026-11-24, image filesystem read | sandbox |
 | Foundry `v1.8.6` (Contracts CI) | Contract build and test toolchain | none | app bundle: rustls-webpki 0.103.16, webpki-roots 1.0.10 | build-time only | Foundry v1.8.6 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-22, carried over | sandbox |
 
 - To re-check a bundle, count it as exposed only when it contains one of the
@@ -518,13 +518,14 @@
   tag now points at a different digest and newer tags in the same line; a weekly
   workflow (`image-pin-report`) runs it and writes the job summary. It never
   fails a build and opens no pull requests.
-- State on 2026-11-23, from `report-image-pin-updates.py`. Patch releases not
-  yet taken: PostgreSQL 18.7 (the header of
-  `common/images.yaml` says how to bump a pin; Besu moved to 26.11.2 on
-  2026-11-24, skipping 26.11.1, whose only change 26.11.2 carries). The NB UI nginx base stays on 1.30.6 until a
+- State on 2026-11-24, from `report-image-pin-updates.py`. Patch releases not
+  yet taken: none (the header of `common/images.yaml` says how to bump a pin).
+  Besu moved to 26.11.2 on 2026-11-24, skipping 26.11.1, whose only change
+  26.11.2 carries, and PostgreSQL moved to 18.7 the same day. The NB UI nginx base stays on 1.30.6 until a
   1.30.7 image is published; only the 1.31 line is newer today. Newer lines
   not taken: Python 3.15 (BENS) and Kind node v1.37.0. `registry:3.1.2` shows
-  as moved, as described above.
+  as moved, as described above, and `node:26.13.1` shows as moved too (not
+  investigated; the pin is unchanged).
 - No CI check is a required status check: the branch rulesets require a pull
   request but list no required checks, so `validate-image-pins`, like the other
   validate jobs, blocks a merge only because a reviewer reads its result.
