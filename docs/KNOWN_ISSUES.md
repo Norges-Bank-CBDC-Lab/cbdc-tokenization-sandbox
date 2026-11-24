@@ -49,7 +49,7 @@
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI (the action builds its image `FROM python:3.10`) | AAA Certificate Services; emSign ECC Root CA - G3 (system store of the `python:3.10` base) | Debian 13 ca-certificates 20250419 in `python:3.10` (pushed 2026-10-06); `solc-select` fetches through the pip-installed certifi, which was not read | yes: downloads `solc` (and `wget` installs in the action's entrypoint) | none yet (action v0.4.2 from 2026-01-16 is the newest release, and the `python:3.10` tag has not been rebuilt since 2026-10-06; Python 3.10 reached end of life in October 2026) | open | 2026-11-11, bundle read in the `python:3.10` image | sandbox |
 | `busybox:1.38.0` | Blockscout migration init container (waits for Postgres with `nc -z`) | none | no CA store in the image (no `/etc/ssl`; the 1.37.0 image had none either) | no: inbound only (port probe, no TLS) | not affected (no CA store) | fixed (adopted v0.13.0, 2026-10-29) | 2026-10-29, image filesystem read | sandbox |
-| `hyperledger/besu:26.11.0` | Chain nodes | none | JDK cacerts (Temurin 25.0.3, 142 certificates) on Ubuntu 24.04.5; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.0, 2026-11-03) | 2026-11-03, keytool listing of cacerts in image | sandbox |
+| `hyperledger/besu:26.11.2` | Chain nodes | none | JDK cacerts (Temurin 25.0.5.1, 116 certificates) on Ubuntu 24.04.5; none of the emSign or AAA roots is present (26.11.0 carried "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots) | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.2, 2026-11-24) | 2026-11-24, keytool listing of cacerts in image | sandbox |
 | `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
 | `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
 | `node:26.13.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22; pin moved to 26.13.1, 2026-11-13) | 2026-11-13, bundle and Node roots read in image (unchanged: ca-certificates 20250419+deb13u1, 118 Node roots) | sandbox |
@@ -148,6 +148,18 @@
   the legacy `besu-pvc` must run `./sandbox.sh delete` before its first upgraded
   start. The deploy helper intentionally rejects that PVC instead of risking a
   mixed chain identity.
+
+## Besu 26.11.2 data cannot be opened by 26.11.0 without an override
+- Besu 26.11.2 checks the version that last started with a data directory
+  against its own. A node pinned back to 26.11.0 on data that 26.11.2 last
+  started refuses to start while the compatibility check is on. A separate test reported that setting
+  `BESU_VERSION_COMPATIBILITY_PROTECTION=false` (or the
+  `--version-compatibility-protection=false` option) lets 26.11.0 start and
+  re-stamp the directory. This sandbox did not exercise the downgrade; the option
+  is listed in the 26.11.2 image's `besu --help`.
+- A rollback of the pin therefore needs that override on both nodes for the
+  first start, or a clean chain start (`./sandbox.sh delete`). No chart value
+  sets it today.
 
 ## Foundry + Besu fee settings
 - Some deployments require explicit gas settings to avoid
@@ -507,8 +519,9 @@
   workflow (`image-pin-report`) runs it and writes the job summary. It never
   fails a build and opens no pull requests.
 - State on 2026-11-23, from `report-image-pin-updates.py`. Patch releases not
-  yet taken: Besu 26.11.1 and PostgreSQL 18.7 (the header of
-  `common/images.yaml` says how to bump a pin). The NB UI nginx base stays on 1.30.6 until a
+  yet taken: PostgreSQL 18.7 (the header of
+  `common/images.yaml` says how to bump a pin; Besu moved to 26.11.2 on
+  2026-11-24, skipping 26.11.1, whose only change 26.11.2 carries). The NB UI nginx base stays on 1.30.6 until a
   1.30.7 image is published; only the 1.31 line is newer today. Newer lines
   not taken: Python 3.15 (BENS) and Kind node v1.37.0. `registry:3.1.2` shows
   as moved, as described above.
