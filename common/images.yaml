@@ -46,7 +46,7 @@
 #   - Python: https://hub.docker.com/_/python/tags
 #   - Node: https://hub.docker.com/_/node/tags
 #
-besu: hyperledger/besu:26.11.0@sha256:3d6ac0368d449c13c4ba075acac90d6b96afa5b3113295385d88c4d5122c8808
+besu: hyperledger/besu:26.11.2@sha256:19d6cf7fffda207c814778b301b9d4eb8f6f2d7acaad7e4ca4a974784b4f8554
 
 blockscout:
   # Backend + frontend refs name the upstream release tags, but upstream no
@@ -57,7 +57,7 @@ blockscout:
   # See docs/KNOWN_ISSUES.md.
   backend: ghcr.io/blockscout/blockscout:v12.0.4
   frontend: ghcr.io/blockscout/frontend:v2.13.0
-  db: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+  db: postgres:18.7@sha256:eece53c7c4410fb9c6556a19b8e0f2d61708a5893e2aa0a1e3c716661374ab18
   bens: python:3.14.10@sha256:e5de6bc932256f8138c2353023dc4fd24d010d72f6b5cb06be126f0a4cd53784
   # Smart-contract verification microservice. Modern Blockscout delegates
   # source compilation / bytecode matching to this standalone service; the

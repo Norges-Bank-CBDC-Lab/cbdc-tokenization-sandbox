@@ -93,7 +93,7 @@ def main() -> int:
     require(common_image == chart_image, "Besu image pins differ", errors)
     # The pin is tag@digest (check-image-pins.py enforces the digest); this
     # baseline record names the tag.
-    require(common_image.split("@", 1)[0] == "hyperledger/besu:26.11.0",
+    require(common_image.split("@", 1)[0] == "hyperledger/besu:26.11.2",
             "unexpected Besu version", errors)
 
     extra_data = value(r'^qbftExtraData:\s*"(0x[0-9a-f]+)"$', values, "QBFT extraData")

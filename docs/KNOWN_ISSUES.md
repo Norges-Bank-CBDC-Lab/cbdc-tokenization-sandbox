@@ -49,11 +49,11 @@
 | `nginxinc/nginx-unprivileged:1.30.6-alpine` | NB UI runtime | emSign ECC Root CA - G3 | Alpine ca-certificates 20260909-r0 | no: inbound only (serves static files) | none yet (the pinned digest is unchanged, and no tag has been pushed since 2026-10-19, including the mainline 1.31.7-alpine, so none carries Alpine ca-certificates 20261020-r0) | open | 2026-11-11, bundle read in image | sandbox |
 | `crytic/slither-action` (Contracts CI) | Static analysis in CI (the action builds its image `FROM python:3.10`) | AAA Certificate Services; emSign ECC Root CA - G3 (system store of the `python:3.10` base) | Debian 13 ca-certificates 20250419 in `python:3.10` (pushed 2026-10-06); `solc-select` fetches through the pip-installed certifi, which was not read | yes: downloads `solc` (and `wget` installs in the action's entrypoint) | none yet (action v0.4.2 from 2026-01-16 is the newest release, and the `python:3.10` tag has not been rebuilt since 2026-10-06; Python 3.10 reached end of life in October 2026) | open | 2026-11-11, bundle read in the `python:3.10` image | sandbox |
 | `busybox:1.38.0` | Blockscout migration init container (waits for Postgres with `nc -z`) | none | no CA store in the image (no `/etc/ssl`; the 1.37.0 image had none either) | no: inbound only (port probe, no TLS) | not affected (no CA store) | fixed (adopted v0.13.0, 2026-10-29) | 2026-10-29, image filesystem read | sandbox |
-| `hyperledger/besu:26.11.0` | Chain nodes | none | JDK cacerts (Temurin 25.0.3, 142 certificates) on Ubuntu 24.04.5; carries "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.0, 2026-11-03) | 2026-11-03, keytool listing of cacerts in image | sandbox |
+| `hyperledger/besu:26.11.2` | Chain nodes | none | JDK cacerts (Temurin 25.0.5.1, 116 certificates) on Ubuntu 24.04.5; none of the emSign or AAA roots is present (26.11.0 carried "emSign ECC Root CA - C3" and "emSign Root CA - C1", which are different roots) | no: inbound only | Besu 26.10.2 and later | fixed (adopted v0.11.0, 2026-10-27; pin moved to 26.11.2, 2026-11-24) | 2026-11-24, keytool listing of cacerts in image | sandbox |
 | `registry:3.1.2` | Local image registry | none | Alpine 3.24.3 ca-certificates 20261020-r0 | no: inbound only (no pull-through proxy) | registry 3.1.2 as rebuilt on 2026-10-26 | fixed (adopted v0.11.0, 2026-10-28) | 2026-10-28, bundle read in image | sandbox |
 | `python:3.14.10` | BENS builder and runtime base | none | Debian 13 ca-certificates 20250419+deb13u1; pip 26.2.2 with certifi 2026.10.19; `ssl` blocks the intermediates' keys | yes: pip downloads at build time | python 3.14.9 and later | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-28, bundle read in image | sandbox |
 | `node:26.13.1` | NB Bond API runtime base; NB Bond API and NB UI builder | none | Debian 13 ca-certificates 20250419+deb13u1; Node built-in roots from NSS 3.131.1 (118 roots) | yes: NB Bond API calls the Besu RPC in-cluster and the identity provider's key endpoint when sign-in is enabled; builders: build-time only | Node 26.12.1 | fixed (adopted v0.10.0, 2026-10-22; pin moved to 26.13.1, 2026-11-13) | 2026-11-13, bundle and Node roots read in image (unchanged: ca-certificates 20250419+deb13u1, 118 Node roots) | sandbox |
-| `postgres:18.6` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21) | 2026-10-28, image filesystem read | sandbox |
+| `postgres:18.7` | Explorer and BENS databases | none | no CA store in the image (no ca-certificates package; `/etc/ssl/certs` holds only the snake-oil certificate) | no: inbound only | not affected (no CA store) | fixed (adopted v0.10.0, 2026-10-21; pin moved to 18.7, 2026-11-24) | 2026-11-24, image filesystem read | sandbox |
 | Foundry `v1.8.6` (Contracts CI) | Contract build and test toolchain | none | app bundle: rustls-webpki 0.103.16, webpki-roots 1.0.10 | build-time only | Foundry v1.8.6 | fixed (adopted v0.10.0, 2026-10-22) | 2026-10-22, carried over | sandbox |
 
 - To re-check a bundle, count it as exposed only when it contains one of the
@@ -121,6 +121,20 @@
   connection. Use an IPv4-only option where the tool has one (`curl -4`), or
   `kubectl port-forward` against the specific service (see the README).
 
+## CodeQL reports six `js/clear-text-logging` alerts on `nb-bond-api` log lines
+- Six alerts (code-scanning alerts 8 to 13) were first reported on 2026-11-23
+  by a CodeQL scan of `development` (CodeQL 2.27.5). Each says a log line
+  "logs sensitive data returned by process environment as clear text": the
+  `auth mode` line in `services/nb-bond-api/src/auth.ts`, the listening-port
+  line in `index.ts`, and four block-range and poll-interval lines in
+  `ingestion.ts`.
+- The logged values are the auth mode name, the port, the poll interval and
+  block numbers; none is a credential. The lines were not changed by the
+  v0.14.4 work, so the new reports most likely come from a changed query or
+  data-flow model rather than from new code (not confirmed). They are open and
+  not dismissed; whether to dismiss them as false positives, or to restructure
+  the log calls, is the operator's decision.
+
 ## Local QBFT topology has one validator
 - The default sandbox has one QBFT validator, so it has immediate deterministic
   finality but no Byzantine fault tolerance.
@@ -134,6 +148,18 @@
   the legacy `besu-pvc` must run `./sandbox.sh delete` before its first upgraded
   start. The deploy helper intentionally rejects that PVC instead of risking a
   mixed chain identity.
+
+## Besu 26.11.2 data cannot be opened by 26.11.0 without an override
+- Besu 26.11.2 checks the version that last started with a data directory
+  against its own. A node pinned back to 26.11.0 on data that 26.11.2 last
+  started refuses to start while the compatibility check is on. A separate test reported that setting
+  `BESU_VERSION_COMPATIBILITY_PROTECTION=false` (or the
+  `--version-compatibility-protection=false` option) lets 26.11.0 start and
+  re-stamp the directory. This sandbox did not exercise the downgrade; the option
+  is listed in the 26.11.2 image's `besu --help`.
+- A rollback of the pin therefore needs that override on both nodes for the
+  first start, or a clean chain start (`./sandbox.sh delete`). No chart value
+  sets it today.
 
 ## Foundry + Besu fee settings
 - Some deployments require explicit gas settings to avoid
@@ -164,6 +190,12 @@
   in the local sandbox (`AUTH_MODE=none`) and cannot be exercised here, so
   silent renewal is build/lint/test-verified but runtime-unverified until a
   non-local deployment running `entra` mode exercises the timed renewal.
+- The `@azure/msal-browser` 5.30.0 and `jose` 6.2.18 updates (v0.14.4) were
+  exercised only as far as the local sandbox allows: the built MSAL chunk
+  initialises in a browser on a secure origin (`localhost`; the plain-HTTP
+  sandbox hostname is refused by the library), and `jose` verified locally
+  signed tokens with issuer and audience checks. A real sign-in, token
+  acquisition and an API call carrying that token have not been run.
 
 ## Closed and finalised auctions cannot be reopened
 - `BondAuction` has no closed→open transition and the NB Bond API has no
@@ -335,14 +367,25 @@
   future tag cannot bring an affected Next.js back unnoticed. Raise the minimum
   when a newer Next.js advisory is fixed.
 - Frontend `v2.13.0` replaced `v2.12.1` on 2026-11-18 for two reasons found in a
-  real browser (a headless Chromium render of every page type; HTTP 200 alone
-  did not show either). First, `v2.12.1`'s production pages returned 200 but did
-  not render: the body stayed empty and the browser logged an inline script that
-  violated the page's own Content-Security-Policy; the `v2.13.0` release notes
-  list a fix for production pages failing the CSP, and every page type renders
-  on it. Second, `v2.13.0` sends a 3.2 KB `Content-Security-Policy` header, which
-  with the other response headers is 4097 bytes on an HTML request, one byte over
-  NGINX's default 4 KB `proxy_buffer_size`. The gateway then answered 502
+  headless Chromium render of every page type (HTTP 200 alone did not show
+  either). First, in the sandbox the `v2.12.1` pages returned 200 but stayed
+  empty: the body had no content and the browser logged an inline script that
+  violated the page's own `script-src` Content-Security-Policy. That build ran
+  Next.js 16.4.3, which `build-images.sh` had added on top of `v2.12.1`'s own
+  lock (16.3.5; see the previous bullet). The `v2.13.0` release notes describe
+  a matching cause: Next.js 16.4 turns on a Turbopack shared runtime that, in a
+  production build, emits an inline bootstrap script with neither hash nor
+  nonce, which a strict `script-src` blocks; `v2.13.0` switches it off. So this
+  was most likely a property of the sandbox's build (Next.js 16.4.3 with the
+  policy enforced), not of every `v2.12.1` deployment: the same upstream
+  version has been seen rendering normally in another deployment served over
+  HTTPS. Not established: that the blocked script was that bootstrap script (the
+  browser message was not traced to a script), and whether a regular browser
+  shows the same (only the headless render was run, on a plain-HTTP hostname).
+  Every page type renders on `v2.13.0` in the sandbox. Second, `v2.13.0` sends a
+  3.2 KB `Content-Security-Policy` header, which with the other response
+  headers is 4097 bytes on an HTML request, one byte over NGINX's default 4 KB
+  `proxy_buffer_size`. The gateway then answered 502
   ("upstream sent too big header") to every browser page request while a request
   without an HTML `Accept` header still worked. `services/blockscout/templates/
   proxy-settings-policy.yaml` raises the buffer to 8k for the Blockscout route.
@@ -351,6 +394,12 @@
   than 4 KB. With `NEXT_PUBLIC_COLOR_THEME_DEFAULT` unset the explorer follows
   the operating system's colour scheme in both versions (`v2.13.0` calls it
   "Auto (System)"), so no theme variable is set.
+- No automated check shows that the explorer renders. A request for any page
+  returned 200 while the `v2.12.1` pages in the sandbox were empty, so a plain
+  HTTP probe cannot catch that class of fault. The adoption of `v2.13.0` was
+  checked with a headless browser run by hand; no such check is kept in the
+  repository, and adding one would need a browser-automation dependency, which
+  needs approval first.
 - Correction: the v0.14.1 release notes and the register called the frontend row
   `fixed`; that overstated it. The Node base and the OS bundle are clean, but the
   `@next/swc` binary that the image ships for the sitemap generator embeds its own
@@ -469,6 +518,18 @@
   tag now points at a different digest and newer tags in the same line; a weekly
   workflow (`image-pin-report`) runs it and writes the job summary. It never
   fails a build and opens no pull requests.
+- State on 2026-11-24, from `report-image-pin-updates.py`. Patch releases not
+  yet taken: none (the header of `common/images.yaml` says how to bump a pin).
+  Besu moved to 26.11.2 on 2026-11-24, skipping 26.11.1, whose only change
+  26.11.2 carries, and PostgreSQL moved to 18.7 the same day. The NB UI nginx base stays on 1.30.6 until a
+  1.30.7 image is published; only the 1.31 line is newer today. Newer lines
+  not taken: Python 3.15 (BENS) and Kind node v1.37.0. `registry:3.1.2` shows
+  as moved, as described above, and `node:26.13.1` shows as moved too (not
+  investigated; the pin is unchanged).
+- No CI check is a required status check: the branch rulesets require a pull
+  request but list no required checks, so `validate-image-pins`, like the other
+  validate jobs, blocks a merge only because a reviewer reads its result.
+  Making it required is a repository setting, not a code change.
 - Not pinned by digest: GitHub Actions (major-version tags that Dependabot
   tracks, except the two that are pinned by commit); the optional local tools
   `contracts/slither.sh` (`trailofbits/eth-security-toolbox:latest`, amd64-only)
@@ -514,6 +575,16 @@
   The other Dockerfile-based local services
   (`services/nb-ui`, `services/nb-bond-api`) build their images inside
   their own `<svc>.sh start`.
+- `./sandbox.sh build-images` builds both images and then stops before it
+  pushes them when the Kind cluster exists but is stopped. `ensureKindRegistry`
+  (`common/helpers.sh`) applies the `local-registry-hosting` ConfigMap with
+  `kubectl apply` whenever `kind get clusters` lists the cluster, and a stopped
+  cluster is still listed, so the apply fails and `set -e` ends the script.
+  `start` needs those images, so a stopped sandbox cannot be rebuilt and
+  started in that order; start the cluster first, or run `registry-start` and
+  push by hand. A possible fix, not made: apply the ConfigMap only when the
+  API answers (`kubectl --context=kind-<cluster> get --raw=/readyz`), since
+  cluster creation runs `ensureKindRegistry` again once the API is up.
 - Planned follow-up: decide whether `./sandbox.sh build-images` should
   remain a Blockscout-only escape hatch, or grow to drive every
   per-service Docker build in one command (parallel `nb-ui.sh start
@@ -540,6 +611,18 @@
   registry container and re-syncs base images; repo-owned images rebuild on
   the next start. This is preferred over enabling registry delete + GC for a
   disposable local registry.
+- The content hash is not the same on two checkouts of one commit. Each hash
+  is taken over a `shasum` listing, which prints the file's path, so the
+  absolute path of the checkout is part of the hashed text. This holds for all
+  four hashes (`blockscoutSourceBuildHash`, `nbUIBundleHash`,
+  `nbBondApiBundleHash` and `bensImageHash` in `common/helpers.sh`): a fresh
+  clone at another path computes different tag digits and builds its own tags.
+  That is harmless on one machine, but it means a digit string quoted from one
+  checkout (in release notes, for example) is not reproducible elsewhere, and
+  moving or re-cloning the repository rebuilds every image once. Hashing the
+  file content alone, or a path relative to the repository root, would remove
+  the dependence; this has not been done, and changing it would move every tag
+  once.
 
 ## Babel 8 for `nb-bond-api` runs beside Babel 7 inside jest and ESLint
 - `nb-bond-api` runs `@babel/core` 8 and `@babel/preset-env` 8 through
